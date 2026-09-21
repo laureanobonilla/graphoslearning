@@ -37,13 +37,15 @@ exports.handler = async function(event, context) {
             const masterRes = await fetch(`https://api.jsonbin.io/v3/b/${MASTER_BIN_ID}/latest`, { headers });
             const masterData = await masterRes.json();
             
-            let index = Array.isArray(masterData.record) ? masterData.record : [];
+            // Buscamos el arreglo dentro de 'proyectos' (JSONBin guarda los datos dentro de .record)
+            let index = Array.isArray(masterData.record.proyectos) ? masterData.record.proyectos : [];
             index.push({ id: binId, title, user, date: new Date().toISOString() });
 
+            // Enviamos el objeto con la misma estructura original
             await fetch(`https://api.jsonbin.io/v3/b/${MASTER_BIN_ID}`, {
                 method: 'PUT',
                 headers,
-                body: JSON.stringify(index)
+                body: JSON.stringify({ proyectos: index })
             });
         }
 
