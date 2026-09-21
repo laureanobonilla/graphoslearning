@@ -41,8 +41,8 @@
         <!-- Lienzo del Grafo -->
         <div id="network-container" class="flex-1 h-full cursor-crosshair"></div>
 
-        <!-- Menú Flotante de Acciones -->
-        <div id="actionMenu" class="hidden absolute bg-white/95 backdrop-blur-md shadow-2xl rounded-xl border border-slate-200 z-50 flex flex-col overflow-hidden transform -translate-x-1/2 -translate-y-full min-w-[220px] transition-all">
+        <!-- Menú Flotante (Centrado automático sobre el nodo y sin desbordarse) -->
+        <div id="actionMenu" class="hidden absolute bg-white/95 backdrop-blur-md shadow-2xl rounded-xl border border-slate-200 z-50 flex flex-col overflow-hidden transform -translate-x-1/2 -translate-y-full min-w-[160px] md:min-w-[180px] transition-all">
             
             <!-- Selector de Nodos -->
             <div class="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center text-sm text-slate-600">
@@ -50,10 +50,16 @@
                 <input type="number" id="nodeCount" min="1" max="10" value="3" class="w-14 text-center border border-slate-300 rounded-md py-1 focus:outline-none focus:border-indigo-500">
             </div>
 
-            <button id="btnMenuExpand" class="px-5 py-3 hover:bg-indigo-50 text-indigo-700 font-semibold text-sm text-left border-b border-slate-100 flex items-center gap-2 transition-colors">
+            <button id="btnMenuExpand" class="px-4 py-3 md:px-5 hover:bg-indigo-50 text-indigo-700 font-semibold text-sm text-left border-b border-slate-100 flex items-center gap-2 transition-colors">
                 <span class="text-lg">✨</span> Expandir Ramas
             </button>
-            <button id="btnMenuDefine" class="px-5 py-3 hover:bg-purple-50 text-purple-700 font-semibold text-sm text-left border-b border-slate-100 flex items-center gap-2 transition-colors">
+            
+            <!-- NUEVO BOTÓN PARA EJEMPLOS -->
+            <button id="btnMenuExamples" class="px-4 py-3 md:px-5 hover:bg-amber-50 text-amber-600 font-semibold text-sm text-left border-b border-slate-100 flex items-center gap-2 transition-colors">
+                <span class="text-lg">💡</span> Dar Ejemplos
+            </button>
+
+            <button id="btnMenuDefine" class="px-4 py-3 md:px-5 hover:bg-purple-50 text-purple-700 font-semibold text-sm text-left border-b border-slate-100 flex items-center gap-2 transition-colors">
                 <span class="text-lg">📖</span> Cargar Definición
             </button>
 
