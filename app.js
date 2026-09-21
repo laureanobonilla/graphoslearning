@@ -33,6 +33,14 @@ let network = new vis.Network(container, { nodes, edges }, {
     interaction: { hover: true }
 });
 
+
+network.on("stabilizationIterationsDone", function () {
+    network.setOptions({ physics: { enabled: false } });
+});
+network.on("stabilized", function () {
+    network.setOptions({ physics: { enabled: false } });
+});
+
 // Referencias UI
 const topicInput = document.getElementById('topicInput');
 const sidePanel = document.getElementById('sidePanel');
