@@ -114,60 +114,67 @@ network.on('click', function (params) {
 network.on('zoom', () => actionMenu.classList.add('hidden'));
 network.on('dragStart', () => actionMenu.classList.add('hidden'));
 
-// Botón de Expandir
+
+// Valores por defecto para el tamaño de las cajas con texto
+const DEFAULT_MAX_WIDTH = 250;
+const DEFAULT_MAX_HEIGHT = 80;
+
+// Botón de Expandir (Ahora lee el input numérico)
 document.getElementById('btnMenuExpand').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
 
     const contextPath = getContextPath(selectedNodeId);
     const currentNode = nodes.get(selectedNodeId);
+    // Leer el número seleccionado por el usuario
+    const maxNodes = parseInt(document.getElementById('nodeCount').value) || 3;
     
     if (currentNode && currentNode.expanded) return;
-
-    showLoader('Generando conceptos conexos...');
+    showLoader('Generando conceptos...');
 
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'expand', topic: selectedNodeId, contextPath })
+            body: JSON.stringify({ action: 'expand', topic: selectedNodeId, contextPath, maxNodes })
         });
         const data = await response.json();
         
-        // 3. AGREGAR ESTA LÍNEA: Encender físicas para que los nuevos se separen
+        const existingNodes = nodes.get();
+        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: true })));
+
+        const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
         
         data.concepts.forEach(concept => {
             if (!nodes.get(concept.id)) {
-                nodes.add({ id: concept.id, label: concept.label, expanded: false });
+                nodes.add({ 
+                    id: concept.id, 
+                    label: concept.label, 
+                    baseTitle: concept.label, // Guardamos el nombre original sin la definición
+                    expanded: false,
+                    boxWidth: DEFAULT_MAX_WIDTH,
+                    boxHeight: DEFAULT_MAX_HEIGHT,
+                    x: parentPos.x, 
+                    y: parentPos.y
+                });
                 edges.add({ from: selectedNodeId, to: concept.id, label: concept.relationship });
             }
         });
-
         nodes.update({ id: selectedNodeId, expanded: true });
-    } catch (err) {
-        alert("Error al conectar con la IA.");
-    } finally {
-        hideLoader();
-    }
+    } catch (err) { alert("Error de conexión"); } finally { hideLoader(); }
 });
 
-// Botón de Definir
+// Botón de Definición (Inyecta en el canvas y corta el texto)
 document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
 
     const contextPath = getContextPath(selectedNodeId);
     const currentNode = nodes.get(selectedNodeId);
+    const title = currentNode.baseTitle || currentNode.label; // Respaldo del título original
     
-    panelTitle.innerText = currentNode.label || selectedNodeId;
-    sidePanel.classList.remove('translate-x-full');
+    if (currentNode && currentNode.definition) return; // Si ya la tiene, no hace nada
 
-    if (currentNode && currentNode.definition) {
-        panelContent.innerHTML = currentNode.definition;
-        return;
-    }
-
-    panelContent.innerHTML = '<span class="text-slate-400">Generando definición detallada...</span>';
     showLoader('Redactando definición...');
 
     try {
@@ -177,14 +184,45 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         });
         const data = await response.json();
 
-        nodes.update({ id: selectedNodeId, definition: data.definition });
-        panelContent.innerHTML = data.definition;
-    } catch (err) {
-        panelContent.innerHTML = '<span class="text-red-500">Error al obtener la definición.</span>';
-    } finally {
-        hideLoader();
-    }
+        // Inyectamos el título original, dos saltos de línea y el texto plano
+        const newLabel = `${title}\n\n${data.definition}`;
+
+        nodes.update({ 
+            id: selectedNodeId, 
+            baseTitle: title,
+            definition: data.definition, 
+            label: newLabel,
+            shape: 'box',
+            widthConstraint: { maximum: currentNode.boxWidth || DEFAULT_MAX_WIDTH },
+            // valign: top empuja el texto hacia arriba, lo que sobra abajo se corta
+            heightConstraint: { maximum: currentNode.boxHeight || DEFAULT_MAX_HEIGHT, valign: 'top' }
+        });
+    } catch (err) { alert("Error de conexión"); } finally { hideLoader(); }
 });
+
+// Controles para cambiar el tamaño del nodo seleccionado
+function resizeNode(increment) {
+    if (!selectedNodeId) return;
+    const currentNode = nodes.get(selectedNodeId);
+    
+    // Aumentamos o reducimos el área en 50px
+    const newWidth = (currentNode.boxWidth || DEFAULT_MAX_WIDTH) + increment;
+    const newHeight = (currentNode.boxHeight || DEFAULT_MAX_HEIGHT) + increment;
+
+    // Solo actualizamos si el nodo ya tiene una definición inyectada
+    if (currentNode.definition) {
+        nodes.update({ 
+            id: selectedNodeId,
+            boxWidth: newWidth,
+            boxHeight: newHeight,
+            widthConstraint: { maximum: newWidth },
+            heightConstraint: { maximum: newHeight, valign: 'top' }
+        });
+    }
+}
+
+document.getElementById('btnSizePlus').addEventListener('click', () => resizeNode(50));
+document.getElementById('btnSizeMinus').addEventListener('click', () => resizeNode(-50));
 
 document.getElementById('btnClosePanel').addEventListener('click', () => {
     sidePanel.classList.add('translate-x-full');
