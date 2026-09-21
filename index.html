@@ -6,43 +6,58 @@
     <title>Mapas Conceptuales AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        #network-container { width: 100%; height: 100%; outline: none; }
+        .vis-network:focus { outline: none; }
+        /* Transición suave para el loader */
+        #loader.show { opacity: 1; transform: translate(-50%, 0); }
+    </style>
 </head>
-<body class="bg-gray-50 h-screen flex flex-col overflow-hidden">
+<body class="bg-gradient-to-br from-slate-50 to-slate-200 h-screen flex flex-col overflow-hidden text-slate-800">
     
-    <header class="bg-white shadow px-6 py-4 flex justify-between items-center z-10">
-        <h1 class="text-xl font-bold text-gray-800">Mapas Conceptuales AI</h1>
-        <div class="flex gap-2">
-            <input type="text" id="topicInput" placeholder="Escribe un tema..." class="border rounded px-3 py-2 w-64">
-            <button id="btnGenerate" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Generar Raíz</button>
-            <button id="btnSave" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-4">Guardar Proyecto</button>
+    <!-- Notificador de Carga Flotante -->
+    <div id="loader" class="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-indigo-600 text-white px-6 py-3 rounded-b-xl shadow-lg font-semibold z-50 flex items-center gap-3 transition-all duration-300 opacity-0 pointer-events-none">
+        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <span id="loaderText">Procesando...</span>
+    </div>
+
+    <!-- Cabecera Glassmorphism -->
+    <header class="bg-white/70 backdrop-blur-lg border-b border-slate-200 shadow-sm px-6 py-4 flex justify-between items-center z-10">
+        <h1 class="text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight">Graphos AI</h1>
+        <div class="flex gap-3">
+            <input type="text" id="topicInput" placeholder="Escribe tu tema central..." class="border border-slate-300 rounded-lg px-4 py-2 w-72 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-slate-700">
+            <button id="btnGenerate" class="bg-gradient-to-r from-indigo-600 to-blue-500 text-white px-5 py-2 rounded-lg font-semibold hover:shadow-md hover:opacity-90 transition-all">Generar Raíz</button>
+            <button id="btnSave" class="bg-white border border-slate-300 text-slate-700 px-5 py-2 rounded-lg font-semibold hover:bg-slate-50 hover:shadow-sm transition-all ml-2">Guardar</button>
         </div>
     </header>
 
     <div class="flex flex-1 h-full relative">
         <!-- Lienzo del Grafo -->
-        <div id="network-container" class="flex-1 h-full"></div>
-<div id="actionMenu" class="hidden absolute bg-white shadow-xl rounded-lg border border-gray-200 z-50 flex overflow-hidden transform -translate-y-full">
-    <button id="btnMenuExpand" class="px-4 py-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border-r border-gray-200 text-sm">
-        ➕ Expandir Ramas
-    </button>
-    <button id="btnMenuDefine" class="px-4 py-3 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-sm">
-        📖 Leer Definición
-    </button>
-</div>
-        <!-- Panel Lateral para Definiciones -->
-        <div id="sidePanel" class="w-1/3 bg-white border-l shadow-lg p-6 overflow-y-auto transform transition-transform duration-300 translate-x-full absolute right-0 top-0 h-full">
-            <button id="btnClosePanel" class="text-gray-500 hover:text-gray-800 mb-4 font-bold">✕ Cerrar</button>
-            <h2 id="panelTitle" class="text-2xl font-bold mb-4 text-gray-800">Concepto</h2>
-            <div id="panelContent" class="text-gray-600 leading-relaxed selection:bg-blue-200">
-                <!-- La definición irá aquí -->
-            </div>
-            <button id="btnNewProjectFromSelection" class="hidden mt-6 bg-purple-600 text-white px-4 py-2 rounded shadow w-full">
-                Crear nuevo proyecto desde selección
+        <div id="network-container" class="flex-1 h-full cursor-crosshair"></div>
+
+        <!-- Menú Flotante de Acciones -->
+        <div id="actionMenu" class="hidden absolute bg-white/95 backdrop-blur-md shadow-2xl rounded-xl border border-slate-200 z-50 flex flex-col overflow-hidden transform -translate-y-full min-w-[180px] transition-all">
+            <button id="btnMenuExpand" class="px-5 py-3 hover:bg-indigo-50 text-indigo-700 font-semibold text-sm text-left border-b border-slate-100 flex items-center gap-2 transition-colors">
+                <span class="text-lg">✨</span> Expandir Ramas
+            </button>
+            <button id="btnMenuDefine" class="px-5 py-3 hover:bg-purple-50 text-purple-700 font-semibold text-sm text-left flex items-center gap-2 transition-colors">
+                <span class="text-lg">📖</span> Leer Definición
             </button>
         </div>
-    </div>
 
+        <!-- Panel Lateral -->
+        <div id="sidePanel" class="w-1/3 min-w-[350px] bg-white/95 backdrop-blur-xl border-l border-slate-200 shadow-2xl p-8 overflow-y-auto transform transition-transform duration-300 translate-x-full absolute right-0 top-0 h-full z-40">
+            <button id="btnClosePanel" class="text-slate-400 hover:text-slate-700 mb-6 font-bold flex items-center gap-1 text-sm tracking-wide uppercase transition-colors">
+                ✕ Cerrar Panel
+            </button>
+            <h2 id="panelTitle" class="text-3xl font-extrabold mb-6 text-slate-800 tracking-tight">Concepto</h2>
+            <div id="panelContent" class="text-slate-600 leading-relaxed text-lg selection:bg-indigo-100">
+                <!-- La definición irá aquí -->
+            </div>
+        </div>
+    </div>
     <script src="app.js"></script>
 </body>
 </html>
