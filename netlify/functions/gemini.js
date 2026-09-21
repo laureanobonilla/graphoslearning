@@ -48,7 +48,43 @@ exports.handler = async function(event, context) {
             });
             return { statusCode: 200, body: response.text };
         } 
-        
+        if (action === 'examples') {
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    examples: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING', description: 'Nombre corto del ejemplo práctico' },
+                                relationship: { type: 'STRING', description: 'Ej: "ejemplo de", "aplicado en"' }
+                            },
+                            required: ["id", "label", "relationship"]
+                        }
+                    }
+                },
+                required: ["examples"]
+            };
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Concepto del que se requieren ejemplos: "${topic}".
+                Contexto jerárquico: "${contextPath}".
+                
+                INSTRUCCIONES:
+                1. Genera EXACTAMENTE ${maxNodes} ejemplos prácticos, reales o casos de uso del concepto.
+                2. El "label" debe ser muy conciso (máximo 5 palabras).
+                3. No repitas ejemplos.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.4 // Un poco más alto para fomentar creatividad en los ejemplos
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
         if (action === 'define') {
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
