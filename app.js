@@ -3,9 +3,32 @@ const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
 let network = new vis.Network(container, { nodes, edges }, {
-    physics: { stabilization: true },
-    nodes: { shape: 'box', margin: 10, font: { size: 16 } },
-    edges: { arrows: 'to', smooth: { type: 'continuous' } }
+    layout: {
+        hierarchical: {
+            enabled: true,
+            direction: 'UD', // Up-Down (De arriba hacia abajo)
+            sortMethod: 'directed', // Sigue la dirección de las flechas
+            levelSeparation: 150, // Distancia vertical
+            nodeSpacing: 250      // Distancia horizontal
+        }
+    },
+    physics: {
+        enabled: true,
+        hierarchicalRepulsion: {
+            nodeDistance: 200,
+            avoidOverlap: 1
+        }
+    },
+    nodes: { 
+        shape: 'box', 
+        margin: 12, 
+        font: { size: 16 },
+        borderWidth: 2
+    },
+    edges: { 
+        arrows: 'to', 
+        smooth: { type: 'cubicBezier' } // Evita líneas rectas rígidas
+    }
 });
 
 // Referencias UI
