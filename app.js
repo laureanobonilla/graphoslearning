@@ -13,7 +13,6 @@ let network = new vis.Network(container, { nodes, edges }, {
     nodes: { 
         shape: 'box', 
         margin: { top: 12, bottom: 12, left: 16, right: 16 },
-        // multi: 'md' nos permite usar *texto* para negritas
         font: { multi: 'md', size: 15, face: 'Inter, sans-serif', color: '#1e293b', bold: { color: '#3730a3', size: 16 } },
         borderWidth: 1,
         color: {
@@ -34,10 +33,12 @@ let network = new vis.Network(container, { nodes, edges }, {
     interaction: { hover: true }
 });
 
+// Función para liberar todos los nodos con seguridad absoluta
 function stopPhysicsAndUnlock() {
     network.setOptions({ physics: { enabled: false } });
     const allNodes = nodes.get();
-    const unlockUpdates = allNodes.map(n => ({ id: n.id, fixed: false }));
+    // Usamos {x: false, y: false} para asegurar que Vis.js lo entienda en todos los navegadores
+    const unlockUpdates = allNodes.map(n => ({ id: n.id, fixed: { x: false, y: false } }));
     nodes.update(unlockUpdates);
 }
 
@@ -68,8 +69,7 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     edges.clear();
     network.setOptions({ physics: { enabled: true } });
     
-    // Lo guardamos con formato bold Markdown (*texto*)
-    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic });
+    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, fixed: { x: false, y: false } });
 
     setTimeout(() => {
         network.focus(topic, {
@@ -106,7 +106,14 @@ network.on('click', function (params) {
 });
 
 network.on('zoom', () => actionMenu.classList.add('hidden'));
-network.on('dragStart', () => actionMenu.classList.add('hidden'));
+
+// SEGURO DE VIDA 1: Si el usuario intenta arrastrar, desbloquear el nodo inmediatamente
+network.on('dragStart', (params) => {
+    actionMenu.classList.add('hidden');
+    if (params.nodes.length > 0) {
+        nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
+    }
+});
 
 const DEFAULT_MAX_WIDTH = 250;
 const DEFAULT_MAX_HEIGHT = 90;
@@ -129,8 +136,9 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
         });
         const data = await response.json();
         
+        // Bloqueamos los nodos existentes solo momentáneamente
         const existingNodes = nodes.get();
-        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: true })));
+        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
 
         const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
@@ -145,12 +153,17 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
                     boxWidth: DEFAULT_MAX_WIDTH,
                     boxHeight: DEFAULT_MAX_HEIGHT,
                     x: parentPos.x, 
-                    y: parentPos.y
+                    y: parentPos.y,
+                    fixed: { x: false, y: false } // Los nuevos nacen libres
                 });
                 edges.add({ from: selectedNodeId, to: concept.id, label: concept.relationship });
             }
         });
         nodes.update({ id: selectedNodeId, expanded: true });
+
+        // SEGURO DE VIDA 2: Forzar el desbloqueo general 1.5s después de expandir
+        setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
+
     } catch (err) { alert("Error de conexión"); } finally { hideLoader(); }
 });
 
@@ -173,7 +186,6 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         });
         const data = await response.json();
 
-        // Estilo diagrama de clases: Título en negrita, separador y texto
         const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
 
         nodes.update({ 
@@ -182,7 +194,7 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
             definition: data.definition, 
             label: newLabel,
             shape: 'box',
-            fixed: false, // Asegura que el nodo se pueda mover
+            fixed: { x: false, y: false },
             widthConstraint: { maximum: currentNode.boxWidth || DEFAULT_MAX_WIDTH },
             heightConstraint: { maximum: currentNode.boxHeight || DEFAULT_MAX_HEIGHT, valign: 'top' }
         });
@@ -197,12 +209,11 @@ function resizeNode(increment) {
     const newHeight = (currentNode.boxHeight || DEFAULT_MAX_HEIGHT) + increment;
 
     if (currentNode.definition) {
-        // Al actualizar tamaño, forzamos que se mantenga libre
         nodes.update({ 
             id: selectedNodeId,
             boxWidth: newWidth,
             boxHeight: newHeight,
-            fixed: false,
+            fixed: { x: false, y: false },
             widthConstraint: { maximum: newWidth },
             heightConstraint: { maximum: newHeight, valign: 'top' }
         });
