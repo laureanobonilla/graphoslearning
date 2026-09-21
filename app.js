@@ -49,21 +49,96 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     nodes.add({ id: topic, label: topic, level: 0 });
 });
 
-// Interacción con el grafo
-network.on('doubleClick', async function (params) {
+const actionMenu = document.getElementById('actionMenu');
+let selectedNodeId = null;
+
+// Función para rastrear el camino desde el nodo actual hasta la raíz
+function getContextPath(nodeId) {
+    let path = [nodeId];
+    let current = nodeId;
+    // Trazamos hacia atrás un máximo de 5 niveles para no sobrecargar el prompt
+    for(let i = 0; i < 5; i++) {
+        let parentEdges = edges.get({ filter: e => e.to === current });
+        if (parentEdges.length === 0) break;
+        current = parentEdges[0].from;
+        path.unshift(current);
+    }
+    return path.join(' > ');
+}
+
+// 1. Mostrar menú al hacer clic en un nodo
+network.on('click', function (params) {
     if (params.nodes.length > 0) {
-        const nodeId = params.nodes[0];
-        await expandNode(nodeId);
+        selectedNodeId = params.nodes[0];
+        
+        // Obtener coordenadas exactas en la pantalla
+        const DOMCoords = network.canvasToDOM(network.getPositions([selectedNodeId])[selectedNodeId]);
+        
+        actionMenu.style.left = DOMCoords.x + 'px';
+        actionMenu.style.top = (DOMCoords.y - 20) + 'px'; // Aparece un poco arriba del nodo
+        actionMenu.classList.remove('hidden');
+    } else {
+        actionMenu.classList.add('hidden');
+        selectedNodeId = null;
     }
 });
 
-network.on('click', async function (params) {
-    if (params.nodes.length > 0) {
-        const nodeId = params.nodes[0];
-        await showDefinition(nodeId);
-    } else {
-        closePanel();
+// 2. Al mover el mapa o hacer zoom, ocultamos el menú para que no flote suelto
+network.on('zoom', () => actionMenu.classList.add('hidden'));
+network.on('dragStart', () => actionMenu.classList.add('hidden'));
+
+// 3. Botón de Expandir (Ahora envía el contextPath)
+document.getElementById('btnMenuExpand').addEventListener('click', async () => {
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+
+    const contextPath = getContextPath(selectedNodeId);
+    const currentNode = nodes.get(selectedNodeId);
+    
+    if (currentNode && currentNode.expanded) return;
+
+    const response = await fetch('/.netlify/functions/gemini', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'expand', topic: selectedNodeId, contextPath })
+    });
+    const data = await response.json();
+    
+    data.concepts.forEach(concept => {
+        if (!nodes.get(concept.id)) {
+            nodes.add({ id: concept.id, label: concept.label, expanded: false });
+            edges.add({ from: selectedNodeId, to: concept.id, label: concept.relationship });
+        }
+    });
+
+    nodes.update({ id: selectedNodeId, expanded: true });
+});
+
+// 4. Botón de Definir (Ahora envía el contextPath)
+document.getElementById('btnMenuDefine').addEventListener('click', async () => {
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+
+    const contextPath = getContextPath(selectedNodeId);
+    const currentNode = nodes.get(selectedNodeId);
+    
+    panelTitle.innerText = currentNode.label || selectedNodeId;
+    sidePanel.classList.remove('translate-x-full');
+
+    if (currentNode && currentNode.definition) {
+        panelContent.innerHTML = currentNode.definition;
+        return;
     }
+
+    panelContent.innerHTML = 'Generando contexto...';
+
+    const response = await fetch('/.netlify/functions/gemini', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'define', topic: selectedNodeId, contextPath })
+    });
+    const data = await response.json();
+
+    nodes.update({ id: selectedNodeId, definition: data.definition });
+    panelContent.innerHTML = data.definition;
 });
 
 // 1. Expansión con bandera de estado
