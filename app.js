@@ -4,19 +4,15 @@ let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
 let network = new vis.Network(container, { nodes, edges }, {
     layout: {
-        hierarchical: {
-            enabled: true,
-            direction: 'UD', // Up-Down (De arriba hacia abajo)
-            sortMethod: 'directed', // Sigue la dirección de las flechas
-            levelSeparation: 150, // Distancia vertical
-            nodeSpacing: 250      // Distancia horizontal
-        }
+        hierarchical: false // Apagamos la jerarquía estricta para liberar el movimiento
     },
     physics: {
         enabled: true,
-        hierarchicalRepulsion: {
-            nodeDistance: 200,
-            avoidOverlap: 1
+        solver: 'repulsion', // Motor magnético: los nodos se separan pero puedes arrastrarlos
+        repulsion: {
+            nodeDistance: 200, // Distancia base entre conceptos
+            springLength: 200, // Largo de las flechas
+            springConstant: 0.05
         }
     },
     nodes: { 
@@ -27,7 +23,7 @@ let network = new vis.Network(container, { nodes, edges }, {
     },
     edges: { 
         arrows: 'to', 
-        smooth: { type: 'cubicBezier' } // Evita líneas rectas rígidas
+        smooth: { type: 'continuous' } // Las flechas se curvan naturalmente hacia donde muevas el nodo
     }
 });
 
@@ -39,7 +35,7 @@ const panelContent = document.getElementById('panelContent');
 
 let currentProjectId = null; // Guardará el ID de JSONBin si ya está guardado
 
-// Generar nodo raíz
+// Generar nodo raíz y centrar la cámara
 document.getElementById('btnGenerate').addEventListener('click', async () => {
     const topic = topicInput.value.trim();
     if (!topic) return;
@@ -47,26 +43,16 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     nodes.clear();
     edges.clear();
     
-    // Eliminamos "level: 0". Vis.js lo calculará automáticamente.
-    nodes.add({ id: topic, label: topic }); 
+    nodes.add({ id: topic, label: topic });
+
+    // Esperar un instante a que el nodo se dibuje y mover la cámara hacia él
+    setTimeout(() => {
+        network.focus(topic, {
+            scale: 1.2, // Nivel de zoom inicial
+            animation: { duration: 800, easingFunction: 'easeInOutQuad' }
+        });
+    }, 100);
 });
-
-const actionMenu = document.getElementById('actionMenu');
-let selectedNodeId = null;
-
-// Función para rastrear el camino desde el nodo actual hasta la raíz
-function getContextPath(nodeId) {
-    let path = [nodeId];
-    let current = nodeId;
-    // Trazamos hacia atrás un máximo de 5 niveles para no sobrecargar el prompt
-    for(let i = 0; i < 5; i++) {
-        let parentEdges = edges.get({ filter: e => e.to === current });
-        if (parentEdges.length === 0) break;
-        current = parentEdges[0].from;
-        path.unshift(current);
-    }
-    return path.join(' > ');
-}
 
 // 1. Mostrar menú al hacer clic en un nodo
 network.on('click', function (params) {
