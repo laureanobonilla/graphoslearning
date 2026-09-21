@@ -46,7 +46,9 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     
     nodes.clear();
     edges.clear();
-    nodes.add({ id: topic, label: topic, level: 0 });
+    
+    // Eliminamos "level: 0". Vis.js lo calculará automáticamente.
+    nodes.add({ id: topic, label: topic }); 
 });
 
 const actionMenu = document.getElementById('actionMenu');
