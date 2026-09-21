@@ -45,7 +45,7 @@ exports.handler = async function(event, context) {
         
         if (action === 'define') {
             const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash'',
+                model: 'gemini-3.6-flash',
                 contents: `Escribe una definición concisa (máximo 2 párrafos) sobre el concepto: ${topic}.`,
                 config: {
                     temperature: 0.3
