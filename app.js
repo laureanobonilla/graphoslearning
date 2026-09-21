@@ -1,30 +1,36 @@
-// Configuración inicial del Grafo (Vis.js)
 const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
+
+// Configuración estética y física del Grafo
 let network = new vis.Network(container, { nodes, edges }, {
-    layout: {
-        hierarchical: false // Apagamos la jerarquía estricta para liberar el movimiento
-    },
+    layout: { hierarchical: false },
     physics: {
         enabled: true,
-        solver: 'repulsion', // Motor magnético: los nodos se separan pero puedes arrastrarlos
-        repulsion: {
-            nodeDistance: 200, // Distancia base entre conceptos
-            springLength: 200, // Largo de las flechas
-            springConstant: 0.05
-        }
+        solver: 'repulsion',
+        repulsion: { nodeDistance: 220, springLength: 200, springConstant: 0.05 }
     },
     nodes: { 
         shape: 'box', 
-        margin: 12, 
-        font: { size: 16 },
-        borderWidth: 2
+        margin: { top: 12, bottom: 12, left: 16, right: 16 },
+        font: { size: 15, face: 'Inter, sans-serif', color: '#1e293b' },
+        borderWidth: 1,
+        color: {
+            border: '#cbd5e1',
+            background: '#ffffff',
+            highlight: { border: '#6366f1', background: '#f8fafc' },
+            hover: { border: '#94a3b8', background: '#f1f5f9' }
+        },
+        shadow: { enabled: true, color: 'rgba(15, 23, 42, 0.08)', size: 10, x: 0, y: 4 },
+        shapeProperties: { borderRadius: 8 }
     },
     edges: { 
         arrows: 'to', 
-        smooth: { type: 'continuous' } // Las flechas se curvan naturalmente hacia donde muevas el nodo
-    }
+        color: { color: '#94a3b8', highlight: '#6366f1' },
+        font: { size: 12, color: '#64748b', strokeWidth: 3, strokeColor: '#ffffff' },
+        smooth: { type: 'continuous' } 
+    },
+    interaction: { hover: true }
 });
 
 // Referencias UI
@@ -32,38 +38,60 @@ const topicInput = document.getElementById('topicInput');
 const sidePanel = document.getElementById('sidePanel');
 const panelTitle = document.getElementById('panelTitle');
 const panelContent = document.getElementById('panelContent');
+const actionMenu = document.getElementById('actionMenu');
+const loader = document.getElementById('loader');
+const loaderText = document.getElementById('loaderText');
 
-let currentProjectId = null; // Guardará el ID de JSONBin si ya está guardado
+let currentProjectId = null;
+let selectedNodeId = null;
 
-// Generar nodo raíz y centrar la cámara
+// Control del Loader Visual
+function showLoader(msg) {
+    loaderText.innerText = msg;
+    loader.classList.add('show');
+}
+function hideLoader() {
+    loader.classList.remove('show');
+}
+
+// Generar nodo raíz y centrar
 document.getElementById('btnGenerate').addEventListener('click', async () => {
     const topic = topicInput.value.trim();
     if (!topic) return;
     
     nodes.clear();
     edges.clear();
-    
     nodes.add({ id: topic, label: topic });
 
-    // Esperar un instante a que el nodo se dibuje y mover la cámara hacia él
     setTimeout(() => {
         network.focus(topic, {
-            scale: 1.2, // Nivel de zoom inicial
+            scale: 1.2,
             animation: { duration: 800, easingFunction: 'easeInOutQuad' }
         });
     }, 100);
 });
 
-// 1. Mostrar menú al hacer clic en un nodo
+// Obtener contexto jerárquico
+function getContextPath(nodeId) {
+    let path = [nodeId];
+    let current = nodeId;
+    for(let i = 0; i < 5; i++) {
+        let parentEdges = edges.get({ filter: e => e.to === current });
+        if (parentEdges.length === 0) break;
+        current = parentEdges[0].from;
+        path.unshift(current);
+    }
+    return path.join(' > ');
+}
+
+// Eventos de interacción con el lienzo
 network.on('click', function (params) {
     if (params.nodes.length > 0) {
         selectedNodeId = params.nodes[0];
-        
-        // Obtener coordenadas exactas en la pantalla
         const DOMCoords = network.canvasToDOM(network.getPositions([selectedNodeId])[selectedNodeId]);
         
         actionMenu.style.left = DOMCoords.x + 'px';
-        actionMenu.style.top = (DOMCoords.y - 20) + 'px'; // Aparece un poco arriba del nodo
+        actionMenu.style.top = (DOMCoords.y - 30) + 'px';
         actionMenu.classList.remove('hidden');
     } else {
         actionMenu.classList.add('hidden');
@@ -71,11 +99,10 @@ network.on('click', function (params) {
     }
 });
 
-// 2. Al mover el mapa o hacer zoom, ocultamos el menú para que no flote suelto
 network.on('zoom', () => actionMenu.classList.add('hidden'));
 network.on('dragStart', () => actionMenu.classList.add('hidden'));
 
-// 3. Botón de Expandir (Ahora envía el contextPath)
+// Botón de Expandir
 document.getElementById('btnMenuExpand').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
@@ -85,23 +112,31 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
     
     if (currentNode && currentNode.expanded) return;
 
-    const response = await fetch('/.netlify/functions/gemini', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'expand', topic: selectedNodeId, contextPath })
-    });
-    const data = await response.json();
-    
-    data.concepts.forEach(concept => {
-        if (!nodes.get(concept.id)) {
-            nodes.add({ id: concept.id, label: concept.label, expanded: false });
-            edges.add({ from: selectedNodeId, to: concept.id, label: concept.relationship });
-        }
-    });
+    showLoader('Generando conceptos conexos...');
 
-    nodes.update({ id: selectedNodeId, expanded: true });
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'expand', topic: selectedNodeId, contextPath })
+        });
+        const data = await response.json();
+        
+        data.concepts.forEach(concept => {
+            if (!nodes.get(concept.id)) {
+                nodes.add({ id: concept.id, label: concept.label, expanded: false });
+                edges.add({ from: selectedNodeId, to: concept.id, label: concept.relationship });
+            }
+        });
+
+        nodes.update({ id: selectedNodeId, expanded: true });
+    } catch (err) {
+        alert("Error al conectar con la IA.");
+    } finally {
+        hideLoader();
+    }
 });
 
-// 4. Botón de Definir (Ahora envía el contextPath)
+// Botón de Definir
 document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
@@ -117,89 +152,25 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         return;
     }
 
-    panelContent.innerHTML = 'Generando contexto...';
+    panelContent.innerHTML = '<span class="text-slate-400">Generando definición detallada...</span>';
+    showLoader('Redactando definición...');
 
-    const response = await fetch('/.netlify/functions/gemini', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'define', topic: selectedNodeId, contextPath })
-    });
-    const data = await response.json();
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'define', topic: selectedNodeId, contextPath })
+        });
+        const data = await response.json();
 
-    nodes.update({ id: selectedNodeId, definition: data.definition });
-    panelContent.innerHTML = data.definition;
+        nodes.update({ id: selectedNodeId, definition: data.definition });
+        panelContent.innerHTML = data.definition;
+    } catch (err) {
+        panelContent.innerHTML = '<span class="text-red-500">Error al obtener la definición.</span>';
+    } finally {
+        hideLoader();
+    }
 });
 
-// 1. Expansión con bandera de estado
-async function expandNode(nodeId) {
-    const currentNode = nodes.get(nodeId);
-    
-    // Si ya fue expandido previamente, no consultamos al API de nuevo
-    if (currentNode && currentNode.expanded) {
-        return;
-    }
-
-    const response = await fetch('/.netlify/functions/gemini', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'expand', topic: nodeId })
-    });
-    const data = await response.json();
-    
-    data.concepts.forEach(concept => {
-        if (!nodes.get(concept.id)) {
-            nodes.add({ id: concept.id, label: concept.label, expanded: false, definition: null });
-            edges.add({ from: nodeId, to: concept.id, label: concept.relationship });
-        }
-    });
-
-    // Marcamos el nodo como ya expandido
-    nodes.update({ id: nodeId, expanded: true });
-}
-
-// 2. Definición con caché en memoria
-async function showDefinition(nodeId) {
-    const currentNode = nodes.get(nodeId);
-    panelTitle.innerText = currentNode.label || nodeId;
-    sidePanel.classList.remove('translate-x-full');
-
-    // Si ya tenemos la definición guardada en el nodo, la mostramos al instante
-    if (currentNode && currentNode.definition) {
-        panelContent.innerHTML = currentNode.definition;
-        return;
-    }
-
-    panelContent.innerHTML = 'Cargando definición...';
-
-    const response = await fetch('/.netlify/functions/gemini', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'define', topic: nodeId })
-    });
-    const data = await response.json();
-
-    // Guardamos la definición en el nodo para futuros clics
-    nodes.update({ id: nodeId, definition: data.definition });
-    panelContent.innerHTML = data.definition;
-}
-
-document.getElementById('btnClosePanel').addEventListener('click', closePanel);
-function closePanel() { sidePanel.classList.add('translate-x-full'); }
-
-// Guardar en JSONBin
-document.getElementById('btnSave').addEventListener('click', async () => {
-    const graphData = {
-        nodes: nodes.get(),
-        edges: edges.get()
-    };
-    
-    const response = await fetch('/.netlify/functions/db', {
-        method: 'POST',
-        body: JSON.stringify({
-            projectId: currentProjectId,
-            title: nodes.get()[0]?.label || "Proyecto sin título",
-            data: graphData,
-            user: "usuario_demo" // Aquí luego puedes enlazar un sistema de login real
-        })
-    });
-    const result = await response.json();
-    currentProjectId = result.projectId;
-    alert("Proyecto guardado correctamente");
+document.getElementById('btnClosePanel').addEventListener('click', () => {
+    sidePanel.classList.add('translate-x-full');
 });
