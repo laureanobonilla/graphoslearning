@@ -5,6 +5,13 @@ exports.handler = async function(event, context) {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
+    if (!process.env.GEMINI_API_KEY) {
+        return { 
+            statusCode: 500, 
+            body: JSON.stringify({ error: 'GEMINI_API_KEY no está configurada en las variables de entorno de Netlify' }) 
+        };
+    }
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const { action, topic } = JSON.parse(event.body);
 
@@ -29,8 +36,9 @@ exports.handler = async function(event, context) {
                 required: ["concepts"]
             };
 
+            // Usar gemini-1.5-flash-latest o gemini-2.0-flash
             const model = genAI.getGenerativeModel({
-                model: 'gemini-1.5-flash',
+                model: 'gemini-1.5-flash-latest',
                 generationConfig: {
                     responseMimeType: 'application/json',
                     responseSchema: schema
@@ -42,7 +50,8 @@ exports.handler = async function(event, context) {
         } 
         
         if (action === 'define') {
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            // Usar gemini-1.5-flash-latest o gemini-2.0-flash
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
             const result = await model.generateContent(`Escribe una definición concisa (máximo 2 párrafos) sobre el concepto: ${topic}.`);
             return { 
                 statusCode: 200, 
