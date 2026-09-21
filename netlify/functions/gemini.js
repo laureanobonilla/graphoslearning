@@ -1,33 +1,27 @@
-const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
+
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-        return { 
-            statusCode: 500, 
-            body: JSON.stringify({ error: 'GEMINI_API_KEY no está configurada en las variables de entorno de Netlify' }) 
-        };
-    }
-
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const { action, topic } = JSON.parse(event.body);
-
     try {
+        const { action, topic } = JSON.parse(event.body);
+
         if (action === 'expand') {
             const schema = {
-                type: SchemaType.OBJECT,
+                type: 'OBJECT',
                 properties: {
                     concepts: {
-                        type: SchemaType.ARRAY,
+                        type: 'ARRAY',
                         items: {
-                            type: SchemaType.OBJECT,
+                            type: 'OBJECT',
                             properties: {
-                                id: { type: SchemaType.STRING, description: "Identificador único corto en minúsculas" },
-                                label: { type: SchemaType.STRING, description: "Nombre del concepto" },
-                                relationship: { type: SchemaType.STRING, description: "Verbo de enlace corto" }
+                                id: { type: 'STRING', description: 'Identificador único corto en minúsculas' },
+                                label: { type: 'STRING', description: 'Nombre del concepto' },
+                                relationship: { type: 'STRING', description: 'Verbo de enlace corto' }
                             },
                             required: ["id", "label", "relationship"]
                         }
@@ -36,32 +30,38 @@ exports.handler = async function(event, context) {
                 required: ["concepts"]
             };
 
-            // Usar gemini-1.5-flash-latest o gemini-2.0-flash
-            const model = genAI.getGenerativeModel({
-                model: 'gemini-1.5-flash',
-                generationConfig: {
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `Genera de 3 a 5 conceptos clave directamente relacionados con: ${topic}.`,
+                config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema
+                    responseSchema: schema,
+                    temperature: 0.3
                 }
             });
-
-            const result = await model.generateContent(`Genera de 3 a 5 conceptos clave directamente relacionados con: ${topic}.`);
-            return { statusCode: 200, body: result.response.text() };
+            
+            return { statusCode: 200, body: response.text };
         } 
         
         if (action === 'define') {
-            // Usar gemini-1.5-flash-latest o gemini-2.0-flash
-            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
-            const result = await model.generateContent(`Escribe una definición concisa (máximo 2 párrafos) sobre el concepto: ${topic}.`);
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `Escribe una definición concisa (máximo 2 párrafos) sobre el concepto: ${topic}.`,
+                config: {
+                    temperature: 0.3
+                }
+            });
+            
             return { 
                 statusCode: 200, 
-                body: JSON.stringify({ definition: result.response.text() }) 
+                body: JSON.stringify({ definition: response.text }) 
             };
         }
 
         return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 
     } catch (error) {
+        console.error('Error:', error);
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };
