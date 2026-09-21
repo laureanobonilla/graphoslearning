@@ -224,6 +224,12 @@ function resizeNode(increment) {
 document.getElementById('btnSizePlus').addEventListener('click', () => resizeNode(50));
 document.getElementById('btnSizeMinus').addEventListener('click', () => resizeNode(-50));
 
-document.getElementById('btnClosePanel').addEventListener('click', () => {
-    sidePanel.classList.add('translate-x-full');
-});
+const btnPlus = document.getElementById('btnSizePlus');
+if (btnPlus) {
+    btnPlus.addEventListener('click', () => resizeNode(50));
+}
+
+const btnMinus = document.getElementById('btnSizeMinus');
+if (btnMinus) {
+    btnMinus.addEventListener('click', () => resizeNode(-50));
+}
