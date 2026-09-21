@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapas Conceptuales AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-gray-50 h-screen flex flex-col overflow-hidden">
+    
+    <header class="bg-white shadow px-6 py-4 flex justify-between items-center z-10">
+        <h1 class="text-xl font-bold text-gray-800">Mapas Conceptuales AI</h1>
+        <div class="flex gap-2">
+            <input type="text" id="topicInput" placeholder="Escribe un tema..." class="border rounded px-3 py-2 w-64">
+            <button id="btnGenerate" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Generar Raíz</button>
+            <button id="btnSave" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 ml-4">Guardar Proyecto</button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 h-full relative">
+        <!-- Lienzo del Grafo -->
+        <div id="network-container" class="flex-1 h-full"></div>
+
+        <!-- Panel Lateral para Definiciones -->
+        <div id="sidePanel" class="w-1/3 bg-white border-l shadow-lg p-6 overflow-y-auto transform transition-transform duration-300 translate-x-full absolute right-0 top-0 h-full">
+            <button id="btnClosePanel" class="text-gray-500 hover:text-gray-800 mb-4 font-bold">✕ Cerrar</button>
+            <h2 id="panelTitle" class="text-2xl font-bold mb-4 text-gray-800">Concepto</h2>
+            <div id="panelContent" class="text-gray-600 leading-relaxed selection:bg-blue-200">
+                <!-- La definición irá aquí -->
+            </div>
+            <button id="btnNewProjectFromSelection" class="hidden mt-6 bg-purple-600 text-white px-4 py-2 rounded shadow w-full">
+                Crear nuevo proyecto desde selección
+            </button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
