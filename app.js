@@ -43,8 +43,15 @@ network.on('click', async function (params) {
     }
 });
 
-// Llamadas a Netlify Functions
+// 1. Expansión con bandera de estado
 async function expandNode(nodeId) {
+    const currentNode = nodes.get(nodeId);
+    
+    // Si ya fue expandido previamente, no consultamos al API de nuevo
+    if (currentNode && currentNode.expanded) {
+        return;
+    }
+
     const response = await fetch('/.netlify/functions/gemini', {
         method: 'POST',
         body: JSON.stringify({ action: 'expand', topic: nodeId })
@@ -53,22 +60,37 @@ async function expandNode(nodeId) {
     
     data.concepts.forEach(concept => {
         if (!nodes.get(concept.id)) {
-            nodes.add({ id: concept.id, label: concept.label });
+            nodes.add({ id: concept.id, label: concept.label, expanded: false, definition: null });
             edges.add({ from: nodeId, to: concept.id, label: concept.relationship });
         }
     });
+
+    // Marcamos el nodo como ya expandido
+    nodes.update({ id: nodeId, expanded: true });
 }
 
+// 2. Definición con caché en memoria
 async function showDefinition(nodeId) {
-    panelTitle.innerText = nodeId;
-    panelContent.innerHTML = 'Cargando definición...';
+    const currentNode = nodes.get(nodeId);
+    panelTitle.innerText = currentNode.label || nodeId;
     sidePanel.classList.remove('translate-x-full');
+
+    // Si ya tenemos la definición guardada en el nodo, la mostramos al instante
+    if (currentNode && currentNode.definition) {
+        panelContent.innerHTML = currentNode.definition;
+        return;
+    }
+
+    panelContent.innerHTML = 'Cargando definición...';
 
     const response = await fetch('/.netlify/functions/gemini', {
         method: 'POST',
         body: JSON.stringify({ action: 'define', topic: nodeId })
     });
     const data = await response.json();
+
+    // Guardamos la definición en el nodo para futuros clics
+    nodes.update({ id: nodeId, definition: data.definition });
     panelContent.innerHTML = data.definition;
 }
 
