@@ -69,6 +69,10 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     
     nodes.clear();
     edges.clear();
+
+    // 2. AGREGAR ESTA LÍNEA: Encender físicas momentáneamente
+    network.setOptions({ physics: { enabled: true } });
+    
     nodes.add({ id: topic, label: topic });
 
     setTimeout(() => {
@@ -128,6 +132,9 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
             body: JSON.stringify({ action: 'expand', topic: selectedNodeId, contextPath })
         });
         const data = await response.json();
+        
+        // 3. AGREGAR ESTA LÍNEA: Encender físicas para que los nuevos se separen
+        network.setOptions({ physics: { enabled: true } });
         
         data.concepts.forEach(concept => {
             if (!nodes.get(concept.id)) {
