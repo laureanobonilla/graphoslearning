@@ -1,48 +1,56 @@
-const { GoogleGenAI, Type, Schema } = require('@google/genai');
+const { GoogleGenerativeAI, SchemaType } = require('@google/generative-ai');
 
 exports.handler = async function(event, context) {
-    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+    if (event.httpMethod !== 'POST') {
+        return { statusCode: 405, body: 'Method Not Allowed' };
+    }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const { action, topic } = JSON.parse(event.body);
 
     try {
         if (action === 'expand') {
             const schema = {
-                type: Type.OBJECT,
+                type: SchemaType.OBJECT,
                 properties: {
                     concepts: {
-                        type: Type.ARRAY,
+                        type: SchemaType.ARRAY,
                         items: {
-                            type: Type.OBJECT,
+                            type: SchemaType.OBJECT,
                             properties: {
-                                id: { type: Type.STRING, description: "Identificador único corto en minúsculas" },
-                                label: { type: Type.STRING, description: "Nombre del concepto" },
-                                relationship: { type: Type.STRING, description: "Verbo de enlace corto (ej: 'requiere', 'es parte de')" }
-                            }
+                                id: { type: SchemaType.STRING, description: "Identificador único corto en minúsculas" },
+                                label: { type: SchemaType.STRING, description: "Nombre del concepto" },
+                                relationship: { type: SchemaType.STRING, description: "Verbo de enlace corto" }
+                            },
+                            required: ["id", "label", "relationship"]
                         }
                     }
-                }
+                },
+                required: ["concepts"]
             };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: `Genera de 3 a 5 conceptos clave directamente relacionados con: ${topic}.`,
-                config: {
+            const model = genAI.getGenerativeModel({
+                model: 'gemini-1.5-flash',
+                generationConfig: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
+                    responseSchema: schema
                 }
             });
-            return { statusCode: 200, body: response.text };
+
+            const result = await model.generateContent(`Genera de 3 a 5 conceptos clave directamente relacionados con: ${topic}.`);
+            return { statusCode: 200, body: result.response.text() };
         } 
         
         if (action === 'define') {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: `Escribe una definición concisa (máximo 2 párrafos) sobre el concepto: ${topic}.`
-            });
-            return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
+            const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+            const result = await model.generateContent(`Escribe una definición concisa (máximo 2 párrafos) sobre el concepto: ${topic}.`);
+            return { 
+                statusCode: 200, 
+                body: JSON.stringify({ definition: result.response.text() }) 
+            };
         }
+
+        return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 
     } catch (error) {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
