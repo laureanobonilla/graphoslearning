@@ -78,7 +78,69 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
         });
     }, 100);
 });
+// --- LÓGICA PARA GENERAR EJEMPLOS ---
+document.getElementById('btnMenuExamples').addEventListener('click', async () => {
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
 
+    const contextPath = getContextPath(selectedNodeId);
+    const maxNodes = parseInt(document.getElementById('nodeCount').value) || 3;
+    
+    showLoader('Buscando ejemplos prácticos...');
+
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'examples', topic: selectedNodeId, contextPath, maxNodes })
+        });
+        const data = await response.json();
+        
+        // Bloquear nodos temporalmente
+        const existingNodes = nodes.get();
+        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+
+        const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
+        network.setOptions({ physics: { enabled: true } });
+        
+        data.examples.forEach(example => {
+            if (!nodes.get(example.id)) {
+                nodes.add({ 
+                    id: example.id, 
+                    label: `*Ejemplo:*\n${example.label}`, 
+                    baseTitle: example.label,
+                    expanded: false,
+                    boxWidth: DEFAULT_MAX_WIDTH,
+                    boxHeight: DEFAULT_MAX_HEIGHT,
+                    x: parentPos.x, 
+                    y: parentPos.y,
+                    fixed: { x: false, y: false },
+                    
+                    // FORMATO VISUAL ESPECÍFICO PARA EJEMPLOS (Post-it amarillo)
+                    color: {
+                        background: '#fef3c7', // Ámbar claro
+                        border: '#f59e0b',     // Ámbar fuerte
+                        highlight: { background: '#fde68a', border: '#d97706' },
+                        hover: { background: '#fffbeb', border: '#d97706' }
+                    },
+                    font: { color: '#92400e' }, // Texto café/ámbar oscuro
+                    shapeProperties: { borderDashes: [5, 5] } // Borde punteado
+                });
+                
+                edges.add({ 
+                    from: selectedNodeId, 
+                    to: example.id, 
+                    label: example.relationship,
+                    color: { color: '#f59e0b', highlight: '#d97706' },
+                    dashes: true // Flecha de conexión punteada
+                });
+            }
+        });
+
+        // Desbloqueo de seguridad
+        setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
+
+    } catch (err) { alert("Error de conexión"); } finally { hideLoader(); }
+});
 function getContextPath(nodeId) {
     let path = [nodeId];
     let current = nodeId;
