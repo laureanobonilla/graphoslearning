@@ -7,12 +7,29 @@ exports.handler = async function(event, context) {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-    try {
-        // Agregamos maxNodes (por defecto 3)
+  try {
         const { action, topic, contextPath, maxNodes = 3 } = JSON.parse(event.body);
 
         if (action === 'expand') {
-            const schema = { /* ... mantén tu schema intacto ... */ };
+            // Aquí está el schema restaurado
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    concepts: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING' },
+                                relationship: { type: 'STRING' }
+                            },
+                            required: ["id", "label", "relationship"]
+                        }
+                    }
+                },
+                required: ["concepts"]
+            };
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
@@ -40,7 +57,7 @@ exports.handler = async function(event, context) {
                 
                 INSTRUCCIONES CRÍTICAS:
                 1. Redacta la definición en máximo 2 párrafos cortos.
-                2. Usa ÚNICAMENTE TEXTO PLANO. Está ESTRICTAMENTE PROHIBIDO usar formato Markdown (nada de asteriscos ** o *).
+                2. Usa ÚNICAMENTE TEXTO PLANO. Está ESTRICTAMENTE PROHIBIDO usar formato Markdown.
                 3. Determina si requiere su contexto teórico o si es universal.`,
                 config: { temperature: 0.2 }
             });
@@ -49,7 +66,6 @@ exports.handler = async function(event, context) {
 
         return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 
-    // Aquí estaba el error, este catch debe cerrar el try
     } catch (error) {
         console.error('Error:', error);
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
