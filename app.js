@@ -61,20 +61,46 @@ function hideLoader() {
 }
 
 // Generar nodo raíz
+// Generar nodo raíz (Temas paralelos)
 document.getElementById('btnGenerate').addEventListener('click', async () => {
     const topic = topicInput.value.trim();
     if (!topic) return;
     
+    // 1. Congelar todos los nodos existentes para que no se desordene el mapa
+    const existingNodes = nodes.get();
+    nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+
+    // 2. Obtener el centro actual de la pantalla
+    const viewCenter = network.getViewPosition();
+    
+    // 3. Crear un desfase aleatorio (entre -100px y 100px) para que no caigan en el mismo pixel
+    const randomX = viewCenter.x + (Math.random() * 200 - 100);
+    const randomY = viewCenter.y + (Math.random() * 200 - 100);
+
     network.setOptions({ physics: { enabled: true } });
     
-    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, fixed: { x: false, y: false } });
+    // 4. Agregar el nodo en la posición calculada
+    nodes.add({ 
+        id: topic, 
+        label: `*${topic}*`, 
+        baseTitle: topic, 
+        x: randomX,
+        y: randomY,
+        fixed: { x: false, y: false } // El nuevo nodo nace libre
+    });
+    
+    topicInput.value = ''; // Limpiamos el input
 
+    // 5. Enfocar la cámara en el nuevo nodo
     setTimeout(() => {
         network.focus(topic, {
             scale: 1.2,
             animation: { duration: 800, easingFunction: 'easeInOutQuad' }
         });
     }, 100);
+
+    // 6. Seguro de vida: Apagar físicas y liberar todos los nodos 1.5s después
+    setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
 });
 // --- LÓGICA PARA GENERAR EJEMPLOS ---
 document.getElementById('btnMenuExamples').addEventListener('click', async () => {
