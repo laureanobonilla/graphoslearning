@@ -48,6 +48,42 @@ exports.handler = async function(event, context) {
             });
             return { statusCode: 200, body: response.text };
         } 
+if (action === 'connect') {
+            const { topicB } = JSON.parse(event.body); // Recibimos el segundo nodo
+            
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    bridge: {
+                        type: 'OBJECT',
+                        properties: {
+                            id: { type: 'STRING', description: 'ID corto en minúsculas' },
+                            label: { type: 'STRING', description: 'Nombre del concepto intermedio' },
+                            relFromA: { type: 'STRING', description: 'Verbo de enlace del Tema A hacia este concepto' },
+                            relToB: { type: 'STRING', description: 'Verbo de enlace de este concepto hacia el Tema B' }
+                        },
+                        required: ["id", "label", "relFromA", "relToB"]
+                    }
+                },
+                required: ["bridge"]
+            };
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Analiza la relación entre el Tema A: "${topic}" y el Tema B: "${topicB}".
+                
+                INSTRUCCIONES:
+                1. Genera un (1) concepto intermedio o puente lógico que conecte ambos temas.
+                2. Define el verbo de enlace que va desde el Tema A hacia el puente (relFromA).
+                3. Define el verbo de enlace que va desde el puente hacia el Tema B (relToB).`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.2
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }        
         if (action === 'examples') {
             const schema = {
                 type: 'OBJECT',

@@ -65,8 +65,6 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     const topic = topicInput.value.trim();
     if (!topic) return;
     
-    nodes.clear();
-    edges.clear();
     network.setOptions({ physics: { enabled: true } });
     
     nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, fixed: { x: false, y: false } });
@@ -281,9 +279,92 @@ function resizeNode(increment) {
         });
     }
 }
-
+document.getElementById('btnMenuDelete').addEventListener('click', () => {
+    if (selectedNodeId) nodes.remove(selectedNodeId);
+    actionMenu.classList.add('hidden');
+});
 const btnPlus = document.getElementById('btnSizePlus');
 if (btnPlus) btnPlus.addEventListener('click', () => resizeNode(50));
 
 const btnMinus = document.getElementById('btnSizeMinus');
 if (btnMinus) btnMinus.addEventListener('click', () => resizeNode(-50));
+let sourceNodeForConnection = null;
+const connectionBanner = document.getElementById('connectionBanner');
+
+// Activar el modo conexión
+document.getElementById('btnMenuConnect').addEventListener('click', () => {
+    sourceNodeForConnection = selectedNodeId;
+    actionMenu.classList.add('hidden');
+    connectionBanner.classList.remove('hidden');
+});
+
+// Cancelar el modo conexión tocando el banner
+connectionBanner.addEventListener('click', () => {
+    sourceNodeForConnection = null;
+    connectionBanner.classList.add('hidden');
+});
+
+// Modificar el evento network.on('click') existente:
+network.on('click', async function (params) {
+    if (params.nodes.length > 0) {
+        const clickedNode = params.nodes[0];
+
+        // Si estamos en modo conexión y tocamos un nodo diferente al origen
+        if (sourceNodeForConnection && sourceNodeForConnection !== clickedNode) {
+            const nodeA = sourceNodeForConnection;
+            const nodeB = clickedNode;
+            
+            sourceNodeForConnection = null;
+            connectionBanner.classList.add('hidden');
+            showLoader('Generando puente conceptual...');
+
+            try {
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'connect', topic: nodeA, topicB: nodeB })
+                });
+                const data = await response.json();
+                
+                // Calculamos el punto medio entre A y B para que nazca el nuevo nodo ahí
+                const posA = network.getPositions([nodeA])[nodeA];
+                const posB = network.getPositions([nodeB])[nodeB];
+                const midX = (posA.x + posB.x) / 2;
+                const midY = (posA.y + posB.y) / 2;
+
+                network.setOptions({ physics: { enabled: true } });
+
+                const bridge = data.bridge;
+                if (!nodes.get(bridge.id)) {
+                    // Creamos el concepto puente
+                    nodes.add({
+                        id: bridge.id,
+                        label: `*${bridge.label}*`,
+                        baseTitle: bridge.label,
+                        x: midX, y: midY,
+                        boxWidth: DEFAULT_MAX_WIDTH,
+                        boxHeight: DEFAULT_MAX_HEIGHT,
+                        fixed: { x: false, y: false },
+                        color: { background: '#e0e7ff', border: '#6366f1' } // Tono índigo claro para puentes
+                    });
+                }
+                
+                // Conectamos A -> Puente -> B
+                edges.add({ from: nodeA, to: bridge.id, label: bridge.relFromA });
+                edges.add({ from: bridge.id, to: nodeB, label: bridge.relToB });
+
+                setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
+            } catch (err) { alert("Error de conexión"); } finally { hideLoader(); }
+            return; // Detenemos la ejecución para que no abra el menú flotante
+        }
+
+        // Si no estamos conectando, abrimos el menú flotante normal
+        selectedNodeId = clickedNode;
+        const DOMCoords = network.canvasToDOM(network.getPositions([selectedNodeId])[selectedNodeId]);
+        actionMenu.style.left = DOMCoords.x + 'px';
+        actionMenu.style.top = (DOMCoords.y - 30) + 'px';
+        actionMenu.classList.remove('hidden');
+    } else {
+        actionMenu.classList.add('hidden');
+        selectedNodeId = null;
+    }
+});
