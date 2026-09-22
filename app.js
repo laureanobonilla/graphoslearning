@@ -5,7 +5,6 @@ const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
 
-
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
     physics: {
@@ -30,24 +29,12 @@ let network = new vis.Network(container, { nodes, edges }, {
             highlight: { border: '#0f172a', background: '#f8fafc' },
             hover: { border: '#94a3b8', background: '#ffffff' }
         },
-        shadow: { 
-            enabled: true, 
-            color: 'rgba(15, 23, 42, 0.04)', 
-            size: 16, 
-            x: 0, 
-            y: 8 
-        },
+        shadow: { enabled: true, color: 'rgba(15, 23, 42, 0.04)', size: 16, x: 0, y: 8 },
         shapeProperties: { borderRadius: 10 }
     },
     edges: { 
-        arrows: {
-            to: { enabled: true, scaleFactor: 0.6 }
-        },
-        color: { 
-            color: '#cbd5e1', 
-            highlight: '#475569', 
-            hover: '#94a3b8' 
-        },
+        arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+        color: { color: '#cbd5e1', highlight: '#475569', hover: '#94a3b8' },
         font: { 
             size: 11, 
             face: 'Inter, sans-serif',
@@ -58,10 +45,7 @@ let network = new vis.Network(container, { nodes, edges }, {
         },
         smooth: { type: 'continuous', roundness: 0.5 }
     },
-    interaction: { 
-        hover: true,
-        tooltipDelay: 100
-    }
+    interaction: { hover: true }
 });
 
 function stopPhysicsAndUnlock() {
@@ -82,6 +66,11 @@ const loader = document.getElementById('loader');
 const loaderText = document.getElementById('loaderText');
 const connectionBanner = document.getElementById('connectionBanner');
 const storeModal = document.getElementById('storeModal');
+const helpModal = document.getElementById('helpModal');
+const textSchemaModal = document.getElementById('textSchemaModal');
+const rawTextInput = document.getElementById('rawTextInput');
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
 
 let selectedNodeId = null;
 let sourceNodeForConnection = null;
@@ -112,7 +101,7 @@ if (!sessionId) {
 let nodesTracked = parseInt(localStorage.getItem('gk_nodes_tracked') || '0', 10);
 
 function trackNodeUsage(topicName) {
-    if (nodesTracked >= 50) return; // Límite ampliado a 50 nodos por usuario
+    if (nodesTracked >= 50) return;
 
     nodesTracked++;
     localStorage.setItem('gk_nodes_tracked', nodesTracked.toString());
@@ -189,7 +178,7 @@ function checkBalance(cost) {
 document.getElementById('nodeCounterBtn')?.addEventListener('click', openStore);
 document.getElementById('closeStore')?.addEventListener('click', closeStoreModal);
 
-// Acceso Seguro de Admin
+// Acceso de Administrador
 document.getElementById('btnAdminAccess')?.addEventListener('click', async () => {
     const inputPass = prompt("Ingresa la clave de administración:");
     if (!inputPass) return;
@@ -207,12 +196,12 @@ document.getElementById('btnAdminAccess')?.addEventListener('click', async () =>
             isAdmin = true;
             localStorage.setItem('gk_is_admin', 'true');
             updateCounterDisplay();
-            alert("Acceso administrador concedido. Nodos ilimitados activados.");
+            alert("Acceso administrador concedido. Nodos ilimitados.");
         } else {
             alert("Contraseña incorrecta.");
         }
     } catch {
-        alert("Error al verificar credenciales.");
+        alert("Error de autenticación.");
     } finally {
         hideLoader();
     }
@@ -227,12 +216,12 @@ let selectedNodeAmount = 1000;
 document.querySelectorAll('.package-card').forEach(card => {
     card.addEventListener('click', (e) => {
         document.querySelectorAll('.package-card').forEach(c => {
-            c.classList.remove('border-2', 'border-indigo-500', 'bg-indigo-50');
-            c.classList.add('border', 'border-slate-200');
+            c.classList.remove('border-2', 'border-slate-900', 'bg-slate-900', 'text-white');
+            c.classList.add('border', 'border-slate-200', 'bg-slate-50/40', 'text-slate-900');
         });
         const target = e.currentTarget;
-        target.classList.remove('border', 'border-slate-200');
-        target.classList.add('border-2', 'border-indigo-500', 'bg-indigo-50');
+        target.classList.remove('border', 'border-slate-200', 'bg-slate-50/40');
+        target.classList.add('border-2', 'border-slate-900', 'bg-slate-900', 'text-white');
         
         selectedPrice = target.dataset.price;
         selectedNodeAmount = parseInt(target.dataset.nodes, 10);
@@ -272,14 +261,12 @@ if (window.paypal) {
                 }
 
                 availableNodes += selectedNodeAmount;
-                currentLicense = licenseKey;
-
                 localStorage.setItem('gk_license', licenseKey);
                 localStorage.setItem('gk_balance', availableNodes);
                 updateCounterDisplay();
                 closeStoreModal();
 
-                alert(`¡Pago completado! Se agregaron ${selectedNodeAmount} nodos.\nTu clave es: ${licenseKey}\nConsérvala para sincronizar tu saldo en otros dispositivos.`);
+                alert(`¡Pago completado! Se agregaron ${selectedNodeAmount} nodos.\nTu clave es: ${licenseKey}`);
             });
         },
         onError: function(err) {
@@ -288,6 +275,7 @@ if (window.paypal) {
         }
     }).render('#paypal-button-container');
 }
+
 document.getElementById('btnVerifyLicense')?.addEventListener('click', async () => {
     const key = document.getElementById('licenseInput').value.trim().toUpperCase();
     if (!key) return;
@@ -302,9 +290,8 @@ document.getElementById('btnVerifyLicense')?.addEventListener('click', async () 
         const data = await res.json();
 
         if (res.ok && data.success) {
-            currentLicense = data.licenseKey;
             availableNodes = data.balance;
-            localStorage.setItem('gk_license', currentLicense);
+            localStorage.setItem('gk_license', data.licenseKey);
             localStorage.setItem('gk_balance', availableNodes);
             updateCounterDisplay();
             closeStoreModal();
@@ -318,8 +305,9 @@ document.getElementById('btnVerifyLicense')?.addEventListener('click', async () 
         hideLoader();
     }
 });
+
 // ==========================================
-// 6. GENERAR NODO RAÍZ (SIN REVOLVER EL LIENZO)
+// 6. GENERAR NODO RAÍZ DESDE INPUT
 // ==========================================
 document.getElementById('btnGenerate').addEventListener('click', async () => {
     const topic = topicInput.value.trim();
@@ -327,12 +315,10 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
 
     if (!checkBalance(1)) return;
 
-    // Calculamos el centro actual donde el usuario tiene la cámara puesta
     const viewCenter = network.getViewPosition();
     const spawnX = viewCenter.x + (Math.random() * 80 - 40);
     const spawnY = viewCenter.y + (Math.random() * 80 - 40);
 
-    // Agregamos directamente en posición fija SIN activar el motor de físicas
     nodes.add({ 
         id: topic, 
         label: `*${topic}*`, 
@@ -346,7 +332,6 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
     consumeNodes(1);
     topicInput.value = '';
 
-    // Enfoque suave hacia el nuevo nodo sin alterar los demás
     setTimeout(() => {
         network.focus(topic, {
             scale: 1.0,
@@ -356,7 +341,7 @@ document.getElementById('btnGenerate').addEventListener('click', async () => {
 });
 
 // ==========================================
-// 7. EXPANDIR RAMAS
+// 7. EXPANDIR RAMAS MANUALMENTE
 // ==========================================
 function getContextPath(nodeId) {
     let path = [nodeId];
@@ -390,7 +375,6 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
         });
         const data = await response.json();
 
-        // Congelar nodos existentes para que solo se muevan los nuevos
         const existingNodes = nodes.get();
         nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
 
@@ -428,7 +412,7 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
 });
 
 // ==========================================
-// 8. GENERAR EJEMPLOS
+// 8. GENERAR EJEMPLOS MANUALMENTE
 // ==========================================
 document.getElementById('btnMenuExamples').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
@@ -438,7 +422,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
     if (!checkBalance(maxNodes)) return;
 
     const contextPath = getContextPath(selectedNodeId);
-    showLoader('Buscando ejemplos prácticos...');
+    showLoader('Buscando casos prácticos...');
 
     try {
         const response = await fetch('/.netlify/functions/gemini', {
@@ -472,10 +456,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
                         highlight: { background: '#f5f5f4', border: '#78716c' },
                         hover: { background: '#ffffff', border: '#a8a29e' }
                     },
-                    font: { 
-                        color: '#44403c',
-                        bold: { color: '#292524', size: 14 }
-                    },
+                    font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
                     shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
                 });
                 
@@ -483,7 +464,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
                     from: selectedNodeId, 
                     to: example.id, 
                     label: example.relationship,
-                    color: { color: '#f59e0b', highlight: '#d97706' },
+                    color: { color: '#cbd5e1', highlight: '#78716c' },
                     dashes: true
                 });
                 trackNodeUsage(example.label);
@@ -501,7 +482,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
 });
 
 // ==========================================
-// 9. DEFINICIÓN, CONEXIONES Y TAMAÑO
+// 9. DEFINICIÓN, CONECTAR, ELIMINAR Y TAMAÑO
 // ==========================================
 document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
@@ -510,9 +491,8 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     const currentNode = nodes.get(selectedNodeId);
     const title = currentNode.baseTitle || selectedNodeId;
 
-    // CASO A: Ya tiene definición precargada (del texto) o ya renderizada
+    // Si ya tiene definición precargada del documento, mostrarla de inmediato
     if (currentNode && currentNode.definition) {
-        // Si el label aún no muestra la definición, la estampamos de inmediato
         if (!currentNode.label.includes('──────────')) {
             const newLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
             nodes.update({ 
@@ -527,7 +507,6 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         return;
     }
 
-    // CASO B: No venía en el texto, procedemos a consultar a Gemini normalmente
     const contextPath = getContextPath(selectedNodeId);
     showLoader('Redactando definición...');
 
@@ -597,7 +576,7 @@ document.getElementById('btnSizePlus')?.addEventListener('click', () => resizeNo
 document.getElementById('btnSizeMinus')?.addEventListener('click', () => resizeNode(-50));
 
 // ==========================================
-// 10. LIMPIAR Y CAPTURAR
+// 10. LIMPIAR, CAPTURAR Y AYUDA
 // ==========================================
 document.getElementById('btnClear')?.addEventListener('click', () => {
     if (nodes.length === 0) return;
@@ -631,7 +610,7 @@ document.getElementById('btnCapture')?.addEventListener('click', () => {
             exportCanvas.height = canvas.height;
             const ctx = exportCanvas.getContext('2d');
 
-            ctx.fillStyle = '#f8fafc';
+            ctx.fillStyle = '#fbfcfd';
             ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
             ctx.drawImage(canvas, 0, 0);
 
@@ -652,8 +631,262 @@ document.getElementById('btnCapture')?.addEventListener('click', () => {
     }, 150);
 });
 
+document.getElementById('btnHelp')?.addEventListener('click', () => {
+    helpModal.classList.remove('hidden');
+    helpModal.classList.add('flex');
+});
+document.getElementById('closeHelp')?.addEventListener('click', () => {
+    helpModal.classList.add('hidden');
+    helpModal.classList.remove('flex');
+});
+
 // ==========================================
-// 11. EVENTOS DE RED
+// 11. PROCESAMIENTO DOCUMENTAL LOCAL (PDF, DOCX, ZIP)
+// ==========================================
+let selectedDensity = 'medium';
+
+document.querySelectorAll('.density-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.density-btn').forEach(b => {
+            b.classList.remove('bg-white', 'text-slate-900', 'shadow-xs', 'font-semibold');
+            b.classList.add('text-slate-600', 'font-medium');
+        });
+        const target = e.currentTarget;
+        target.classList.remove('text-slate-600', 'font-medium');
+        target.classList.add('bg-white', 'text-slate-900', 'shadow-xs', 'font-semibold');
+        selectedDensity = target.dataset.density;
+    });
+});
+
+document.getElementById('btnOpenTextModal')?.addEventListener('click', () => {
+    rawTextInput.value = '';
+    textSchemaModal.classList.remove('hidden');
+    textSchemaModal.classList.add('flex');
+});
+
+document.getElementById('closeTextModal')?.addEventListener('click', () => {
+    textSchemaModal.classList.add('hidden');
+    textSchemaModal.classList.remove('flex');
+});
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('border-slate-900'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('border-slate-900'));
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('border-slate-900');
+    if (e.dataTransfer.files.length > 0) handleFileUpload(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) handleFileUpload(e.target.files[0]);
+});
+
+async function extractTextFromPDF(arrayBuffer) {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = '';
+    const maxPages = Math.min(pdf.numPages, 20); // Límite de seguridad
+    for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        fullText += textContent.items.map(item => item.str).join(' ') + '\n';
+    }
+    return fullText;
+}
+
+async function extractTextFromDocx(arrayBuffer) {
+    const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+    return result.value;
+}
+
+async function handleFileUpload(file) {
+    showLoader('Extrayendo texto del archivo...');
+    try {
+        const fileName = file.name.toLowerCase();
+        let extractedText = '';
+
+        if (fileName.endsWith('.txt')) {
+            extractedText = await file.text();
+        } else if (fileName.endsWith('.pdf')) {
+            const buffer = await file.arrayBuffer();
+            extractedText = await extractTextFromPDF(buffer);
+        } else if (fileName.endsWith('.docx')) {
+            const buffer = await file.arrayBuffer();
+            extractedText = await extractTextFromDocx(buffer);
+        } else if (fileName.endsWith('.zip')) {
+            const buffer = await file.arrayBuffer();
+            const zip = await JSZip.loadAsync(buffer);
+            let combined = '';
+
+            for (let relativePath in zip.files) {
+                const zipEntry = zip.files[relativePath];
+                if (!zipEntry.dir) {
+                    const entryName = zipEntry.name.toLowerCase();
+                    if (entryName.endsWith('.txt')) {
+                        const t = await zipEntry.async('text');
+                        combined += `\n--- Archivo: ${zipEntry.name} ---\n` + t;
+                    } else if (entryName.endsWith('.docx')) {
+                        const b = await zipEntry.async('arraybuffer');
+                        const t = await extractTextFromDocx(b);
+                        combined += `\n--- Archivo: ${zipEntry.name} ---\n` + t;
+                    } else if (entryName.endsWith('.pdf')) {
+                        const b = await zipEntry.async('arraybuffer');
+                        const t = await extractTextFromPDF(b);
+                        combined += `\n--- Archivo: ${zipEntry.name} ---\n` + t;
+                    }
+                }
+            }
+            extractedText = combined;
+        }
+
+        // Truncado de seguridad para evitar superar el timeout de Netlify
+        const words = extractedText.trim().split(/\s+/);
+        if (words.length > 7000) {
+            extractedText = words.slice(0, 7000).join(' ') + '\n[... Texto delimitado a las primeras 7000 palabras ...]';
+        }
+
+        rawTextInput.value = extractedText;
+    } catch (err) {
+        console.error(err);
+        alert('No se pudo extraer el texto del archivo.');
+    } finally {
+        hideLoader();
+    }
+}
+
+// ==========================================
+// 12. GENERACIÓN DEL ÁRBOL JERÁRQUICO
+// ==========================================
+document.getElementById('btnProcessText')?.addEventListener('click', async () => {
+    const textContent = rawTextInput.value.trim();
+    if (!textContent) return;
+
+    // Validación de cobro preventiva
+    const estimatedMinCost = selectedDensity === 'low' ? 4 : selectedDensity === 'high' ? 10 : 6;
+    if (!checkBalance(estimatedMinCost)) return;
+
+    textSchemaModal.classList.add('hidden');
+    textSchemaModal.classList.remove('flex');
+    showLoader(`Generando árbol estructurado...`);
+
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'parse_text', 
+                text: textContent,
+                density: selectedDensity 
+            })
+        });
+        const data = await response.json();
+
+        // 1. Calcular total de nodos y confirmar saldo exacto
+        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
+        if (!checkBalance(totalNodes)) return;
+
+        // 2. Congelar nodos previos
+        const existingNodes = nodes.get();
+        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+
+        // 3. Posicionar Raíz en la cabecera
+        const viewCenter = network.getViewPosition();
+        const rootX = viewCenter.x;
+        const rootY = viewCenter.y - 120;
+
+        const root = data.root;
+        nodes.add({
+            id: root.id,
+            label: `*${root.label}*`,
+            baseTitle: root.label,
+            definition: root.definition || null,
+            x: rootX,
+            y: rootY,
+            fixed: { x: false, y: false }
+        });
+        trackNodeUsage(root.label);
+
+        // 4. Posicionar Ramas en fila horizontal uniforme
+        const branches = data.branches || [];
+        const branchSpacing = 280;
+        const totalBranchWidth = (branches.length - 1) * branchSpacing;
+        const startBranchX = rootX - (totalBranchWidth / 2);
+        const branchY = rootY + 160;
+
+        const branchPositions = {};
+
+        branches.forEach((branch, index) => {
+            const bx = startBranchX + (index * branchSpacing);
+            const by = branchY;
+            branchPositions[branch.id] = { x: bx, y: by, exampleCount: 0 };
+
+            nodes.add({
+                id: branch.id,
+                label: `*${branch.label}*`,
+                baseTitle: branch.label,
+                definition: branch.definition || null,
+                x: bx,
+                y: by,
+                fixed: { x: false, y: false }
+            });
+            edges.add({ from: root.id, to: branch.id, label: branch.relationship });
+            trackNodeUsage(branch.label);
+        });
+
+        // 5. Posicionar Ejemplos en columna debajo de su respectiva rama
+        const examples = data.examples || [];
+        examples.forEach(ex => {
+            const parentPos = branchPositions[ex.targetId] || { x: rootX, y: branchY, exampleCount: 0 };
+            parentPos.exampleCount++;
+            
+            const exX = parentPos.x;
+            const exY = parentPos.y + (parentPos.exampleCount * 110);
+
+            nodes.add({
+                id: ex.id,
+                label: `*Ejemplo:*\n${ex.label}`,
+                baseTitle: ex.label,
+                definition: ex.definition || null,
+                x: exX,
+                y: exY,
+                fixed: { x: false, y: false },
+                color: {
+                    background: '#fafaf9',
+                    border: '#d6d3d1',
+                    highlight: { background: '#f5f5f4', border: '#78716c' },
+                    hover: { background: '#ffffff', border: '#a8a29e' }
+                },
+                font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
+                shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
+            });
+
+            const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
+            edges.add({
+                from: target,
+                to: ex.id,
+                label: ex.relationship,
+                color: { color: '#cbd5e1', highlight: '#78716c' },
+                dashes: true
+            });
+            trackNodeUsage(ex.label);
+        });
+
+        // Consumir créditos del usuario
+        consumeNodes(totalNodes);
+
+        // Desactivar físicas para mantener la disposición del árbol intacta
+        network.setOptions({ physics: { enabled: false } });
+        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+
+    } catch (err) {
+        console.error(err);
+        alert('No se pudo procesar el esquema desde el documento.');
+    } finally {
+        hideLoader();
+    }
+});
+
+// ==========================================
+// 13. EVENTOS DEL CANVAS (CLIC, ARRASTRE, ZOOM)
 // ==========================================
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
@@ -692,12 +925,7 @@ network.on('click', async function (params) {
                         boxWidth: DEFAULT_MAX_WIDTH,
                         boxHeight: DEFAULT_MAX_HEIGHT,
                         fixed: { x: false, y: false },
-                        color: {
-                            background: '#f1f5f9',
-                            border: '#cbd5e1',
-                            highlight: { background: '#e2e8f0', border: '#475569' }
-                        },
-                        font: { color: '#1e293b' }
+                        color: { background: '#f1f5f9', border: '#cbd5e1' }
                     });
                     trackNodeUsage(bridge.label);
                     consumeNodes(1);
@@ -730,254 +958,5 @@ network.on('dragStart', (params) => {
     actionMenu.classList.add('hidden');
     if (params.nodes.length > 0) {
         nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
-    }
-});
-
-// ==========================================
-// CONTROL DEL MODAL DE TEXTO A ESQUEMA
-// ==========================================
-const textSchemaModal = document.getElementById('textSchemaModal');
-const rawTextInput = document.getElementById('rawTextInput');
-
-document.getElementById('btnOpenTextModal')?.addEventListener('click', () => {
-    rawTextInput.value = '';
-    textSchemaModal.classList.remove('hidden');
-    textSchemaModal.classList.add('flex');
-});
-
-document.getElementById('closeTextModal')?.addEventListener('click', () => {
-    textSchemaModal.classList.add('hidden');
-    textSchemaModal.classList.remove('flex');
-});
-
-document.getElementById('btnProcessText')?.addEventListener('click', async () => {
-    const textContent = rawTextInput.value.trim();
-    if (!textContent) return;
-
-    textSchemaModal.classList.add('hidden');
-    textSchemaModal.classList.remove('flex');
-    showLoader('Estructurando texto en esquema...');
-
-    try {
-        const response = await fetch('/.netlify/functions/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'parse_text', text: textContent })
-        });
-        const data = await response.json();
-
-        // 1. Calcular total de nodos entrantes
-        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
-        if (!checkBalance(totalNodes)) return;
-
-        // 2. Congelar nodos previos
-        const existingNodes = nodes.get();
-        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
-
-        const viewCenter = network.getViewPosition();
-        const rootX = viewCenter.x;
-        const rootY = viewCenter.y;
-
-        network.setOptions({ physics: { enabled: true } });
-
-        // 3. Crear Nodo Raíz (con definición en memoria si venía en el texto)
-        const root = data.root;
-        nodes.add({
-            id: root.id,
-            label: `*${root.label}*`,
-            baseTitle: root.label,
-            definition: root.definition || null, // Precargada si existe
-            x: rootX,
-            y: rootY,
-            fixed: { x: false, y: false }
-        });
-        trackNodeUsage(root.label);
-
-        // 4. Crear Ramas Temáticas
-        if (Array.isArray(data.branches)) {
-            data.branches.forEach(branch => {
-                nodes.add({
-                    id: branch.id,
-                    label: `*${branch.label}*`,
-                    baseTitle: branch.label,
-                    definition: branch.definition || null, // Precargada si existe
-                    x: rootX + (Math.random() * 60 - 30),
-                    y: rootY + (Math.random() * 60 - 30),
-                    fixed: { x: false, y: false }
-                });
-                edges.add({ from: root.id, to: branch.id, label: branch.relationship });
-                trackNodeUsage(branch.label);
-            });
-        }
-
-        // 5. Crear Nodos de Ejemplos
-        if (Array.isArray(data.examples)) {
-            data.examples.forEach(ex => {
-                nodes.add({
-                    id: ex.id,
-                    label: `*Ejemplo:*\n${ex.label}`,
-                    baseTitle: ex.label,
-                    definition: ex.definition || null, // Precargada si existe
-                    x: rootX + (Math.random() * 80 - 40),
-                    y: rootY + (Math.random() * 80 - 40),
-                    fixed: { x: false, y: false },
-                    color: {
-                        background: '#fafaf9',
-                        border: '#d6d3d1',
-                        highlight: { background: '#f5f5f4', border: '#78716c' },
-                        hover: { background: '#ffffff', border: '#a8a29e' }
-                    },
-                    font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
-                    shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
-                });
-
-                const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
-                edges.add({
-                    from: target,
-                    to: ex.id,
-                    label: ex.relationship,
-                    color: { color: '#cbd5e1', highlight: '#78716c' },
-                    dashes: true
-                });
-                trackNodeUsage(ex.label);
-            });
-        }
-
-        consumeNodes(totalNodes);
-
-        // 6. Ajustar físicas y estabilizar
-        setTimeout(() => { stopPhysicsAndUnlock(); }, 1600);
-
-    } catch (err) {
-        console.error(err);
-        alert('No se pudo procesar el esquema desde el texto.');
-    } finally {
-        hideLoader();
-    }
-});
-
-// Variable de densidad activa (por defecto: medium)
-let selectedDensity = 'medium';
-
-// Selector visual de densidad
-document.querySelectorAll('.density-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.density-btn').forEach(b => {
-            b.classList.remove('bg-white', 'text-slate-900', 'shadow-xs', 'font-semibold');
-            b.classList.add('text-slate-600', 'font-medium');
-        });
-        const target = e.currentTarget;
-        target.classList.remove('text-slate-600', 'font-medium');
-        target.classList.add('bg-white', 'text-slate-900', 'shadow-xs', 'font-semibold');
-        selectedDensity = target.dataset.density;
-    });
-});
-
-// En el evento click de btnProcessText:
-document.getElementById('btnProcessText')?.addEventListener('click', async () => {
-    const textContent = rawTextInput.value.trim();
-    if (!textContent) return;
-
-    textSchemaModal.classList.add('hidden');
-    textSchemaModal.classList.remove('flex');
-    showLoader(`Sintetizando esquema (${selectedDensity === 'low' ? 'esencial' : selectedDensity === 'high' ? 'exhaustivo' : 'equilibrado'})...`);
-
-    try {
-        const response = await fetch('/.netlify/functions/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                action: 'parse_text', 
-                text: textContent,
-                density: selectedDensity 
-            })
-        });
-        const data = await response.json();
-
-        // 1. Calcular total de nodos y validar saldo
-        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
-        if (!checkBalance(totalNodes)) return;
-
-        // 2. Congelar nodos existentes para preservar el mapa
-        const existingNodes = nodes.get();
-        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
-
-        const viewCenter = network.getViewPosition();
-        const rootX = viewCenter.x;
-        const rootY = viewCenter.y;
-
-        network.setOptions({ physics: { enabled: true } });
-
-        // 3. Nodo Raíz
-        const root = data.root;
-        nodes.add({
-            id: root.id,
-            label: `*${root.label}*`,
-            baseTitle: root.label,
-            definition: root.definition || null,
-            x: rootX,
-            y: rootY,
-            fixed: { x: false, y: false }
-        });
-        trackNodeUsage(root.label);
-
-        // 4. Ramas
-        if (Array.isArray(data.branches)) {
-            data.branches.forEach(branch => {
-                nodes.add({
-                    id: branch.id,
-                    label: `*${branch.label}*`,
-                    baseTitle: branch.label,
-                    definition: branch.definition || null,
-                    x: rootX + (Math.random() * 80 - 40),
-                    y: rootY + (Math.random() * 80 - 40),
-                    fixed: { x: false, y: false }
-                });
-                edges.add({ from: root.id, to: branch.id, label: branch.relationship });
-                trackNodeUsage(branch.label);
-            });
-        }
-
-        // 5. Ejemplos
-        if (Array.isArray(data.examples)) {
-            data.examples.forEach(ex => {
-                nodes.add({
-                    id: ex.id,
-                    label: `*Ejemplo:*\n${ex.label}`,
-                    baseTitle: ex.label,
-                    definition: ex.definition || null,
-                    x: rootX + (Math.random() * 100 - 50),
-                    y: rootY + (Math.random() * 100 - 50),
-                    fixed: { x: false, y: false },
-                    color: {
-                        background: '#fafaf9',
-                        border: '#d6d3d1',
-                        highlight: { background: '#f5f5f4', border: '#78716c' },
-                        hover: { background: '#ffffff', border: '#a8a29e' }
-                    },
-                    font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
-                    shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
-                });
-
-                const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
-                edges.add({
-                    from: target,
-                    to: ex.id,
-                    label: ex.relationship,
-                    color: { color: '#cbd5e1', highlight: '#78716c' },
-                    dashes: true
-                });
-                trackNodeUsage(ex.label);
-            });
-        }
-
-        consumeNodes(totalNodes);
-        setTimeout(() => { stopPhysicsAndUnlock(); }, 1800);
-
-    } catch (err) {
-        console.error(err);
-        alert('No se pudo procesar el esquema desde el texto.');
-    } finally {
-        hideLoader();
     }
 });

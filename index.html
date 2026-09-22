@@ -5,16 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Graphikosmos</title>
     
-    <!-- Tipografías Premium: Plus Jakarta Sans + Inter -->
+    <!-- Tipografías Premium -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     
+    <!-- Librerías de Visualización y Estilos -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://www.paypal.com/sdk/js?client-id=BAAoSqwffH3QBaBX37mWEhxTqnuTNANyr2qtNUPlGViCBrx1rLw1NDyOa9pkDZzRa7kIVcdPDZTDj_PrdY&currency=USD"></script>
     
+    <!-- Librerías para Procesamiento Local de Documentos (PDF, DOCX, ZIP) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
     <style>
         :root {
             --font-display: 'Plus Jakarta Sans', -apple-system, sans-serif;
@@ -29,7 +36,6 @@
             letter-spacing: -0.025em;
         }
 
-        /* Cuadrícula de micropuntos premium para el lienzo */
         .canvas-blueprint {
             background-color: #fbfcfd;
             background-image: radial-gradient(rgba(100, 116, 139, 0.18) 1px, transparent 1px);
@@ -39,7 +45,6 @@
         #network-container { width: 100%; height: 100%; outline: none; }
         .vis-network:focus { outline: none; }
 
-        /* Sombras multicapa refinadas */
         .glass-panel {
             background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(20px);
@@ -56,7 +61,6 @@
             box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08), 0 0 1px 1px rgba(255, 255, 255, 0.8) inset;
         }
 
-        /* Notificador de status */
         #loader.show {
             opacity: 1;
             transform: translate(-50%, 16px);
@@ -65,7 +69,7 @@
 </head>
 <body class="h-screen flex flex-col overflow-hidden text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
     
-    <!-- Notificador Flotante con estilo HUD discreto -->
+    <!-- Notificador Flotante -->
     <div id="loader" class="fixed top-0 left-1/2 transform -translate-x-1/2 -translate-y-full glass-dock text-slate-900 px-5 py-2.5 rounded-full z-50 flex items-center gap-3 transition-all duration-300 opacity-0 pointer-events-none text-xs font-semibold tracking-wide border border-slate-300/80 shadow-2xl">
         <span class="relative flex h-2 w-2">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
@@ -74,7 +78,7 @@
         <span id="loaderText">Sintetizando...</span>
     </div>
 
-    <!-- Banner Modo Conexión con acabado ámbar ahumado -->
+    <!-- Banner Modo Conexión -->
     <div id="connectionBanner" class="absolute top-20 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white backdrop-blur-md px-5 py-2.5 rounded-full shadow-2xl font-medium text-xs tracking-wide z-40 hidden flex items-center gap-3 cursor-pointer border border-slate-700/60 transition-transform active:scale-95">
         <span class="flex items-center gap-1.5 text-amber-300">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
@@ -83,8 +87,8 @@
         <span class="text-slate-400 hover:text-white ml-2 text-[10px] uppercase font-bold tracking-wider">Cancelar</span>
     </div>
 
-    <!-- Barra de Navegación / Workspace Deck -->
-    <header class="glass-panel border-b border-slate-200/80 px-4 md:px-8 py-3.5 flex flex-col md:flex-row justify-between items-center z-10 gap-3 md:gap-0">
+    <!-- Barra de Navegación -->
+    <header class="glass-panel border-b border-slate-200/80 px-4 md:px-8 py-3 flex flex-col md:flex-row justify-between items-center z-10 gap-3 md:gap-0">
         <div class="flex justify-between items-center w-full md:w-auto">
             <div class="flex items-center gap-3">
                 <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold font-heading text-sm shadow-sm ring-1 ring-white/20">
@@ -94,14 +98,15 @@
                 <span class="text-[10px] font-semibold tracking-widest uppercase bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200/70">Studio</span>
             </div>
             
-            <!-- Contador de saldo en cápsula minimalista -->
             <div id="nodeCounterBtn" class="ml-4 md:ml-6 cursor-pointer bg-white/80 hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full flex items-center gap-2.5 transition-all shadow-sm active:scale-95">
                 <span class="w-2 h-2 rounded-full bg-emerald-500" id="statusDot"></span>
                 <span id="nodeCountDisplay" class="text-xs font-semibold text-slate-700 font-mono tracking-tight">50 Nodos</span>
             </div>
 
-            <!-- Acciones secundarias en cabecera -->
             <div class="flex items-center gap-2 md:ml-4">
+                <button id="btnOpenTextModal" title="Cargar documento o pegar texto" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5">
+                    <span>📄</span> Documento / Texto
+                </button>
                 <button id="btnClear" title="Limpiar lienzo" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-600 hover:text-red-600 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm">
                     Limpiar
                 </button>
@@ -115,7 +120,6 @@
             </div>
         </div>
 
-        <!-- Barra de entrada de temas centrada y refinada -->
         <div class="flex gap-2 w-full md:w-auto">
             <div class="relative w-full md:w-80">
                 <input type="text" id="topicInput" placeholder="Comenzar con un concepto matriz..." class="w-full bg-white/90 border border-slate-200/90 rounded-lg pl-3.5 pr-8 py-2 text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 shadow-sm transition-all font-sans">
@@ -124,18 +128,13 @@
                 Generar
             </button>
         </div>
-        <button id="btnOpenTextModal" title="Pegar texto y convertir a esquema" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center gap-1.5">
-            <span>📝</span> Texto a Esquema
-        </button>        
     </header>
 
     <div class="flex flex-1 h-full relative">
-        <!-- Lienzo con textura de blueprint táctil -->
         <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
 
-        <!-- Menú de Acciones Flotante: Estilo Inspector contextual -->
+        <!-- Menú de Acciones Flotante -->
         <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col overflow-hidden transform -translate-x-1/2 -translate-y-full min-w-[210px] transition-all">
-            
             <div class="px-3.5 py-2.5 bg-slate-50/70 border-b border-slate-200/60 flex justify-between items-center">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Densidad</span>
                 <div class="flex items-center gap-1.5">
@@ -179,13 +178,57 @@
             </div>
         </div>
 
-        <!-- Enlace discreto de Admin -->
         <div class="absolute bottom-3 left-4 z-30 opacity-30 hover:opacity-100 transition-opacity">
             <button id="btnAdminAccess" class="text-[10px] font-mono text-slate-400 hover:text-slate-900 tracking-wider uppercase">Console</button>
         </div>
     </div>
 
-    <!-- Modal de Tienda / Licencia -->
+    <!-- Modal de Documento / Texto a Esquema -->
+    <div id="textSchemaModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[105] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/80">
+            <div class="px-7 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
+                <div>
+                    <h2 class="text-lg font-bold font-heading text-slate-900">Sintetizador Documental</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Sube archivos (PDF, Word, TXT, ZIP) o pega contenido de estudio.</p>
+                </div>
+                <button id="closeTextModal" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors">✕</button>
+            </div>
+            
+            <div class="p-6 flex flex-col gap-4">
+                <!-- Dropzone de Archivos -->
+                <div class="border-2 border-dashed border-slate-200 hover:border-slate-400 rounded-xl p-4 text-center bg-slate-50/50 transition-colors cursor-pointer" id="dropZone">
+                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.txt,.zip">
+                    <div class="flex flex-col items-center gap-1.5">
+                        <span class="text-2xl">📥</span>
+                        <p class="text-xs font-semibold text-slate-700">Arrastra o haz clic para subir archivo</p>
+                        <p class="text-[11px] text-slate-400">Formatos: PDF, Word (.docx), TXT o archivos .ZIP con varios documentos</p>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <textarea id="rawTextInput" rows="6" placeholder="O pega el texto manualmente aquí..." class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-sans resize-none leading-relaxed"></textarea>
+                </div>
+                
+                <!-- Selector de Densidad y Disparo -->
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2 border-t border-slate-100">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Densidad:</span>
+                        <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs" id="densitySelector">
+                            <button type="button" data-density="low" class="density-btn px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Esencial</button>
+                            <button type="button" data-density="medium" class="density-btn px-3 py-1 rounded-md font-semibold bg-white text-slate-900 shadow-xs transition-colors">Media</button>
+                            <button type="button" data-density="high" class="density-btn px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Exhaustiva</button>
+                        </div>
+                    </div>
+
+                    <button id="btnProcessText" class="w-full sm:w-auto bg-slate-950 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <span>Generar Árbol Jerárquico</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Tienda -->
     <div id="storeModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[100] hidden items-center justify-center p-4">
         <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/80">
             <div class="px-7 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
@@ -203,13 +246,11 @@
                         <div class="text-2xl font-extrabold font-heading text-slate-900 my-1.5">200</div>
                         <div class="text-xs text-slate-500 font-mono">$5.00 USD</div>
                     </div>
-                    
                     <div class="border border-slate-200 rounded-xl p-4 text-center hover:border-slate-400 transition-all cursor-pointer package-card bg-slate-50/40" data-nodes="400" data-price="9.00">
                         <div class="text-xs font-semibold uppercase tracking-wider text-slate-500">Estudio</div>
                         <div class="text-2xl font-extrabold font-heading text-slate-900 my-1.5">400</div>
                         <div class="text-xs text-slate-500 font-mono">$9.00 USD</div>
                     </div>
-                    
                     <div class="border-2 border-slate-900 bg-slate-900 text-white rounded-xl p-4 text-center relative cursor-pointer package-card shadow-md" data-nodes="1000" data-price="15.00">
                         <div class="text-xs font-semibold uppercase tracking-wider text-slate-300">Completo</div>
                         <div class="text-2xl font-extrabold font-heading text-white my-1.5">1000</div>
@@ -229,7 +270,7 @@
         </div>
     </div>
 
-    <!-- Modal de Ayuda / Referencia -->
+    <!-- Modal de Ayuda -->
     <div id="helpModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[110] hidden items-center justify-center p-4">
         <div class="bg-white w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/80">
             <div class="px-7 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
@@ -241,59 +282,28 @@
                 <div class="flex gap-3">
                     <div class="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded h-fit">01</div>
                     <div>
-                        <div class="font-bold text-slate-900 mb-0.5">Entrada de Conceptos</div>
-                        <p class="text-slate-500 leading-relaxed">Genera un nuevo núcleo sin alterar la disposición que ya hayas organizado en tu mesa de trabajo.</p>
+                        <div class="font-bold text-slate-900 mb-0.5">Sintetizador Documental</div>
+                        <p class="text-slate-500 leading-relaxed">Carga un PDF, Word o ZIP para generar un organigrama en árbol limpio sin solapamientos. Las definiciones extraídas quedan listas para consulta instantánea.</p>
                     </div>
                 </div>
                 <div class="flex gap-3">
                     <div class="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded h-fit">02</div>
                     <div>
-                        <div class="font-bold text-slate-900 mb-0.5">Acciones por Nodo</div>
-                        <p class="text-slate-500 leading-relaxed">Haz un solo clic sobre cualquier elemento para abrir el inspector contextual y solicitar derivaciones teóricas, aplicaciones prácticas o síntesis.</p>
+                        <div class="font-bold text-slate-900 mb-0.5">Inspector de Nodo</div>
+                        <p class="text-slate-500 leading-relaxed">Haz un clic sobre cualquier elemento para expandir ramas, solicitar casos prácticos o sintetizar definiciones.</p>
                     </div>
                 </div>
                 <div class="flex gap-3">
                     <div class="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded h-fit">03</div>
                     <div>
                         <div class="font-bold text-slate-900 mb-0.5">Vínculos de Síntesis</div>
-                        <p class="text-slate-500 leading-relaxed">Usa "Vincular con..." para seleccionar dos conceptos aislados; el sistema formulará un nodo puente que explique la correlación lógica.</p>
+                        <p class="text-slate-500 leading-relaxed">Usa "Vincular con..." para seleccionar dos conceptos aislados; el sistema formula un nodo puente lógico.</p>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- Modal de Texto a Esquema con Selector de Densidad -->
-    <div id="textSchemaModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[105] hidden items-center justify-center p-4">
-        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/80">
-            <div class="px-7 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
-                <div>
-                    <h2 class="text-lg font-bold font-heading text-slate-900">Sintetizar Esquema desde Texto</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Pega un artículo, resumen o apuntes para diagramar automáticamente.</p>
-                </div>
-                <button id="closeTextModal" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors">✕</button>
-            </div>
-            
-            <div class="p-6 flex flex-col gap-4">
-                <textarea id="rawTextInput" rows="7" placeholder="Pega aquí el texto que deseas estructurar..." class="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-sans resize-none leading-relaxed"></textarea>
-                
-                <!-- Selector de Densidad -->
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-1 border-t border-slate-100">
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Densidad:</span>
-                        <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs" id="densitySelector">
-                            <button type="button" data-density="low" class="density-btn px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Esencial</button>
-                            <button type="button" data-density="medium" class="density-btn px-3 py-1 rounded-md font-semibold bg-white text-slate-900 shadow-xs transition-colors">Media</button>
-                            <button type="button" data-density="high" class="density-btn px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Exhaustiva</button>
-                        </div>
-                    </div>
-
-                    <button id="btnProcessText" class="w-full sm:w-auto bg-slate-950 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold text-xs shadow-md transition-all active:scale-95">
-                        Generar Esquema
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    
     <script src="app.js"></script>
 </body>
 </html>

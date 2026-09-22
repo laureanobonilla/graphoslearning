@@ -8,7 +8,7 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB } = JSON.parse(event.body);
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium' } = JSON.parse(event.body);
 
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
@@ -26,7 +26,7 @@ exports.handler = async function(event, context) {
                                 label: { type: 'STRING' },
                                 relationship: { 
                                     type: 'STRING', 
-                                    description: 'Verbo de enlace o conector extremadamente corto (máximo 1 a 3 palabras, ej: "produce", "incluye", "requiere").' 
+                                    description: 'Verbo de enlace o conector ultracorto (máximo 1 a 3 palabras, ej: "produce", "incluye", "requiere").' 
                                 }
                             },
                             required: ["id", "label", "relationship"]
@@ -88,7 +88,7 @@ exports.handler = async function(event, context) {
                 
                 REGLAS CRÍTICAS:
                 1. Genera EXACTAMENTE ${maxNodes} ejemplos prácticos concisos.
-                2. El campo "relationship" solo debe contener un enlace ultracorto de 1 o 2 palabras (ej: "ejemplo de", "caso en", "aplicación"). Nunca frases largas.`,
+                2. El campo "relationship" solo debe contener un enlace ultracorto de 1 o 2 palabras. Nunca frases largas.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
@@ -125,7 +125,7 @@ exports.handler = async function(event, context) {
                 
                 REGLAS CRÍTICAS:
                 1. "label": Nombre corto del concepto intermedio.
-                2. "relFromA" y "relToB": Verbos o conectores sintéticos de 1 a 3 palabras como máximo (ej: "influye en", "determina", "basado en"). No redactes párrafos.`,
+                2. "relFromA" y "relToB": Verbos o conectores sintéticos de 1 a 3 palabras como máximo.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
@@ -151,23 +151,18 @@ exports.handler = async function(event, context) {
             });
             return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
         }
-// ==========================================
-        // 5. PARSEAR TEXTO COMPLETO A ESQUEMA
+
         // ==========================================
-       // ==========================================
-        // 5. PARSEAR TEXTO COMPLETO A ESQUEMA
+        // 5. PARSEAR TEXTO COMPLETO A ESQUEMA JERÁRQUICO
         // ==========================================
         if (action === 'parse_text') {
-            const { text, density = 'medium' } = JSON.parse(event.body);
-
-            // Ajuste de directivas según densidad
             let densityGuideline = '';
             if (density === 'low') {
-                densityGuideline = 'DENSIDAD BAJA (Esencial): Limítate a 2-3 ramas temáticas principales y como máximo 1-2 ejemplos globales. Solo ideas nucleares.';
+                densityGuideline = 'DENSIDAD BAJA (Esencial): Genera solo 2-3 ramas temáticas principales y 1-2 ejemplos globales. Enfócate exclusivamente en las ideas nucleares.';
             } else if (density === 'high') {
-                densityGuideline = 'DENSIDAD ALTA (Exhaustiva): Desglosa entre 6-10 ramas temáticas detalladas y 4-6 ejemplos o casos concretos. Captura matices y conceptos secundarios.';
+                densityGuideline = 'DENSIDAD ALTA (Exhaustiva): Genera entre 6-9 ramas temáticas detalladas y 4-6 ejemplos específicos, capturando matices y elementos secundarios del texto.';
             } else {
-                densityGuideline = 'DENSIDAD MEDIA (Equilibrada): Extrae 3-5 ramas temáticas centrales y 2-3 ejemplos representativos.';
+                densityGuideline = 'DENSIDAD MEDIA (Equilibrada): Genera 3-5 ramas temáticas centrales y 2-4 ejemplos ilustrativos.';
             }
 
             const schema = {
@@ -189,7 +184,7 @@ exports.handler = async function(event, context) {
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                relationship: { type: 'STRING', description: 'Conector ultracorto (1 a 3 palabras).' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras.' },
                                 definition: { type: 'STRING', nullable: true }
                             },
                             required: ["id", "label", "relationship"]
@@ -202,8 +197,8 @@ exports.handler = async function(event, context) {
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                targetId: { type: 'STRING' },
-                                relationship: { type: 'STRING' },
+                                targetId: { type: 'STRING', description: 'ID de la rama a la que ejemplifica' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 2 palabras.' },
                                 definition: { type: 'STRING', nullable: true }
                             },
                             required: ["id", "label", "targetId", "relationship"]
@@ -215,18 +210,18 @@ exports.handler = async function(event, context) {
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
-                contents: `Analiza este texto y estructúralo en un esquema visual:
+                contents: `Analiza este documento y organízalo en un esquema jerárquico:
                 """${text}"""
 
                 INSTRUCCIONES DE DENSIDAD:
                 ${densityGuideline}
 
-                REGLAS ESTRUCTURALES:
-                1. "root": Tema central articulador.
-                2. "branches": Subdivisiones teóricas acordes a la densidad requerida.
-                3. "examples": Casos y aplicaciones vinculados mediante "targetId" a su concepto padre.
-                4. "relationship": Máximo 1 a 3 palabras.
-                5. "definition": Incluye la definición si viene explícita en el texto, de lo contrario null.`,
+                REGLAS ESTRUCTURALES ESTRICTAS:
+                1. "root": El concepto rector central.
+                2. "branches": Las divisiones conceptuales principales que se derivan de la raíz.
+                3. "examples": Casos de uso o aplicaciones vinculadas con "targetId" a su rama teórica.
+                4. "relationship": Estrictamente de 1 a 3 palabras como máximo.
+                5. "definition": Si el texto provee una definición explícita del concepto, extráela. Si el texto no lo define directamente, coloca null.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
