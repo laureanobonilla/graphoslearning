@@ -1,60 +1,90 @@
+// Mapa en memoria para recordar qué BinId le pertenece a qué SessionId
+// Nota: Este mapa sobrevive mientras la instancia de la función Netlify esté viva ("warm").
+const sessionToBinMap = new Map();
+
 exports.handler = async function(event) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     const apiKey = process.env.JSONBIN_KEY;
-    const binId = process.env.JSONBIN_MASTER_BIN_ID;
+    const collectionId = process.env.JSONBIN_COLLECTION_ID;
 
-    if (!apiKey || !binId) {
-        console.error("Faltan variables en Netlify: JSONBIN_KEY o JSONBIN_MASTER_BIN_ID");
+    if (!apiKey || !collectionId) {
+        console.error("Faltan variables en Netlify: JSONBIN_KEY o JSONBIN_COLLECTION_ID");
         return { statusCode: 500, body: JSON.stringify({ error: "Configuración incompleta" }) };
     }
 
     try {
         const { topic, sessionId } = JSON.parse(event.body);
+        let userBinId = sessionToBinMap.get(sessionId);
 
-        // 1. Obtener el estado actual del bin
-        const getRes = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
-            headers: { 
-                'X-Master-Key': apiKey 
+        // ==========================================
+        // FASE 1: Crear Bin si no existe
+        // ==========================================
+        if (!userBinId) {
+            // Estructura inicial del nuevo Bin del usuario
+            const initialPayload = {
+                session: sessionId,
+                created_at: new Date().toISOString(),
+                nodos: []
+            };
+
+            const createRes = await fetch(`https://api.jsonbin.io/v3/b`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': apiKey,
+                    'X-Collection-Id': collectionId,
+                    'X-Bin-Name': `Session_${sessionId.substring(0,6)}` // Nombre fácil de leer
+                },
+                body: JSON.stringify(initialPayload)
+            });
+
+            if (!createRes.ok) {
+                const errText = await createRes.text();
+                console.error("Error creando el Bin del usuario:", createRes.status, errText);
+                return { statusCode: createRes.status, body: errText };
             }
+
+            const createData = await createRes.json();
+            userBinId = createData.metadata.id; // Extraemos el ID del nuevo Bin
+            sessionToBinMap.set(sessionId, userBinId); // Lo recordamos para el próximo nodo
+            console.log(`[+] Nuevo Bin creado para la sesión ${sessionId} -> BinId: ${userBinId}`);
+        }
+
+        // ==========================================
+        // FASE 2: Obtener el estado actual del Bin
+        // ==========================================
+        const getRes = await fetch(`https://api.jsonbin.io/v3/b/${userBinId}/latest`, {
+            headers: { 'X-Master-Key': apiKey }
         });
 
         if (!getRes.ok) {
             const errText = await getRes.text();
-            console.error("Error al leer JSONBin:", getRes.status, errText);
+            console.error("Error al leer el Bin del usuario:", getRes.status, errText);
             return { statusCode: getRes.status, body: errText };
         }
 
         const data = await getRes.json();
+        const payload = data.record;
         
-        // Soportar tanto { proyectos: [...] } como arreglos directos
-        let payload = {};
-        let lista = [];
-
-        if (data.record && Array.isArray(data.record.proyectos)) {
-            lista = data.record.proyectos;
-            payload = data.record;
-        } else if (Array.isArray(data.record)) {
-            lista = data.record;
-            payload = { proyectos: lista };
-        } else {
-            payload = { proyectos: [] };
-            lista = payload.proyectos;
+        // ==========================================
+        // FASE 3: Actualizar el array "nodos"
+        // ==========================================
+        if (!Array.isArray(payload.nodos)) {
+            payload.nodos = [];
         }
 
-        // 2. Agregar el nodo rastreado
-        lista.push({
-            session: sessionId,
+        payload.nodos.push({
             topic: topic,
             timestamp: new Date().toISOString()
         });
 
-        payload.proyectos = lista;
-
-        // 3. Guardar en JSONBin
-        const putRes = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
+        // ==========================================
+        // FASE 4: Guardar los cambios en el Bin del usuario
+        // ==========================================
+        const putRes = await fetch(`https://api.jsonbin.io/v3/b/${userBinId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -69,7 +99,7 @@ exports.handler = async function(event) {
             return { statusCode: putRes.status, body: putErr };
         }
 
-        return { statusCode: 200, body: JSON.stringify({ status: 'ok', count: lista.length }) };
+        return { statusCode: 200, body: JSON.stringify({ status: 'ok', binId: userBinId, nodesCount: payload.nodos.length }) };
 
     } catch (err) {
         console.error("Error general en track.js:", err);
