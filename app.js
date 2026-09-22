@@ -5,9 +5,6 @@ const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
 
-const container = document.getElementById('network-container');
-let nodes = new vis.DataSet([]);
-let edges = new vis.DataSet([]);
 
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
