@@ -59,6 +59,14 @@ function stopPhysicsAndUnlock() {
 network.on("stabilizationIterationsDone", stopPhysicsAndUnlock);
 network.on("stabilized", stopPhysicsAndUnlock);
 
+
+
+let selectedNodeId = null;
+let sourceNodeForConnection = null;
+
+const DEFAULT_MAX_WIDTH = 250;
+const DEFAULT_MAX_HEIGHT = 90;
+
 // ==========================================
 // 2. REFERENCIAS UI Y NOTIFICADOR
 // ==========================================
@@ -74,31 +82,6 @@ const rawTextInput = document.getElementById('rawTextInput');
 const fileInput = document.getElementById('fileInput');
 const dropZone = document.getElementById('dropZone');
 
-let selectedNodeId = null;
-let sourceNodeForConnection = null;
-
-const DEFAULT_MAX_WIDTH = 250;
-const DEFAULT_MAX_HEIGHT = 90;
-
-// ==========================================
-// 2. REFERENCIAS UI Y NOTIFICADOR INMERSIVO
-// ==========================================
-const topicInput = document.getElementById('topicInput');
-const actionMenu = document.getElementById('actionMenu');
-const loaderOverlay = document.getElementById('loaderOverlay'); // <-- Nuevo
-const loaderText = document.getElementById('loaderText');
-const connectionBanner = document.getElementById('connectionBanner');
-
-const mainHeader = document.getElementById('mainHeader');
-const landscapeToggle = document.getElementById('landscapeToggle');
-
-// Resto de referencias de modales...
-const storeModal = document.getElementById('storeModal');
-const helpModal = document.getElementById('helpModal');
-const textSchemaModal = document.getElementById('textSchemaModal');
-const rawTextInput = document.getElementById('rawTextInput');
-const fileInput = document.getElementById('fileInput');
-const dropZone = document.getElementById('dropZone');
 
 let selectedNodeId = null;
 let sourceNodeForConnection = null;
