@@ -454,15 +454,28 @@ const hookTopics = [
     "Economía Conductual", "La Teoría de Cuerdas", "Imperio Romano"
 ];
 
-function toggleWelcomeScreen() {
-    if (nodes.length > 0) {
-        welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-        setTimeout(() => welcomeScreen.classList.add('hidden'), 500);
-    } else {
-        welcomeScreen.classList.remove('hidden');
-        setTimeout(() => welcomeScreen.classList.remove('opacity-0', 'pointer-events-none'), 10);
-    }
+// Variable para controlar que la ventana de bienvenida solo salga al inicio
+let hasDismissedWelcomeScreen = false;
+
+function dismissWelcomeScreen() {
+    if (hasDismissedWelcomeScreen) return; // Si ya se fue, no vuelve a ejecutar
+    
+    welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+    setTimeout(() => {
+        welcomeScreen.classList.add('hidden');
+        hasDismissedWelcomeScreen = true; // Marcamos como cerrada por el resto de la sesión
+    }, 500);
 }
+
+// Escuchamos si el usuario escribe o interactúa para quitarla preventivamente
+topicInput.addEventListener('focus', dismissWelcomeScreen);
+
+// Escuchamos cambios en el grafo para quitarla en cuanto se genera el primer nodo
+nodes.on('*', () => {
+    if (nodes.length > 0 && !hasDismissedWelcomeScreen) {
+        dismissWelcomeScreen();
+    }
+});
 
 const chipsContainer = document.getElementById('suggestionChips');
 if (chipsContainer) {
