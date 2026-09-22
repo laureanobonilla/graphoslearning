@@ -80,16 +80,56 @@ let sourceNodeForConnection = null;
 const DEFAULT_MAX_WIDTH = 250;
 const DEFAULT_MAX_HEIGHT = 90;
 
+// ==========================================
+// 2. REFERENCIAS UI Y NOTIFICADOR INMERSIVO
+// ==========================================
+const topicInput = document.getElementById('topicInput');
+const actionMenu = document.getElementById('actionMenu');
+const loaderOverlay = document.getElementById('loaderOverlay'); // <-- Nuevo
+const loaderText = document.getElementById('loaderText');
+const connectionBanner = document.getElementById('connectionBanner');
+
+const mainHeader = document.getElementById('mainHeader');
+const landscapeToggle = document.getElementById('landscapeToggle');
+
+// Resto de referencias de modales...
+const storeModal = document.getElementById('storeModal');
+const helpModal = document.getElementById('helpModal');
+const textSchemaModal = document.getElementById('textSchemaModal');
+const rawTextInput = document.getElementById('rawTextInput');
+const fileInput = document.getElementById('fileInput');
+const dropZone = document.getElementById('dropZone');
+
+let selectedNodeId = null;
+let sourceNodeForConnection = null;
+
+const DEFAULT_MAX_WIDTH = 250;
+const DEFAULT_MAX_HEIGHT = 90;
+
+// Nuevo Loader de Pantalla Completa
 function showLoader(msg) {
-    if (loaderText && loader) {
+    if (loaderText && loaderOverlay) {
         loaderText.innerText = msg;
-        loader.classList.add('show');
+        loaderOverlay.classList.add('show');
     }
 }
 
 function hideLoader() {
-    if (loader) loader.classList.remove('show');
+    if (loaderOverlay) {
+        loaderOverlay.classList.remove('show');
+    }
 }
+
+// Control del modo Inmersivo (Landscape) en móviles
+landscapeToggle?.addEventListener('click', () => {
+    mainHeader.classList.toggle('force-show');
+    // Cambia el ícono del botón dependiendo del estado
+    if (mainHeader.classList.contains('force-show')) {
+        landscapeToggle.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>';
+    } else {
+        landscapeToggle.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>';
+    }
+});
 
 // ==========================================
 // 3. TELEMETRÍA (PRIMEROS 50 NODOS)
