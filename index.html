@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+    <script src="https://www.paypal.com/sdk/js?client-id=BAAoSqwffH3QBaBX37mWEhxTqnuTNANyr2qtNUPlGViCBrx1rLw1NDyOa9pkDZzRa7kIVcdPDZTDj_PrdY&currency=USD"></script>
     <meta charset="UTF-8">
     <!-- CRÍTICO PARA MÓVILES: Evita el zoom automático y hace que se sienta como App Nativa -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -34,8 +35,24 @@
     <header class="bg-white/70 backdrop-blur-lg border-b border-slate-200 shadow-sm p-3 md:px-6 md:py-4 flex flex-col md:flex-row justify-between items-center z-10 gap-3 md:gap-0">
         <div class="flex justify-between items-center w-full md:w-auto">
             <h1 class="text-xl md:text-2xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 tracking-tight">Graphikosmos</h1>
-            <button id="btnSave" class="md:ml-4 bg-white border border-slate-300 text-slate-700 px-3 py-1.5 md:px-5 md:py-2 rounded-lg font-semibold hover:bg-slate-50 hover:shadow-sm transition-all text-sm md:text-base">Guardar</button>
+            
+            <!-- Contador de Nodos -->
+            <div id="nodeCounterBtn" class="ml-4 md:ml-6 cursor-pointer bg-slate-100 hover:bg-slate-200 border border-slate-300 px-3 py-1.5 rounded-full flex items-center gap-2 transition-colors">
+                <span class="w-2 h-2 rounded-full bg-emerald-500" id="statusDot"></span>
+                <span id="nodeCountDisplay" class="text-sm font-bold text-slate-700">50 Nodos</span>
+            </div>
+
+            <!-- Botones de Acción Global -->
+            <div class="flex items-center gap-2 md:ml-4">
+                <button id="btnClear" title="Limpiar lienzo" class="bg-white border border-slate-300 text-slate-600 hover:text-red-600 hover:border-red-300 px-3 py-1.5 rounded-lg font-semibold transition-all text-sm flex items-center gap-1 shadow-sm">
+                    <span>🧹</span> <span class="hidden sm:inline">Limpiar</span>
+                </button>
+                <button id="btnCapture" title="Descargar imagen del esquema" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg font-semibold transition-all text-sm md:text-base flex items-center gap-1.5 shadow-sm whitespace-nowrap">
+                    <span>📷</span> <span>Capturar Esquema</span>
+                </button>
+            </div>
         </div>
+
         <div class="flex gap-2 w-full md:w-auto">
             <input type="text" id="topicInput" placeholder="Tema central..." class="border border-slate-300 rounded-lg px-3 py-2 w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm text-slate-700 text-sm md:text-base">
             <button id="btnGenerate" class="bg-gradient-to-r from-indigo-600 to-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:shadow-md hover:opacity-90 transition-all text-sm md:text-base whitespace-nowrap">Generar</button>
@@ -83,5 +100,53 @@
 
     </div>
     <script src="app.js"></script>
+<!-- Modal de Tienda / Licencia -->
+    <div id="storeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] hidden flex justify-center items-center p-4">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h2 class="text-2xl font-bold text-slate-800">Amplía tu capacidad</h2>
+                <button id="closeStore" class="text-slate-400 hover:text-slate-800 font-bold text-xl">✕</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto">
+                <p class="text-slate-600 mb-6">Se han agotado tus nodos gratuitos. Adquiere un paquete para seguir construyendo o ingresa tu clave si ya compraste uno.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <!-- Paquete Básico -->
+                    <div class="border border-slate-200 rounded-xl p-4 text-center hover:border-indigo-500 transition-colors cursor-pointer package-card" data-nodes="200" data-price="5.00">
+                        <div class="text-lg font-bold text-slate-700">Básico</div>
+                        <div class="text-3xl font-extrabold text-indigo-600 my-2">200<span class="text-sm text-slate-500"> nodos</span></div>
+                        <div class="text-slate-600 font-medium">$5.00 USD</div>
+                    </div>
+                    <!-- Paquete Avanzado -->
+                    <div class="border border-slate-200 rounded-xl p-4 text-center hover:border-indigo-500 transition-colors cursor-pointer package-card" data-nodes="400" data-price="9.00">
+                        <div class="text-lg font-bold text-slate-700">Avanzado</div>
+                        <div class="text-3xl font-extrabold text-indigo-600 my-2">400<span class="text-sm text-slate-500"> nodos</span></div>
+                        <div class="text-slate-600 font-medium">$9.00 USD</div>
+                    </div>
+                    <!-- Paquete Pro -->
+                    <div class="border-2 border-indigo-500 bg-indigo-50 rounded-xl p-4 text-center relative cursor-pointer package-card" data-nodes="1000" data-price="15.00">
+                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full">MEJOR VALOR</div>
+                        <div class="text-lg font-bold text-indigo-900">Pro</div>
+                        <div class="text-3xl font-extrabold text-indigo-600 my-2">1000<span class="text-sm text-slate-500"> nodos</span></div>
+                        <div class="text-slate-600 font-medium">$15.00 USD</div>
+                    </div>
+                </div>
+
+                <!-- Contenedor del Botón PayPal -->
+                <div id="paypal-button-container" class="min-h-[50px] mb-8"></div>
+
+                <hr class="border-slate-200 mb-6">
+
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <h3 class="text-sm font-bold text-slate-700 mb-2">¿Ya tienes una clave de licencia?</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="licenseInput" placeholder="Ej: GK-A1B2C3D4" class="border border-slate-300 rounded-lg px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm uppercase">
+                        <button id="btnVerifyLicense" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-semibold hover:bg-slate-700 transition-all text-sm">Sincronizar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>    
 </body>
 </html>
