@@ -101,7 +101,7 @@ function hideLoader() {
 }
 
 // ==========================================
-// 3. TELEMETRÍA (PRIMEROS 10 NODOS)
+// 3. TELEMETRÍA (PRIMEROS 50 NODOS)
 // ==========================================
 let sessionId = localStorage.getItem('gk_session_id');
 if (!sessionId) {
@@ -112,7 +112,7 @@ if (!sessionId) {
 let nodesTracked = parseInt(localStorage.getItem('gk_nodes_tracked') || '0', 10);
 
 function trackNodeUsage(topicName) {
-    if (nodesTracked >= 10) return; // Máximo 10 nodos por usuario
+    if (nodesTracked >= 50) return; // Límite ampliado a 50 nodos por usuario
 
     nodesTracked++;
     localStorage.setItem('gk_nodes_tracked', nodesTracked.toString());
@@ -121,7 +121,7 @@ function trackNodeUsage(topicName) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ topic: topicName, sessionId: sessionId })
-    }).catch(() => {}); // Falla silenciosa sin afectar la UX
+    }).catch(() => {});
 }
 
 // ==========================================

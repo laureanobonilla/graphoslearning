@@ -6,14 +6,9 @@ exports.handler = async function(event) {
     const apiKey = process.env.JSONBIN_KEY;
     const binId = process.env.JSONBIN_MASTER_BIN_ID;
 
-    // Diagnóstico en consola de Netlify
-    if (!apiKey) {
-        console.error("FALTA VARIABLE: JSONBIN_KEY no está definida en Netlify");
-        return { statusCode: 500, body: JSON.stringify({ error: "Falta JSONBIN_KEY" }) };
-    }
-    if (!binId) {
-        console.error("FALTA VARIABLE: JSONBIN_MASTER_BIN_ID no está definida en Netlify");
-        return { statusCode: 500, body: JSON.stringify({ error: "Falta JSONBIN_MASTER_BIN_ID" }) };
+    if (!apiKey || !binId) {
+        console.error("Faltan variables en Netlify: JSONBIN_KEY o JSONBIN_MASTER_BIN_ID");
+        return { statusCode: 500, body: JSON.stringify({ error: "Configuración incompleta" }) };
     }
 
     try {
@@ -33,23 +28,39 @@ exports.handler = async function(event) {
         }
 
         const data = await getRes.json();
-        const records = Array.isArray(data.record) ? data.record : [];
+        
+        // Soportar tanto { proyectos: [...] } como arreglos directos
+        let payload = {};
+        let lista = [];
 
-        // 2. Insertar el nuevo registro
-        records.push({
+        if (data.record && Array.isArray(data.record.proyectos)) {
+            lista = data.record.proyectos;
+            payload = data.record;
+        } else if (Array.isArray(data.record)) {
+            lista = data.record;
+            payload = { proyectos: lista };
+        } else {
+            payload = { proyectos: [] };
+            lista = payload.proyectos;
+        }
+
+        // 2. Agregar el nodo rastreado
+        lista.push({
             session: sessionId,
             topic: topic,
             timestamp: new Date().toISOString()
         });
 
-        // 3. Sobrescribir el bin actualizado
+        payload.proyectos = lista;
+
+        // 3. Guardar en JSONBin
         const putRes = await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Master-Key': apiKey
             },
-            body: JSON.stringify(records)
+            body: JSON.stringify(payload)
         });
 
         if (!putRes.ok) {
@@ -58,8 +69,7 @@ exports.handler = async function(event) {
             return { statusCode: putRes.status, body: putErr };
         }
 
-        console.log(`Nodo "${topic}" registrado exitosamente para la sesión ${sessionId}`);
-        return { statusCode: 200, body: JSON.stringify({ status: 'ok' }) };
+        return { statusCode: 200, body: JSON.stringify({ status: 'ok', count: lista.length }) };
 
     } catch (err) {
         console.error("Error general en track.js:", err);
