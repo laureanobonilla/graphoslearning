@@ -164,15 +164,27 @@ exports.handler = async function(event, context) {
         // ==========================================
         // 5. PARSEAR TEXTO A ESQUEMA JERÁRQUICO
         // ==========================================
+        // ==========================================
+        // 5. SINTETIZAR ESQUEMA (TEXTO LARGO O TEMA CORTO)
+        // ==========================================
         if (action === 'parse_text') {
             let densityGuideline = '';
+            
             if (density === 'low') {
-                densityGuideline = 'DENSIDAD BAJA: 2 a 3 ramas principales y 1 a 2 ejemplos concretos sólo si el texto los menciona.';
+                densityGuideline = 'DENSIDAD BAJA: Genera 2-3 ramas principales y 1 ejemplo global. Máximo 5 nodos en total.';
             } else if (density === 'high') {
-                densityGuideline = 'DENSIDAD ALTA: 6 a 9 ramas temáticas detalladas y los ejemplos o casos que el texto cite.';
+                densityGuideline = 'DENSIDAD ALTA: Genera 4-6 ramas detalladas y 3-4 ejemplos específicos. Máximo 10 nodos en total.';
+            } else if (density === 'medium') {
+                densityGuideline = 'DENSIDAD MEDIA: Genera 3-4 ramas centrales y 2-3 ejemplos. Máximo 8 nodos en total.';
             } else {
-                densityGuideline = 'DENSIDAD MEDIA: 3 a 5 ramas temáticas y 2 a 3 ejemplos relevantes presentes en la lectura.';
+                densityGuideline = 'DENSIDAD INTELIGENTE (AUTO): Evalúa la complejidad del tema. Si es simple, usa densidad baja. Si es un tema amplio o científico, despliega ramas y ejemplos exhaustivos sin superar JAMÁS los 10 nodos generados (ramas + ejemplos).';
             }
+
+            // Detectar si es un documento largo o solo el nombre de un tema
+            const isShortTopic = text.trim().split(/\s+/).length < 20;
+            const inputContext = isShortTopic 
+                ? `Construye un esquema conceptual experto sobre este tema: "${text}"`
+                : `Analiza minuciosamente el siguiente documento y estructura un mapa conceptual fiel a su contenido:\n"""${text}"""`;
 
             const schema = {
                 type: 'OBJECT',
@@ -193,7 +205,7 @@ exports.handler = async function(event, context) {
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras.' },
+                                relationship: { type: 'STRING' },
                                 definition: { type: 'STRING', nullable: true }
                             },
                             required: ["id", "label", "relationship"]
@@ -219,18 +231,16 @@ exports.handler = async function(event, context) {
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
-                contents: `Analiza minuciosamente el siguiente texto y estructura un mapa conceptual fiel a su contenido:
-                """${text}"""
+                contents: `${inputContext}
 
                 PAUTAS DE DENSIDAD:
                 ${densityGuideline}
 
-                PROHIBICIÓN ESTRICTA DE PLACEHOLDERS Y RELLENO:
-                - Queda terminantemente PROHIBIDO inventar o usar textos comodín como: "Ejemplo Específico A", "Caso de Uso B", "Resultado C", "Concepto 1", "Factor X".
-                - Todos los "label" de ramas y ejemplos DEBEN ser términos, nombres de teorías, datos, entidades o situaciones reales extraídas directamente de la lectura.
-                - Si el texto no menciona ejemplos concretos para una rama, NO inventes nada: deja el arreglo "examples" vacío o con menos elementos.
-                - En "definition", si el texto explica qué es el término, extráelo con precisión. Si no lo explica, pon null.
-                - En "relationship", usa únicamente 1 a 3 palabras (ej: "origina", "consiste en", "clasificado en").`,
+                PROHIBICIÓN ESTRICTA DE PLACEHOLDERS:
+                - Queda terminantemente PROHIBIDO inventar textos comodín como: "Ejemplo Específico A", "Caso de Uso B", "Concepto 1".
+                - Los "label" DEBEN ser términos, teorías, datos o situaciones reales (ej. en lugar de "Ejemplo 1", usa "El colapso de Wall Street de 1929").
+                - Si analizas un texto largo, extrae los datos del texto. Si es un tema corto, extrae de tu conocimiento experto.
+                - "relationship" usa únicamente 1 a 3 palabras.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,

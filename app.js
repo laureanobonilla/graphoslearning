@@ -5,6 +5,7 @@ const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
 let currentDocumentText = "";
+let selectedDensity = 'auto'; // Ahora "auto" es el por defecto
 
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
@@ -308,38 +309,185 @@ document.getElementById('btnVerifyLicense')?.addEventListener('click', async () 
 });
 
 // ==========================================
-// 6. GENERAR NODO RAÍZ DESDE INPUT
+// 6. GENERACIÓN COMPLETA DESDE INPUT O SORPRESA
 // ==========================================
-document.getElementById('btnGenerate').addEventListener('click', async () => {
-    const topic = topicInput.value.trim();
-    if (!topic) return;
+async function generateFullSchemaFromTopic(topicText) {
+    if (!topicText) return;
 
-    if (!checkBalance(1)) return;
+    // Validación de cobro preventiva (estimada: máximo 10 nodos)
+    if (!checkBalance(10)) return;
 
-    const viewCenter = network.getViewPosition();
-    const spawnX = viewCenter.x + (Math.random() * 80 - 40);
-    const spawnY = viewCenter.y + (Math.random() * 80 - 40);
-
-    nodes.add({ 
-        id: topic, 
-        label: `*${topic}*`, 
-        baseTitle: topic, 
-        x: spawnX, 
-        y: spawnY,
-        fixed: { x: false, y: false }
-    });
-
-    trackNodeUsage(topic);
-    consumeNodes(1);
+    showLoader(`Estructurando esquema...`);
     topicInput.value = '';
 
-    setTimeout(() => {
-        network.focus(topic, {
-            scale: 1.0,
-            animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'parse_text', 
+                text: topicText,
+                density: selectedDensity 
+            })
         });
-    }, 50);
+        const data = await response.json();
+
+        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
+        if (!checkBalance(totalNodes)) return;
+
+        // Limpiar el lienzo actual si lo hubiera para centrar la nueva idea principal
+        if (nodes.length > 0) {
+            nodes.clear();
+            edges.clear();
+        }
+
+        const viewCenter = network.getViewPosition();
+        const rootX = viewCenter.x;
+        const rootY = viewCenter.y - 120;
+
+        // 1. Nodo Raíz
+        const root = data.root;
+        nodes.add({
+            id: root.id,
+            label: `*${root.label}*`,
+            baseTitle: root.label,
+            definition: root.definition || null,
+            x: rootX,
+            y: rootY,
+            fixed: { x: false, y: false }
+        });
+        trackNodeUsage(root.label);
+
+        // 2. Ramas en fila horizontal
+        const branches = data.branches || [];
+        const branchSpacing = 280;
+        const totalBranchWidth = (branches.length - 1) * branchSpacing;
+        const startBranchX = rootX - (totalBranchWidth / 2);
+        const branchY = rootY + 160;
+
+        const branchPositions = {};
+
+        branches.forEach((branch, index) => {
+            const bx = startBranchX + (index * branchSpacing);
+            const by = branchY;
+            branchPositions[branch.id] = { x: bx, y: by, exampleCount: 0 };
+
+            nodes.add({
+                id: branch.id,
+                label: `*${branch.label}*`,
+                baseTitle: branch.label,
+                definition: branch.definition || null,
+                x: bx,
+                y: by,
+                fixed: { x: false, y: false }
+            });
+            edges.add({ from: root.id, to: branch.id, label: branch.relationship });
+            trackNodeUsage(branch.label);
+        });
+
+        // 3. Ejemplos colgando de ramas
+        const examples = data.examples || [];
+        examples.forEach(ex => {
+            const parentPos = branchPositions[ex.targetId] || { x: rootX, y: branchY, exampleCount: 0 };
+            parentPos.exampleCount++;
+            
+            const exX = parentPos.x;
+            const exY = parentPos.y + (parentPos.exampleCount * 110);
+
+            nodes.add({
+                id: ex.id,
+                label: `*Ejemplo:*\n${ex.label}`,
+                baseTitle: ex.label,
+                definition: ex.definition || null,
+                x: exX,
+                y: exY,
+                fixed: { x: false, y: false },
+                color: {
+                    background: '#fafaf9', border: '#d6d3d1',
+                    highlight: { background: '#f5f5f4', border: '#78716c' },
+                    hover: { background: '#ffffff', border: '#a8a29e' }
+                },
+                font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
+                shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
+            });
+
+            const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
+            edges.add({
+                from: target, to: ex.id, label: ex.relationship,
+                color: { color: '#cbd5e1', highlight: '#78716c' }, dashes: true
+            });
+            trackNodeUsage(ex.label);
+        });
+
+        consumeNodes(totalNodes);
+        currentDocumentText = ""; // Es un tema libre, no hay documento base
+        
+        network.setOptions({ physics: { enabled: false } });
+        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+
+    } catch (err) {
+        console.error(err);
+        alert('Hubo un error al generar el esquema.');
+    } finally {
+        hideLoader();
+    }
+}
+
+// Evento del botón Generar de la barra
+document.getElementById('btnGenerate')?.addEventListener('click', () => {
+    generateFullSchemaFromTopic(topicInput.value.trim());
 });
+
+// Soporte para tecla Enter en el input
+document.getElementById('topicInput')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') generateFullSchemaFromTopic(topicInput.value.trim());
+});
+
+// ==========================================
+// 14. PANTALLA DE BIENVENIDA Y SORPRÉNDEME
+// ==========================================
+const welcomeScreen = document.getElementById('welcomeScreen');
+
+const hookTopics = [
+    "La Paradoja de Fermi", "El Mito de la Caverna", "Computación Cuántica",
+    "Filosofía Estoica", "Neuroplasticidad", "Inteligencia Artificial General",
+    "Economía Conductual", "La Teoría de Cuerdas", "Imperio Romano"
+];
+
+function toggleWelcomeScreen() {
+    if (nodes.length > 0) {
+        welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => welcomeScreen.classList.add('hidden'), 500);
+    } else {
+        welcomeScreen.classList.remove('hidden');
+        setTimeout(() => welcomeScreen.classList.remove('opacity-0', 'pointer-events-none'), 10);
+    }
+}
+
+const chipsContainer = document.getElementById('suggestionChips');
+if (chipsContainer) {
+    const shuffled = [...hookTopics].sort(() => 0.5 - Math.random());
+    shuffled.slice(0, 3).forEach(topic => {
+        const chip = document.createElement('button');
+        chip.className = "bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:border-slate-400 hover:text-slate-900 transition-colors shadow-sm";
+        chip.innerText = topic;
+        chip.onclick = () => generateFullSchemaFromTopic(topic);
+        chipsContainer.appendChild(chip);
+    });
+}
+
+document.getElementById('btnSurprise')?.addEventListener('click', () => {
+    const randomTopic = hookTopics[Math.floor(Math.random() * hookTopics.length)];
+    // Forzamos densidad Media o Alta para los "sorprendeme" para que se vea impresionante
+    selectedDensity = Math.random() > 0.5 ? 'high' : 'medium'; 
+    generateFullSchemaFromTopic(randomTopic);
+});
+
+document.getElementById('btnWelcomeDoc')?.addEventListener('click', () => {
+    document.getElementById('btnOpenTextModal').click();
+});
+
+nodes.on('*', toggleWelcomeScreen);
 
 // ==========================================
 // 7. EXPANDIR RAMAS MANUALMENTE
@@ -980,65 +1128,3 @@ network.on('dragStart', (params) => {
     }
 });
 
-// ==========================================
-// 14. PANTALLA DE BIENVENIDA Y GANCHO INICIAL
-// ==========================================
-const welcomeScreen = document.getElementById('welcomeScreen');
-
-// Temas fascinantes para enganchar la curiosidad
-const hookTopics = [
-    "La Paradoja de Fermi",
-    "El Mito de la Caverna",
-    "Computación Cuántica",
-    "Filosofía Estoica",
-    "Neuroplasticidad",
-    "Inteligencia Artificial General",
-    "Economía Conductual",
-    "La Teoría de Cuerdas",
-    "Imperio Romano"
-];
-
-// Ocultar / Mostrar pantalla según el estado del grafo
-function toggleWelcomeScreen() {
-    if (nodes.length > 0) {
-        welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-        setTimeout(() => welcomeScreen.classList.add('hidden'), 500); // Dar tiempo a la transición
-    } else {
-        welcomeScreen.classList.remove('hidden');
-        // Pequeño delay para que la transición css de opacity funcione
-        setTimeout(() => welcomeScreen.classList.remove('opacity-0', 'pointer-events-none'), 10);
-    }
-}
-
-// Poblar los "chips" de sugerencias
-const chipsContainer = document.getElementById('suggestionChips');
-if (chipsContainer) {
-    // Tomar 3 temas al azar para los chips
-    const shuffled = [...hookTopics].sort(() => 0.5 - Math.random());
-    shuffled.slice(0, 3).forEach(topic => {
-        const chip = document.createElement('button');
-        chip.className = "bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:border-slate-400 hover:text-slate-900 transition-colors shadow-sm";
-        chip.innerText = topic;
-        chip.onclick = () => {
-            document.getElementById('topicInput').value = topic;
-            document.getElementById('btnGenerate').click();
-        };
-        chipsContainer.appendChild(chip);
-    });
-}
-
-// Lógica del botón "Sorpréndeme"
-document.getElementById('btnSurprise')?.addEventListener('click', () => {
-    const randomTopic = hookTopics[Math.floor(Math.random() * hookTopics.length)];
-    document.getElementById('topicInput').value = randomTopic;
-    // Dispara el botón generar automáticamente
-    document.getElementById('btnGenerate').click(); 
-});
-
-// Vincular el botón de Documento de la pantalla de bienvenida al modal
-document.getElementById('btnWelcomeDoc')?.addEventListener('click', () => {
-    document.getElementById('btnOpenTextModal').click();
-});
-
-// Asegurarnos de revisar la pantalla en acciones clave
-nodes.on('*', toggleWelcomeScreen); // Si se añade o quita un nodo, se evalúa

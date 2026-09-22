@@ -128,7 +128,7 @@
 
             <!-- Input de Texto (El placeholder anima a escribir) -->
             <div class="flex gap-2 w-full order-1 md:order-2 flex-1">
-                <input type="text" id="topicInput" placeholder="¿Qué quieres estructurar? (Ej: Inteligencia Artificial)" class="w-full bg-white/90 border border-slate-200/90 rounded-lg pl-3 pr-2 py-2.5 md:py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 shadow-sm font-sans flex-1">
+                <input type="text" id="topicInput" placeholder="¿De qué se trata tu esquema? (Ej: Inteligencia Artificial)" class="w-full bg-white/90 border border-slate-200/90 rounded-lg pl-3 pr-2 py-2.5 md:py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 shadow-sm font-sans flex-1">
                 <button id="btnGenerate" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-md transition-all active:scale-95">
                     Generar
                 </button>
@@ -248,9 +248,10 @@
                     <div class="flex items-center gap-2 w-full sm:w-auto">
                         <span class="text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider">Densidad:</span>
                         <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px] md:text-xs w-full sm:w-auto justify-between" id="densitySelector">
+                            <button type="button" data-density="auto" class="density-btn px-2 md:px-3 py-1 rounded-md font-semibold bg-white text-slate-900 shadow-xs transition-colors">Auto</button>
                             <button type="button" data-density="low" class="density-btn px-2 md:px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Esencial</button>
-                            <button type="button" data-density="medium" class="density-btn px-2 md:px-3 py-1 rounded-md font-semibold bg-white text-slate-900 shadow-xs transition-colors">Media</button>
-                            <button type="button" data-density="high" class="density-btn px-2 md:px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Exhaustiva</button>
+                            <button type="button" data-density="medium" class="density-btn px-2 md:px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Media</button>
+                            <button type="button" data-density="high" class="density-btn px-2 md:px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Alta</button>
                         </div>
                     </div>
 
