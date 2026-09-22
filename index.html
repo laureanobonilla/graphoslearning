@@ -96,60 +96,77 @@
     </div>
 
     <!-- Barra de Navegación Optimizada Móvil -->
-    <header class="glass-panel border-b border-slate-200/80 p-2 md:px-6 md:py-3 flex flex-col z-10 gap-2 w-full">
-        <!-- Fila 1: Logo, Acciones Globales (Iconos en móvil), Contador -->
+  <!-- Barra de Navegación Optimizada -->
+    <header class="glass-panel border-b border-slate-200/80 p-3 md:px-6 md:py-3 flex flex-col z-30 gap-3 w-full relative">
+        <!-- Fila 1: Logo y Acciones Secundarias -->
         <div class="flex justify-between items-center w-full">
             <div class="flex items-center gap-2">
-                <div class="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold font-heading text-xs md:text-sm shadow-sm ring-1 ring-white/20">
-                    Γ
-                </div>
-                <!-- Oculto en móvil vertical, visible en tablets/PC -->
-                <h1 class="text-xl font-bold font-heading text-slate-950 tracking-tight hidden sm:block">Graphikosmos</h1>
-                <span class="hidden md:inline-block text-[10px] font-semibold tracking-widest uppercase bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md border border-slate-200/70">Studio</span>
+                <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold font-heading text-sm shadow-sm ring-1 ring-white/20">Γ</div>
+                <h1 class="text-lg md:text-xl font-bold font-heading text-slate-950 tracking-tight hidden sm:block">Graphikosmos</h1>
             </div>
             
-            <div class="flex items-center gap-1 md:gap-3">
-                <!-- Botonera: Iconos en móvil, Icono+Texto en escritorio -->
-                <div class="flex items-center gap-1">
-                    <button id="btnOpenTextModal" title="Cargar documento o pegar texto" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 p-1.5 md:px-3 md:py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5">
-                        <span class="text-sm">📄</span> <span class="hidden md:inline">Documental</span>
-                    </button>
-                    <button id="btnClear" title="Limpiar lienzo" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-600 hover:text-red-600 p-1.5 md:px-3 md:py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center gap-1.5">
-                        <span class="text-sm hidden md:inline">🧹</span>
-                        <span class="text-sm md:hidden text-center w-4 h-4 leading-none">🧹</span> 
-                        <span class="hidden md:inline">Limpiar</span>
-                    </button>
-                    <button id="btnCapture" title="Descargar esquema" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-800 p-1.5 md:px-3 md:py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center gap-1.5">
-                        <svg class="w-4 h-4 md:w-3.5 md:h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                        <span class="hidden md:inline">Capturar</span>
-                    </button>
-                    <button id="btnHelp" title="Manual y Funciones" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-500 p-1.5 md:px-2.5 md:py-1.5 rounded-lg font-medium transition-colors shadow-sm flex items-center justify-center">
-                        <span class="text-xs md:text-sm font-bold w-4 h-4 text-center leading-none">?</span>
-                    </button>
-                </div>
-
-                <!-- Contador de nodos (Solo número en móvil) -->
-                <div id="nodeCounterBtn" class="cursor-pointer bg-white/80 hover:bg-slate-50 border border-slate-200 px-2 md:px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ml-1">
+            <div class="flex items-center gap-2">
+                <button id="btnCapture" title="Descargar esquema" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-800 p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-medium transition-colors shadow-sm flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span class="hidden md:inline">Capturar</span>
+                </button>
+                <button id="btnHelp" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-500 p-2 md:px-3 rounded-lg font-medium transition-colors shadow-sm">?</button>
+                
+                <div id="nodeCounterBtn" class="cursor-pointer bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shadow-sm active:scale-95 ml-1">
                     <span class="w-2 h-2 rounded-full bg-emerald-500" id="statusDot"></span>
-                    <span id="nodeCountDisplay" class="text-[11px] md:text-xs font-semibold text-slate-700 font-mono tracking-tight whitespace-nowrap">50 <span class="hidden md:inline">Nodos</span></span>
+                    <span id="nodeCountDisplay" class="text-xs font-bold text-slate-700 font-mono">50</span>
                 </div>
             </div>
         </div>
 
-        <!-- Fila 2: Buscador / Generador -->
-        <div class="flex gap-2 w-full justify-center">
-            <div class="relative w-full md:w-96">
-                <input type="text" id="topicInput" placeholder="Comenzar con un concepto matriz..." class="w-full bg-white/90 border border-slate-200/90 rounded-lg pl-3 pr-2 py-2 text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 shadow-sm transition-all font-sans">
+        <!-- Fila 2: Los Controles Principales (Igual de importantes) -->
+        <div class="flex flex-col md:flex-row gap-2 w-full">
+            <!-- Botón de Documentos (Gana protagonismo en móvil) -->
+            <button id="btnOpenTextModal" class="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 py-2.5 md:py-2 md:px-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 w-full md:w-auto order-2 md:order-1">
+                <span>📄</span> Analizar Documento
+            </button>
+
+            <!-- Input de Texto (El placeholder anima a escribir) -->
+            <div class="flex gap-2 w-full order-1 md:order-2 flex-1">
+                <input type="text" id="topicInput" placeholder="¿Qué quieres estructurar? (Ej: Inteligencia Artificial)" class="w-full bg-white/90 border border-slate-200/90 rounded-lg pl-3 pr-2 py-2.5 md:py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 shadow-sm font-sans flex-1">
+                <button id="btnGenerate" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-md transition-all active:scale-95">
+                    Generar
+                </button>
             </div>
-            <button id="btnGenerate" class="bg-slate-950 hover:bg-slate-800 text-white px-4 md:px-5 py-2 rounded-lg font-semibold text-xs md:text-sm shadow-md hover:shadow-lg transition-all active:scale-95 whitespace-nowrap">
-                Generar
+
+            <!-- Botón Limpiar -->
+            <button id="btnClear" class="bg-white border border-slate-200 text-red-600 hover:bg-red-50 py-2.5 md:py-2 md:px-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 w-full md:w-auto order-3">
+                <span>🧹</span> Limpiar
             </button>
         </div>
     </header>
 
     <div class="flex flex-1 h-full relative">
         <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
+        <!-- Pantalla de Bienvenida (Lienzo Vacío) -->
+        <div id="welcomeScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 bg-slate-900/5 backdrop-blur-[2px] transition-opacity duration-500">
+            <div class="glass-dock p-6 md:p-10 rounded-3xl max-w-2xl w-full text-center shadow-2xl border border-slate-200/80">
+                <div class="w-16 h-16 mx-auto bg-slate-900 text-white rounded-2xl flex items-center justify-center text-3xl mb-5 shadow-lg shadow-slate-900/20">Γ</div>
+                <h2 class="text-2xl md:text-3xl font-heading font-extrabold text-slate-900 mb-3 tracking-tight">¿Qué vamos a explorar hoy?</h2>
+                <p class="text-sm text-slate-500 mb-8 max-w-md mx-auto">Construye tu segundo cerebro. Escribe un concepto, sube un documento o explora una idea fascinante al azar.</p>
+                
+                <div class="flex flex-col sm:flex-row gap-3 justify-center mb-8">
+                    <button id="btnWelcomeDoc" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-6 py-3.5 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto text-sm md:text-base">
+                        <span class="text-lg">📄</span> Extraer de Documento
+                    </button>
+                    <button id="btnSurprise" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto text-sm md:text-base">
+                        <span class="text-lg">🎲</span> Sorpréndeme
+                    </button>
+                </div>
 
+                <div class="border-t border-slate-100 pt-6">
+                    <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4">Temas sugeridos</p>
+                    <div class="flex flex-wrap gap-2 justify-center" id="suggestionChips">
+                        <!-- Se llenan por JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Menú de Acciones Flotante Contextual -->
         <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col overflow-hidden transform -translate-x-1/2 -translate-y-full min-w-[200px] transition-all">
             <div class="px-3 py-2 bg-slate-50/70 border-b border-slate-200/60 flex justify-between items-center">

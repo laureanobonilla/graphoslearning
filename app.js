@@ -979,3 +979,66 @@ network.on('dragStart', (params) => {
         nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
     }
 });
+
+// ==========================================
+// 14. PANTALLA DE BIENVENIDA Y GANCHO INICIAL
+// ==========================================
+const welcomeScreen = document.getElementById('welcomeScreen');
+
+// Temas fascinantes para enganchar la curiosidad
+const hookTopics = [
+    "La Paradoja de Fermi",
+    "El Mito de la Caverna",
+    "Computación Cuántica",
+    "Filosofía Estoica",
+    "Neuroplasticidad",
+    "Inteligencia Artificial General",
+    "Economía Conductual",
+    "La Teoría de Cuerdas",
+    "Imperio Romano"
+];
+
+// Ocultar / Mostrar pantalla según el estado del grafo
+function toggleWelcomeScreen() {
+    if (nodes.length > 0) {
+        welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => welcomeScreen.classList.add('hidden'), 500); // Dar tiempo a la transición
+    } else {
+        welcomeScreen.classList.remove('hidden');
+        // Pequeño delay para que la transición css de opacity funcione
+        setTimeout(() => welcomeScreen.classList.remove('opacity-0', 'pointer-events-none'), 10);
+    }
+}
+
+// Poblar los "chips" de sugerencias
+const chipsContainer = document.getElementById('suggestionChips');
+if (chipsContainer) {
+    // Tomar 3 temas al azar para los chips
+    const shuffled = [...hookTopics].sort(() => 0.5 - Math.random());
+    shuffled.slice(0, 3).forEach(topic => {
+        const chip = document.createElement('button');
+        chip.className = "bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:border-slate-400 hover:text-slate-900 transition-colors shadow-sm";
+        chip.innerText = topic;
+        chip.onclick = () => {
+            document.getElementById('topicInput').value = topic;
+            document.getElementById('btnGenerate').click();
+        };
+        chipsContainer.appendChild(chip);
+    });
+}
+
+// Lógica del botón "Sorpréndeme"
+document.getElementById('btnSurprise')?.addEventListener('click', () => {
+    const randomTopic = hookTopics[Math.floor(Math.random() * hookTopics.length)];
+    document.getElementById('topicInput').value = randomTopic;
+    // Dispara el botón generar automáticamente
+    document.getElementById('btnGenerate').click(); 
+});
+
+// Vincular el botón de Documento de la pantalla de bienvenida al modal
+document.getElementById('btnWelcomeDoc')?.addEventListener('click', () => {
+    document.getElementById('btnOpenTextModal').click();
+});
+
+// Asegurarnos de revisar la pantalla en acciones clave
+nodes.on('*', toggleWelcomeScreen); // Si se añade o quita un nodo, se evalúa
