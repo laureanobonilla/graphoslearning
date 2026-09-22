@@ -530,7 +530,11 @@ function getContextPath(nodeId) {
         current = parentEdges[0].from;
         path.unshift(current);
     }
-    return path.join(' > ');
+    // CORRECCIÓN: Convertir los IDs internos a los textos reales para la IA
+    return path.map(id => {
+        const n = nodes.get(id);
+        return n ? (n.baseTitle || id) : id;
+    }).join(' > ');
 }
 
 document.getElementById('btnMenuExpand').addEventListener('click', async () => {
@@ -542,6 +546,8 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
 
     const contextPath = getContextPath(selectedNodeId);
     const currentNode = nodes.get(selectedNodeId);
+    // CORRECCIÓN: Usar el texto real, no el ID
+    const topicName = currentNode.baseTitle || selectedNodeId;
 
     if (currentNode && currentNode.expanded) return;
     showLoader('Generando conceptos conexos...');
@@ -551,10 +557,10 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
             method: 'POST',
             body: JSON.stringify({ 
                 action: 'expand', 
-                topic: selectedNodeId, 
+                topic: topicName, // Enviamos el texto real
                 contextPath, 
                 maxNodes,
-                documentContext: currentDocumentText // <-- Contexto del documento
+                documentContext: currentDocumentText 
             })
         });
         const data = await response.json();
@@ -606,6 +612,10 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
     if (!checkBalance(maxNodes)) return;
 
     const contextPath = getContextPath(selectedNodeId);
+    const currentNode = nodes.get(selectedNodeId);
+    // CORRECCIÓN: Usar el texto real
+    const topicName = currentNode.baseTitle || selectedNodeId;
+
     showLoader('Buscando casos prácticos...');
 
     try {
@@ -613,10 +623,10 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
             method: 'POST',
             body: JSON.stringify({ 
                 action: 'examples', 
-                topic: selectedNodeId, 
+                topic: topicName, // Enviamos el texto real
                 contextPath, 
                 maxNodes,
-                documentContext: currentDocumentText // <-- Contexto del documento
+                documentContext: currentDocumentText 
             })
         });
         const data = await response.json();
@@ -641,8 +651,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
                     y: parentPos.y,
                     fixed: { x: false, y: false },
                     color: {
-                        background: '#fafaf9',
-                        border: '#d6d3d1',
+                        background: '#fafaf9', border: '#d6d3d1',
                         highlight: { background: '#f5f5f4', border: '#78716c' },
                         hover: { background: '#ffffff', border: '#a8a29e' }
                     },
@@ -1085,9 +1094,15 @@ network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNode = params.nodes[0];
 
+        // LÓGICA DE VINCULAR DOS NODOS
         if (sourceNodeForConnection && sourceNodeForConnection !== clickedNode) {
-            const nodeA = sourceNodeForConnection;
-            const nodeB = clickedNode;
+            const nodeA = nodes.get(sourceNodeForConnection);
+            const nodeB = nodes.get(clickedNode);
+            
+            // CORRECCIÓN: Extraer nombres reales
+            const topicA = nodeA.baseTitle || sourceNodeForConnection;
+            const topicB = nodeB.baseTitle || clickedNode;
+            
             sourceNodeForConnection = null;
             connectionBanner.classList.add('hidden');
 
@@ -1098,12 +1113,12 @@ network.on('click', async function (params) {
             try {
                 const response = await fetch('/.netlify/functions/gemini', {
                     method: 'POST',
-                    body: JSON.stringify({ action: 'connect', topic: nodeA, topicB: nodeB })
+                    body: JSON.stringify({ action: 'connect', topic: topicA, topicB: topicB })
                 });
                 const data = await response.json();
 
-                const posA = network.getPositions([nodeA])[nodeA];
-                const posB = network.getPositions([nodeB])[nodeB];
+                const posA = network.getPositions([nodeA.id])[nodeA.id];
+                const posB = network.getPositions([nodeB.id])[nodeB.id];
                 const midX = (posA.x + posB.x) / 2;
                 const midY = (posA.y + posB.y) / 2;
 
@@ -1124,8 +1139,8 @@ network.on('click', async function (params) {
                     consumeNodes(1);
                 }
                 
-                edges.add({ from: nodeA, to: bridge.id, label: bridge.relFromA });
-                edges.add({ from: bridge.id, to: nodeB, label: bridge.relToB });
+                edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
+                edges.add({ from: bridge.id, to: nodeB.id, label: bridge.relToB });
             } catch {
                 alert("Error al conectar los nodos.");
             } finally {
@@ -1134,6 +1149,7 @@ network.on('click', async function (params) {
             return;
         }
 
+        // MOSTRAR MENÚ FLOTANTE
         selectedNodeId = clickedNode;
         const DOMCoords = network.canvasToDOM(network.getPositions([selectedNodeId])[selectedNodeId]);
         actionMenu.style.left = DOMCoords.x + 'px';
