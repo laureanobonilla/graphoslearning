@@ -60,10 +60,6 @@ network.on("stabilizationIterationsDone", stopPhysicsAndUnlock);
 network.on("stabilized", stopPhysicsAndUnlock);
 
 
-
-let selectedNodeId = null;
-let sourceNodeForConnection = null;
-
 const DEFAULT_MAX_WIDTH = 250;
 const DEFAULT_MAX_HEIGHT = 90;
 
@@ -85,9 +81,6 @@ const dropZone = document.getElementById('dropZone');
 
 let selectedNodeId = null;
 let sourceNodeForConnection = null;
-
-const DEFAULT_MAX_WIDTH = 250;
-const DEFAULT_MAX_HEIGHT = 90;
 
 // Nuevo Loader de Pantalla Completa
 function showLoader(msg) {
