@@ -807,10 +807,7 @@ document.getElementById('closeHelp')?.addEventListener('click', () => {
     helpModal.classList.remove('flex');
 });
 
-// ==========================================
-// 11. PROCESAMIENTO DOCUMENTAL LOCAL (PDF, DOCX, ZIP)
-// ==========================================
-let selectedDensity = 'medium';
+
 
 document.querySelectorAll('.density-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
