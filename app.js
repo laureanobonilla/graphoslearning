@@ -8,7 +8,7 @@ let edges = new vis.DataSet([]);
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
     physics: {
-        enabled: true,
+        enabled: false, // Por defecto apagadas para evitar movimientos fantasma
         solver: 'repulsion',
         repulsion: { nodeDistance: 220, springLength: 200, springConstant: 0.05 }
     },
@@ -41,12 +41,10 @@ let network = new vis.Network(container, { nodes, edges }, {
     interaction: { hover: true }
 });
 
-// Desbloquear nodos y apagar físicas al estabilizarse
 function stopPhysicsAndUnlock() {
     network.setOptions({ physics: { enabled: false } });
     const allNodes = nodes.get();
-    const unlockUpdates = allNodes.map(n => ({ id: n.id, fixed: { x: false, y: false } }));
-    nodes.update(unlockUpdates);
+    nodes.update(allNodes.map(n => ({ id: n.id, fixed: { x: false, y: false } })));
 }
 
 network.on("stabilizationIterationsDone", stopPhysicsAndUnlock);
@@ -80,9 +78,33 @@ function hideLoader() {
 }
 
 // ==========================================
-// 3. SISTEMA DE SALDO Y LICENCIAS
+// 3. TELEMETRÍA (PRIMEROS 10 NODOS)
 // ==========================================
-let currentLicense = localStorage.getItem('gk_license') || 'FREE_TRIAL';
+let sessionId = localStorage.getItem('gk_session_id');
+if (!sessionId) {
+    sessionId = 's_' + Math.random().toString(36).substring(2, 9);
+    localStorage.setItem('gk_session_id', sessionId);
+}
+
+let nodesTracked = parseInt(localStorage.getItem('gk_nodes_tracked') || '0', 10);
+
+function trackNodeUsage(topicName) {
+    if (nodesTracked >= 10) return; // Máximo 10 nodos por usuario
+
+    nodesTracked++;
+    localStorage.setItem('gk_nodes_tracked', nodesTracked.toString());
+
+    fetch('/.netlify/functions/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: topicName, sessionId: sessionId })
+    }).catch(() => {}); // Falla silenciosa sin afectar la UX
+}
+
+// ==========================================
+// 4. SALDO, LICENCIAS Y ADMIN
+// ==========================================
+let isAdmin = localStorage.getItem('gk_is_admin') === 'true';
 let availableNodes = parseInt(localStorage.getItem('gk_balance'), 10);
 
 if (isNaN(availableNodes)) {
@@ -96,8 +118,13 @@ function updateCounterDisplay() {
     const dot = document.getElementById('statusDot');
     if (!display || !dot) return;
 
+    if (isAdmin) {
+        display.innerText = 'Admin (∞)';
+        dot.className = 'w-2 h-2 rounded-full bg-purple-500';
+        return;
+    }
+
     display.innerText = `${availableNodes} Nodos`;
-    
     if (availableNodes <= 0) {
         dot.className = 'w-2 h-2 rounded-full bg-red-500';
     } else if (availableNodes < 10) {
@@ -108,7 +135,18 @@ function updateCounterDisplay() {
 }
 updateCounterDisplay();
 
+function openStore() {
+    storeModal.classList.remove('hidden');
+    storeModal.classList.add('flex');
+}
+
+function closeStoreModal() {
+    storeModal.classList.add('hidden');
+    storeModal.classList.remove('flex');
+}
+
 function consumeNodes(amount) {
+    if (isAdmin) return;
     availableNodes -= amount;
     if (availableNodes < 0) availableNodes = 0;
     localStorage.setItem('gk_balance', availableNodes);
@@ -116,24 +154,49 @@ function consumeNodes(amount) {
 }
 
 function checkBalance(cost) {
+    if (isAdmin) return true;
     if (availableNodes < cost) {
         if (actionMenu) actionMenu.classList.add('hidden');
-        if (storeModal) storeModal.classList.remove('hidden');
+        openStore();
         return false;
     }
     return true;
 }
 
-// Abrir / Cerrar Tienda
-document.getElementById('nodeCounterBtn')?.addEventListener('click', () => {
-    storeModal.classList.remove('hidden');
-});
-document.getElementById('closeStore')?.addEventListener('click', () => {
-    storeModal.classList.add('hidden');
+document.getElementById('nodeCounterBtn')?.addEventListener('click', openStore);
+document.getElementById('closeStore')?.addEventListener('click', closeStoreModal);
+
+// Acceso Seguro de Admin
+document.getElementById('btnAdminAccess')?.addEventListener('click', async () => {
+    const inputPass = prompt("Ingresa la clave de administración:");
+    if (!inputPass) return;
+
+    showLoader('Verificando acceso...');
+    try {
+        const res = await fetch('/.netlify/functions/admin-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: inputPass })
+        });
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
+            isAdmin = true;
+            localStorage.setItem('gk_is_admin', 'true');
+            updateCounterDisplay();
+            alert("Acceso administrador concedido. Nodos ilimitados activados.");
+        } else {
+            alert("Contraseña incorrecta.");
+        }
+    } catch {
+        alert("Error al verificar credenciales.");
+    } finally {
+        hideLoader();
+    }
 });
 
 // ==========================================
-// 4. TIENDA Y PAGOS CON PAYPAL
+// 5. PAYPAL Y PAQUETES
 // ==========================================
 let selectedPrice = "15.00";
 let selectedNodeAmount = 1000;
@@ -155,65 +218,122 @@ document.querySelectorAll('.package-card').forEach(card => {
 
 if (window.paypal) {
     paypal.Buttons({
-        style: {
-            layout: 'vertical',
-            color:  'gold',
-            shape:  'rect',
-            label:  'paypal'
-        },
+        style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' },
         createOrder: function(data, actions) {
             return actions.order.create({
                 purchase_units: [{
                     description: `Graphikosmos - ${selectedNodeAmount} Nodos`,
-                    amount: {
-                        currency_code: 'USD',
-                        value: selectedPrice
-                    }
+                    amount: { currency_code: 'USD', value: selectedPrice }
                 }]
             });
         },
         onApprove: function(data, actions) {
-            return actions.order.capture().then(function(details) {
+            return actions.order.capture().then(async function(details) {
                 const licenseKey = 'GK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-                
+
+                showLoader('Registrando licencia...');
+                try {
+                    await fetch('/.netlify/functions/license', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            action: 'create',
+                            licenseKey: licenseKey,
+                            nodesToAdd: selectedNodeAmount
+                        })
+                    });
+                } catch (e) {
+                    console.error('Error registrando en la nube:', e);
+                } finally {
+                    hideLoader();
+                }
+
                 availableNodes += selectedNodeAmount;
                 currentLicense = licenseKey;
 
                 localStorage.setItem('gk_license', licenseKey);
                 localStorage.setItem('gk_balance', availableNodes);
                 updateCounterDisplay();
+                closeStoreModal();
 
-                storeModal.classList.add('hidden');
-                alert(
-                    `¡Pago acreditado con éxito, ${details.payer.name.given_name}!\n\n` +
-                    `Se agregaron ${selectedNodeAmount} nodos a tu cuenta.\n` +
-                    `Tu clave de licencia es: ${licenseKey}\n` +
-                    `Consérvala para sincronizar tu saldo en otros navegadores.`
-                );
+                alert(`¡Pago completado! Se agregaron ${selectedNodeAmount} nodos.\nTu clave es: ${licenseKey}\nConsérvala para sincronizar tu saldo en otros dispositivos.`);
             });
         },
         onError: function(err) {
-            console.error('Error en PayPal:', err);
-            alert('No se pudo procesar la transacción con PayPal.');
+            console.error('Error PayPal:', err);
+            alert('No se pudo procesar la transacción.');
         }
     }).render('#paypal-button-container');
 }
-
-// Sincronizar clave manual (simulación local inicial)
-document.getElementById('btnVerifyLicense')?.addEventListener('click', () => {
+document.getElementById('btnVerifyLicense')?.addEventListener('click', async () => {
     const key = document.getElementById('licenseInput').value.trim().toUpperCase();
     if (!key) return;
-    
-    // Si coincide con la clave guardada en este equipo
-    if (key === localStorage.getItem('gk_license')) {
-        alert('Licencia activa verificada.');
-    } else {
-        alert('Clave no encontrada localmente. Cuando conectemos JSONBin se validará en la nube.');
+
+    showLoader('Verificando licencia en la nube...');
+    try {
+        const res = await fetch('/.netlify/functions/license', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'verify', licenseKey: key })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            currentLicense = data.licenseKey;
+            availableNodes = data.balance;
+            localStorage.setItem('gk_license', currentLicense);
+            localStorage.setItem('gk_balance', availableNodes);
+            updateCounterDisplay();
+            closeStoreModal();
+            alert(`¡Licencia sincronizada! Saldo restaurado: ${availableNodes} nodos.`);
+        } else {
+            alert('La clave ingresada no es válida o no existe.');
+        }
+    } catch {
+        alert('Error al conectar con el servidor.');
+    } finally {
+        hideLoader();
     }
+});
+// ==========================================
+// 6. GENERAR NODO RAÍZ (SIN REVOLVER EL LIENZO)
+// ==========================================
+document.getElementById('btnGenerate').addEventListener('click', async () => {
+    const topic = topicInput.value.trim();
+    if (!topic) return;
+
+    if (!checkBalance(1)) return;
+
+    // Calculamos el centro actual donde el usuario tiene la cámara puesta
+    const viewCenter = network.getViewPosition();
+    const spawnX = viewCenter.x + (Math.random() * 80 - 40);
+    const spawnY = viewCenter.y + (Math.random() * 80 - 40);
+
+    // Agregamos directamente en posición fija SIN activar el motor de físicas
+    nodes.add({ 
+        id: topic, 
+        label: `*${topic}*`, 
+        baseTitle: topic, 
+        x: spawnX, 
+        y: spawnY,
+        fixed: { x: false, y: false }
+    });
+
+    trackNodeUsage(topic);
+    consumeNodes(1);
+    topicInput.value = '';
+
+    // Enfoque suave hacia el nuevo nodo sin alterar los demás
+    setTimeout(() => {
+        network.focus(topic, {
+            scale: 1.0,
+            animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+        });
+    }, 50);
 });
 
 // ==========================================
-// 5. RUTAS Y CONTEXTO JERÁRQUICO
+// 7. EXPANDIR RAMAS
 // ==========================================
 function getContextPath(nodeId) {
     let path = [nodeId];
@@ -227,51 +347,6 @@ function getContextPath(nodeId) {
     return path.join(' > ');
 }
 
-// ==========================================
-// 6. GENERAR TEMA RAÍZ / PARALELO
-// ==========================================
-document.getElementById('btnGenerate').addEventListener('click', async () => {
-    const topic = topicInput.value.trim();
-    if (!topic) return;
-
-    if (!checkBalance(1)) return;
-
-    // Congelar nodos existentes para evitar reacomodos
-    const existingNodes = nodes.get();
-    nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
-
-    // Desfase aleatorio cerca del centro de vista
-    const viewCenter = network.getViewPosition();
-    const randomX = viewCenter.x + (Math.random() * 160 - 80);
-    const randomY = viewCenter.y + (Math.random() * 160 - 80);
-
-    network.setOptions({ physics: { enabled: true } });
-
-    nodes.add({ 
-        id: topic, 
-        label: `*${topic}*`, 
-        baseTitle: topic, 
-        x: randomX,
-        y: randomY,
-        fixed: { x: false, y: false }
-    });
-
-    consumeNodes(1);
-    topicInput.value = '';
-
-    setTimeout(() => {
-        network.focus(topic, {
-            scale: 1.1,
-            animation: { duration: 600, easingFunction: 'easeInOutQuad' }
-        });
-    }, 100);
-
-    setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
-});
-
-// ==========================================
-// 7. EXPANDIR RAMAS (CONCEPTOS TEÓRICOS)
-// ==========================================
 document.getElementById('btnMenuExpand').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
@@ -292,6 +367,7 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
         });
         const data = await response.json();
 
+        // Congelar nodos existentes para que solo se muevan los nuevos
         const existingNodes = nodes.get();
         nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
 
@@ -313,15 +389,15 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
                     fixed: { x: false, y: false }
                 });
                 edges.add({ from: selectedNodeId, to: concept.id, label: concept.relationship });
+                trackNodeUsage(concept.label);
                 createdCount++;
             }
         });
 
         nodes.update({ id: selectedNodeId, expanded: true });
         consumeNodes(createdCount);
-
-        setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
-    } catch (err) {
+        setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
+    } catch {
         alert("Error al conectar con el servicio.");
     } finally {
         hideLoader();
@@ -329,7 +405,7 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
 });
 
 // ==========================================
-// 8. GENERAR EJEMPLOS PRÁCTICOS
+// 8. GENERAR EJEMPLOS
 // ==========================================
 document.getElementById('btnMenuExamples').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
@@ -384,13 +460,14 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
                     color: { color: '#f59e0b', highlight: '#d97706' },
                     dashes: true
                 });
+                trackNodeUsage(example.label);
                 createdCount++;
             }
         });
 
         consumeNodes(createdCount);
-        setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
-    } catch (err) {
+        setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
+    } catch {
         alert("Error al conectar con el servicio.");
     } finally {
         hideLoader();
@@ -398,7 +475,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
 });
 
 // ==========================================
-// 9. CARGAR DEFINICIÓN EN EL NODO
+// 9. DEFINICIÓN, CONEXIONES Y TAMAÑO
 // ==========================================
 document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
@@ -431,16 +508,13 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
             widthConstraint: { maximum: currentNode.boxWidth || DEFAULT_MAX_WIDTH },
             heightConstraint: { maximum: currentNode.boxHeight || DEFAULT_MAX_HEIGHT, valign: 'top' }
         });
-    } catch (err) {
+    } catch {
         alert("Error al obtener la definición.");
     } finally {
         hideLoader();
     }
 });
 
-// ==========================================
-// 10. MODO CONEXIÓN ENTRE DOS NODOS
-// ==========================================
 document.getElementById('btnMenuConnect').addEventListener('click', () => {
     sourceNodeForConnection = selectedNodeId;
     actionMenu.classList.add('hidden');
@@ -452,20 +526,12 @@ connectionBanner.addEventListener('click', () => {
     connectionBanner.classList.add('hidden');
 });
 
-// ==========================================
-// 11. ELIMINAR NODO
-// ==========================================
 document.getElementById('btnMenuDelete').addEventListener('click', () => {
-    if (selectedNodeId) {
-        nodes.remove(selectedNodeId);
-    }
+    if (selectedNodeId) nodes.remove(selectedNodeId);
     actionMenu.classList.add('hidden');
     selectedNodeId = null;
 });
 
-// ==========================================
-// 12. CONTROLES DE TAMAÑO (+ / -)
-// ==========================================
 function resizeNode(increment) {
     if (!selectedNodeId) return;
     const currentNode = nodes.get(selectedNodeId);
@@ -489,11 +555,10 @@ document.getElementById('btnSizePlus')?.addEventListener('click', () => resizeNo
 document.getElementById('btnSizeMinus')?.addEventListener('click', () => resizeNode(-50));
 
 // ==========================================
-// 13. ACCIONES GLOBALES (LIMPIAR Y CAPTURAR)
+// 10. LIMPIAR Y CAPTURAR
 // ==========================================
 document.getElementById('btnClear')?.addEventListener('click', () => {
     if (nodes.length === 0) return;
-    
     if (confirm("¿Deseas vaciar todo el esquema actual?")) {
         nodes.clear();
         edges.clear();
@@ -506,13 +571,12 @@ document.getElementById('btnClear')?.addEventListener('click', () => {
 
 document.getElementById('btnCapture')?.addEventListener('click', () => {
     if (nodes.length === 0) {
-        alert("El lienzo está vacío. Genera algunos nodos primero.");
+        alert("El lienzo está vacío.");
         return;
     }
 
     actionMenu.classList.add('hidden');
     showLoader('Preparando captura...');
-
     network.fit({ animation: false });
 
     setTimeout(() => {
@@ -538,8 +602,7 @@ document.getElementById('btnCapture')?.addEventListener('click', () => {
             document.body.appendChild(downloadLink);
             downloadLink.click();
             document.body.removeChild(downloadLink);
-        } catch (err) {
-            console.error(err);
+        } catch {
             alert("No se pudo exportar la imagen.");
         } finally {
             hideLoader();
@@ -548,17 +611,15 @@ document.getElementById('btnCapture')?.addEventListener('click', () => {
 });
 
 // ==========================================
-// 14. EVENTOS DEL CANVAS (CLIC, ARRASTRE, ZOOM)
+// 11. EVENTOS DE RED
 // ==========================================
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNode = params.nodes[0];
 
-        // Resolución del modo conexión
         if (sourceNodeForConnection && sourceNodeForConnection !== clickedNode) {
             const nodeA = sourceNodeForConnection;
             const nodeB = clickedNode;
-            
             sourceNodeForConnection = null;
             connectionBanner.classList.add('hidden');
 
@@ -578,8 +639,6 @@ network.on('click', async function (params) {
                 const midX = (posA.x + posB.x) / 2;
                 const midY = (posA.y + posB.y) / 2;
 
-                network.setOptions({ physics: { enabled: true } });
-
                 const bridge = data.bridge;
                 if (!nodes.get(bridge.id)) {
                     nodes.add({
@@ -593,14 +652,13 @@ network.on('click', async function (params) {
                         fixed: { x: false, y: false },
                         color: { background: '#e0e7ff', border: '#6366f1' }
                     });
+                    trackNodeUsage(bridge.label);
                     consumeNodes(1);
                 }
                 
                 edges.add({ from: nodeA, to: bridge.id, label: bridge.relFromA });
                 edges.add({ from: bridge.id, to: nodeB, label: bridge.relToB });
-
-                setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
-            } catch (err) {
+            } catch {
                 alert("Error al conectar los nodos.");
             } finally {
                 hideLoader();
@@ -608,7 +666,6 @@ network.on('click', async function (params) {
             return;
         }
 
-        // Selección ordinaria de nodo
         selectedNodeId = clickedNode;
         const DOMCoords = network.canvasToDOM(network.getPositions([selectedNodeId])[selectedNodeId]);
         actionMenu.style.left = DOMCoords.x + 'px';
@@ -622,7 +679,6 @@ network.on('click', async function (params) {
 
 network.on('zoom', () => actionMenu.classList.add('hidden'));
 
-// Garantizar libertad de movimiento al arrastrar
 network.on('dragStart', (params) => {
     actionMenu.classList.add('hidden');
     if (params.nodes.length > 0) {
