@@ -4,6 +4,7 @@
 const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
+let currentDocumentText = "";
 
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
@@ -371,7 +372,13 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'expand', topic: selectedNodeId, contextPath, maxNodes })
+            body: JSON.stringify({ 
+                action: 'expand', 
+                topic: selectedNodeId, 
+                contextPath, 
+                maxNodes,
+                documentContext: currentDocumentText // <-- Contexto del documento
+            })
         });
         const data = await response.json();
 
@@ -427,7 +434,13 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'examples', topic: selectedNodeId, contextPath, maxNodes })
+            body: JSON.stringify({ 
+                action: 'examples', 
+                topic: selectedNodeId, 
+                contextPath, 
+                maxNodes,
+                documentContext: currentDocumentText // <-- Contexto del documento
+            })
         });
         const data = await response.json();
 
@@ -513,7 +526,12 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'define', topic: selectedNodeId, contextPath })
+            body: JSON.stringify({ 
+                action: 'define', 
+                topic: selectedNodeId, 
+                contextPath,
+                documentContext: currentDocumentText // <-- Contexto del documento
+            })
         });
         const data = await response.json();
 
@@ -583,6 +601,7 @@ document.getElementById('btnClear')?.addEventListener('click', () => {
     if (confirm("¿Deseas vaciar todo el esquema actual?")) {
         nodes.clear();
         edges.clear();
+        currentDocumentText = ""; // <-- Se limpia la memoria del documento
         actionMenu.classList.add('hidden');
         if (connectionBanner) connectionBanner.classList.add('hidden');
         sourceNodeForConnection = null;
@@ -759,7 +778,7 @@ async function handleFileUpload(file) {
 document.getElementById('btnProcessText')?.addEventListener('click', async () => {
     const textContent = rawTextInput.value.trim();
     if (!textContent) return;
-
+    currentDocumentText = textContent;
     // Validación de cobro preventiva
     const estimatedMinCost = selectedDensity === 'low' ? 4 : selectedDensity === 'high' ? 10 : 6;
     if (!checkBalance(estimatedMinCost)) return;

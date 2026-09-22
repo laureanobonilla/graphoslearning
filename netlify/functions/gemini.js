@@ -8,7 +8,7 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium' } = JSON.parse(event.body);
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);
 
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
@@ -26,7 +26,7 @@ exports.handler = async function(event, context) {
                                 label: { type: 'STRING' },
                                 relationship: { 
                                     type: 'STRING', 
-                                    description: 'Verbo de enlace o conector ultracorto (máximo 1 a 3 palabras, ej: "produce", "incluye", "requiere").' 
+                                    description: 'Verbo o enlace ultracorto (1 a 3 palabras).' 
                                 }
                             },
                             required: ["id", "label", "relationship"]
@@ -36,16 +36,19 @@ exports.handler = async function(event, context) {
                 required: ["concepts"]
             };
 
+            const docPrompt = documentContext 
+                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nREGLA DE PRIORIDAD: Extrae las derivaciones a partir de los hechos y argumentos presentes en el documento. Si el documento no contiene suficiente detalle específico para este nodo, complementa con conocimiento riguroso del tema.`
+                : 'Usa conocimiento riguroso del tema.';
+
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
-                contents: `Tema central: "${topic}".
+                contents: `Tema a expandir: "${topic}".
                 Contexto jerárquico: "${contextPath}".
+                ${docPrompt}
                 
                 REGLAS CRÍTICAS:
-                1. Genera EXACTAMENTE ${maxNodes} subconceptos clave en "label".
-                2. El campo "relationship" DEBE SER UN CONECTOR ULTRACORTO (de 1 a 3 palabras como máximo). 
-                   Ejemplos válidos: "produce", "incluye", "regulado por", "deriva en", "se divide en".
-                   PROHIBIDO escribir oraciones explicativas o párrafos en "relationship".`,
+                1. Genera entre 1 y ${maxNodes} conceptos reales y sustanciales. PROHIBIDO usar etiquetas genéricas o placeholders como "Concepto A", "Paso 1", "Elemento clave". Nombra el concepto explícito.
+                2. "relationship": Estrictamente de 1 a 3 palabras (ej: "deriva en", "regulado por", "incluye").`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
@@ -68,11 +71,8 @@ exports.handler = async function(event, context) {
                             type: 'OBJECT',
                             properties: {
                                 id: { type: 'STRING' },
-                                label: { type: 'STRING', description: 'Nombre conciso del caso práctico o ejemplo' },
-                                relationship: { 
-                                    type: 'STRING', 
-                                    description: 'Conector de máximo 2 palabras (ej: "ejemplo de", "aplicado en", "caso de")' 
-                                }
+                                label: { type: 'STRING', description: 'Nombre concreto del caso real o aplicación práctica' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 2 palabras.' }
                             },
                             required: ["id", "label", "relationship"]
                         }
@@ -81,18 +81,24 @@ exports.handler = async function(event, context) {
                 required: ["examples"]
             };
 
+            const docPrompt = documentContext 
+                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nREGLA DE PRIORIDAD: Busca casos, experimentos, aplicaciones o situaciones mencionadas en el documento para "${topic}". Solo si el documento carece de ejemplos concretos, genera ejemplos reales del mundo exterior.`
+                : 'Genera ejemplos reales y específicos del mundo exterior.';
+
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
                 contents: `Concepto: "${topic}".
-                Contexto: "${contextPath}".
+                Contexto jerárquico: "${contextPath}".
+                ${docPrompt}
                 
-                REGLAS CRÍTICAS:
-                1. Genera EXACTAMENTE ${maxNodes} ejemplos prácticos concisos.
-                2. El campo "relationship" solo debe contener un enlace ultracorto de 1 o 2 palabras. Nunca frases largas.`,
+                REGLAS CRÍTICAS ANTI-PLACEHOLDER:
+                1. PROHIBIDO GENERAR textos como "Ejemplo Específico A", "Caso de Estudio 1", "Resultado B". Nombra el caso o la aplicación concreta (ej: "Cifrado RSA", "Fiebre del oro de 1848", "Vacuna de ARN mensajero").
+                2. Genera entre 1 y ${maxNodes} ejemplos reales. Si solo hay 1 o 2 válidos, devuelve solo esos.
+                3. "relationship": Conector de 1 o 2 palabras (ej: "ejemplo de", "aplicado en").`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
-                    temperature: 0.3
+                    temperature: 0.2
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -109,9 +115,9 @@ exports.handler = async function(event, context) {
                         type: 'OBJECT',
                         properties: {
                             id: { type: 'STRING' },
-                            label: { type: 'STRING', description: 'Concepto puente intermedio' },
-                            relFromA: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde Tema A' },
-                            relToB: { type: 'STRING', description: 'Conector de 1 a 3 palabras hacia Tema B' }
+                            label: { type: 'STRING' },
+                            relFromA: { type: 'STRING' },
+                            relToB: { type: 'STRING' }
                         },
                         required: ["id", "label", "relFromA", "relToB"]
                     }
@@ -122,10 +128,7 @@ exports.handler = async function(event, context) {
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
                 contents: `Conecta lógicamente Tema A: "${topic}" con Tema B: "${topicB}".
-                
-                REGLAS CRÍTICAS:
-                1. "label": Nombre corto del concepto intermedio.
-                2. "relFromA" y "relToB": Verbos o conectores sintéticos de 1 a 3 palabras como máximo.`,
+                Genera un concepto puente intermedio concreto (no genérico). Conectores de 1 a 3 palabras.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
@@ -139,30 +142,36 @@ exports.handler = async function(event, context) {
         // 4. CARGAR DEFINICIÓN
         // ==========================================
         if (action === 'define') {
+            const docPrompt = documentContext 
+                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nSi el documento explica o describe "${topic}", extrae y sintetiza esa explicación explícita. Si no se menciona con profundidad en el texto, proporciona una definición rigurosa y directa.`
+                : `Proporciona una definición conceptual clara y directa.`;
+
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
-                contents: `Concepto a definir: "${topic}".
+                contents: `Define el concepto: "${topic}".
                 Ruta contextual: "${contextPath}".
+                ${docPrompt}
                 
                 INSTRUCCIONES:
-                1. Redacta la definición en 1 o 2 párrafos concisos y claros.
-                2. Solo texto plano, sin asteriscos ni markdown decorativo.`,
+                1. Redacta 1 o 2 párrafos concisos, precisos y sustanciales.
+                2. PROHIBIDO redactar definiciones vacías o genéricas ("Este es un concepto que representa un elemento en el sistema"). Explica qué es exactamente.
+                3. Solo texto plano, sin asteriscos ni markdown decorativo.`,
                 config: { temperature: 0.2 }
             });
             return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
         }
 
         // ==========================================
-        // 5. PARSEAR TEXTO COMPLETO A ESQUEMA JERÁRQUICO
+        // 5. PARSEAR TEXTO A ESQUEMA JERÁRQUICO
         // ==========================================
         if (action === 'parse_text') {
             let densityGuideline = '';
             if (density === 'low') {
-                densityGuideline = 'DENSIDAD BAJA (Esencial): Genera solo 2-3 ramas temáticas principales y 1-2 ejemplos globales. Enfócate exclusivamente en las ideas nucleares.';
+                densityGuideline = 'DENSIDAD BAJA: 2 a 3 ramas principales y 1 a 2 ejemplos concretos sólo si el texto los menciona.';
             } else if (density === 'high') {
-                densityGuideline = 'DENSIDAD ALTA (Exhaustiva): Genera entre 6-9 ramas temáticas detalladas y 4-6 ejemplos específicos, capturando matices y elementos secundarios del texto.';
+                densityGuideline = 'DENSIDAD ALTA: 6 a 9 ramas temáticas detalladas y los ejemplos o casos que el texto cite.';
             } else {
-                densityGuideline = 'DENSIDAD MEDIA (Equilibrada): Genera 3-5 ramas temáticas centrales y 2-4 ejemplos ilustrativos.';
+                densityGuideline = 'DENSIDAD MEDIA: 3 a 5 ramas temáticas y 2 a 3 ejemplos relevantes presentes en la lectura.';
             }
 
             const schema = {
@@ -197,8 +206,8 @@ exports.handler = async function(event, context) {
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                targetId: { type: 'STRING', description: 'ID de la rama a la que ejemplifica' },
-                                relationship: { type: 'STRING', description: 'Conector de 1 a 2 palabras.' },
+                                targetId: { type: 'STRING' },
+                                relationship: { type: 'STRING' },
                                 definition: { type: 'STRING', nullable: true }
                             },
                             required: ["id", "label", "targetId", "relationship"]
@@ -210,22 +219,22 @@ exports.handler = async function(event, context) {
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
-                contents: `Analiza este documento y organízalo en un esquema jerárquico:
+                contents: `Analiza minuciosamente el siguiente texto y estructura un mapa conceptual fiel a su contenido:
                 """${text}"""
 
-                INSTRUCCIONES DE DENSIDAD:
+                PAUTAS DE DENSIDAD:
                 ${densityGuideline}
 
-                REGLAS ESTRUCTURALES ESTRICTAS:
-                1. "root": El concepto rector central.
-                2. "branches": Las divisiones conceptuales principales que se derivan de la raíz.
-                3. "examples": Casos de uso o aplicaciones vinculadas con "targetId" a su rama teórica.
-                4. "relationship": Estrictamente de 1 a 3 palabras como máximo.
-                5. "definition": Si el texto provee una definición explícita del concepto, extráela. Si el texto no lo define directamente, coloca null.`,
+                PROHIBICIÓN ESTRICTA DE PLACEHOLDERS Y RELLENO:
+                - Queda terminantemente PROHIBIDO inventar o usar textos comodín como: "Ejemplo Específico A", "Caso de Uso B", "Resultado C", "Concepto 1", "Factor X".
+                - Todos los "label" de ramas y ejemplos DEBEN ser términos, nombres de teorías, datos, entidades o situaciones reales extraídas directamente de la lectura.
+                - Si el texto no menciona ejemplos concretos para una rama, NO inventes nada: deja el arreglo "examples" vacío o con menos elementos.
+                - En "definition", si el texto explica qué es el término, extráelo con precisión. Si no lo explica, pon null.
+                - En "relationship", usa únicamente 1 a 3 palabras (ej: "origina", "consiste en", "clasificado en").`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
-                    temperature: 0.2
+                    temperature: 0.15
                 }
             });
             return { statusCode: 200, body: response.text };
