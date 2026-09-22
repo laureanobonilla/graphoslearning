@@ -26,7 +26,7 @@ exports.handler = async function(event, context) {
                                 label: { type: 'STRING' },
                                 relationship: { 
                                     type: 'STRING', 
-                                    description: 'Verbo de enlace o conector extremadamente corto (máximo 1 a 3 palabras, ej: "compuesto por", "genera", "requiere").' 
+                                    description: 'Verbo de enlace o conector extremadamente corto (máximo 1 a 3 palabras, ej: "produce", "incluye", "requiere").' 
                                 }
                             },
                             required: ["id", "label", "relationship"]
@@ -37,7 +37,7 @@ exports.handler = async function(event, context) {
             };
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3.6-flash',
                 contents: `Tema central: "${topic}".
                 Contexto jerárquico: "${contextPath}".
                 
@@ -82,7 +82,7 @@ exports.handler = async function(event, context) {
             };
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3.6-flash',
                 contents: `Concepto: "${topic}".
                 Contexto: "${contextPath}".
                 
@@ -120,7 +120,7 @@ exports.handler = async function(event, context) {
             };
 
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3.6-flash',
                 contents: `Conecta lógicamente Tema A: "${topic}" con Tema B: "${topicB}".
                 
                 REGLAS CRÍTICAS:
@@ -140,7 +140,7 @@ exports.handler = async function(event, context) {
         // ==========================================
         if (action === 'define') {
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gemini-3.6-flash',
                 contents: `Concepto a definir: "${topic}".
                 Ruta contextual: "${contextPath}".
                 
