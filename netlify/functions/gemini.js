@@ -151,6 +151,90 @@ exports.handler = async function(event, context) {
             });
             return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
         }
+// ==========================================
+        // 5. PARSEAR TEXTO COMPLETO A ESQUEMA
+        // ==========================================
+       // ==========================================
+        // 5. PARSEAR TEXTO COMPLETO A ESQUEMA
+        // ==========================================
+        if (action === 'parse_text') {
+            const { text, density = 'medium' } = JSON.parse(event.body);
+
+            // Ajuste de directivas según densidad
+            let densityGuideline = '';
+            if (density === 'low') {
+                densityGuideline = 'DENSIDAD BAJA (Esencial): Limítate a 2-3 ramas temáticas principales y como máximo 1-2 ejemplos globales. Solo ideas nucleares.';
+            } else if (density === 'high') {
+                densityGuideline = 'DENSIDAD ALTA (Exhaustiva): Desglosa entre 6-10 ramas temáticas detalladas y 4-6 ejemplos o casos concretos. Captura matices y conceptos secundarios.';
+            } else {
+                densityGuideline = 'DENSIDAD MEDIA (Equilibrada): Extrae 3-5 ramas temáticas centrales y 2-3 ejemplos representativos.';
+            }
+
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    root: {
+                        type: 'OBJECT',
+                        properties: {
+                            id: { type: 'STRING' },
+                            label: { type: 'STRING' },
+                            definition: { type: 'STRING', nullable: true }
+                        },
+                        required: ["id", "label"]
+                    },
+                    branches: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING' },
+                                relationship: { type: 'STRING', description: 'Conector ultracorto (1 a 3 palabras).' },
+                                definition: { type: 'STRING', nullable: true }
+                            },
+                            required: ["id", "label", "relationship"]
+                        }
+                    },
+                    examples: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING' },
+                                targetId: { type: 'STRING' },
+                                relationship: { type: 'STRING' },
+                                definition: { type: 'STRING', nullable: true }
+                            },
+                            required: ["id", "label", "targetId", "relationship"]
+                        }
+                    }
+                },
+                required: ["root", "branches", "examples"]
+            };
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Analiza este texto y estructúralo en un esquema visual:
+                """${text}"""
+
+                INSTRUCCIONES DE DENSIDAD:
+                ${densityGuideline}
+
+                REGLAS ESTRUCTURALES:
+                1. "root": Tema central articulador.
+                2. "branches": Subdivisiones teóricas acordes a la densidad requerida.
+                3. "examples": Casos y aplicaciones vinculados mediante "targetId" a su concepto padre.
+                4. "relationship": Máximo 1 a 3 palabras.
+                5. "definition": Incluye la definición si viene explícita en el texto, de lo contrario null.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.2
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
 
         return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 

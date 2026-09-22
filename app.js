@@ -508,11 +508,27 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     if (!selectedNodeId) return;
 
     const currentNode = nodes.get(selectedNodeId);
-    if (currentNode && currentNode.definition) return;
-
-    const contextPath = getContextPath(selectedNodeId);
     const title = currentNode.baseTitle || selectedNodeId;
 
+    // CASO A: Ya tiene definición precargada (del texto) o ya renderizada
+    if (currentNode && currentNode.definition) {
+        // Si el label aún no muestra la definición, la estampamos de inmediato
+        if (!currentNode.label.includes('──────────')) {
+            const newLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
+            nodes.update({ 
+                id: selectedNodeId, 
+                label: newLabel,
+                shape: 'box',
+                fixed: { x: false, y: false },
+                widthConstraint: { maximum: currentNode.boxWidth || DEFAULT_MAX_WIDTH },
+                heightConstraint: { maximum: currentNode.boxHeight || DEFAULT_MAX_HEIGHT, valign: 'top' }
+            });
+        }
+        return;
+    }
+
+    // CASO B: No venía en el texto, procedemos a consultar a Gemini normalmente
+    const contextPath = getContextPath(selectedNodeId);
     showLoader('Redactando definición...');
 
     try {
@@ -714,5 +730,254 @@ network.on('dragStart', (params) => {
     actionMenu.classList.add('hidden');
     if (params.nodes.length > 0) {
         nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
+    }
+});
+
+// ==========================================
+// CONTROL DEL MODAL DE TEXTO A ESQUEMA
+// ==========================================
+const textSchemaModal = document.getElementById('textSchemaModal');
+const rawTextInput = document.getElementById('rawTextInput');
+
+document.getElementById('btnOpenTextModal')?.addEventListener('click', () => {
+    rawTextInput.value = '';
+    textSchemaModal.classList.remove('hidden');
+    textSchemaModal.classList.add('flex');
+});
+
+document.getElementById('closeTextModal')?.addEventListener('click', () => {
+    textSchemaModal.classList.add('hidden');
+    textSchemaModal.classList.remove('flex');
+});
+
+document.getElementById('btnProcessText')?.addEventListener('click', async () => {
+    const textContent = rawTextInput.value.trim();
+    if (!textContent) return;
+
+    textSchemaModal.classList.add('hidden');
+    textSchemaModal.classList.remove('flex');
+    showLoader('Estructurando texto en esquema...');
+
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'parse_text', text: textContent })
+        });
+        const data = await response.json();
+
+        // 1. Calcular total de nodos entrantes
+        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
+        if (!checkBalance(totalNodes)) return;
+
+        // 2. Congelar nodos previos
+        const existingNodes = nodes.get();
+        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+
+        const viewCenter = network.getViewPosition();
+        const rootX = viewCenter.x;
+        const rootY = viewCenter.y;
+
+        network.setOptions({ physics: { enabled: true } });
+
+        // 3. Crear Nodo Raíz (con definición en memoria si venía en el texto)
+        const root = data.root;
+        nodes.add({
+            id: root.id,
+            label: `*${root.label}*`,
+            baseTitle: root.label,
+            definition: root.definition || null, // Precargada si existe
+            x: rootX,
+            y: rootY,
+            fixed: { x: false, y: false }
+        });
+        trackNodeUsage(root.label);
+
+        // 4. Crear Ramas Temáticas
+        if (Array.isArray(data.branches)) {
+            data.branches.forEach(branch => {
+                nodes.add({
+                    id: branch.id,
+                    label: `*${branch.label}*`,
+                    baseTitle: branch.label,
+                    definition: branch.definition || null, // Precargada si existe
+                    x: rootX + (Math.random() * 60 - 30),
+                    y: rootY + (Math.random() * 60 - 30),
+                    fixed: { x: false, y: false }
+                });
+                edges.add({ from: root.id, to: branch.id, label: branch.relationship });
+                trackNodeUsage(branch.label);
+            });
+        }
+
+        // 5. Crear Nodos de Ejemplos
+        if (Array.isArray(data.examples)) {
+            data.examples.forEach(ex => {
+                nodes.add({
+                    id: ex.id,
+                    label: `*Ejemplo:*\n${ex.label}`,
+                    baseTitle: ex.label,
+                    definition: ex.definition || null, // Precargada si existe
+                    x: rootX + (Math.random() * 80 - 40),
+                    y: rootY + (Math.random() * 80 - 40),
+                    fixed: { x: false, y: false },
+                    color: {
+                        background: '#fafaf9',
+                        border: '#d6d3d1',
+                        highlight: { background: '#f5f5f4', border: '#78716c' },
+                        hover: { background: '#ffffff', border: '#a8a29e' }
+                    },
+                    font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
+                    shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
+                });
+
+                const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
+                edges.add({
+                    from: target,
+                    to: ex.id,
+                    label: ex.relationship,
+                    color: { color: '#cbd5e1', highlight: '#78716c' },
+                    dashes: true
+                });
+                trackNodeUsage(ex.label);
+            });
+        }
+
+        consumeNodes(totalNodes);
+
+        // 6. Ajustar físicas y estabilizar
+        setTimeout(() => { stopPhysicsAndUnlock(); }, 1600);
+
+    } catch (err) {
+        console.error(err);
+        alert('No se pudo procesar el esquema desde el texto.');
+    } finally {
+        hideLoader();
+    }
+});
+
+// Variable de densidad activa (por defecto: medium)
+let selectedDensity = 'medium';
+
+// Selector visual de densidad
+document.querySelectorAll('.density-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.density-btn').forEach(b => {
+            b.classList.remove('bg-white', 'text-slate-900', 'shadow-xs', 'font-semibold');
+            b.classList.add('text-slate-600', 'font-medium');
+        });
+        const target = e.currentTarget;
+        target.classList.remove('text-slate-600', 'font-medium');
+        target.classList.add('bg-white', 'text-slate-900', 'shadow-xs', 'font-semibold');
+        selectedDensity = target.dataset.density;
+    });
+});
+
+// En el evento click de btnProcessText:
+document.getElementById('btnProcessText')?.addEventListener('click', async () => {
+    const textContent = rawTextInput.value.trim();
+    if (!textContent) return;
+
+    textSchemaModal.classList.add('hidden');
+    textSchemaModal.classList.remove('flex');
+    showLoader(`Sintetizando esquema (${selectedDensity === 'low' ? 'esencial' : selectedDensity === 'high' ? 'exhaustivo' : 'equilibrado'})...`);
+
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'parse_text', 
+                text: textContent,
+                density: selectedDensity 
+            })
+        });
+        const data = await response.json();
+
+        // 1. Calcular total de nodos y validar saldo
+        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
+        if (!checkBalance(totalNodes)) return;
+
+        // 2. Congelar nodos existentes para preservar el mapa
+        const existingNodes = nodes.get();
+        nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+
+        const viewCenter = network.getViewPosition();
+        const rootX = viewCenter.x;
+        const rootY = viewCenter.y;
+
+        network.setOptions({ physics: { enabled: true } });
+
+        // 3. Nodo Raíz
+        const root = data.root;
+        nodes.add({
+            id: root.id,
+            label: `*${root.label}*`,
+            baseTitle: root.label,
+            definition: root.definition || null,
+            x: rootX,
+            y: rootY,
+            fixed: { x: false, y: false }
+        });
+        trackNodeUsage(root.label);
+
+        // 4. Ramas
+        if (Array.isArray(data.branches)) {
+            data.branches.forEach(branch => {
+                nodes.add({
+                    id: branch.id,
+                    label: `*${branch.label}*`,
+                    baseTitle: branch.label,
+                    definition: branch.definition || null,
+                    x: rootX + (Math.random() * 80 - 40),
+                    y: rootY + (Math.random() * 80 - 40),
+                    fixed: { x: false, y: false }
+                });
+                edges.add({ from: root.id, to: branch.id, label: branch.relationship });
+                trackNodeUsage(branch.label);
+            });
+        }
+
+        // 5. Ejemplos
+        if (Array.isArray(data.examples)) {
+            data.examples.forEach(ex => {
+                nodes.add({
+                    id: ex.id,
+                    label: `*Ejemplo:*\n${ex.label}`,
+                    baseTitle: ex.label,
+                    definition: ex.definition || null,
+                    x: rootX + (Math.random() * 100 - 50),
+                    y: rootY + (Math.random() * 100 - 50),
+                    fixed: { x: false, y: false },
+                    color: {
+                        background: '#fafaf9',
+                        border: '#d6d3d1',
+                        highlight: { background: '#f5f5f4', border: '#78716c' },
+                        hover: { background: '#ffffff', border: '#a8a29e' }
+                    },
+                    font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
+                    shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
+                });
+
+                const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
+                edges.add({
+                    from: target,
+                    to: ex.id,
+                    label: ex.relationship,
+                    color: { color: '#cbd5e1', highlight: '#78716c' },
+                    dashes: true
+                });
+                trackNodeUsage(ex.label);
+            });
+        }
+
+        consumeNodes(totalNodes);
+        setTimeout(() => { stopPhysicsAndUnlock(); }, 1800);
+
+    } catch (err) {
+        console.error(err);
+        alert('No se pudo procesar el esquema desde el texto.');
+    } finally {
+        hideLoader();
     }
 });
