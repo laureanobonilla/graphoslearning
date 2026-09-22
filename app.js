@@ -5,40 +5,66 @@ const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
 
+const container = document.getElementById('network-container');
+let nodes = new vis.DataSet([]);
+let edges = new vis.DataSet([]);
+
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
     physics: {
-        enabled: false, // Por defecto apagadas para evitar movimientos fantasma
+        enabled: false,
         solver: 'repulsion',
-        repulsion: { nodeDistance: 220, springLength: 200, springConstant: 0.05 }
+        repulsion: { nodeDistance: 240, springLength: 220, springConstant: 0.04 }
     },
     nodes: { 
         shape: 'box', 
-        margin: { top: 12, bottom: 12, left: 16, right: 16 },
+        margin: { top: 14, bottom: 14, left: 18, right: 18 },
         font: { 
             multi: 'md', 
-            size: 15, 
-            face: 'Inter, sans-serif', 
-            color: '#1e293b', 
-            bold: { color: '#3730a3', size: 16 } 
+            size: 14, 
+            face: 'Plus Jakarta Sans, Inter, -apple-system, sans-serif', 
+            color: '#0f172a',
+            bold: { color: '#090d16', size: 15, face: 'Plus Jakarta Sans' } 
         },
         borderWidth: 1,
         color: {
-            border: '#cbd5e1',
+            border: '#e2e8f0',
             background: '#ffffff',
-            highlight: { border: '#6366f1', background: '#f8fafc' },
-            hover: { border: '#94a3b8', background: '#f1f5f9' }
+            highlight: { border: '#0f172a', background: '#f8fafc' },
+            hover: { border: '#94a3b8', background: '#ffffff' }
         },
-        shadow: { enabled: true, color: 'rgba(15, 23, 42, 0.08)', size: 10, x: 0, y: 4 },
-        shapeProperties: { borderRadius: 8 }
+        shadow: { 
+            enabled: true, 
+            color: 'rgba(15, 23, 42, 0.04)', 
+            size: 16, 
+            x: 0, 
+            y: 8 
+        },
+        shapeProperties: { borderRadius: 10 }
     },
     edges: { 
-        arrows: 'to', 
-        color: { color: '#94a3b8', highlight: '#6366f1' },
-        font: { size: 12, color: '#64748b', strokeWidth: 3, strokeColor: '#ffffff' },
-        smooth: { type: 'continuous' } 
+        arrows: {
+            to: { enabled: true, scaleFactor: 0.6 }
+        },
+        color: { 
+            color: '#cbd5e1', 
+            highlight: '#475569', 
+            hover: '#94a3b8' 
+        },
+        font: { 
+            size: 11, 
+            face: 'Inter, sans-serif',
+            color: '#64748b', 
+            strokeWidth: 4, 
+            strokeColor: '#fbfcfd',
+            align: 'middle'
+        },
+        smooth: { type: 'continuous', roundness: 0.5 }
     },
-    interaction: { hover: true }
+    interaction: { 
+        hover: true,
+        tooltipDelay: 100
+    }
 });
 
 function stopPhysicsAndUnlock() {
@@ -444,13 +470,16 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
                     y: parentPos.y,
                     fixed: { x: false, y: false },
                     color: {
-                        background: '#fef3c7',
-                        border: '#f59e0b',
-                        highlight: { background: '#fde68a', border: '#d97706' },
-                        hover: { background: '#fffbeb', border: '#d97706' }
+                        background: '#fafaf9',
+                        border: '#d6d3d1',
+                        highlight: { background: '#f5f5f4', border: '#78716c' },
+                        hover: { background: '#ffffff', border: '#a8a29e' }
                     },
-                    font: { color: '#92400e' },
-                    shapeProperties: { borderDashes: [5, 5] }
+                    font: { 
+                        color: '#44403c',
+                        bold: { color: '#292524', size: 14 }
+                    },
+                    shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
                 });
                 
                 edges.add({ 
@@ -650,7 +679,12 @@ network.on('click', async function (params) {
                         boxWidth: DEFAULT_MAX_WIDTH,
                         boxHeight: DEFAULT_MAX_HEIGHT,
                         fixed: { x: false, y: false },
-                        color: { background: '#e0e7ff', border: '#6366f1' }
+                        color: {
+                            background: '#f1f5f9',
+                            border: '#cbd5e1',
+                            highlight: { background: '#e2e8f0', border: '#475569' }
+                        },
+                        font: { color: '#1e293b' }
                     });
                     trackNodeUsage(bridge.label);
                     consumeNodes(1);
