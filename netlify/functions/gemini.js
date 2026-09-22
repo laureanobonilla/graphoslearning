@@ -7,11 +7,13 @@ exports.handler = async function(event, context) {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
-  try {
-        const { action, topic, contextPath, maxNodes = 3 } = JSON.parse(event.body);
+    try {
+        const { action, topic, contextPath, maxNodes = 3, topicB } = JSON.parse(event.body);
 
+        // ==========================================
+        // 1. EXPANDIR RAMAS (CONCEPTOS)
+        // ==========================================
         if (action === 'expand') {
-            // Aquí está el schema restaurado
             const schema = {
                 type: 'OBJECT',
                 properties: {
@@ -22,7 +24,10 @@ exports.handler = async function(event, context) {
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                relationship: { type: 'STRING' }
+                                relationship: { 
+                                    type: 'STRING', 
+                                    description: 'Verbo de enlace o conector extremadamente corto (máximo 1 a 3 palabras, ej: "compuesto por", "genera", "requiere").' 
+                                }
                             },
                             required: ["id", "label", "relationship"]
                         }
@@ -32,14 +37,15 @@ exports.handler = async function(event, context) {
             };
 
             const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
-                contents: `Tema central a expandir: "${topic}".
-                Contexto jerárquico de origen: "${contextPath}".
+                model: 'gemini-2.5-flash',
+                contents: `Tema central: "${topic}".
+                Contexto jerárquico: "${contextPath}".
                 
-                INSTRUCCIONES:
-                1. Genera EXACTAMENTE ${maxNodes} subconceptos clave.
-                2. Evalúa si "${topic}" requiere contexto o es universal. 
-                3. No repitas términos que ya existan en la jerarquía.`,
+                REGLAS CRÍTICAS:
+                1. Genera EXACTAMENTE ${maxNodes} subconceptos clave en "label".
+                2. El campo "relationship" DEBE SER UN CONECTOR ULTRACORTO (de 1 a 3 palabras como máximo). 
+                   Ejemplos válidos: "produce", "incluye", "regulado por", "deriva en", "se divide en".
+                   PROHIBIDO escribir oraciones explicativas o párrafos en "relationship".`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
@@ -48,42 +54,10 @@ exports.handler = async function(event, context) {
             });
             return { statusCode: 200, body: response.text };
         } 
-if (action === 'connect') {
-            const { topicB } = JSON.parse(event.body); // Recibimos el segundo nodo
-            
-            const schema = {
-                type: 'OBJECT',
-                properties: {
-                    bridge: {
-                        type: 'OBJECT',
-                        properties: {
-                            id: { type: 'STRING', description: 'ID corto en minúsculas' },
-                            label: { type: 'STRING', description: 'Nombre del concepto intermedio' },
-                            relFromA: { type: 'STRING', description: 'Verbo de enlace del Tema A hacia este concepto' },
-                            relToB: { type: 'STRING', description: 'Verbo de enlace de este concepto hacia el Tema B' }
-                        },
-                        required: ["id", "label", "relFromA", "relToB"]
-                    }
-                },
-                required: ["bridge"]
-            };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
-                contents: `Analiza la relación entre el Tema A: "${topic}" y el Tema B: "${topicB}".
-                
-                INSTRUCCIONES:
-                1. Genera un (1) concepto intermedio o puente lógico que conecte ambos temas.
-                2. Define el verbo de enlace que va desde el Tema A hacia el puente (relFromA).
-                3. Define el verbo de enlace que va desde el puente hacia el Tema B (relToB).`,
-                config: {
-                    responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
-                }
-            });
-            return { statusCode: 200, body: response.text };
-        }        
+        // ==========================================
+        // 2. DAR EJEMPLOS PRÁCTICOS
+        // ==========================================
         if (action === 'examples') {
             const schema = {
                 type: 'OBJECT',
@@ -94,8 +68,11 @@ if (action === 'connect') {
                             type: 'OBJECT',
                             properties: {
                                 id: { type: 'STRING' },
-                                label: { type: 'STRING', description: 'Nombre corto del ejemplo práctico' },
-                                relationship: { type: 'STRING', description: 'Ej: "ejemplo de", "aplicado en"' }
+                                label: { type: 'STRING', description: 'Nombre conciso del caso práctico o ejemplo' },
+                                relationship: { 
+                                    type: 'STRING', 
+                                    description: 'Conector de máximo 2 palabras (ej: "ejemplo de", "aplicado en", "caso de")' 
+                                }
                             },
                             required: ["id", "label", "relationship"]
                         }
@@ -105,32 +82,71 @@ if (action === 'connect') {
             };
 
             const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
-                contents: `Concepto del que se requieren ejemplos: "${topic}".
-                Contexto jerárquico: "${contextPath}".
+                model: 'gemini-2.5-flash',
+                contents: `Concepto: "${topic}".
+                Contexto: "${contextPath}".
                 
-                INSTRUCCIONES:
-                1. Genera EXACTAMENTE ${maxNodes} ejemplos prácticos, reales o casos de uso del concepto.
-                2. El "label" debe ser muy conciso (máximo 5 palabras).
-                3. No repitas ejemplos.`,
+                REGLAS CRÍTICAS:
+                1. Genera EXACTAMENTE ${maxNodes} ejemplos prácticos concisos.
+                2. El campo "relationship" solo debe contener un enlace ultracorto de 1 o 2 palabras (ej: "ejemplo de", "caso en", "aplicación"). Nunca frases largas.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
-                    temperature: 0.4 // Un poco más alto para fomentar creatividad en los ejemplos
+                    temperature: 0.3
                 }
             });
             return { statusCode: 200, body: response.text };
         }
+
+        // ==========================================
+        // 3. CONECTAR DOS NODOS (PUENTE)
+        // ==========================================
+        if (action === 'connect') {
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    bridge: {
+                        type: 'OBJECT',
+                        properties: {
+                            id: { type: 'STRING' },
+                            label: { type: 'STRING', description: 'Concepto puente intermedio' },
+                            relFromA: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde Tema A' },
+                            relToB: { type: 'STRING', description: 'Conector de 1 a 3 palabras hacia Tema B' }
+                        },
+                        required: ["id", "label", "relFromA", "relToB"]
+                    }
+                },
+                required: ["bridge"]
+            };
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: `Conecta lógicamente Tema A: "${topic}" con Tema B: "${topicB}".
+                
+                REGLAS CRÍTICAS:
+                1. "label": Nombre corto del concepto intermedio.
+                2. "relFromA" y "relToB": Verbos o conectores sintéticos de 1 a 3 palabras como máximo (ej: "influye en", "determina", "basado en"). No redactes párrafos.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.2
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
+        // ==========================================
+        // 4. CARGAR DEFINICIÓN
+        // ==========================================
         if (action === 'define') {
             const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+                model: 'gemini-2.5-flash',
                 contents: `Concepto a definir: "${topic}".
-                Ruta contextual en el mapa conceptual: "${contextPath}".
+                Ruta contextual: "${contextPath}".
                 
-                INSTRUCCIONES CRÍTICAS:
-                1. Redacta la definición en máximo 2 párrafos cortos.
-                2. Usa ÚNICAMENTE TEXTO PLANO. Está ESTRICTAMENTE PROHIBIDO usar formato Markdown.
-                3. Determina si requiere su contexto teórico o si es universal.`,
+                INSTRUCCIONES:
+                1. Redacta la definición en 1 o 2 párrafos concisos y claros.
+                2. Solo texto plano, sin asteriscos ni markdown decorativo.`,
                 config: { temperature: 0.2 }
             });
             return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
@@ -139,7 +155,7 @@ if (action === 'connect') {
         return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error en Gemini Function:', error);
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
 };
