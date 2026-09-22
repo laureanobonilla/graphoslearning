@@ -516,7 +516,7 @@ document.getElementById('btnWelcomeDoc')?.addEventListener('click', () => {
     document.getElementById('btnOpenTextModal').click();
 });
 
-nodes.on('*', toggleWelcomeScreen);
+
 
 // ==========================================
 // 7. EXPANDIR RAMAS MANUALMENTE
