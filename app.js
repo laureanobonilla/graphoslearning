@@ -1830,7 +1830,6 @@ document.getElementById('nextPage')?.addEventListener('click', () => {
 });
 
 // Manejo de la carga del archivo PDF
-const readerPdfInput = document.getElementById('readerPdfInput');
 readerPdfInput?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
