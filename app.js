@@ -1777,16 +1777,18 @@ docContextInput?.addEventListener('input', (e) => {
 
 // Renderizado de página con capa de texto interactiva para selección
 // Renderizado de página corregido y limpio
+// Renderizado de página optimizado para evitar texto encimado y errores
 async function renderPage(num) {
     if (!pdfDoc) return;
     pageRendering = true;
     
     const page = await pdfDoc.getPage(num);
     const viewport = page.getViewport({ scale: scale });
+    
     canvas.height = viewport.height;
     canvas.width = viewport.width;
     
-    // Ajustar contenedor del canvas y la capa de texto exactamente a las dimensiones de la página
+    // Ajustar contenedor del canvas
     pdfCanvasWrapper.style.width = `${viewport.width}px`;
     pdfCanvasWrapper.style.height = `${viewport.height}px`;
 
@@ -1795,25 +1797,32 @@ async function renderPage(num) {
         viewport: viewport
     };
     
-    // Renderizamos la página en el canvas
+    // 1. Renderizamos la página limpia en el canvas
     await page.render(renderContext).promise;
 
-    // Limpiamos la capa de texto anterior para evitar que se encimen los textos
+    // 2. Limpiamos por completo la capa de texto anterior
     const textLayerDiv = document.getElementById('pdfTextLayer');
-    textLayerDiv.innerHTML = '';
-    textLayerDiv.style.width = `${viewport.width}px`;
-    textLayerDiv.style.height = `${viewport.height}px`;
+    if (textLayerDiv) {
+        textLayerDiv.innerHTML = '';
+        textLayerDiv.style.width = `${viewport.width}px`;
+        textLayerDiv.style.height = `${viewport.height}px`;
 
-    // Obtenemos y renderizamos el texto correspondiente a esta página exacta
-    const textContent = await page.getTextContent();
-    
-    if (window.pdfjsLib && pdfjsLib.renderTextLayer) {
-        pdfjsLib.renderTextLayer({
-            textContentSource: textContent,
-            container: textLayerDiv,
-            viewport: viewport,
-            textDivs: []
-        });
+        try {
+            // Obtenemos el texto de la página de forma segura
+            const textContent = await page.getTextContent();
+            
+            // Renderizamos la capa de texto asegurando compatibilidad
+            if (window.pdfjsLib && typeof pdfjsLib.renderTextLayer === 'function') {
+                await pdfjsLib.renderTextLayer({
+                    textContentSource: textContent,
+                    container: textLayerDiv,
+                    viewport: viewport,
+                    textDivs: []
+                }).promise;
+            }
+        } catch (textErr) {
+            console.warn("Aviso menor en la capa de texto de la página:", textErr);
+        }
     }
 
     pageRendering = false;
@@ -1825,7 +1834,6 @@ async function renderPage(num) {
 
     document.getElementById('pageNum').textContent = num;
 }
-
 function queueRenderPage(num) {
     if (pageRendering) {
         pageNumPending = num;
