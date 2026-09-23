@@ -424,8 +424,8 @@ document.getElementById('btnAdminAccess')?.addEventListener('click', async () =>
 // ==========================================
 // 5. PAYPAL Y PAQUETES
 // ==========================================
-let selectedPrice = "15.00";
-let selectedNodeAmount = 1000;
+let selectedPrice = "5.00";
+let selectedNodeAmount = 200;
 
 document.querySelectorAll('.package-card').forEach(card => {
     card.addEventListener('click', (e) => {
@@ -444,7 +444,13 @@ document.querySelectorAll('.package-card').forEach(card => {
 
 if (window.paypal) {
     paypal.Buttons({
-        style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'paypal' },
+        style: { 
+            layout: 'horizontal', // Cambiado a horizontal para ocupar menos espacio vertical
+            color: 'gold', 
+            shape: 'rect', 
+            label: 'pay',
+            height: 40 // Altura controlada para que no sea intrusivo
+        },
         createOrder: function(data, actions) {
             return actions.order.create({
                 purchase_units: [{
@@ -452,7 +458,7 @@ if (window.paypal) {
                     amount: { currency_code: 'USD', value: selectedPrice }
                 }]
             });
-        },
+        },hagam
         onApprove: function(data, actions) {
             return actions.order.capture().then(async function(details) {
                 const licenseKey = 'GK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
