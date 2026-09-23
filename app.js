@@ -1812,7 +1812,7 @@ document.getElementById('nextPage')?.addEventListener('click', () => {
 });
 
 // Interceptar la carga del archivo PDF desde el visor
-const readerPdfInput = document.getElementById('readerPdfInput');
+
 readerPdfInput?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
