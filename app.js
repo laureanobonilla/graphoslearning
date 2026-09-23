@@ -148,7 +148,7 @@ let availableNodes = 0;
 if (window.netlifyIdentity) {
     netlifyIdentity.init({ locale: 'es' });
     
-    // Sincronización inmediata a prueba de fallos
+    // Sincronización inmediata al cargar
     currentUser = netlifyIdentity.currentUser();
     initializeBalance();
     updateAuthUI();
@@ -176,19 +176,27 @@ if (window.netlifyIdentity) {
 }
 
 function initializeBalance() {
-    if (isAdmin) return;
+    if (isAdmin) {
+        updateCounterDisplay();
+        return;
+    }
 
     if (currentUser) {
-        // Usuario logueado: busca su saldo real o le da los 50 iniciales
+        // Usuario logueado
         let storedBalance = parseInt(localStorage.getItem(`gk_balance_${currentUser.id}`), 10);
         if (isNaN(storedBalance)) {
-            storedBalance = 50; // Bono de bienvenida
+            storedBalance = 50; 
             localStorage.setItem(`gk_balance_${currentUser.id}`, storedBalance);
         }
         availableNodes = storedBalance;
     } else {
-        // Invitado (Teaser): 15 nodos efímeros
-        availableNodes = 15; 
+        // Invitado (Guardamos su saldo temporal para que sí se rebajen y no se reinicien al recargar)
+        let guestBalance = parseInt(localStorage.getItem('gk_guest_balance'), 10);
+        if (isNaN(guestBalance)) {
+            guestBalance = 15;
+            localStorage.setItem('gk_guest_balance', guestBalance);
+        }
+        availableNodes = guestBalance;
     }
     updateCounterDisplay();
 }
@@ -196,6 +204,7 @@ function initializeBalance() {
 function updateAuthUI() {
     const loginText = document.getElementById('loginText');
     const userStatusDot = document.getElementById('userStatusDot');
+    if (!loginText || !userStatusDot) return;
     
     if (currentUser) {
         loginText.innerText = currentUser.user_metadata?.full_name?.split(' ')[0] || "Mi Cuenta";
@@ -208,11 +217,8 @@ function updateAuthUI() {
 
 // 4.2 Interacciones de Autenticación
 document.getElementById('btnLogin')?.addEventListener('click', () => {
-    if (currentUser) {
-        netlifyIdentity.open(); // Abre el modal nativo de perfil
-    } else {
-        netlifyIdentity.open('login');
-    }
+    if (currentUser) netlifyIdentity.open();
+    else netlifyIdentity.open('login');
 });
 
 document.getElementById('btnTriggerNetlifyLogin')?.addEventListener('click', () => {
@@ -224,11 +230,12 @@ document.getElementById('closeAuthWall')?.addEventListener('click', () => {
     document.getElementById('authWallModal').classList.remove('flex');
 });
 
-// Guardián de acciones premium (El Muro de Valor)
 function requireAuth(actionDescription) {
     if (currentUser || isAdmin) return true;
     
-    document.getElementById('authWallReason').innerText = actionDescription;
+    const reasonEl = document.getElementById('authWallReason');
+    if(reasonEl) reasonEl.innerText = actionDescription;
+    
     document.getElementById('authWallModal').classList.remove('hidden');
     document.getElementById('authWallModal').classList.add('flex');
     if (actionMenu) actionMenu.classList.add('hidden');
@@ -257,24 +264,19 @@ function updateCounterDisplay() {
     }
 }
 
-function openStore() {
-    storeModal.classList.remove('hidden');
-    storeModal.classList.add('flex');
-}
-
-function closeStoreModal() {
-    storeModal.classList.add('hidden');
-    storeModal.classList.remove('flex');
-}
-
 function consumeNodes(amount) {
     if (isAdmin) return;
+    
     availableNodes -= amount;
     if (availableNodes < 0) availableNodes = 0;
     
+    // Aquí es donde se garantiza el guardado correcto tanto para invitados como usuarios
     if (currentUser) {
         localStorage.setItem(`gk_balance_${currentUser.id}`, availableNodes);
+    } else {
+        localStorage.setItem('gk_guest_balance', availableNodes);
     }
+    
     updateCounterDisplay();
 }
 
@@ -283,16 +285,24 @@ function checkBalance(cost) {
     
     if (availableNodes < cost) {
         if (!currentUser) {
-            // Se le acabó el saldo de invitado (Teaser)
-            requireAuth("procesar este esquema completo");
+            requireAuth("procesar este esquema");
         } else {
-            // Se le acabó el saldo real, abrir tienda
             if (actionMenu) actionMenu.classList.add('hidden');
             openStore();
         }
         return false;
     }
     return true;
+}
+
+function openStore() {
+    storeModal.classList.remove('hidden');
+    storeModal.classList.add('flex');
+}
+
+function closeStoreModal() {
+    storeModal.classList.add('hidden');
+    storeModal.classList.remove('flex');
 }
 
 // 4.4 Eventos Preservados (Sinergia, Tienda y Admin)
