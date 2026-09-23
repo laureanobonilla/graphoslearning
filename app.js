@@ -955,15 +955,15 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         if (!currentNode.label.includes('──────────')) {
             const newLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
             nodes.update({ 
-                id: selectedNodeId, 
-                baseTitle: title,
-                definition: data.definition, 
-                label: newLabel,
-                shape: 'box',
-                fixed: { x: false, y: false },
-                widthConstraint: { maximum: 220 }, // Ancho controlado y cuadrado
-                heightConstraint: { maximum: 220, valign: 'top' } // Altura cuadrada inicial menos invasiva
-            });
+                        id: selectedNodeId, 
+                        baseTitle: title,
+                        definition: data.definition, 
+                        label: newLabel,
+                        shape: 'box',
+                        fixed: { x: false, y: false },
+                        widthConstraint: { maximum: 240 }, // Ancho máximo controlado
+                        heightConstraint: { maximum: 240, valign: 'top' } // Altura limitada para que sea cuadrado por defecto
+                    });
         }
         return;
     }
@@ -1522,9 +1522,14 @@ network.on('click', async function (params) {
 
         // MOSTRAR MENÚ FLOTANTE
         selectedNodeId = clickedNode;
-        const DOMCoords = network.canvasToDOM(network.getPositions([selectedNodeId])[selectedNodeId]);
-        actionMenu.style.left = DOMCoords.x + 'px';
-        actionMenu.style.top = (DOMCoords.y - 30) + 'px';
+        const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
+        const DOMCoords = network.canvasToDOM(nodePosition);
+        
+        // Obtenemos la posición del contenedor para ajustar el desplazamiento exacto
+        const containerRect = container.getBoundingClientRect();
+        
+        actionMenu.style.left = (DOMCoords.x) + 'px';
+        actionMenu.style.top = (DOMCoords.y - 40) + 'px';
         actionMenu.classList.remove('hidden');
     } else {
         actionMenu.classList.add('hidden');
@@ -1600,52 +1605,47 @@ document.addEventListener('mousedown', (e) => {
     }
 });
 
-// Función auxiliar para resaltar el texto en el lector (Highlight amarillo)
-function highlightSelectedText() {
-    if (!activeSelectionRange) return;
-    try {
-        const span = document.createElement('span');
-        span.className = "bg-amber-200/80 rounded px-0.5 transition-colors";
-        span.appendChild(activeSelectionRange.extractContents());
-        activeSelectionRange.insertNode(span);
-    } catch (err) {
-        console.error("No se pudo aplicar el resaltado:", err);
-    }
-}
+
 
 // 4. Acciones desde el menú flotante del lector hacia el grafo
 function createNodeFromReader(actionType) {
     if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
-    highlightSelectedText();
 
     const topic = activeSelectedText;
+    const rangeToHighlight = activeSelectionRange; // Guardamos referencia antes de limpiar
+    
     activeSelectedText = "";
     activeSelectionRange = null;
 
     if (!checkBalance(1)) return;
 
-    // Crear el nodo raíz derivado del documento en el lienzo
     const viewCenter = network.getViewPosition();
     const spawnX = viewCenter.x + (Math.random() * 100 - 50);
     const spawnY = viewCenter.y + (Math.random() * 100 - 50);
 
-    if (!nodes.get(topic)) {
+    const nodeId = topic; // Usamos el texto como ID único del nodo
+
+    if (!nodes.get(nodeId)) {
         nodes.add({
-            id: topic,
+            id: nodeId,
             label: `*📄 Lector:*\n${topic}`,
             baseTitle: topic,
             x: spawnX,
             y: spawnY,
             fixed: { x: false, y: false },
-            color: { background: '#fef3c7', border: '#f59e0b' } // Tono ámbar distintivo de documento
+            color: { background: '#fef3c7', border: '#f59e0b' }
         });
         trackNodeUsage(topic);
         consumeNodes(1);
     }
 
-    // Si el usuario eligió expandir o ver ejemplos de inmediato, simulamos el clic sobre el nodo recién creado
-    selectedNodeId = topic;
+    // Aplicamos el resaltado y el enlace interactivo en el texto
+    activeSelectionRange = rangeToHighlight;
+    highlightSelectedTextAndLink(nodeId);
+
+    // Ejecutar la acción extra elegida (expandir, definir, etc.)
+    selectedNodeId = nodeId;
     if (actionType === 'expand') {
         document.getElementById('btnMenuExpand').click();
     } else if (actionType === 'examples') {
@@ -1655,7 +1655,95 @@ function createNodeFromReader(actionType) {
     }
 }
 
+function highlightSelectedTextAndLink(nodeId) {
+    if (!activeSelectionRange) return;
+    try {
+        const span = document.createElement('span');
+        span.className = "bg-amber-200/95 hover:bg-amber-300 rounded px-1 transition-colors cursor-pointer border-b-2 border-amber-400";
+        span.appendChild(activeSelectionRange.extractContents());
+        activeSelectionRange.insertNode(span);
+        
+        // Conectamos el clic del span con el ID del nodo creado
+        highlightAndBindSelectedText(span, nodeId);
+    } catch (err) {
+        console.error("Error al resaltar texto:", err);
+    }
+}
+
 document.getElementById('tipBtnExpand')?.addEventListener('click', () => createNodeFromReader('expand'));
 document.getElementById('tipBtnExamples')?.addEventListener('click', () => createNodeFromReader('examples'));
 document.getElementById('tipBtnDefine')?.addEventListener('click', () => createNodeFromReader('define'));
 
+// ==========================================
+// CARGADOR DE PDF EN EL MODO LECTOR ACTIVO
+// ==========================================
+const readerPdfInput = document.getElementById('readerPdfInput');
+// ==========================================
+// INTERACCIÓN BIDIRECCIONAL: TEXTO -> NODO
+// ==========================================
+// Modificamos ligeramente la función de creación para guardar el vínculo con el elemento del DOM
+let domTextToNodeMap = new Map();
+
+// Dentro de tu función createNodeFromReader(actionType), al crear el span con highlight, 
+// le asignamos un evento de clic:
+function highlightAndBindSelectedText(spanElement, nodeId) {
+    spanElement.style.cursor = 'pointer';
+    spanElement.title = "Haz clic para enfocar este nodo en el grafo";
+    
+    spanElement.addEventListener('click', () => {
+        if (nodes.get(nodeId)) {
+            network.selectNodes([nodeId]);
+            network.focus(nodeId, {
+                scale: 1.2,
+                animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+            });
+            
+            selectedNodeId = nodeId;
+            const pos = network.getPositions([nodeId])[nodeId];
+            const domCoords = network.canvasToDOM(pos);
+            actionMenu.style.left = domCoords.x + 'px';
+            actionMenu.style.top = (domCoords.y - 40) + 'px';
+            actionMenu.classList.remove('hidden');
+        }
+    });
+}
+readerPdfInput?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    showLoader('Cargando PDF en el lector...');
+    try {
+        let textContent = '';
+        const fileName = file.name.toLowerCase();
+
+        if (fileName.endsWith('.pdf')) {
+            const buffer = await file.arrayBuffer();
+            // Reutilizamos el motor pdfjsLib que ya está inicializado en tu index
+            const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+            let fullText = '';
+            
+            // Leemos hasta 30 páginas para una lectura fluida en el panel
+            const maxPages = Math.min(pdf.numPages, 30); 
+            for (let i = 1; i <= maxPages; i++) {
+                const page = await pdf.getPage(i);
+                const textData = await page.getTextContent();
+                fullText += textData.items.map(item => item.str).join(' ') + '\n\n';
+            }
+            textContent = fullText;
+        } else if (fileName.endsWith('.txt')) {
+            textContent = await file.text();
+        }
+
+        if (textContent.trim()) {
+            // Inyectamos el texto limpio en el panel lector
+            readerContentArea.innerText = textContent;
+        } else {
+            alert('El archivo no contiene texto legible.');
+        }
+    } catch (err) {
+        console.error("Error al cargar el PDF en el lector:", err);
+        alert('No se pudo leer el archivo PDF.');
+    } finally {
+        hideLoader();
+    }
+});

@@ -183,16 +183,24 @@
 <div class="flex flex-1 h-full relative overflow-hidden">
         
     <!-- NUEVO: Panel Izquierdo de Lectura Activa con Resizer -->
+<!-- Panel Izquierdo de Lectura Activa -->
         <div id="readerPanel" class="w-1/2 h-full bg-white border-r border-slate-200 flex flex-col hidden z-10 shadow-lg relative min-w-[250px] max-w-[70vw]">
             <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center select-none">
-                <h3 class="text-xs font-bold font-heading text-slate-700 uppercase tracking-wider">Lector Activo de Documento</h3>
-                <span class="text-[11px] text-slate-400">Subraya cualquier texto para desplegar acciones</span>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-xs font-bold font-heading text-slate-700 uppercase tracking-wider">Lector Activo</h3>
+                    <!-- Botón para cargar PDF directamente aquí -->
+                    <label class="bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md text-[11px] font-semibold cursor-pointer shadow-xs transition-colors flex items-center gap-1">
+                        <span>📁 Abrir PDF</span>
+                        <input type="file" id="readerPdfInput" class="hidden" accept=".pdf,.txt">
+                    </label>
+                </div>
+                <span class="text-[11px] text-slate-400">Subraya para crear nodos</span>
             </div>
-            <!-- Área de lectura editable / subrayable -->
+            <!-- Área de lectura -->
             <div id="readerContentArea" class="p-6 flex-1 overflow-y-auto text-slate-800 text-sm leading-relaxed font-sans select-text outline-none" contenteditable="true">
-                Pega aquí el texto que deseas leer y estudiar. Todo lo que subrayes activará un menú flotante con las opciones de análisis conceptual para conectarlo directamente a tu grafo.
+                Sube un PDF o pega tu texto aquí para comenzar a leer y extraer conceptos de forma interactiva.
             </div>
-            <!-- Barra de Redimensionamiento (Resizer lateral) -->
+            <!-- Barra de Redimensionamiento -->
             <div id="panelResizer" class="absolute top-0 right-0 w-1.5 h-full bg-transparent hover:bg-indigo-500 cursor-col-resize transition-colors"></div>
         </div>
 
