@@ -122,18 +122,20 @@ landscapeToggle?.addEventListener('click', () => {
 let currentProjectId = localStorage.getItem('gk_current_project_id');
 
 async function saveCurrentProjectToBin() {
-    // Si el usuario es admin, no gastamos llamadas a la base de datos
     if (isAdmin) return;
 
-    // Determinamos el ID único (ID del usuario de Netlify o ID de sesión temporal)
     const userIdentifier = currentUser ? currentUser.id : sessionId;
     
+    // Obtenemos el nombre o correo del usuario logueado, o "Invitado" si no ha iniciado sesión
+    const userName = currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : "Invitado";
+
     const projectData = {
+        owner: userName,
+        email: currentUser ? currentUser.email : null,
         nodes: nodes.get(),
         edges: edges.get()
     };
 
-    // Obtenemos un título representativo basado en el primer nodo o el estado
     let projectTitle = "Mapa Conceptual";
     const allNodes = nodes.get();
     if (allNodes.length > 0) {
@@ -155,7 +157,6 @@ async function saveCurrentProjectToBin() {
         const resData = await response.json();
         if (response.ok && resData.projectId) {
             currentProjectId = resData.projectId;
-            // Guardamos el Bin ID específico dependiendo de si está logueado o es invitado
             if (currentUser) {
                 localStorage.setItem(`gk_bin_user_${currentUser.id}`, currentProjectId);
             } else {

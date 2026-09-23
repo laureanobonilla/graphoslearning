@@ -38,8 +38,19 @@ exports.handler = async function(event, context) {
             const masterData = await masterRes.json();
             
             // Buscamos el arreglo dentro de 'proyectos' (JSONBin guarda los datos dentro de .record)
+            // Dentro de la sección donde se agrega al Master Index en db.js:
             let index = Array.isArray(masterData.record.proyectos) ? masterData.record.proyectos : [];
-            index.push({ id: binId, title, user, date: new Date().toISOString() });
+
+            // Extraemos el nombre del usuario que viene en data, o ponemos "Invitado"
+            const ownerName = data.owner || "Invitado";
+
+            index.push({ 
+                id: binId, 
+                title, 
+                user, 
+                ownerName, // <-- Guardamos el nombre aquí también para tenerlo a la vista en el índice
+                date: new Date().toISOString() 
+            });
 
             // Enviamos el objeto con la misma estructura original
             await fetch(`https://api.jsonbin.io/v3/b/${MASTER_BIN_ID}`, {
