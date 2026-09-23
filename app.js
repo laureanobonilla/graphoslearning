@@ -148,6 +148,11 @@ let availableNodes = 0;
 if (window.netlifyIdentity) {
     netlifyIdentity.init({ locale: 'es' });
     
+    // Sincronización inmediata a prueba de fallos
+    currentUser = netlifyIdentity.currentUser();
+    initializeBalance();
+    updateAuthUI();
+    
     netlifyIdentity.on('init', user => {
         currentUser = user;
         initializeBalance();
@@ -168,7 +173,6 @@ if (window.netlifyIdentity) {
         initializeBalance();
         updateAuthUI();
     });
-}
 
 function initializeBalance() {
     if (isAdmin) return;
