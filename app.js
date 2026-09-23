@@ -941,6 +941,9 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
 // ==========================================
 // 9. DEFINICIÓN, CONECTAR, ELIMINAR Y TAMAÑO
 // ==========================================
+// ==========================================
+// 9. DEFINICIÓN, CONECTAR, ELIMINAR Y TAMAÑO
+// ==========================================
 document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
@@ -953,15 +956,15 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         if (!currentNode.label.includes('──────────')) {
             const newLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
             nodes.update({ 
-                        id: selectedNodeId, 
-                        baseTitle: title,
-                        definition: data.definition, 
-                        label: newLabel,
-                        shape: 'box',
-                        fixed: { x: false, y: false },
-                        widthConstraint: { maximum: 240 }, // Ancho máximo controlado
-                        heightConstraint: { maximum: 240, valign: 'top' } // Altura limitada para que sea cuadrado por defecto
-                    });
+                id: selectedNodeId, 
+                baseTitle: title,
+                definition: currentNode.definition, 
+                label: newLabel,
+                shape: 'box',
+                fixed: { x: false, y: false },
+                widthConstraint: { maximum: 240 },
+                heightConstraint: { maximum: 240, valign: 'top' }
+            });
         }
         return;
     }
@@ -972,15 +975,19 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
-                action: 'define', // o 'expand', 'examples', etc.
-                topic: topicName, 
+                action: 'define', 
+                topic: title, // Corregido: usamos 'title' en lugar de 'topicName'
                 contextPath,
-                documentContext: globalDocumentContext || currentDocumentText 
+                documentContext: (globalDocumentContext || currentDocumentText || "").slice(0, 6000) 
             })
         });
-        const data = await response.json();
-
+        
+        const responseText = await response.text();
+        if (!response.ok) throw new Error(responseText);
+        
+        const data = JSON.parse(responseText);
         const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
 
         nodes.update({ 
@@ -990,11 +997,12 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
             label: newLabel,
             shape: 'box',
             fixed: { x: false, y: false },
-            widthConstraint: { maximum: currentNode.boxWidth || DEFAULT_MAX_WIDTH },
-            heightConstraint: { maximum: currentNode.boxHeight || DEFAULT_MAX_HEIGHT, valign: 'top' }
+            widthConstraint: { maximum: 240 },
+            heightConstraint: { maximum: 240, valign: 'top' }
         });
-    } catch {
-        alert("Error al obtener la definición.");
+    } catch (err) {
+        console.error("Error al obtener la definición:", err);
+        alert("Error al obtener la definición. Revisa la consola.");
     } finally {
         hideLoader();
     }
@@ -1768,6 +1776,7 @@ docContextInput?.addEventListener('input', (e) => {
 });
 
 // Renderizado de página con capa de texto interactiva para selección
+// Renderizado de página corregido y limpio
 async function renderPage(num) {
     if (!pdfDoc) return;
     pageRendering = true;
@@ -1777,7 +1786,7 @@ async function renderPage(num) {
     canvas.height = viewport.height;
     canvas.width = viewport.width;
     
-    // Ajustar contenedor del canvas
+    // Ajustar contenedor del canvas y la capa de texto exactamente a las dimensiones de la página
     pdfCanvasWrapper.style.width = `${viewport.width}px`;
     pdfCanvasWrapper.style.height = `${viewport.height}px`;
 
@@ -1786,7 +1795,27 @@ async function renderPage(num) {
         viewport: viewport
     };
     
+    // Renderizamos la página en el canvas
     await page.render(renderContext).promise;
+
+    // Limpiamos la capa de texto anterior para evitar que se encimen los textos
+    const textLayerDiv = document.getElementById('pdfTextLayer');
+    textLayerDiv.innerHTML = '';
+    textLayerDiv.style.width = `${viewport.width}px`;
+    textLayerDiv.style.height = `${viewport.height}px`;
+
+    // Obtenemos y renderizamos el texto correspondiente a esta página exacta
+    const textContent = await page.getTextContent();
+    
+    if (window.pdfjsLib && pdfjsLib.renderTextLayer) {
+        pdfjsLib.renderTextLayer({
+            textContentSource: textContent,
+            container: textLayerDiv,
+            viewport: viewport,
+            textDivs: []
+        });
+    }
+
     pageRendering = false;
 
     if (pageNumPending !== null) {
@@ -1795,18 +1824,6 @@ async function renderPage(num) {
     }
 
     document.getElementById('pageNum').textContent = num;
-
-    // Renderizar la capa de texto real por encima del canvas para permitir subrayar y seleccionar
-    const textContent = await page.getTextContent();
-    const textLayerDiv = document.getElementById('pdfTextLayer');
-    textLayerDiv.innerHTML = '';
-    
-    pdfjsLib.renderTextLayer({
-        textContentSource: textContent,
-        container: textLayerDiv,
-        viewport: viewport,
-        textDivs: []
-    });
 }
 
 function queueRenderPage(num) {
