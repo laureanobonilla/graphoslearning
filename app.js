@@ -13,40 +13,45 @@ let network = new vis.Network(container, { nodes, edges }, {
     physics: {
         enabled: false,
         solver: 'repulsion',
-        repulsion: { nodeDistance: 240, springLength: 220, springConstant: 0.04 }
+        repulsion: { nodeDistance: 220, springLength: 200, springConstant: 0.05 }
     },
     nodes: { 
         shape: 'box', 
-        margin: { top: 14, bottom: 14, left: 18, right: 18 },
+        margin: { top: 16, bottom: 16, left: 20, right: 20 },
         font: { 
             multi: 'md', 
-            size: 14, 
-            face: 'Plus Jakarta Sans, Inter, -apple-system, sans-serif', 
-            color: '#0f172a',
-            bold: { color: '#090d16', size: 15, face: 'Plus Jakarta Sans' } 
+            size: 18, // Letra más grande para el estilo a mano
+            face: 'Kalam, cursive', 
+            color: '#1e293b',
+            bold: { color: '#0f172a', size: 20, face: 'Kalam' } 
         },
-        borderWidth: 1,
+        borderWidth: 2,
         color: {
-            border: '#e2e8f0',
-            background: '#ffffff',
-            highlight: { border: '#0f172a', background: '#f8fafc' },
-            hover: { border: '#94a3b8', background: '#ffffff' }
+            border: '#f59e0b', // Naranja/Amarillo cálido
+            background: '#fef08a', // Fondo estilo Post-it amarillo
+            highlight: { border: '#ea580c', background: '#fde047' },
+            hover: { border: '#fb923c', background: '#fef9c3' }
         },
-        shadow: { enabled: true, color: 'rgba(15, 23, 42, 0.04)', size: 16, x: 0, y: 8 },
-        shapeProperties: { borderRadius: 10 }
+        shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.15)', size: 10, x: 4, y: 4 },
+        shapeProperties: { 
+            borderRadius: 25, // Bordes muy redondeados (casi pastilla)
+            borderDashes: [8, 4] // Efecto de trazado a lápiz/marcador discontinuo
+        }
     },
     edges: { 
-        arrows: { to: { enabled: true, scaleFactor: 0.6 } },
-        color: { color: '#cbd5e1', highlight: '#475569', hover: '#94a3b8' },
+        arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+        color: { color: '#94a3b8', highlight: '#64748b', hover: '#cbd5e1' },
         font: { 
-            size: 11, 
-            face: 'Inter, sans-serif',
-            color: '#64748b', 
-            strokeWidth: 4, 
+            size: 14, 
+            face: 'Kalam, cursive',
+            color: '#475569', 
+            strokeWidth: 3, 
             strokeColor: '#fbfcfd',
             align: 'middle'
         },
-        smooth: { type: 'continuous', roundness: 0.5 }
+        width: 2,
+        dashes: [6, 4], // Flechas punteadas dinámicas
+        smooth: { type: 'curvedCW', roundness: 0.3 } // Líneas curvas orgánicas en vez de rectas
     },
     interaction: { hover: true }
 });
@@ -1182,9 +1187,10 @@ network.on('click', async function (params) {
                 const totalNodes = 1 + (data.pathsFromA?.length || 0) + (data.pathsFromB?.length || 0);
                 if (!checkBalance(totalNodes)) return;
 
-                // Descongelamos la red momentáneamente para que los nodos se acomoden
+                // CONGELAMOS la red existente para que no se desacomode el árbol
                 const existingNodes = nodes.get();
-                nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: false, y: false } })));
+                nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+                // Encendemos las físicas SOLO para que los nuevos puentes se acomoden solos
                 network.setOptions({ physics: { enabled: true } });
 
                 const posA = network.getPositions([nodeA.id])[nodeA.id];
