@@ -820,8 +820,7 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
                 topic: topicName, // Enviamos el texto real
                 contextPath, 
                 maxNodes,
-                documentContext: currentDocumentText 
-            })
+                documentContext: globalDocumentContext || currentDocumentText // <-- Aquí viaja el contexto            })
         });
         const data = await response.json();
 
@@ -886,8 +885,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
                 topic: topicName, // Enviamos el texto real
                 contextPath, 
                 maxNodes,
-                documentContext: currentDocumentText 
-            })
+                documentContext: globalDocumentContext || currentDocumentText // <-- Aquí viaja el contexto            })
         });
         const data = await response.json();
 
@@ -975,10 +973,10 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
             body: JSON.stringify({ 
-                action: 'define', 
-                topic: selectedNodeId, 
+                action: 'define', // o 'expand', 'examples', etc.
+                topic: topicName, 
                 contextPath,
-                documentContext: currentDocumentText // <-- Contexto del documento
+                documentContext: globalDocumentContext || currentDocumentText // <-- Aquí viaja el contexto
             })
         });
         const data = await response.json();
@@ -1745,5 +1743,131 @@ readerPdfInput?.addEventListener('change', async (e) => {
         alert('No se pudo leer el archivo PDF.');
     } finally {
         hideLoader();
+    }
+});
+
+// ==========================================
+// VISOR DE PDF PROFESIONAL Y CONTEXTO
+// ==========================================
+let pdfDoc = null;
+let pageNum = 1;
+let pageRendering = false;
+let pageNumPending = null;
+const scale = 1.3; // Escala de nitidez para la lectura
+const canvas = document.getElementById('pdfRenderCanvas');
+const ctx = canvas ? canvas.getContext('2d') : null;
+
+const docContextInput = document.getElementById('docContextInput');
+let globalDocumentContext = "";
+
+// Actualizar contexto en tiempo real conforme el usuario escribe
+docContextInput?.addEventListener('input', (e) => {
+    globalDocumentContext = e.target.value.trim();
+});
+
+// Cargar y renderizar una página específica del PDF
+function renderPage(num) {
+    pageRendering = true;
+    pdfDoc.getPage(num).then(function(page) {
+        const viewport = page.getViewport({ scale: scale });
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+
+        const renderContext = {
+            canvasContext: ctx,
+            viewport: viewport
+        };
+        const renderTask = page.render(renderContext);
+
+        renderTask.promise.then(function() {
+            pageRendering = false;
+            if (pageNumPending !== null) {
+                renderPage(pageNumPending);
+                pageNumPending = null;
+            }
+        });
+    });
+
+    document.getElementById('pageNum').textContent = num;
+}
+
+function queueRenderPage(num) {
+    if (pageRendering) {
+        pageNumPending = num;
+    } else {
+        renderPage(num);
+    }
+}
+
+document.getElementById('prevPage')?.addEventListener('click', () => {
+    if (pageNum <= 1) return;
+    pageNum--;
+    queueRenderPage(pageNum);
+});
+
+document.getElementById('nextPage')?.addEventListener('click', () => {
+    if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
+    pageNum++;
+    queueRenderPage(pageNum);
+});
+
+// Interceptar la carga del archivo PDF desde el visor
+const readerPdfInput = document.getElementById('readerPdfInput');
+readerPdfInput?.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    showLoader('Cargando documento PDF...');
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Inicializar documento usando pdfjsLib
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        pdfDoc = await loadingTask.promise;
+        
+        document.getElementById('pageCount').textContent = pdfDoc.numPages;
+        pageNum = 1;
+        renderPage(pageNum);
+
+        // Auto-llenar el contexto inicial con el nombre del archivo y primeras líneas si está vacío
+        if (!docContextInput.value) {
+            docContextInput.value = `Documento de estudio: ${file.name}`;
+            globalDocumentContext = docContextInput.value;
+        }
+
+        // Extraer texto completo de fondo para alimentar la memoria de contexto global de la IA
+        let fullExtractedText = '';
+        const maxPagesToExtract = Math.min(pdfDoc.numPages, 15);
+        for (let i = 1; i <= maxPagesToExtract; i++) {
+            const p = await pdfDoc.getPage(i);
+            const txt = await p.getTextContent();
+            fullExtractedText += txt.items.map(item => item.str).join(' ') + '\n';
+        }
+        currentDocumentText = fullExtractedText; // Vinculado a tu memoria existente en app.js
+
+    } catch (err) {
+        console.error("Error al abrir el PDF:", err);
+        alert("No se pudo procesar el archivo PDF.");
+    } finally {
+        hideLoader();
+    }
+});
+
+// Capturar selección de texto sobre el visor PDF para crear nodos
+document.getElementById('pdfViewerContainer')?.addEventListener('mouseup', (e) => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+
+    if (text.length > 2) {
+        activeSelectedText = text;
+        activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+        if (tooltipPreview) tooltipPreview.innerText = `"${text.substring(0, 25)}..."`;
+
+        selectionTooltip.style.left = `${e.pageX - 60}px`;
+        selectionTooltip.style.top = `${e.pageY - 70}px`;
+        selectionTooltip.classList.remove('hidden');
+    } else {
+        selectionTooltip.classList.add('hidden');
     }
 });
