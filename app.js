@@ -138,16 +138,13 @@ function trackNodeUsage(topicName) {
 }
 
 // ==========================================
-// 4. SALDO, LICENCIAS Y ADMIN
-// ==========================================
-// ==========================================
-// 4. AUTENTICACIÓN (NETLIFY IDENTITY) Y SALDOS
+// 4. AUTENTICACIÓN (NETLIFY IDENTITY), SALDOS Y TIENDA
 // ==========================================
 let currentUser = null;
 let isAdmin = localStorage.getItem('gk_is_admin') === 'true';
 let availableNodes = 0;
 
-// Inicializar Netlify Identity
+// 4.1 Inicializar Netlify Identity
 if (window.netlifyIdentity) {
     netlifyIdentity.init({ locale: 'es' });
     
@@ -185,7 +182,7 @@ function initializeBalance() {
         }
         availableNodes = storedBalance;
     } else {
-        // Invitado (Teaser): 15 nodos efímeros para que pruebe la herramienta
+        // Invitado (Teaser): 15 nodos efímeros
         availableNodes = 15; 
     }
     updateCounterDisplay();
@@ -204,10 +201,10 @@ function updateAuthUI() {
     }
 }
 
-// Botones de Login en la UI
+// 4.2 Interacciones de Autenticación
 document.getElementById('btnLogin')?.addEventListener('click', () => {
     if (currentUser) {
-        netlifyIdentity.open(); // Abre el modal nativo para ver su perfil o cerrar sesión
+        netlifyIdentity.open(); // Abre el modal nativo de perfil
     } else {
         netlifyIdentity.open('login');
     }
@@ -233,19 +230,19 @@ function requireAuth(actionDescription) {
     return false;
 }
 
-// Funciones de consumo y chequeo de saldo
+// 4.3 Control de Saldo y Tienda
 function updateCounterDisplay() {
     const display = document.getElementById('nodeCountDisplay');
     const dot = document.getElementById('statusDot');
     if (!display || !dot) return;
 
     if (isAdmin) {
-        display.innerText = 'Admin';
+        display.innerText = 'Admin (∞)';
         dot.className = 'w-2 h-2 rounded-full bg-purple-500';
         return;
     }
 
-    display.innerText = `${availableNodes}`;
+    display.innerText = `${availableNodes} Nodos`;
     if (availableNodes <= 0) {
         dot.className = 'w-2 h-2 rounded-full bg-red-500';
     } else if (availableNodes < 10 && currentUser) {
@@ -253,6 +250,16 @@ function updateCounterDisplay() {
     } else {
         dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
     }
+}
+
+function openStore() {
+    storeModal.classList.remove('hidden');
+    storeModal.classList.add('flex');
+}
+
+function closeStoreModal() {
+    storeModal.classList.add('hidden');
+    storeModal.classList.remove('flex');
 }
 
 function consumeNodes(amount) {
@@ -283,6 +290,7 @@ function checkBalance(cost) {
     return true;
 }
 
+// 4.4 Eventos Preservados (Sinergia, Tienda y Admin)
 document.getElementById('btnMenuSynergy')?.addEventListener('click', () => {
     sourceNodeForSynergy = selectedNodeId;
     actionMenu.classList.add('hidden');
@@ -293,8 +301,37 @@ synergyBanner?.addEventListener('click', () => {
     sourceNodeForSynergy = null;
     synergyBanner.classList.add('hidden');
 });
+
 document.getElementById('nodeCounterBtn')?.addEventListener('click', openStore);
 document.getElementById('closeStore')?.addEventListener('click', closeStoreModal);
+
+document.getElementById('btnAdminAccess')?.addEventListener('click', async () => {
+    const inputPass = prompt("Ingresa la clave de administración:");
+    if (!inputPass) return;
+
+    showLoader('Verificando acceso...');
+    try {
+        const res = await fetch('/.netlify/functions/admin-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: inputPass })
+        });
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
+            isAdmin = true;
+            localStorage.setItem('gk_is_admin', 'true');
+            updateCounterDisplay();
+            alert("Acceso administrador concedido. Nodos ilimitados.");
+        } else {
+            alert("Contraseña incorrecta.");
+        }
+    } catch {
+        alert("Error de autenticación.");
+    } finally {
+        hideLoader();
+    }
+});
 // ==========================================
 // 5. PAYPAL Y PAQUETES
 // ==========================================
