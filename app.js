@@ -956,11 +956,13 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
             const newLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
             nodes.update({ 
                 id: selectedNodeId, 
+                baseTitle: title,
+                definition: data.definition, 
                 label: newLabel,
                 shape: 'box',
                 fixed: { x: false, y: false },
-                widthConstraint: { maximum: currentNode.boxWidth || DEFAULT_MAX_WIDTH },
-                heightConstraint: { maximum: currentNode.boxHeight || DEFAULT_MAX_HEIGHT, valign: 'top' }
+                widthConstraint: { maximum: 220 }, // Ancho controlado y cuadrado
+                heightConstraint: { maximum: 220, valign: 'top' } // Altura cuadrada inicial menos invasiva
             });
         }
         return;
@@ -1540,60 +1542,120 @@ network.on('dragStart', (params) => {
 });
 
 // ==========================================
-// MODO LECTOR ACTIVO (SELECCIÓN GRANULAR)
+// MODO LECTOR ACTIVO - FUNCIONALIDAD AVANZADA
 // ==========================================
 const btnToggleReader = document.getElementById('btnToggleReader');
 const readerPanel = document.getElementById('readerPanel');
 const readerContentArea = document.getElementById('readerContentArea');
 const selectionTooltip = document.getElementById('selectionTooltip');
+const panelResizer = document.getElementById('panelResizer');
+const tooltipPreview = document.getElementById('tooltipSelectedTextPreview');
 
-let lastSelectedText = "";
+let activeSelectedText = "";
+let activeSelectionRange = null;
 
-// Alternar visibilidad de la pantalla dividida
+// 1. Mostrar / Ocultar Panel Lector
 btnToggleReader?.addEventListener('click', () => {
     readerPanel.classList.toggle('hidden');
-    // Forzamos a vis-network a recalcular el tamaño del canvas tras dividir la pantalla
-    setTimeout(() => {
-        if (typeof network !== 'undefined') network.redraw();
-    }, 200);
+    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
 });
 
-// Detectar selección de texto dentro del panel lector
+// 2. Redimensionar panel izquierdo arrastrando el borde
+let isResizing = false;
+panelResizer?.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    e.preventDefault();
+});
+window.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX;
+    if (newWidth > 200 && newWidth < window.innerWidth * 0.7) {
+        readerPanel.style.width = `${newWidth}px`;
+    }
+});
+window.addEventListener('mouseup', () => { isResizing = false; });
+
+// 3. Detectar selección de texto y aplicar Highlight visual automático
 readerContentArea?.addEventListener('mouseup', (e) => {
     const selection = window.getSelection();
     const text = selection.toString().trim();
 
     if (text.length > 2) {
-        lastSelectedText = text;
-        
-        // Posicionar el tooltip flotante cerca del cursor
-        selectionTooltip.style.left = `${e.pageX - 40}px`;
-        selectionTooltip.style.top = `${e.pageY - 50}px`;
+        activeSelectedText = text;
+        activeSelectionRange = selection.getRangeAt(0);
+
+        if (tooltipPreview) tooltipPreview.innerText = `"${text.substring(0, 25)}..."`;
+
+        selectionTooltip.style.left = `${e.pageX - 60}px`;
+        selectionTooltip.style.top = `${e.pageY - 70}px`;
         selectionTooltip.classList.remove('hidden');
     } else {
         selectionTooltip.classList.add('hidden');
     }
 });
 
-// Ocultar tooltip si hace clic fuera
 document.addEventListener('mousedown', (e) => {
     if (!selectionTooltip.contains(e.target) && !readerPanel.contains(e.target)) {
         selectionTooltip.classList.add('hidden');
     }
 });
 
-// Acción al hacer clic en el tooltip: Enviar texto seleccionado al grafo como nodo
-selectionTooltip?.addEventListener('click', () => {
-    if (!lastSelectedText) return;
+// Función auxiliar para resaltar el texto en el lector (Highlight amarillo)
+function highlightSelectedText() {
+    if (!activeSelectionRange) return;
+    try {
+        const span = document.createElement('span');
+        span.className = "bg-amber-200/80 rounded px-0.5 transition-colors";
+        span.appendChild(activeSelectionRange.extractContents());
+        activeSelectionRange.insertNode(span);
+    } catch (err) {
+        console.error("No se pudo aplicar el resaltado:", err);
+    }
+}
 
-    // Ocultar tooltip
+// 4. Acciones desde el menú flotante del lector hacia el grafo
+function createNodeFromReader(actionType) {
+    if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
+    highlightSelectedText();
 
-    // Usamos tu función existente que ya valida saldo, descuenta nodos y guarda en JSONBin
-    insertSingleNode(lastSelectedText);
-    
-    // Limpiar selección actual
-    window.getSelection().removeAllRanges();
-    lastSelectedText = "";
-});
+    const topic = activeSelectedText;
+    activeSelectedText = "";
+    activeSelectionRange = null;
+
+    if (!checkBalance(1)) return;
+
+    // Crear el nodo raíz derivado del documento en el lienzo
+    const viewCenter = network.getViewPosition();
+    const spawnX = viewCenter.x + (Math.random() * 100 - 50);
+    const spawnY = viewCenter.y + (Math.random() * 100 - 50);
+
+    if (!nodes.get(topic)) {
+        nodes.add({
+            id: topic,
+            label: `*📄 Lector:*\n${topic}`,
+            baseTitle: topic,
+            x: spawnX,
+            y: spawnY,
+            fixed: { x: false, y: false },
+            color: { background: '#fef3c7', border: '#f59e0b' } // Tono ámbar distintivo de documento
+        });
+        trackNodeUsage(topic);
+        consumeNodes(1);
+    }
+
+    // Si el usuario eligió expandir o ver ejemplos de inmediato, simulamos el clic sobre el nodo recién creado
+    selectedNodeId = topic;
+    if (actionType === 'expand') {
+        document.getElementById('btnMenuExpand').click();
+    } else if (actionType === 'examples') {
+        document.getElementById('btnMenuExamples').click();
+    } else if (actionType === 'define') {
+        document.getElementById('btnMenuDefine').click();
+    }
+}
+
+document.getElementById('tipBtnExpand')?.addEventListener('click', () => createNodeFromReader('expand'));
+document.getElementById('tipBtnExamples')?.addEventListener('click', () => createNodeFromReader('examples'));
+document.getElementById('tipBtnDefine')?.addEventListener('click', () => createNodeFromReader('define'));
 
