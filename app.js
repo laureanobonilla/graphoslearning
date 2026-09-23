@@ -445,11 +445,11 @@ document.querySelectorAll('.package-card').forEach(card => {
 if (window.paypal) {
     paypal.Buttons({
         style: { 
-            layout: 'horizontal', // Cambiado a horizontal para ocupar menos espacio vertical
+            layout: 'vertical', // Vertical permite que se desplieguen los botones de tarjeta integrados
             color: 'gold', 
             shape: 'rect', 
-            label: 'pay',
-            height: 40 // Altura controlada para que no sea intrusivo
+            label: 'checkout', // Cambiado a checkout para abrir pasarela general de pago y tarjeta
+            height: 45 
         },
         createOrder: function(data, actions) {
             return actions.order.create({
@@ -465,7 +465,6 @@ if (window.paypal) {
 
                 showLoader('Registrando licencia y actualizando cuenta...');
                 try {
-                    // 1. Registrar licencia en la nube
                     await fetch('/.netlify/functions/license', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -481,7 +480,6 @@ if (window.paypal) {
                     hideLoader();
                 }
 
-                // 2. Actualizar saldo local y forzar guardado en su Bin exclusivo
                 availableNodes += selectedNodeAmount;
                 localStorage.setItem('gk_license', licenseKey);
                 if (currentUser) {
@@ -490,7 +488,6 @@ if (window.paypal) {
                     localStorage.setItem('gk_balance', availableNodes);
                 }
                 
-                // Forzar guardado inmediato en su Bin tras la compra
                 await saveCurrentProjectToBin();
 
                 updateCounterDisplay();
