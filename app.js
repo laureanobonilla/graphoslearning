@@ -820,7 +820,7 @@ document.getElementById('btnMenuExpand').addEventListener('click', async () => {
                 topic: topicName, // Enviamos el texto real
                 contextPath, 
                 maxNodes,
-                documentContext: globalDocumentContext || currentDocumentText // <-- Aquí viaja el contexto            })
+                documentContext: globalDocumentContext || currentDocumentText})
         });
         const data = await response.json();
 
@@ -885,7 +885,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
                 topic: topicName, // Enviamos el texto real
                 contextPath, 
                 maxNodes,
-                documentContext: globalDocumentContext || currentDocumentText // <-- Aquí viaja el contexto            })
+                documentContext: globalDocumentContext || currentDocumentText  })
         });
         const data = await response.json();
 
@@ -976,7 +976,7 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
                 action: 'define', // o 'expand', 'examples', etc.
                 topic: topicName, 
                 contextPath,
-                documentContext: globalDocumentContext || currentDocumentText // <-- Aquí viaja el contexto
+                documentContext: globalDocumentContext || currentDocumentText 
             })
         });
         const data = await response.json();
