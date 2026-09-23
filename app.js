@@ -1539,3 +1539,61 @@ network.on('dragStart', (params) => {
     }
 });
 
+// ==========================================
+// MODO LECTOR ACTIVO (SELECCIÓN GRANULAR)
+// ==========================================
+const btnToggleReader = document.getElementById('btnToggleReader');
+const readerPanel = document.getElementById('readerPanel');
+const readerContentArea = document.getElementById('readerContentArea');
+const selectionTooltip = document.getElementById('selectionTooltip');
+
+let lastSelectedText = "";
+
+// Alternar visibilidad de la pantalla dividida
+btnToggleReader?.addEventListener('click', () => {
+    readerPanel.classList.toggle('hidden');
+    // Forzamos a vis-network a recalcular el tamaño del canvas tras dividir la pantalla
+    setTimeout(() => {
+        if (typeof network !== 'undefined') network.redraw();
+    }, 200);
+});
+
+// Detectar selección de texto dentro del panel lector
+readerContentArea?.addEventListener('mouseup', (e) => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+
+    if (text.length > 2) {
+        lastSelectedText = text;
+        
+        // Posicionar el tooltip flotante cerca del cursor
+        selectionTooltip.style.left = `${e.pageX - 40}px`;
+        selectionTooltip.style.top = `${e.pageY - 50}px`;
+        selectionTooltip.classList.remove('hidden');
+    } else {
+        selectionTooltip.classList.add('hidden');
+    }
+});
+
+// Ocultar tooltip si hace clic fuera
+document.addEventListener('mousedown', (e) => {
+    if (!selectionTooltip.contains(e.target) && !readerPanel.contains(e.target)) {
+        selectionTooltip.classList.add('hidden');
+    }
+});
+
+// Acción al hacer clic en el tooltip: Enviar texto seleccionado al grafo como nodo
+selectionTooltip?.addEventListener('click', () => {
+    if (!lastSelectedText) return;
+
+    // Ocultar tooltip
+    selectionTooltip.classList.add('hidden');
+
+    // Usamos tu función existente que ya valida saldo, descuenta nodos y guarda en JSONBin
+    insertSingleNode(lastSelectedText);
+    
+    // Limpiar selección actual
+    window.getSelection().removeAllRanges();
+    lastSelectedText = "";
+});
+

@@ -162,6 +162,11 @@
                 <span>📄</span> Analizar Documento
             </button>
 
+            <!-- NUEVO BOTÓN: Activar/Desactivar Panel Lector Activo -->
+            <button id="btnToggleReader" class="bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 py-2.5 md:py-2 md:px-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 w-full md:w-auto order-2 md:order-1">
+                <span>📖</span> Modo Lector
+            </button>
+
             <div class="flex gap-2 w-full order-1 md:order-2 flex-1">
                 <input type="text" id="topicInput" placeholder="¿De qué se trata tu esquema? (Ej: Inteligencia Artificial)" class="w-full bg-white/90 border border-slate-200/90 rounded-lg pl-3 pr-2 py-2.5 md:py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-500 shadow-sm font-sans flex-1">
                 <button id="btnGenerate" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-md transition-all active:scale-95">
@@ -175,7 +180,24 @@
         </div>
     </header>
 
-    <div class="flex flex-1 h-full relative">
+<div class="flex flex-1 h-full relative overflow-hidden">
+        
+        <!-- NUEVO: Panel Izquierdo de Lectura Activa (Oculto por defecto) -->
+        <div id="readerPanel" class="w-full md:w-1/2 h-full bg-white border-r border-slate-200 flex flex-col hidden z-10 shadow-lg">
+            <div class="px-5 py-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <h3 class="text-xs font-bold font-heading text-slate-700 uppercase tracking-wider">Lector Activo de Documento</h3>
+                <span class="text-[11px] text-slate-400">Selecciona texto para crear nodos</span>
+            </div>
+            <!-- Área donde el usuario puede pegar texto o leer -->
+            <div id="readerContentArea" class="p-6 flex-1 overflow-y-auto text-slate-800 text-sm leading-relaxed font-sans select-text outline-none" contenteditable="true" placeholder="Pega tu texto aquí para leer y subrayar...">
+                Pega aquí el texto que deseas leer y estudiar. Todo lo que subrayes o selecciones con el cursor te permitirá enviarlo directamente como un nodo interactivo al grafo de la derecha.
+            </div>
+        </div>
+
+        <!-- Tooltip flotante al seleccionar texto -->
+        <div id="selectionTooltip" class="hidden absolute bg-slate-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xl z-[120] cursor-pointer flex items-center gap-1.5 transition-transform active:scale-95">
+            <span>✨ Convertir selección en Nodo</span>
+        </div>
         <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
 
         <!-- Pantalla de Bienvenida (Lienzo Vacío) -->
