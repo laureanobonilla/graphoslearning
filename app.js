@@ -1747,48 +1747,66 @@ readerPdfInput?.addEventListener('change', async (e) => {
 });
 
 // ==========================================
-// VISOR DE PDF PROFESIONAL Y CONTEXTO
+// VISOR HÍBRIDO (PDF Y TEXTO LIBRE)
 // ==========================================
 let pdfDoc = null;
 let pageNum = 1;
 let pageRendering = false;
 let pageNumPending = null;
-const scale = 1.3; // Escala de nitidez para la lectura
+const scale = 1.3;
 const canvas = document.getElementById('pdfRenderCanvas');
 const ctx = canvas ? canvas.getContext('2d') : null;
 
+const readerTextMode = document.getElementById('readerTextMode');
+const pdfCanvasWrapper = document.getElementById('pdfCanvasWrapper');
+const pdfPaginationControls = document.getElementById('pdfPaginationControls');
 const docContextInput = document.getElementById('docContextInput');
 let globalDocumentContext = "";
 
-// Actualizar contexto en tiempo real conforme el usuario escribe
 docContextInput?.addEventListener('input', (e) => {
     globalDocumentContext = e.target.value.trim();
 });
 
-// Cargar y renderizar una página específica del PDF
-function renderPage(num) {
+// Renderizado de página con capa de texto interactiva para selección
+async function renderPage(num) {
+    if (!pdfDoc) return;
     pageRendering = true;
-    pdfDoc.getPage(num).then(function(page) {
-        const viewport = page.getViewport({ scale: scale });
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
+    
+    const page = await pdfDoc.getPage(num);
+    const viewport = page.getViewport({ scale: scale });
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    
+    // Ajustar contenedor del canvas
+    pdfCanvasWrapper.style.width = `${viewport.width}px`;
+    pdfCanvasWrapper.style.height = `${viewport.height}px`;
 
-        const renderContext = {
-            canvasContext: ctx,
-            viewport: viewport
-        };
-        const renderTask = page.render(renderContext);
+    const renderContext = {
+        canvasContext: ctx,
+        viewport: viewport
+    };
+    
+    await page.render(renderContext).promise;
+    pageRendering = false;
 
-        renderTask.promise.then(function() {
-            pageRendering = false;
-            if (pageNumPending !== null) {
-                renderPage(pageNumPending);
-                pageNumPending = null;
-            }
-        });
-    });
+    if (pageNumPending !== null) {
+        renderPage(pageNumPending);
+        pageNumPending = null;
+    }
 
     document.getElementById('pageNum').textContent = num;
+
+    // Renderizar la capa de texto real por encima del canvas para permitir subrayar y seleccionar
+    const textContent = await page.getTextContent();
+    const textLayerDiv = document.getElementById('pdfTextLayer');
+    textLayerDiv.innerHTML = '';
+    
+    pdfjsLib.renderTextLayer({
+        textContentSource: textContent,
+        container: textLayerDiv,
+        viewport: viewport,
+        textDivs: []
+    });
 }
 
 function queueRenderPage(num) {
@@ -1811,8 +1829,8 @@ document.getElementById('nextPage')?.addEventListener('click', () => {
     queueRenderPage(pageNum);
 });
 
-// Interceptar la carga del archivo PDF desde el visor
-
+// Manejo de la carga del archivo PDF
+const readerPdfInput = document.getElementById('readerPdfInput');
 readerPdfInput?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -1820,22 +1838,24 @@ readerPdfInput?.addEventListener('change', async (e) => {
     showLoader('Cargando documento PDF...');
     try {
         const arrayBuffer = await file.arrayBuffer();
-        
-        // Inicializar documento usando pdfjsLib
         const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
         pdfDoc = await loadingTask.promise;
         
+        // Ocultar modo texto libre y mostrar el visor PDF y sus controles
+        readerTextMode.classList.add('hidden');
+        pdfCanvasWrapper.classList.remove('hidden');
+        pdfPaginationControls.classList.remove('hidden');
+
         document.getElementById('pageCount').textContent = pdfDoc.numPages;
         pageNum = 1;
-        renderPage(pageNum);
+        await renderPage(pageNum);
 
-        // Auto-llenar el contexto inicial con el nombre del archivo y primeras líneas si está vacío
         if (!docContextInput.value) {
-            docContextInput.value = `Documento de estudio: ${file.name}`;
+            docContextInput.value = `Documento: ${file.name}`;
             globalDocumentContext = docContextInput.value;
         }
 
-        // Extraer texto completo de fondo para alimentar la memoria de contexto global de la IA
+        // Extraer texto para la memoria general de la IA
         let fullExtractedText = '';
         const maxPagesToExtract = Math.min(pdfDoc.numPages, 15);
         for (let i = 1; i <= maxPagesToExtract; i++) {
@@ -1843,7 +1863,7 @@ readerPdfInput?.addEventListener('change', async (e) => {
             const txt = await p.getTextContent();
             fullExtractedText += txt.items.map(item => item.str).join(' ') + '\n';
         }
-        currentDocumentText = fullExtractedText; // Vinculado a tu memoria existente en app.js
+        currentDocumentText = fullExtractedText;
 
     } catch (err) {
         console.error("Error al abrir el PDF:", err);
@@ -1853,8 +1873,8 @@ readerPdfInput?.addEventListener('change', async (e) => {
     }
 });
 
-// Capturar selección de texto sobre el visor PDF para crear nodos
-document.getElementById('pdfViewerContainer')?.addEventListener('mouseup', (e) => {
+// Captura unificada de selección de texto (tanto en modo texto libre como sobre el visor PDF)
+document.getElementById('readerContentContainer')?.addEventListener('mouseup', (e) => {
     const selection = window.getSelection();
     const text = selection.toString().trim();
 

@@ -182,44 +182,54 @@
 
 <div class="flex flex-1 h-full relative overflow-hidden">
         
-    <!-- Panel Izquierdo de Lectura Activa (Visor PDF Real) -->
-        <div id="readerPanel" class="w-1/2 h-full bg-slate-900 border-r border-slate-800 flex flex-col hidden z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">
-            
-            <!-- Cabecera del Visor y Contexto -->
-            <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-2.5 select-none">
-                <div class="flex justify-between items-center">
-                    <div class="flex items-center gap-2">
-                        <h3 class="text-xs font-bold font-heading text-slate-200 uppercase tracking-wider">Visor PDF Activo</h3>
-                        <label class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold cursor-pointer shadow-sm transition-colors flex items-center gap-1">
-                            <span>📁 Cargar PDF</span>
-                            <input type="file" id="readerPdfInput" class="hidden" accept=".pdf">
-                        </label>
-                    </div>
-                    <!-- Controles de Paginación -->
-                    <div class="flex items-center gap-2 text-xs text-slate-300 font-mono">
-                        <button id="prevPage" class="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">◀</button>
-                        <span><span id="pageNum">1</span> / <span id="pageCount">-</span></span>
-                        <button id="nextPage" class="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">▶</button>
-                    </div>
-                </div>
-
-                <!-- Input de Contexto del Documento (Regla de oro para la IA) -->
+    <!-- Panel Izquierdo de Lectura Activa (Híbrido: Visor PDF + Texto Libre) -->
+    <div id="readerPanel" class="w-1/2 h-full bg-slate-900 border-r border-slate-800 flex flex-col hidden z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">
+        
+        <!-- Cabecera del Visor y Contexto -->
+        <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-2.5 select-none">
+            <div class="flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap">Contexto:</span>
-                    <input type="text" id="docContextInput" placeholder="Ej: Tesis sobre la economía colonial del siglo XIX en C.R." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
+                    <h3 class="text-xs font-bold font-heading text-slate-200 uppercase tracking-wider">Lector Activo</h3>
+                    <!-- Selector de archivo PDF o botón para alternar -->
+                    <label class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold cursor-pointer shadow-sm transition-colors flex items-center gap-1">
+                        <span>📁 Abrir PDF</span>
+                        <input type="file" id="readerPdfInput" class="hidden" accept=".pdf">
+                    </label>
+                </div>
+                <!-- Controles de Paginación (Solo activos para PDF) -->
+                <div id="pdfPaginationControls" class="flex items-center gap-2 text-xs text-slate-300 font-mono hidden">
+                    <button id="prevPage" class="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">◀</button>
+                    <span><span id="pageNum">1</span> / <span id="pageCount">-</span></span>
+                    <button id="nextPage" class="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">▶</button>
                 </div>
             </div>
 
-            <!-- Contenedor del Canvas de PDF y Capa de Selección de Texto -->
-            <div id="pdfViewerContainer" class="flex-1 overflow-auto p-4 flex justify-center bg-slate-900 relative select-text">
-                <div id="pdfCanvasWrapper" class="relative shadow-2xl bg-white">
-                    <canvas id="pdfRenderCanvas" class="block"></canvas>
-                </div>
+            <!-- Input de Contexto del Documento -->
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap">Contexto:</span>
+                <input type="text" id="docContextInput" placeholder="Ej: Tesis sobre economía colonial..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
             </div>
-
-            <!-- Barra de Redimensionamiento (Resizer) -->
-            <div id="panelResizer" class="absolute top-0 right-0 w-1.5 h-full bg-transparent hover:bg-indigo-500 cursor-col-resize transition-colors"></div>
         </div>
+
+        <!-- Contenedor Principal (Soporta PDF o Texto Libre Editable) -->
+        <div id="readerContentContainer" class="flex-1 overflow-auto p-4 flex flex-col bg-slate-900 relative select-text">
+            
+            <!-- Vista de Texto Libre (Por defecto para que se pueda pegar texto de inmediato) -->
+            <div id="readerTextMode" class="w-full h-full flex-1 bg-slate-900 text-slate-200 text-sm leading-relaxed font-sans outline-none p-2" contenteditable="true" placeholder="Pega tu texto aquí o abre un PDF arriba...">
+                Pega aquí el texto que deseas leer y estudiar, o bien haz clic en "Abrir PDF" en la parte superior para cargar un documento completo. Todo lo que subrayes activará el menú para crear nodos.
+            </div>
+
+            <!-- Vista de Canvas PDF (Se muestra solo cuando hay un PDF activo) -->
+            <div id="pdfCanvasWrapper" class="relative shadow-2xl bg-white mx-auto hidden">
+                <canvas id="pdfRenderCanvas" class="block"></canvas>
+                <!-- Capa invisible de texto para permitir la selección real sobre el PDF -->
+                <div id="pdfTextLayer" class="absolute inset-0 leading-none select-text pointer-events-auto"></div>
+            </div>
+        </div>
+
+        <!-- Barra de Redimensionamiento (Resizer) -->
+        <div id="panelResizer" class="absolute top-0 right-0 w-1.5 h-full bg-transparent hover:bg-indigo-500 cursor-col-resize transition-colors"></div>
+    </div>
 
         <!-- Menú Flotante Contextual Avanzado (Opciones de Nodo al Subrayar) -->
         <div id="selectionTooltip" class="hidden absolute glass-dock rounded-xl z-[120] flex flex-col overflow-hidden shadow-2xl min-w-[180px] border border-slate-200">
