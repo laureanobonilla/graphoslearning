@@ -216,18 +216,29 @@ function updateAuthUI() {
 }
 
 // 4.2 Interacciones de Autenticación
+// 4.2 Interacciones de Autenticación
 document.getElementById('btnLogin')?.addEventListener('click', () => {
     if (currentUser) netlifyIdentity.open();
     else netlifyIdentity.open('login');
 });
 
+// Botón de Continuar (Cierra el muro y abre Netlify)
 document.getElementById('btnTriggerNetlifyLogin')?.addEventListener('click', () => {
+    const wallModal = document.getElementById('authWallModal');
+    if (wallModal) {
+        wallModal.classList.add('hidden');
+        wallModal.classList.remove('flex');
+    }
     netlifyIdentity.open('login');
 });
 
+// Botón de Volver al mapa (Solo cierra el muro)
 document.getElementById('closeAuthWall')?.addEventListener('click', () => {
-    document.getElementById('authWallModal').classList.add('hidden');
-    document.getElementById('authWallModal').classList.remove('flex');
+    const wallModal = document.getElementById('authWallModal');
+    if (wallModal) {
+        wallModal.classList.add('hidden');
+        wallModal.classList.remove('flex');
+    }
 });
 
 function requireAuth(actionDescription) {
@@ -236,8 +247,11 @@ function requireAuth(actionDescription) {
     const reasonEl = document.getElementById('authWallReason');
     if(reasonEl) reasonEl.innerText = actionDescription;
     
-    document.getElementById('authWallModal').classList.remove('hidden');
-    document.getElementById('authWallModal').classList.add('flex');
+    const wallModal = document.getElementById('authWallModal');
+    if (wallModal) {
+        wallModal.classList.remove('hidden');
+        wallModal.classList.add('flex');
+    }
     if (actionMenu) actionMenu.classList.add('hidden');
     return false;
 }
