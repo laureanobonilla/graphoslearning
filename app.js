@@ -173,6 +173,7 @@ if (window.netlifyIdentity) {
         initializeBalance();
         updateAuthUI();
     });
+}
 
 function initializeBalance() {
     if (isAdmin) return;
