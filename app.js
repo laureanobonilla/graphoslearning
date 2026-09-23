@@ -1219,6 +1219,16 @@ network.on('click', async function (params) {
                         shadow: { enabled: true, color: 'rgba(217, 70, 239, 0.2)', size: 20 }
                     });
                     trackNodeUsage(synNode.label);
+    // --- MICROINTERACCIÓN EMOCIONAL: ESTALLIDO DE SINERGIA ---
+                    confetti({
+                        particleCount: 80,
+                        spread: 70,
+                        origin: { y: 0.6 },
+                        colors: ['#d946ef', '#fef08a', '#fb923c', '#3b82f6'], // Fucsia, Amarillo, Naranja, Azul
+                        zIndex: 200,
+                        disableForReducedMotion: true
+                    });
+                // ---------------------------------------------------------                    
                 }
 
                 // 2. Crear las rutas desde A

@@ -18,7 +18,10 @@
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-
+    <!-- Reproductor de Lottie Animations -->
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <!-- Librería de Confeti para recompensas emocionales -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         :root {
             --font-display: 'Plus Jakarta Sans', -apple-system, sans-serif;
@@ -100,16 +103,19 @@
         </span>
         <span class="text-slate-400 hover:text-white ml-1 md:ml-2 uppercase font-bold tracking-wider">Cancelar</span>
     </div>
-    <!-- Nuevo Loader Inmersivo Pantalla Completa -->
+    <!-- Nuevo Loader Inmersivo con Lottie -->
     <div id="loaderOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex flex-col items-center justify-center">
-        <div class="bg-white/95 px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border border-slate-200">
-            <!-- Spinner moderno -->
-            <div class="relative w-12 h-12 flex items-center justify-center">
-                <div class="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
-                <div class="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
-                <div class="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"></div>
-            </div>
-            <span id="loaderText" class="text-sm md:text-base font-bold text-slate-700 tracking-tight">Procesando información...</span>
+        <div class="bg-white/95 px-8 py-6 rounded-3xl shadow-2xl flex flex-col items-center gap-2 border-2 border-slate-200" style="border-radius: 30px;">
+            <!-- Lottie Animation (Cerebro mágico o AI procesando) -->
+            <lottie-player 
+                src="https://lottie.host/8b7e2fb2-b7e5-47e1-87c1-dbfa4dbdb8c2/1q7t5aUeL4.json" 
+                background="transparent" 
+                speed="1.2" 
+                style="width: 120px; height: 120px;" 
+                loop 
+                autoplay>
+            </lottie-player>
+            <span id="loaderText" class="text-sm md:text-base font-bold font-heading text-slate-700 tracking-tight">Estructurando ideas...</span>
         </div>
     </div>
 
@@ -175,7 +181,18 @@
         <!-- Pantalla de Bienvenida (Lienzo Vacío) -->
         <div id="welcomeScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 bg-slate-900/5 backdrop-blur-[2px] transition-opacity duration-500 overflow-y-auto">
             <div class="glass-dock p-5 md:p-10 rounded-3xl max-w-2xl w-full text-center shadow-2xl border border-slate-200/80 my-auto">
-                <div class="w-14 h-14 md:w-16 md:h-16 mx-auto bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-5 shadow-lg shadow-slate-900/20">Γ</div>
+               <!-- Reemplaza el div del logo "w-14 h-14..." por esto: -->
+            <div class="mx-auto mb-2 flex justify-center">
+                <lottie-player 
+                    src="https://lottie.host/c88dbbe9-17d9-4b82-bc18-2e06c710f601/ZpZ1ZpZ1Zp.json" 
+                    background="transparent" 
+                    speed="1" 
+                    style="width: 150px; height: 150px;" 
+                    loop 
+                    autoplay>
+                </lottie-player>
+            </div>
+            <h2 class="text-xl md:text-3xl font-heading font-extrabold text-slate-900 mb-2 md:mb-3 tracking-tight">¿Qué vamos a explorar hoy?</h2>
                 <h2 class="text-xl md:text-3xl font-heading font-extrabold text-slate-900 mb-2 md:mb-3 tracking-tight">¿Qué vamos a explorar hoy?</h2>
                 <p class="text-xs md:text-sm text-slate-500 mb-6 md:mb-8 max-w-md mx-auto px-2">Construye tu segundo cerebro. Escribe un concepto, sube un documento o explora una idea fascinante al azar.</p>
                 
