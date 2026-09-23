@@ -458,7 +458,7 @@ if (window.paypal) {
                     amount: { currency_code: 'USD', value: selectedPrice }
                 }]
             });
-        },hagam
+        },
         onApprove: function(data, actions) {
             return actions.order.capture().then(async function(details) {
                 const licenseKey = 'GK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
