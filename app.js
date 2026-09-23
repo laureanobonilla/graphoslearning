@@ -6,7 +6,8 @@ let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
 let currentDocumentText = "";
 let selectedDensity = 'auto'; // Ahora "auto" es el por defecto
-
+let sourceNodeForSynergy = null;
+const synergyBanner = document.getElementById('synergyBanner');
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
     physics: {
@@ -192,7 +193,16 @@ function checkBalance(cost) {
     }
     return true;
 }
+document.getElementById('btnMenuSynergy')?.addEventListener('click', () => {
+    sourceNodeForSynergy = selectedNodeId;
+    actionMenu.classList.add('hidden');
+    synergyBanner.classList.remove('hidden');
+});
 
+synergyBanner?.addEventListener('click', () => {
+    sourceNodeForSynergy = null;
+    synergyBanner.classList.add('hidden');
+});
 document.getElementById('nodeCounterBtn')?.addEventListener('click', openStore);
 document.getElementById('closeStore')?.addEventListener('click', closeStoreModal);
 
@@ -449,14 +459,63 @@ async function generateFullSchemaFromTopic(topicText) {
     }
 }
 
+// ==========================================
+// FUNCIÓN PARA INSERTAR UN NODO INDIVIDUAL (Lienzo Ocupado)
+// ==========================================
+function insertSingleNode(topic) {
+    if (!checkBalance(1)) return;
+
+    // Buscamos el centro de la cámara y lo desplazamos ligeramente a la derecha 
+    // para que no caiga exactamente encima del nodo que el usuario esté mirando
+    const viewCenter = network.getViewPosition();
+    const spawnX = viewCenter.x + 200 + (Math.random() * 50); 
+    const spawnY = viewCenter.y + (Math.random() * 100 - 50);
+
+    nodes.add({ 
+        id: topic, 
+        label: `*${topic}*`, 
+        baseTitle: topic, 
+        x: spawnX, 
+        y: spawnY,
+        fixed: { x: false, y: false },
+        color: { background: '#ffffff', border: '#e2e8f0' } // Estilo de nodo base
+    });
+
+    trackNodeUsage(topic);
+    consumeNodes(1);
+    topicInput.value = '';
+
+    // Llevamos la cámara suavemente hacia el nuevo nodo
+    setTimeout(() => {
+        network.focus(topic, {
+            scale: 1.0,
+            animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+        });
+    }, 50);
+}
+
+// ==========================================
+// EVENTOS DE ENTRADA (Controlador de Flujo)
+// ==========================================
+function handleTopicInput() {
+    const topic = topicInput.value.trim();
+    if (!topic) return;
+
+    if (nodes.length === 0) {
+        // Lienzo en blanco: Despliega el poder de la IA con un árbol completo
+        generateFullSchemaFromTopic(topic);
+    } else {
+        // Lienzo en uso: Solo inserta la pieza para no destruir el trabajo
+        insertSingleNode(topic);
+    }
+}
+
 // Evento del botón Generar de la barra
-document.getElementById('btnGenerate')?.addEventListener('click', () => {
-    generateFullSchemaFromTopic(topicInput.value.trim());
-});
+document.getElementById('btnGenerate')?.addEventListener('click', handleTopicInput);
 
 // Soporte para tecla Enter en el input
 document.getElementById('topicInput')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') generateFullSchemaFromTopic(topicInput.value.trim());
+    if (e.key === 'Enter') handleTopicInput();
 });
 
 // ==========================================
@@ -1093,7 +1152,114 @@ document.getElementById('btnProcessText')?.addEventListener('click', async () =>
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNode = params.nodes[0];
+// LÓGICA DE SINERGIA (FUSIÓN)
+        if (sourceNodeForSynergy && sourceNodeForSynergy !== clickedNode) {
+            const nodeA = nodes.get(sourceNodeForSynergy);
+            const nodeB = nodes.get(clickedNode);
+            
+            const topicA = nodeA.baseTitle || sourceNodeForSynergy;
+            const topicB = nodeB.baseTitle || clickedNode;
+            
+            sourceNodeForSynergy = null;
+            synergyBanner.classList.add('hidden');
 
+            showLoader('Calculando convergencia...');
+
+            try {
+                // Hacemos el fetch al nuevo endpoint
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        action: 'synergy', 
+                        topic: topicA, 
+                        topicB: topicB,
+                        density: selectedDensity 
+                    })
+                });
+                const data = await response.json();
+
+                // Calcular costo: 1 (Sinergia) + N (Rutas A) + M (Rutas B)
+                const totalNodes = 1 + (data.pathsFromA?.length || 0) + (data.pathsFromB?.length || 0);
+                if (!checkBalance(totalNodes)) return;
+
+                // Descongelamos la red momentáneamente para que los nodos se acomoden
+                const existingNodes = nodes.get();
+                nodes.update(existingNodes.map(n => ({ id: n.id, fixed: { x: false, y: false } })));
+                network.setOptions({ physics: { enabled: true } });
+
+                const posA = network.getPositions([nodeA.id])[nodeA.id];
+                const posB = network.getPositions([nodeB.id])[nodeB.id];
+                
+                // Ubicamos el nodo Sinergia exactamente en el punto medio
+                const midX = (posA.x + posB.x) / 2;
+                const midY = (posA.y + posB.y) / 2;
+
+                // 1. Crear nodo central Sinergia (Diseño estelar)
+                const synNode = data.synergy;
+                if (!nodes.get(synNode.id)) {
+                    nodes.add({
+                        id: synNode.id,
+                        label: `*🌟 Sinergia:*\n${synNode.label}`,
+                        baseTitle: synNode.label,
+                        x: midX, y: midY,
+                        fixed: { x: false, y: false },
+                        color: { 
+                            background: '#faf5ff', // fuchsia-50
+                            border: '#d946ef',     // fuchsia-500
+                            highlight: { background: '#fdf4ff', border: '#c026d3' }
+                        },
+                        font: { color: '#4a044e', bold: { color: '#701a75', size: 16 } },
+                        borderWidth: 2,
+                        shadow: { enabled: true, color: 'rgba(217, 70, 239, 0.2)', size: 20 }
+                    });
+                    trackNodeUsage(synNode.label);
+                }
+
+                // 2. Crear las rutas desde A
+                (data.pathsFromA || []).forEach(bridge => {
+                    if (!nodes.get(bridge.id)) {
+                        nodes.add({
+                            id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label,
+                            x: posA.x + (midX - posA.x) / 2 + (Math.random() * 40 - 20),
+                            y: posA.y + (midY - posA.y) / 2 + (Math.random() * 40 - 20),
+                            fixed: { x: false, y: false },
+                            color: { background: '#f8fafc', border: '#e2e8f0' }
+                        });
+                        trackNodeUsage(bridge.label);
+                    }
+                    edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
+                    edges.add({ from: bridge.id, to: synNode.id, label: bridge.relToSynergy });
+                });
+
+                // 3. Crear las rutas desde B
+                (data.pathsFromB || []).forEach(bridge => {
+                    if (!nodes.get(bridge.id)) {
+                        nodes.add({
+                            id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label,
+                            x: posB.x + (midX - posB.x) / 2 + (Math.random() * 40 - 20),
+                            y: posB.y + (midY - posB.y) / 2 + (Math.random() * 40 - 20),
+                            fixed: { x: false, y: false },
+                            color: { background: '#f8fafc', border: '#e2e8f0' }
+                        });
+                        trackNodeUsage(bridge.label);
+                    }
+                    edges.add({ from: nodeB.id, to: bridge.id, label: bridge.relFromB });
+                    edges.add({ from: bridge.id, to: synNode.id, label: bridge.relToSynergy });
+                });
+
+                consumeNodes(totalNodes);
+                
+                // Estabilizar el grafo y volver a congelar
+                setTimeout(() => { stopPhysicsAndUnlock(); }, 1800);
+
+            } catch (err) {
+                console.error(err);
+                alert("Error al procesar la convergencia.");
+            } finally {
+                hideLoader();
+            }
+            return;
+        }
         // LÓGICA DE VINCULAR DOS NODOS
         if (sourceNodeForConnection && sourceNodeForConnection !== clickedNode) {
             const nodeA = nodes.get(sourceNodeForConnection);

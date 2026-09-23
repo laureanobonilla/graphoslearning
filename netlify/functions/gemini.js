@@ -57,7 +57,77 @@ exports.handler = async function(event, context) {
             });
             return { statusCode: 200, body: response.text };
         } 
+// ==========================================
+        // SINERGIA (FUSIÓN DE DOS NODOS)
+        // ==========================================
+        if (action === 'synergy') {
+            let densityGuideline = '';
+            if (density === 'low') {
+                densityGuideline = 'DENSIDAD BAJA: 1 concepto intermedio desde el Tema A y 1 desde el Tema B.';
+            } else if (density === 'high') {
+                densityGuideline = 'DENSIDAD ALTA: 3 conceptos intermedios desde el Tema A y 3 desde el Tema B.';
+            } else {
+                densityGuideline = 'DENSIDAD MEDIA o AUTO: 2 conceptos intermedios desde el Tema A y 2 desde el Tema B.';
+            }
 
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    synergy: {
+                        type: 'OBJECT',
+                        properties: {
+                            id: { type: 'STRING' },
+                            label: { type: 'STRING', description: 'El concepto cumbre o innovación que nace de cruzar A y B.' }
+                        },
+                        required: ["id", "label"]
+                    },
+                    pathsFromA: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING', description: 'Concepto puente que nace de A' },
+                                relFromA: { type: 'STRING', description: 'Conector (1-3 palabras) desde Tema A' },
+                                relToSynergy: { type: 'STRING', description: 'Conector (1-3 palabras) hacia la Sinergia' }
+                            },
+                            required: ["id", "label", "relFromA", "relToSynergy"]
+                        }
+                    },
+                    pathsFromB: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING', description: 'Concepto puente que nace de B' },
+                                relFromB: { type: 'STRING', description: 'Conector (1-3 palabras) desde Tema B' },
+                                relToSynergy: { type: 'STRING', description: 'Conector (1-3 palabras) hacia la Sinergia' }
+                            },
+                            required: ["id", "label", "relFromB", "relToSynergy"]
+                        }
+                    }
+                },
+                required: ["synergy", "pathsFromA", "pathsFromB"]
+            };
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Descubre la sinergia profunda entre Tema A: "${topic}" y Tema B: "${topicB}".
+                
+                INSTRUCCIONES:
+                1. "synergy": Define el concepto definitivo, la intersección más importante o el resultado innovador de unir ambos campos.
+                2. "pathsFromA" y "pathsFromB": Crea los nodos intermedios que explican cómo se llega desde cada extremo hasta esa sinergia central.
+                3. ${densityGuideline}
+                4. Conectores estrictamente de 1 a 3 palabras. Cero descripciones largas.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.3
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
         // ==========================================
         // 2. DAR EJEMPLOS PRÁCTICOS
         // ==========================================
