@@ -140,64 +140,149 @@ function trackNodeUsage(topicName) {
 // ==========================================
 // 4. SALDO, LICENCIAS Y ADMIN
 // ==========================================
+// ==========================================
+// 4. AUTENTICACIÓN (NETLIFY IDENTITY) Y SALDOS
+// ==========================================
+let currentUser = null;
 let isAdmin = localStorage.getItem('gk_is_admin') === 'true';
-let availableNodes = parseInt(localStorage.getItem('gk_balance'), 10);
+let availableNodes = 0;
 
-if (isNaN(availableNodes)) {
-    availableNodes = 50;
-    localStorage.setItem('gk_trial_started', 'true');
-    localStorage.setItem('gk_balance', availableNodes);
+// Inicializar Netlify Identity
+if (window.netlifyIdentity) {
+    netlifyIdentity.init({ locale: 'es' });
+    
+    netlifyIdentity.on('init', user => {
+        currentUser = user;
+        initializeBalance();
+        updateAuthUI();
+    });
+
+    netlifyIdentity.on('login', user => {
+        currentUser = user;
+        document.getElementById('authWallModal').classList.add('hidden');
+        document.getElementById('authWallModal').classList.remove('flex');
+        netlifyIdentity.close();
+        initializeBalance();
+        updateAuthUI();
+    });
+
+    netlifyIdentity.on('logout', () => {
+        currentUser = null;
+        initializeBalance();
+        updateAuthUI();
+    });
 }
 
+function initializeBalance() {
+    if (isAdmin) return;
+
+    if (currentUser) {
+        // Usuario logueado: busca su saldo real o le da los 50 iniciales
+        let storedBalance = parseInt(localStorage.getItem(`gk_balance_${currentUser.id}`), 10);
+        if (isNaN(storedBalance)) {
+            storedBalance = 50; // Bono de bienvenida
+            localStorage.setItem(`gk_balance_${currentUser.id}`, storedBalance);
+        }
+        availableNodes = storedBalance;
+    } else {
+        // Invitado (Teaser): 15 nodos efímeros para que pruebe la herramienta
+        availableNodes = 15; 
+    }
+    updateCounterDisplay();
+}
+
+function updateAuthUI() {
+    const loginText = document.getElementById('loginText');
+    const userStatusDot = document.getElementById('userStatusDot');
+    
+    if (currentUser) {
+        loginText.innerText = currentUser.user_metadata?.full_name?.split(' ')[0] || "Mi Cuenta";
+        userStatusDot.className = 'w-2 h-2 rounded-full bg-indigo-500';
+    } else {
+        loginText.innerText = "Iniciar Sesión";
+        userStatusDot.className = 'w-2 h-2 rounded-full bg-slate-300';
+    }
+}
+
+// Botones de Login en la UI
+document.getElementById('btnLogin')?.addEventListener('click', () => {
+    if (currentUser) {
+        netlifyIdentity.open(); // Abre el modal nativo para ver su perfil o cerrar sesión
+    } else {
+        netlifyIdentity.open('login');
+    }
+});
+
+document.getElementById('btnTriggerNetlifyLogin')?.addEventListener('click', () => {
+    netlifyIdentity.open('login');
+});
+
+document.getElementById('closeAuthWall')?.addEventListener('click', () => {
+    document.getElementById('authWallModal').classList.add('hidden');
+    document.getElementById('authWallModal').classList.remove('flex');
+});
+
+// Guardián de acciones premium (El Muro de Valor)
+function requireAuth(actionDescription) {
+    if (currentUser || isAdmin) return true;
+    
+    document.getElementById('authWallReason').innerText = actionDescription;
+    document.getElementById('authWallModal').classList.remove('hidden');
+    document.getElementById('authWallModal').classList.add('flex');
+    if (actionMenu) actionMenu.classList.add('hidden');
+    return false;
+}
+
+// Funciones de consumo y chequeo de saldo
 function updateCounterDisplay() {
     const display = document.getElementById('nodeCountDisplay');
     const dot = document.getElementById('statusDot');
     if (!display || !dot) return;
 
     if (isAdmin) {
-        display.innerText = 'Admin (∞)';
+        display.innerText = 'Admin';
         dot.className = 'w-2 h-2 rounded-full bg-purple-500';
         return;
     }
 
-    display.innerText = `${availableNodes} Nodos`;
+    display.innerText = `${availableNodes}`;
     if (availableNodes <= 0) {
         dot.className = 'w-2 h-2 rounded-full bg-red-500';
-    } else if (availableNodes < 10) {
+    } else if (availableNodes < 10 && currentUser) {
         dot.className = 'w-2 h-2 rounded-full bg-amber-500';
     } else {
         dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
     }
-}
-updateCounterDisplay();
-
-function openStore() {
-    storeModal.classList.remove('hidden');
-    storeModal.classList.add('flex');
-}
-
-function closeStoreModal() {
-    storeModal.classList.add('hidden');
-    storeModal.classList.remove('flex');
 }
 
 function consumeNodes(amount) {
     if (isAdmin) return;
     availableNodes -= amount;
     if (availableNodes < 0) availableNodes = 0;
-    localStorage.setItem('gk_balance', availableNodes);
+    
+    if (currentUser) {
+        localStorage.setItem(`gk_balance_${currentUser.id}`, availableNodes);
+    }
     updateCounterDisplay();
 }
 
 function checkBalance(cost) {
     if (isAdmin) return true;
+    
     if (availableNodes < cost) {
-        if (actionMenu) actionMenu.classList.add('hidden');
-        openStore();
+        if (!currentUser) {
+            // Se le acabó el saldo de invitado (Teaser)
+            requireAuth("procesar este esquema completo");
+        } else {
+            // Se le acabó el saldo real, abrir tienda
+            if (actionMenu) actionMenu.classList.add('hidden');
+            openStore();
+        }
         return false;
     }
     return true;
 }
+
 document.getElementById('btnMenuSynergy')?.addEventListener('click', () => {
     sourceNodeForSynergy = selectedNodeId;
     actionMenu.classList.add('hidden');
@@ -210,36 +295,6 @@ synergyBanner?.addEventListener('click', () => {
 });
 document.getElementById('nodeCounterBtn')?.addEventListener('click', openStore);
 document.getElementById('closeStore')?.addEventListener('click', closeStoreModal);
-
-// Acceso de Administrador
-document.getElementById('btnAdminAccess')?.addEventListener('click', async () => {
-    const inputPass = prompt("Ingresa la clave de administración:");
-    if (!inputPass) return;
-
-    showLoader('Verificando acceso...');
-    try {
-        const res = await fetch('/.netlify/functions/admin-auth', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: inputPass })
-        });
-        const data = await res.json();
-        
-        if (res.ok && data.success) {
-            isAdmin = true;
-            localStorage.setItem('gk_is_admin', 'true');
-            updateCounterDisplay();
-            alert("Acceso administrador concedido. Nodos ilimitados.");
-        } else {
-            alert("Contraseña incorrecta.");
-        }
-    } catch {
-        alert("Error de autenticación.");
-    } finally {
-        hideLoader();
-    }
-});
-
 // ==========================================
 // 5. PAYPAL Y PAQUETES
 // ==========================================
@@ -604,6 +659,8 @@ function getContextPath(nodeId) {
 document.getElementById('btnMenuExpand').addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
+    if (!requireAuth("profundizar en conceptos relacionados")) return; // <-- GUARDIA
+    // ...resto del código
 
     const maxNodes = parseInt(document.getElementById('nodeCount').value, 10) || 3;
     if (!checkBalance(maxNodes)) return;
@@ -925,6 +982,7 @@ document.querySelectorAll('.density-btn').forEach(btn => {
 });
 
 document.getElementById('btnOpenTextModal')?.addEventListener('click', () => {
+    if (!requireAuth("analizar documentos extensos")) return; // <-- GUARDIA
     rawTextInput.value = '';
     textSchemaModal.classList.remove('hidden');
     textSchemaModal.classList.add('flex');
@@ -1219,16 +1277,6 @@ network.on('click', async function (params) {
                         shadow: { enabled: true, color: 'rgba(217, 70, 239, 0.2)', size: 20 }
                     });
                     trackNodeUsage(synNode.label);
-    // --- MICROINTERACCIÓN EMOCIONAL: ESTALLIDO DE SINERGIA ---
-                    confetti({
-                        particleCount: 80,
-                        spread: 70,
-                        origin: { y: 0.6 },
-                        colors: ['#d946ef', '#fef08a', '#fb923c', '#3b82f6'], // Fucsia, Amarillo, Naranja, Azul
-                        zIndex: 200,
-                        disableForReducedMotion: true
-                    });
-                // ---------------------------------------------------------                    
                 }
 
                 // 2. Crear las rutas desde A
