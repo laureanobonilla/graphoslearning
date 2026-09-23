@@ -116,6 +116,65 @@ landscapeToggle?.addEventListener('click', () => {
 // ==========================================
 // 3. TELEMETRÍA (PRIMEROS 50 NODOS)
 // ==========================================
+// ==========================================
+// PERSISTENCIA AUTOMÁTICA EN BINS (JSONBIN)
+// ==========================================
+let currentProjectId = localStorage.getItem('gk_current_project_id');
+
+async function saveCurrentProjectToBin() {
+    // Si el usuario es admin, no gastamos llamadas a la base de datos
+    if (isAdmin) return;
+
+    // Determinamos el ID único (ID del usuario de Netlify o ID de sesión temporal)
+    const userIdentifier = currentUser ? currentUser.id : sessionId;
+    
+    const projectData = {
+        nodes: nodes.get(),
+        edges: edges.get()
+    };
+
+    // Obtenemos un título representativo basado en el primer nodo o el estado
+    let projectTitle = "Mapa Conceptual";
+    const allNodes = nodes.get();
+    if (allNodes.length > 0) {
+        projectTitle = allNodes[0].baseTitle || allNodes[0].label || "Mi Esquema";
+    }
+
+    try {
+        const response = await fetch('/.netlify/functions/db', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectId: currentProjectId || null,
+                title: projectTitle,
+                data: projectData,
+                user: userIdentifier
+            })
+        });
+
+        const resData = await response.json();
+        if (response.ok && resData.projectId) {
+            currentProjectId = resData.projectId;
+            // Guardamos el Bin ID específico dependiendo de si está logueado o es invitado
+            if (currentUser) {
+                localStorage.setItem(`gk_bin_user_${currentUser.id}`, currentProjectId);
+            } else {
+                localStorage.setItem('gk_guest_bin_id', currentProjectId);
+            }
+            localStorage.setItem('gk_current_project_id', currentProjectId);
+        }
+    } catch (err) {
+        console.error("Error al sincronizar el proyecto en JSONBin:", err);
+    }
+}
+
+// Disparar guardado con un pequeño retraso (debounce) cuando el grafo cambie
+nodes.on('*', () => {
+    clearTimeout(window._binSaveTimer);
+    window._binSaveTimer = setTimeout(() => {
+        saveCurrentProjectToBin();
+    }, 2000);
+});
 let sessionId = localStorage.getItem('gk_session_id');
 if (!sessionId) {
     sessionId = 's_' + Math.random().toString(36).substring(2, 9);
@@ -397,8 +456,9 @@ if (window.paypal) {
             return actions.order.capture().then(async function(details) {
                 const licenseKey = 'GK-' + Math.random().toString(36).substring(2, 10).toUpperCase();
 
-                showLoader('Registrando licencia...');
+                showLoader('Registrando licencia y actualizando cuenta...');
                 try {
+                    // 1. Registrar licencia en la nube
                     await fetch('/.netlify/functions/license', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -414,13 +474,22 @@ if (window.paypal) {
                     hideLoader();
                 }
 
+                // 2. Actualizar saldo local y forzar guardado en su Bin exclusivo
                 availableNodes += selectedNodeAmount;
                 localStorage.setItem('gk_license', licenseKey);
-                localStorage.setItem('gk_balance', availableNodes);
+                if (currentUser) {
+                    localStorage.setItem(`gk_balance_${currentUser.id}`, availableNodes);
+                } else {
+                    localStorage.setItem('gk_balance', availableNodes);
+                }
+                
+                // Forzar guardado inmediato en su Bin tras la compra
+                await saveCurrentProjectToBin();
+
                 updateCounterDisplay();
                 closeStoreModal();
 
-                alert(`¡Pago completado! Se agregaron ${selectedNodeAmount} nodos.\nTu clave es: ${licenseKey}`);
+                alert(`¡Pago completado! Se agregaron ${selectedNodeAmount} nodos a tu cuenta.\nTu clave es: ${licenseKey}`);
             });
         },
         onError: function(err) {
