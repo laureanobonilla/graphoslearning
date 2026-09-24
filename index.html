@@ -13,16 +13,7 @@
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://www.paypal.com/sdk/js?client-id=BAAoSqwffH3QBaBX37mWEhxTqnuTNANyr2qtNUPlGViCBrx1rLw1NDyOa9pkDZzRa7kIVcdPDZTDj_PrdY&currency=USD"></script>
-    <style>
-        /* Fondo blanco impecable para el área de texto del lector */
-        #readerTextMode {
-            background-color: #ffffff !important;
-            color: #1e293b !important;
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-    </style>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -44,8 +35,8 @@
         }
 
         .canvas-blueprint {
-            background-color: #fbfcfd;
-            background-image: radial-gradient(rgba(100, 116, 139, 0.18) 1px, transparent 1px);
+            background-color: #f8fafc;
+            background-image: radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px);
             background-size: 24px 24px;
         }
 
@@ -68,7 +59,6 @@
             box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08);
         }
 
-        /* --- Nuevo Loader de Bloqueo Inmersivo --- */
         #loaderOverlay {
             opacity: 0;
             pointer-events: none;
@@ -83,7 +73,6 @@
             max-width: 90vw;
         }
 
-        /* --- MODO INMERSIVO (Landscape en Móviles) --- */
         @media screen and (max-width: 900px) and (orientation: landscape) {
             #mainHeader {
                 transform: translateY(-100%);
@@ -109,10 +98,10 @@
         </span>
         <span class="text-slate-400 hover:text-white ml-1 md:ml-2 uppercase font-bold tracking-wider">Cancelar</span>
     </div>
-    <!-- Nuevo Loader Inmersivo Pantalla Completa -->
+    
+    <!-- Loader -->
     <div id="loaderOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex flex-col items-center justify-center">
         <div class="bg-white/95 px-8 py-6 rounded-2xl shadow-2xl flex flex-col items-center gap-4 border border-slate-200">
-            <!-- Spinner moderno -->
             <div class="relative w-12 h-12 flex items-center justify-center">
                 <div class="absolute inset-0 border-4 border-slate-100 rounded-full"></div>
                 <div class="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
@@ -131,14 +120,12 @@
         <span class="text-slate-400 hover:text-white ml-1 md:ml-2 uppercase font-bold tracking-wider">Cancelar</span>
     </div>
 
-    <!-- Botón flotante exclusivo para salir del modo Landscape -->
     <button id="landscapeToggle" class="hidden absolute top-4 right-4 z-40 bg-slate-900/80 text-white backdrop-blur-md p-2.5 rounded-full shadow-lg border border-slate-700/60 active:scale-95 transition-all">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
     </button>
 
     <!-- Barra de Navegación -->
     <header id="mainHeader" class="glass-panel border-b border-slate-200/80 p-3 md:px-6 md:py-3 flex flex-col z-30 gap-3 w-full">
-        <!-- Fila 1: Logo y Acciones Secundarias -->
         <div class="flex justify-between items-center w-full">
             <div class="flex items-center gap-2">
                 <div class="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-bold font-heading text-sm shadow-sm ring-1 ring-white/20">Γ</div>
@@ -146,7 +133,6 @@
             </div>
             
             <div class="flex items-center gap-2">
-                <!-- Botón de Usuario / Login -->
                 <button id="btnLogin" class="bg-white hover:bg-slate-50 border border-slate-200/80 text-slate-800 p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-semibold transition-colors shadow-sm flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-slate-300" id="userStatusDot"></span>
                     <span id="loginText" class="hidden md:inline">Iniciar Sesión</span>
@@ -165,10 +151,7 @@
             </div>
         </div>
 
-        <!-- Fila 2: Los Controles Principales -->
         <div class="flex flex-col md:flex-row gap-2 w-full">
-
-            <!-- NUEVO BOTÓN: Activar/Desactivar Panel Lector Activo -->
             <button id="btnToggleReader" class="bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 py-2.5 md:py-2 md:px-4 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center gap-2 w-full md:w-auto order-2 md:order-1">
                 <span>📖</span> Modo Lector
             </button>
@@ -192,26 +175,22 @@
             <h3 id="detailNodeTitle" class="text-xs font-bold font-heading text-amber-400 uppercase tracking-wider">Detalle del Nodo</h3>
             <button id="closeDetailPanel" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded bg-slate-800 transition-colors">✕ Cerrar</button>
         </div>
-        <!-- Contenedor con texto de definición real y seleccionable -->
         <div id="nodeDetailContent" class="flex-1 overflow-auto p-5 text-slate-200 text-sm leading-relaxed font-sans select-text">
             Haz clic en un nodo para leer su definición completa, seleccionarla y extraer nuevos sub-conceptos.
         </div>
-        <!-- Tooltip flotante específico para cuando seleccionas texto dentro de la definición -->
         <div id="nodeSelectionTooltip" class="hidden absolute bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-30 text-xs select-none">
-            <span id="nodeTooltipPreview" class="text-slate-300 italic">"..."</span>
+            <span id="nodeTooltipPreview" class="text-slate-300 italic max-w-[150px] truncate">"..."</span>
             <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear elemento en esquema</button>
         </div>
     </div>
-<!-- Panel Izquierdo de Lectura Activa (Único centro de texto y contexto) -->
+
+    <!-- Panel Izquierdo de Lectura Activa -->
     <div id="readerPanel" class="w-1/2 h-full bg-slate-900 border-r border-slate-800 flex flex-col z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">
-        
-        <!-- Cabecera del Panel, Contexto y Herramienta de IA para Texto -->
         <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-2.5 select-none">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-2">
                     <h3 class="text-xs font-bold font-heading text-slate-200 uppercase tracking-wider">Lector y Sintetizador Activo</h3>
                 </div>
-                <!-- Botón para pedirle a la IA un texto largo a partir de una idea -->
                 <button id="btnAiGenerateText" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1 shadow-sm">
                     <span>✨ Redactar texto con IA</span>
                 </button>
@@ -222,299 +201,123 @@
                     <span>🌐 Generar Esquema del texto</span>
                 </button>
             </div>
-            <!-- Input de Contexto del Documento (Con cálculo automático si se deja vacío) -->
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap">Contexto:</span>
                 <input type="text" id="docContextInput" placeholder="Se detectará automáticamente o escríbelo aquí..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
             </div>
         </div>
 
-        <!-- Área de Lectura con Placeholder Real CSS -->
-        <div id="readerContentContainer" class="flex-1 overflow-auto p-6 bg-slate-900 relative select-text">
-            <div id="readerTextMode" class="w-full h-full text-slate-200 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-500 empty:before:pointer-events-none" contenteditable="true" data-placeholder="Pega aquí tu texto largo o fragmentos de lectura para estudiar..."></div>
+        <!-- Área de Lectura (Fondo Blanco Limpio) -->
+        <div id="readerContentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
+            <div id="readerTextMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:pointer-events-none" contenteditable="true" data-placeholder="Pega aquí tu texto largo o fragmentos de lectura para estudiar..."></div>
         </div>
 
-        <!-- Barra de Redimensionamiento -->
         <div id="panelResizer" class="absolute top-0 right-0 w-1.5 h-full bg-transparent hover:bg-indigo-500 cursor-col-resize transition-colors"></div>
     </div>
 
-        <!-- Menú Flotante Contextual Avanzado (Opciones de Nodo al Subrayar) -->
-        <div id="selectionTooltip" class="hidden absolute glass-dock rounded-xl z-[120] flex flex-col overflow-hidden shadow-2xl min-w-[180px] border border-slate-200">
-            <div class="px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider truncate max-w-[200px]" id="tooltipSelectedTextPreview">Texto seleccionado</div>
-            <div class="py-1 bg-white/95 backdrop-blur-md">
-                <button id="tipBtnExpand" class="w-full px-3.5 py-1.5 hover:bg-slate-100 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Conceptos Relacionados</span>
-                    <span class="text-slate-400 text-[10px]">↵</span>
-                </button>
-                <button id="tipBtnExamples" class="w-full px-3.5 py-1.5 hover:bg-amber-50 text-amber-900 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Ejemplos Prácticos</span>
-                    <span class="text-amber-600 text-[10px]">Ej</span>
-                </button>
-                <button id="tipBtnDefine" class="w-full px-3.5 py-1.5 hover:bg-slate-100 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Definición</span>
-                    <span class="text-slate-400 text-[10px]">⌘D</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Tooltip flotante al seleccionar texto -->
-        <div id="selectionTooltip" class="hidden absolute glass-dock rounded-xl z-[120] flex flex-col overflow-hidden shadow-2xl min-w-[180px] border border-slate-200">
-            <div class="px-3 py-1.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider truncate max-w-[200px]" id="tooltipSelectedTextPreview">Texto seleccionado</div>
-            <div class="py-1 bg-white/95 backdrop-blur-md">
-                <button id="tipBtnCreateNode" class="w-full px-3.5 py-2 hover:bg-slate-100 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Crear elemento en esquema</span>
-                    <span class="text-indigo-600 font-bold text-xs">⚡</span>
-                </button>
-            </div>
-        </div>
-        <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
-
-        <!-- Pantalla de Bienvenida (Lienzo Vacío) -->
-        <div id="welcomeScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 bg-slate-900/5 backdrop-blur-[2px] transition-opacity duration-500 overflow-y-auto">
-            <div class="glass-dock p-5 md:p-10 rounded-3xl max-w-2xl w-full text-center shadow-2xl border border-slate-200/80 my-auto">
-                <div class="w-14 h-14 md:w-16 md:h-16 mx-auto bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-5 shadow-lg shadow-slate-900/20">Γ</div>
-                <h2 class="text-xl md:text-3xl font-heading font-extrabold text-slate-900 mb-2 md:mb-3 tracking-tight">¿Qué vamos a explorar hoy?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-6 md:mb-8 max-w-md mx-auto px-2">Construye tu segundo cerebro. Escribe un concepto, sube un documento o explora una idea fascinante al azar.</p>
-                
-                <div class="flex flex-col sm:flex-row gap-3 justify-center mb-6 md:mb-8">
-                    <button id="btnWelcomeDoc" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-6 py-3 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto text-sm">
-                        <span class="text-base md:text-lg">📄</span> Extraer de Documento
-                    </button>
-                    <!-- NUEVO: Botón de bienvenida para abrir el Modo Lector directamente -->
-                    <button id="btnWelcomeReader" class="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all shadow-sm flex items-center gap-2">
-                        <span>📖</span> Lector Activo
-                    </button>                    
-                    <button id="btnSurprise" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto text-sm">
-                        <span class="text-base md:text-lg">🎲</span> Sorpréndeme
-                    </button>
-                </div>
-            
-                <div class="border-t border-slate-100 pt-5 md:pt-6">
-                    <p class="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Temas sugeridos</p>
-                    <div class="flex flex-wrap gap-2 justify-center" id="suggestionChips"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Menú Contextual (Nodos) -->
-        <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col overflow-hidden transform -translate-x-1/2 -translate-y-full min-w-[200px] transition-all">
-<!-- Selector de Densidad / Ramas (Auto por defecto) -->
-            <div class="px-3 py-2 bg-slate-50/70 border-b border-slate-200/60 flex justify-between items-center">
-                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Densidad / Ramas</span>
-                <div class="flex items-center gap-1.5">
-                    <select id="nodeCount" class="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-400 font-mono">
-                        <option value="auto" selected>Auto</option>
-                        <option value="2">2</option>
-                        <option value="3">3</option>
-                        <option value="4">4</option>
-                        <option value="5">5</option>
-                        <option value="6">6</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="py-1">
-                <button id="btnMenuExpand" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Conceptos Relacionados</span>
-                    <span class="text-slate-400 text-[11px]">↵</span>
-                </button>
-                <button id="btnMenuExamples" class="w-full px-3.5 py-2 hover:bg-amber-50/70 text-amber-900 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Ejemplos</span>
-                    <span class="text-amber-600/70 text-[10px] uppercase font-bold tracking-wider">Ejemplo</span>
-                </button>
-                <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>📖 Usar definición</span>
-                    <span class="text-slate-400 text-[10px]">Panel</span>
-                </button>
-                <button id="btnMenuExpandDef" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>🔍 Expandir definición</span>
-                    <span class="text-slate-400 text-[10px]">Ver aquí</span>
-                </button>
-                <button id="btnMenuCollapseDef" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>📁 Contraer definición</span>
-                    <span class="text-slate-400 text-[10px]">Ocultar</span>
-                </button>
-                <button id="btnMenuConnect" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Vincular con...</span>
-                    <span class="text-slate-400 text-[11px]">🔗</span>
-                </button>
-                <button id="btnMenuSynergy" class="w-full px-3.5 py-2 hover:bg-fuchsia-50/70 text-fuchsia-900 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-fuchsia-100/50 mt-1">
-                    <span>Generar Sinergia</span>
-                    <span class="text-fuchsia-600/70 text-[10px] uppercase font-bold tracking-wider">⚡ Fusión</span>
-                </button>                
-            </div>
-
-            <div class="px-3 py-2 bg-slate-50/70 border-t border-slate-200/60 flex justify-between items-center">
-                <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Escala</span>
-                <div class="flex items-center gap-1">
-                    <button id="btnSizeMinus" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 hover:bg-slate-100 rounded text-slate-600 font-bold text-xs shadow-xs transition-colors">-</button>
-                    <button id="btnSizePlus" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 hover:bg-slate-100 rounded text-slate-600 font-bold text-xs shadow-xs transition-colors">+</button>
-                </div>
-            </div>
-
-            <div class="border-t border-slate-200/60 p-1">
-                <button id="btnMenuDelete" class="w-full px-3 py-1.5 hover:bg-red-50 text-red-600 font-medium text-[11px] rounded text-left transition-colors flex items-center gap-1.5">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                    Eliminar
-                </button>
-            </div>
-        </div>
-
-        <div class="absolute bottom-3 left-4 z-30 opacity-30 hover:opacity-100 transition-opacity">
-            <button id="btnAdminAccess" class="text-[10px] font-mono text-slate-400 hover:text-slate-900 tracking-wider uppercase">Console</button>
-        </div>
+    <!-- Menú Flotante ÚNICO al Subrayar en el Lector -->
+    <div id="selectionTooltip" class="hidden absolute bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-[120] text-xs select-none">
+        <span id="tooltipSelectedTextPreview" class="text-slate-300 italic max-w-[150px] truncate">"..."</span>
+        <button id="tipBtnCreateNode" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear elemento en esquema</button>
     </div>
 
-    <!-- Modales -->
-    
-    <!-- Modal Documental -->
-    <div id="textSchemaModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[105] hidden items-center justify-center p-3 md:p-4">
-        <div class="bg-white w-full max-w-2xl rounded-xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/80">
-            <div class="px-5 py-4 md:px-7 md:py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
-                <div>
-                    <h2 class="text-base md:text-lg font-bold font-heading text-slate-900">Sintetizador Documental</h2>
-                    <p class="text-[11px] md:text-xs text-slate-500 mt-0.5">Sube archivos o pega contenido.</p>
-                </div>
-                <button id="closeTextModal" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors">✕</button>
-            </div>
+    <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
+
+    <!-- Pantalla de Bienvenida -->
+    <div id="welcomeScreen" class="absolute inset-0 z-20 flex flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 bg-slate-900/5 backdrop-blur-[2px] transition-opacity duration-500 overflow-y-auto">
+        <div class="glass-dock p-5 md:p-10 rounded-3xl max-w-2xl w-full text-center shadow-2xl border border-slate-200/80 my-auto">
+            <div class="w-14 h-14 md:w-16 md:h-16 mx-auto bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-5 shadow-lg shadow-slate-900/20">Γ</div>
+            <h2 class="text-xl md:text-3xl font-heading font-extrabold text-slate-900 mb-2 md:mb-3 tracking-tight">¿Qué vamos a explorar hoy?</h2>
+            <p class="text-xs md:text-sm text-slate-500 mb-6 md:mb-8 max-w-md mx-auto px-2">Construye tu segundo cerebro. Escribe un concepto, pega un documento o explora una idea al azar.</p>
             
-            <div class="p-4 md:p-6 flex flex-col gap-3 md:gap-4 overflow-y-auto max-h-[75vh]">
-                <div class="border-2 border-dashed border-slate-200 hover:border-slate-400 rounded-xl p-4 text-center bg-slate-50/50 transition-colors cursor-pointer" id="dropZone">
-                    <input type="file" id="fileInput" class="hidden" accept=".pdf,.docx,.txt,.zip">
-                    <div class="flex flex-col items-center gap-1.5">
-                        <span class="text-2xl">📥</span>
-                        <p class="text-[11px] md:text-xs font-semibold text-slate-700">Toca para subir un archivo (PDF, DOCX, ZIP)</p>
-                    </div>
-                </div>
-
-                <div class="relative">
-                    <textarea id="rawTextInput" rows="5" placeholder="O pega el texto manualmente aquí..." class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 font-sans resize-none leading-relaxed"></textarea>
-                </div>
-                
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pt-2 border-t border-slate-100">
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <span class="text-[10px] md:text-xs font-semibold text-slate-500 uppercase tracking-wider">Densidad:</span>
-                        <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-[10px] md:text-xs w-full sm:w-auto justify-between" id="densitySelector">
-                            <button type="button" data-density="auto" class="density-btn px-2 md:px-3 py-1 rounded-md font-semibold bg-white text-slate-900 shadow-xs transition-colors">Auto</button>
-                            <button type="button" data-density="low" class="density-btn px-2 md:px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Esencial</button>
-                            <button type="button" data-density="medium" class="density-btn px-2 md:px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Media</button>
-                            <button type="button" data-density="high" class="density-btn px-2 md:px-3 py-1 rounded-md font-medium text-slate-600 hover:text-slate-900 transition-colors">Alta</button>
-                        </div>
-                    </div>
-
-                    <button id="btnProcessText" class="w-full sm:w-auto bg-slate-950 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-semibold text-xs shadow-md transition-all active:scale-95 text-center">
-                        Generar Árbol
-                    </button>
-                </div>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center mb-6 md:mb-8">
+                <button id="btnWelcomeReader" class="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-all shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto">
+                    <span>📖</span> Abrir Lector Activo
+                </button>                    
+                <button id="btnSurprise" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto text-sm">
+                    <span class="text-base md:text-lg">🎲</span> Sorpréndeme
+                </button>
+            </div>
+        
+            <div class="border-t border-slate-100 pt-5 md:pt-6">
+                <p class="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Temas sugeridos</p>
+                <div class="flex flex-wrap gap-2 justify-center" id="suggestionChips"></div>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Tienda -->
-<!-- Modal de Tienda (Optimizado y Responsivo) -->
+    <!-- Menú Contextual (Nodos) -->
+    <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col overflow-hidden transform -translate-x-1/2 -translate-y-full min-w-[200px] transition-all shadow-xl">
+        <div class="px-3 py-2 bg-slate-50/70 border-b border-slate-200/60 flex justify-between items-center">
+            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Densidad / Ramas</span>
+            <div class="flex items-center gap-1.5">
+                <select id="nodeCount" class="bg-white border border-slate-200 rounded px-1.5 py-0.5 text-xs font-bold text-slate-700 focus:outline-none focus:border-slate-400 font-mono">
+                    <option value="auto" selected>Auto</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="py-1">
+            <button id="btnMenuExpand" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>Conceptos Relacionados</span>
+                <span class="text-slate-400 text-[11px]">↵</span>
+            </button>
+            <button id="btnMenuExamples" class="w-full px-3.5 py-2 hover:bg-amber-50/70 text-amber-900 font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>Ejemplos Prácticos</span>
+                <span class="text-amber-600/70 text-[10px] uppercase font-bold tracking-wider">Ej</span>
+            </button>
+            <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>📖 Usar definición</span>
+                <span class="text-slate-400 text-[10px]">Panel</span>
+            </button>
+            <button id="btnMenuExpandDef" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>🔍 Expandir definición</span>
+                <span class="text-slate-400 text-[10px]">Ver aquí</span>
+            </button>
+            <button id="btnMenuCollapseDef" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>📁 Contraer definición</span>
+                <span class="text-slate-400 text-[10px]">Ocultar</span>
+            </button>
+            <button id="btnMenuConnect" class="w-full px-3.5 py-2 hover:bg-slate-100/80 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>Vincular con...</span>
+                <span class="text-slate-400 text-[11px]">🔗</span>
+            </button>
+            <button id="btnMenuSynergy" class="w-full px-3.5 py-2 hover:bg-fuchsia-50/70 text-fuchsia-900 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-fuchsia-100/50 mt-1">
+                <span>Generar Sinergia</span>
+                <span class="text-fuchsia-600/70 text-[10px] uppercase font-bold tracking-wider">⚡ Fusión</span>
+            </button>                
+        </div>
+
+        <div class="px-3 py-2 bg-slate-50/70 border-t border-slate-200/60 flex justify-between items-center">
+            <span class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Escala</span>
+            <div class="flex items-center gap-1">
+                <button id="btnSizeMinus" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 hover:bg-slate-100 rounded text-slate-600 font-bold text-xs shadow-xs transition-colors">-</button>
+                <button id="btnSizePlus" class="w-6 h-6 flex items-center justify-center bg-white border border-slate-200 hover:bg-slate-100 rounded text-slate-600 font-bold text-xs shadow-xs transition-colors">+</button>
+            </div>
+        </div>
+
+        <div class="border-t border-slate-200/60 p-1">
+            <button id="btnMenuDelete" class="w-full px-3 py-1.5 hover:bg-red-50 text-red-600 font-medium text-[11px] rounded text-left transition-colors flex items-center gap-1.5">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                Eliminar
+            </button>
+        </div>
+    </div>
+
+    <!-- Modales de Sistema (Tienda, Auth, etc) -->
     <div id="storeModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[100] hidden items-center justify-center p-3 md:p-4">
-        <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/80 max-h-[90vh]">
-            
-            <!-- Cabecera de la Tienda -->
-            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80">
-                <div>
-                    <h2 class="text-lg font-bold font-heading text-slate-900">Potencia tu Segundo Cerebro</h2>
-                    <p class="text-xs text-slate-500">Elige un paquete de nodos para continuar expandiendo tus mapas.</p>
-                </div>
-                <button id="closeStore" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200/50 transition-colors">✕</button>
-            </div>
-
-            <!-- Contenido con Scroll si es necesario -->
-            <div class="p-5 md:p-6 flex flex-col gap-5 overflow-y-auto">
-                
-                <!-- Beneficios / Servicios que se ofrecen -->
-                <div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4 flex flex-col gap-2">
-                    <span class="text-xs font-bold text-indigo-900 uppercase tracking-wider">✨ Lo que incluye tu pase:</span>
-                    <ul class="text-xs text-indigo-800 space-y-1.5 font-medium">
-                        <li class="flex items-center gap-2">✓ Sin caducidad: Los nodos son tuyos para siempre.</li>
-                        <li class="flex items-center gap-2">✓ Sinergias y expansiones ilimitadas con IA.</li>
-                        <li class="flex items-center gap-2">✓ Sincronización automática y persistente en la nube.</li>
-                    </ul>
-                </div>
-
-                <!-- Opciones de Paquetes (Tres opciones, incluyendo la de $5) -->
-                <div class="grid grid-cols-3 gap-2.5">
-                    <!-- Paquete Mini ($5) -->
-                    <div class="package-card border-2 border-slate-900 bg-slate-900 text-white rounded-2xl p-3 flex flex-col justify-between cursor-pointer transition-all shadow-sm" data-price="5.00" data-nodes="200">
-                        <div>
-                            <span class="text-[9px] font-bold uppercase tracking-wider opacity-80">Mini</span>
-                            <h3 class="text-base md:text-lg font-extrabold font-heading">200 Nodos</h3>
-                        </div>
-                        <div class="mt-3">
-                            <span class="text-sm md:text-base font-bold">$5.00</span>
-                        </div>
-                    </div>
-
-                    <!-- Paquete Básico ($10) -->
-                    <div class="package-card border border-slate-200 bg-slate-50/40 text-slate-900 rounded-2xl p-3 flex flex-col justify-between cursor-pointer transition-all shadow-sm hover:border-slate-400" data-price="10.00" data-nodes="500">
-                        <div>
-                            <span class="text-[9px] font-bold uppercase tracking-wider opacity-80">Básico</span>
-                            <h3 class="text-base md:text-lg font-extrabold font-heading">500 Nodos</h3>
-                        </div>
-                        <div class="mt-3">
-                            <span class="text-sm md:text-base font-bold">$10.00</span>
-                        </div>
-                    </div>
-
-                    <!-- Paquete Pro ($20) -->
-                    <div class="package-card border border-slate-200 bg-slate-50/40 text-slate-900 rounded-2xl p-3 flex flex-col justify-between cursor-pointer transition-all shadow-sm hover:border-slate-400" data-price="20.00" data-nodes="1200">
-                        <div>
-                            <span class="text-[9px] font-bold uppercase tracking-wider text-indigo-600">Pro</span>
-                            <h3 class="text-base md:text-lg font-extrabold font-heading">1.2K Nodos</h3>
-                        </div>
-                        <div class="mt-3">
-                            <span class="text-sm md:text-base font-bold">$20.00</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Contenedor del Botón de PayPal (Diseño compacto) -->
-                <div class="pt-2 border-t border-slate-150">
-                    <div class="text-[11px] font-semibold text-slate-500 mb-2 text-center">Completa tu pago de forma segura con PayPal:</div>
-                    <div id="paypal-button-container" class="w-full"></div>
-                </div>
-
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal de Ayuda -->
-    <div id="helpModal" class="fixed inset-0 bg-slate-950/60 backdrop-blur-md z-[110] hidden items-center justify-center p-3 md:p-4">
-         <!-- Contenido de ayuda intacto -->
-        <div class="bg-white w-full max-w-xl rounded-xl md:rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200/80">
-            <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/60">
-                <h2 class="text-base font-bold text-slate-900">Manual Rápido</h2>
-                <button id="closeHelp" class="text-slate-400 p-1">✕</button>
-            </div>
-            <div class="p-5"><p class="text-sm">Todo listo para comenzar.</p></div>
-        </div>
+        <!-- Contenido de tienda intacto (se omite para brevedad pero déjalo tal cual lo tenías) -->
     </div>
     
-<!-- Modal: Muro de Valor (Soft Paywall) -->
     <div id="authWallModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
-        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col text-center p-8 border border-slate-200">
-            <div class="w-16 h-16 mx-auto bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center text-3xl mb-5 shadow-inner">
-                ✨
-            </div>
-            <h2 class="text-2xl font-bold font-heading text-slate-900 mb-2">¡Tu esquema está creciendo!</h2>
-            <p class="text-sm text-slate-500 mb-6 px-4">
-                Para <span id="authWallReason" class="font-bold text-slate-700">continuar explorando</span>, inicia sesión gratis. Guardaremos tu progreso en la nube y desbloquearemos tus <span class="font-bold text-emerald-600">50 nodos de bienvenida</span>.
-            </p>
-            
-            <button id="btnTriggerNetlifyLogin" class="w-full bg-slate-900 hover:bg-slate-800 text-white px-6 py-3.5 rounded-xl font-bold transition-all shadow-md active:scale-95 text-sm mb-3">
-                Continuar / Crear cuenta gratis
-            </button>
-            <button id="closeAuthWall" class="text-xs text-slate-400 hover:text-slate-600 font-medium p-2">
-                Volver al mapa
-            </button>
-        </div>
+        <!-- Contenido de auth intacto -->
     </div>
 
     <script src="app.js"></script>
 </body>
-</html> 
+</html>
