@@ -1044,24 +1044,7 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
     }
 });
 
-// Sincronización: Al cerrar el panel lateral de detalles, el nodo vinculado se contrae en el grafo
-closeDetailPanel?.addEventListener('click', () => {
-    if (activeNodeDetailId) {
-        const currentNode = nodes.get(activeNodeDetailId);
-        if (currentNode) {
-            const title = currentNode.baseTitle || activeNodeDetailId;
-            nodes.update({
-                id: activeNodeDetailId,
-                label: `*${title}*`,
-                isExpandedDef: false,
-                widthConstraint: { minimum: 150, maximum: 250 },
-                heightConstraint: { minimum: 50, maximum: 90 }
-            });
-        }
-    }
-    nodeDetailPanel.classList.add('hidden');
-    activeNodeDetailId = null;
-});
+
 
 document.getElementById('btnMenuConnect').addEventListener('click', () => {
     sourceNodeForConnection = selectedNodeId;
@@ -1619,13 +1602,18 @@ const panelResizer = document.getElementById('panelResizer');
 const tooltipPreview = document.getElementById('tooltipSelectedTextPreview');
 const docContextInput = document.getElementById('docContextInput');
 
+// Declaraciones clave para el panel de detalle (¡Evita el ReferenceError!)
 const nodeDetailPanel = document.getElementById('nodeDetailPanel');
 const detailNodeTitle = document.getElementById('detailNodeTitle');
 const nodeDetailContent = document.getElementById('nodeDetailContent');
-const closeDetailPanel = document.getElementById('closeDetailPanel');
+const closeDetailPanel = document.getElementById('closeDetailPanel'); 
 const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
 const nodeTooltipPreview = document.getElementById('nodeTooltipPreview');
 const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
+
+// Modales y herramientas de IA
+const aiTextModal = document.getElementById('aiTextModal');
+const aiTopicInput = document.getElementById('aiTopicInput');
 
 let globalDocumentContext = "";
 let activeSelectedText = "";
@@ -1633,6 +1621,12 @@ let activeSelectionRange = null;
 let activeNodeDetailId = null;
 let activeNodeSelectionRange = null;
 let activeNodeSelectedText = "";
+
+function getMaxNodesSetting() {
+    const select = document.getElementById('nodeCountSelect');
+    if (!select || select.value === 'auto') return 4; 
+    return parseInt(select.value, 10) || 3;
+}
 
 // Capturar el contexto global en tiempo real
 docContextInput?.addEventListener('input', (e) => {
