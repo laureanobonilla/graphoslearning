@@ -1551,68 +1551,6 @@ network.on('dragStart', (params) => {
         nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
     }
 });
-
-// ==========================================
-// MODO LECTOR ACTIVO - FUNCIONALIDAD AVANZADA
-// ==========================================
-const btnToggleReader = document.getElementById('btnToggleReader');
-const readerPanel = document.getElementById('readerPanel');
-const readerContentArea = document.getElementById('readerContentArea');
-const selectionTooltip = document.getElementById('selectionTooltip');
-const panelResizer = document.getElementById('panelResizer');
-const tooltipPreview = document.getElementById('tooltipSelectedTextPreview');
-
-let activeSelectedText = "";
-let activeSelectionRange = null;
-
-// 1. Mostrar / Ocultar Panel Lector
-btnToggleReader?.addEventListener('click', () => {
-    readerPanel.classList.toggle('hidden');
-    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
-});
-
-// 2. Redimensionar panel izquierdo arrastrando el borde
-let isResizing = false;
-panelResizer?.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    e.preventDefault();
-});
-window.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
-    const newWidth = e.clientX;
-    if (newWidth > 200 && newWidth < window.innerWidth * 0.7) {
-        readerPanel.style.width = `${newWidth}px`;
-    }
-});
-window.addEventListener('mouseup', () => { isResizing = false; });
-
-// 3. Detectar selección de texto y aplicar Highlight visual automático
-readerContentArea?.addEventListener('mouseup', (e) => {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
-
-    if (text.length > 2) {
-        activeSelectedText = text;
-        activeSelectionRange = selection.getRangeAt(0);
-
-        if (tooltipPreview) tooltipPreview.innerText = `"${text.substring(0, 25)}..."`;
-
-        selectionTooltip.style.left = `${e.pageX - 60}px`;
-        selectionTooltip.style.top = `${e.pageY - 70}px`;
-        selectionTooltip.classList.remove('hidden');
-    } else {
-        selectionTooltip.classList.add('hidden');
-    }
-});
-
-document.addEventListener('mousedown', (e) => {
-    if (!selectionTooltip.contains(e.target) && !readerPanel.contains(e.target)) {
-        selectionTooltip.classList.add('hidden');
-    }
-});
-
-
-
 // ==========================================
 // MODO LECTOR ACTIVO - TEXTO LIBRE Y CONTEXTO
 // ==========================================
@@ -1637,6 +1575,12 @@ docContextInput?.addEventListener('input', (e) => {
 btnToggleReader?.addEventListener('click', () => {
     readerPanel.classList.toggle('hidden');
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
+});
+
+// Acceso rápido desde la pantalla de bienvenida
+document.getElementById('btnWelcomeReader')?.addEventListener('click', () => {
+    dismissWelcomeScreen();
+    document.getElementById('btnToggleReader')?.click();
 });
 
 // Redimensionar panel izquierdo arrastrando el borde
@@ -1680,7 +1624,7 @@ document.addEventListener('mousedown', (e) => {
     }
 });
 
-// Vincular texto seleccionado a nodo del grafo
+// Vincular texto seleccionado a nodo del grafo (Interacción bidireccional)
 function highlightAndBindSelectedText(spanElement, nodeId) {
     spanElement.style.cursor = 'pointer';
     spanElement.title = "Haz clic para enfocar este nodo en el grafo";
@@ -1697,7 +1641,7 @@ function highlightAndBindSelectedText(spanElement, nodeId) {
             const pos = network.getPositions([nodeId])[nodeId];
             const domCoords = network.canvasToDOM(pos);
             actionMenu.style.left = domCoords.x + 'px';
-            actionMenu.style.top = (DOMCoords.y - 40) + 'px';
+            actionMenu.style.top = (domCoords.y - 40) + 'px';
             actionMenu.classList.remove('hidden');
         }
     });
@@ -1765,244 +1709,3 @@ function createNodeFromReader(actionType) {
 document.getElementById('tipBtnExpand')?.addEventListener('click', () => createNodeFromReader('expand'));
 document.getElementById('tipBtnExamples')?.addEventListener('click', () => createNodeFromReader('examples'));
 document.getElementById('tipBtnDefine')?.addEventListener('click', () => createNodeFromReader('define'));
-document.getElementById('btnWelcomeReader')?.addEventListener('click', () => {
-    dismissWelcomeScreen(); // Cierra la pantalla de bienvenida
-    // Simula un clic en el botón principal para abrir el panel lector de inmediato
-    document.getElementById('btnToggleReader')?.click();
-});
-
-// ==========================================
-// CARGADOR DE PDF EN EL MODO LECTOR ACTIVO
-// ==========================================
-const readerPdfInput = document.getElementById('readerPdfInput');
-// ==========================================
-// INTERACCIÓN BIDIRECCIONAL: TEXTO -> NODO
-// ==========================================
-// Modificamos ligeramente la función de creación para guardar el vínculo con el elemento del DOM
-let domTextToNodeMap = new Map();
-
-// Dentro de tu función createNodeFromReader(actionType), al crear el span con highlight, 
-// le asignamos un evento de clic:
-function highlightAndBindSelectedText(spanElement, nodeId) {
-    spanElement.style.cursor = 'pointer';
-    spanElement.title = "Haz clic para enfocar este nodo en el grafo";
-    
-    spanElement.addEventListener('click', () => {
-        if (nodes.get(nodeId)) {
-            network.selectNodes([nodeId]);
-            network.focus(nodeId, {
-                scale: 1.2,
-                animation: { duration: 600, easingFunction: 'easeInOutQuad' }
-            });
-            
-            selectedNodeId = nodeId;
-            const pos = network.getPositions([nodeId])[nodeId];
-            const domCoords = network.canvasToDOM(pos);
-            actionMenu.style.left = domCoords.x + 'px';
-            actionMenu.style.top = (domCoords.y - 40) + 'px';
-            actionMenu.classList.remove('hidden');
-        }
-    });
-}
-readerPdfInput?.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    showLoader('Cargando PDF en el lector...');
-    try {
-        let textContent = '';
-        const fileName = file.name.toLowerCase();
-
-        if (fileName.endsWith('.pdf')) {
-            const buffer = await file.arrayBuffer();
-            // Reutilizamos el motor pdfjsLib que ya está inicializado en tu index
-            const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
-            let fullText = '';
-            
-            // Leemos hasta 30 páginas para una lectura fluida en el panel
-            const maxPages = Math.min(pdf.numPages, 30); 
-            for (let i = 1; i <= maxPages; i++) {
-                const page = await pdf.getPage(i);
-                const textData = await page.getTextContent();
-                fullText += textData.items.map(item => item.str).join(' ') + '\n\n';
-            }
-            textContent = fullText;
-        } else if (fileName.endsWith('.txt')) {
-            textContent = await file.text();
-        }
-
-        if (textContent.trim()) {
-            // Inyectamos el texto limpio en el panel lector
-            readerContentArea.innerText = textContent;
-        } else {
-            alert('El archivo no contiene texto legible.');
-        }
-    } catch (err) {
-        console.error("Error al cargar el PDF en el lector:", err);
-        alert('No se pudo leer el archivo PDF.');
-    } finally {
-        hideLoader();
-    }
-});
-
-// ==========================================
-// VISOR HÍBRIDO (PDF Y TEXTO LIBRE)
-// ==========================================
-let pdfDoc = null;
-let pageNum = 1;
-let pageRendering = false;
-let pageNumPending = null;
-const scale = 1.3;
-const canvas = document.getElementById('pdfRenderCanvas');
-const ctx = canvas ? canvas.getContext('2d') : null;
-
-const readerTextMode = document.getElementById('readerTextMode');
-const pdfCanvasWrapper = document.getElementById('pdfCanvasWrapper');
-const pdfPaginationControls = document.getElementById('pdfPaginationControls');
-const docContextInput = document.getElementById('docContextInput');
-let globalDocumentContext = "";
-
-docContextInput?.addEventListener('input', (e) => {
-    globalDocumentContext = e.target.value.trim();
-});
-
-// Renderizado de página con capa de texto interactiva para selección
-// Renderizado de página corregido y limpio
-// Renderizado de página optimizado para evitar texto encimado y errores
-async function renderPage(num) {
-    if (!pdfDoc) return;
-    pageRendering = true;
-    
-    const page = await pdfDoc.getPage(num);
-    const viewport = page.getViewport({ scale: scale });
-    
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
-    
-    // Ajustar contenedor del canvas
-    pdfCanvasWrapper.style.width = `${viewport.width}px`;
-    pdfCanvasWrapper.style.height = `${viewport.height}px`;
-
-    const renderContext = {
-        canvasContext: ctx,
-        viewport: viewport
-    };
-    
-    // 1. Renderizamos la página limpia en el canvas
-    await page.render(renderContext).promise;
-
-    // 2. Limpiamos por completo la capa de texto anterior
-    const textLayerDiv = document.getElementById('pdfTextLayer');
-    if (textLayerDiv) {
-        textLayerDiv.innerHTML = '';
-        textLayerDiv.style.width = `${viewport.width}px`;
-        textLayerDiv.style.height = `${viewport.height}px`;
-
-        try {
-            // Obtenemos el texto de la página de forma segura
-            const textContent = await page.getTextContent();
-            
-            // Renderizamos la capa de texto asegurando compatibilidad
-            if (window.pdfjsLib && typeof pdfjsLib.renderTextLayer === 'function') {
-                await pdfjsLib.renderTextLayer({
-                    textContentSource: textContent,
-                    container: textLayerDiv,
-                    viewport: viewport,
-                    textDivs: []
-                }).promise;
-            }
-        } catch (textErr) {
-            console.warn("Aviso menor en la capa de texto de la página:", textErr);
-        }
-    }
-
-    pageRendering = false;
-
-    if (pageNumPending !== null) {
-        renderPage(pageNumPending);
-        pageNumPending = null;
-    }
-
-    document.getElementById('pageNum').textContent = num;
-}
-function queueRenderPage(num) {
-    if (pageRendering) {
-        pageNumPending = num;
-    } else {
-        renderPage(num);
-    }
-}
-
-document.getElementById('prevPage')?.addEventListener('click', () => {
-    if (pageNum <= 1) return;
-    pageNum--;
-    queueRenderPage(pageNum);
-});
-
-document.getElementById('nextPage')?.addEventListener('click', () => {
-    if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
-    pageNum++;
-    queueRenderPage(pageNum);
-});
-
-// Manejo de la carga del archivo PDF
-readerPdfInput?.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    showLoader('Cargando documento PDF...');
-    try {
-        const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-        pdfDoc = await loadingTask.promise;
-        
-        // Ocultar modo texto libre y mostrar el visor PDF y sus controles
-        readerTextMode.classList.add('hidden');
-        pdfCanvasWrapper.classList.remove('hidden');
-        pdfPaginationControls.classList.remove('hidden');
-
-        document.getElementById('pageCount').textContent = pdfDoc.numPages;
-        pageNum = 1;
-        await renderPage(pageNum);
-
-        if (!docContextInput.value) {
-            docContextInput.value = `Documento: ${file.name}`;
-            globalDocumentContext = docContextInput.value;
-        }
-
-        // Extraer texto para la memoria general de la IA
-        let fullExtractedText = '';
-        const maxPagesToExtract = Math.min(pdfDoc.numPages, 15);
-        for (let i = 1; i <= maxPagesToExtract; i++) {
-            const p = await pdfDoc.getPage(i);
-            const txt = await p.getTextContent();
-            fullExtractedText += txt.items.map(item => item.str).join(' ') + '\n';
-        }
-        currentDocumentText = fullExtractedText;
-
-    } catch (err) {
-        console.error("Error al abrir el PDF:", err);
-        alert("No se pudo procesar el archivo PDF.");
-    } finally {
-        hideLoader();
-    }
-});
-
-// Captura unificada de selección de texto (tanto en modo texto libre como sobre el visor PDF)
-document.getElementById('readerContentContainer')?.addEventListener('mouseup', (e) => {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
-
-    if (text.length > 2) {
-        activeSelectedText = text;
-        activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-
-        if (tooltipPreview) tooltipPreview.innerText = `"${text.substring(0, 25)}..."`;
-
-        selectionTooltip.style.left = `${e.pageX - 60}px`;
-        selectionTooltip.style.top = `${e.pageY - 70}px`;
-        selectionTooltip.classList.remove('hidden');
-    } else {
-        selectionTooltip.classList.add('hidden');
-    }
-});
