@@ -954,17 +954,18 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
     // Si ya tiene definición precargada del documento, mostrarla de inmediato
     if (currentNode && currentNode.definition) {
         if (!currentNode.label.includes('──────────')) {
-            const newLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
-            nodes.update({ 
-                id: selectedNodeId, 
-                baseTitle: title,
-                definition: currentNode.definition, 
-                label: newLabel,
-                shape: 'box',
-                fixed: { x: false, y: false },
-                widthConstraint: { maximum: 240 },
-                heightConstraint: { maximum: 240, valign: 'top' }
-            });
+            const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
+
+                    nodes.update({ 
+                        id: selectedNodeId, 
+                        baseTitle: title,
+                        definition: data.definition, 
+                        label: newLabel,
+                        shape: 'box',
+                        fixed: { x: false, y: false },
+                        widthConstraint: { maximum: 300 }, // Ancho controlado para que no sea un hilo vertical
+                        heightConstraint: { maximum: 250, valign: 'top' } // Altura limitada inicial estilo tarjeta cuadrada
+                    });
         }
         return;
     }
@@ -1527,15 +1528,17 @@ network.on('click', async function (params) {
         }
 
         // MOSTRAR MENÚ FLOTANTE
+
         selectedNodeId = clickedNode;
         const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
         const DOMCoords = network.canvasToDOM(nodePosition);
         
-        // Obtenemos la posición del contenedor para ajustar el desplazamiento exacto
+        // Obtenemos las coordenadas relativas del contenedor del grafo en la pantalla
         const containerRect = container.getBoundingClientRect();
         
-        actionMenu.style.left = (DOMCoords.x) + 'px';
-        actionMenu.style.top = (DOMCoords.y - 40) + 'px';
+        // Posicionamos el menú sumando el offset del contenedor para que caiga exactamente sobre el nodo
+        actionMenu.style.left = (containerRect.left + DOMCoords.x - 40) + 'px';
+        actionMenu.style.top = (containerRect.top + DOMCoords.y - 60) + 'px';
         actionMenu.classList.remove('hidden');
     } else {
         actionMenu.classList.add('hidden');
