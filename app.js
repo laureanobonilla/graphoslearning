@@ -752,8 +752,7 @@ const hookTopics = [
     "Economía Conductual", "La Teoría de Cuerdas", "Imperio Romano"
 ];
 
-// Variable para controlar que la ventana de bienvenida solo salga al inicio
-let hasDismissedWelcomeScreen = false;
+
 
 
 // Escuchamos cambios en el grafo para quitarla en cuanto se genera el primer nodo
@@ -951,10 +950,7 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
 });
 
 // ==========================================
-// 9. DEFINICIÓN, CONECTAR, ELIMINAR Y TAMAÑO
-// ==========================================
-// ==========================================
-// GESTIÓN DE DEFINICIONES Y CONTRACCIÓN DE NODOS
+// GESTIÓN DE DEFINICIONES, CONTRACCIÓN Y PANEL LATERAL
 // ==========================================
 document.getElementById('btnMenuDefine')?.addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
@@ -963,10 +959,10 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
     const currentNode = nodes.get(selectedNodeId);
     const title = currentNode.baseTitle || selectedNodeId;
 
-    // 1. SI YA TIENE DEFINICIÓN: Alternar entre contraer (solo título) o expandir (mostrar en grafo) y abrir panel lateral
+    // 1. SI YA TIENE DEFINICIÓN: Alternar expansión/contracción localmente sin reconsultar a la IA
     if (currentNode && currentNode.definition) {
         if (currentNode.isExpandedDef) {
-            // Contraer el nodo en el grafo (mostrar solo título base)
+            // Contraer el nodo en el grafo (muestra solo el título base)
             nodes.update({
                 id: selectedNodeId,
                 label: `*${title}*`,
@@ -980,7 +976,7 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
                 activeNodeDetailId = null;
             }
         } else {
-            // Expandir el nodo en el grafo con su definición
+            // Expandir el nodo en el grafo con su definición guardada
             const expandedLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
             nodes.update({
                 id: selectedNodeId,
@@ -1048,7 +1044,7 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
     }
 });
 
-// Al cerrar el panel lateral de detalles, contraemos opcionalmente el nodo vinculado
+// Sincronización: Al cerrar el panel lateral de detalles, el nodo vinculado se contrae en el grafo
 closeDetailPanel?.addEventListener('click', () => {
     if (activeNodeDetailId) {
         const currentNode = nodes.get(activeNodeDetailId);
