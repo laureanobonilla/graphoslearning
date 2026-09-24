@@ -193,13 +193,20 @@ if (window.netlifyIdentity) {
 
 function initializeBalance() {
     if (isAdmin) { updateCounterDisplay(); return; }
+    
     if (currentUser) {
         let storedBalance = parseInt(localStorage.getItem(`gk_balance_${currentUser.id}`), 10);
-        if (isNaN(storedBalance)) { storedBalance = 50; localStorage.setItem(`gk_balance_${currentUser.id}`, storedBalance); }
+        if (isNaN(storedBalance)) { 
+            storedBalance = 15; // <-- Reducido a 15 para usuarios logueados
+            localStorage.setItem(`gk_balance_${currentUser.id}`, storedBalance); 
+        }
         availableNodes = storedBalance;
     } else {
         let guestBalance = parseInt(localStorage.getItem('gk_guest_balance'), 10);
-        if (isNaN(guestBalance)) { guestBalance = 15; localStorage.setItem('gk_guest_balance', guestBalance); }
+        if (isNaN(guestBalance)) { 
+            guestBalance = 15; 
+            localStorage.setItem('gk_guest_balance', guestBalance); 
+        }
         availableNodes = guestBalance;
     }
     updateCounterDisplay();
@@ -1206,3 +1213,47 @@ document.getElementById('btnNewProject')?.addEventListener('click', () => {
     projectsModal.classList.add('hidden');
     projectsModal.classList.remove('flex');
 });
+
+// ==========================================
+// 16. TIENDA Y PAYPAL (CIERRE Y COBRO)
+// ==========================================
+document.getElementById('closeStore')?.addEventListener('click', () => {
+    document.getElementById('storeModal').classList.add('hidden');
+    document.getElementById('storeModal').classList.remove('flex');
+});
+
+if (window.paypal) {
+    paypal.Buttons({
+        createOrder: function(data, actions) {
+            // Buscamos cuál paquete seleccionó el usuario y leemos su data-price
+            const selected = document.querySelector('input[name="nodePackage"]:checked');
+            return actions.order.create({
+                purchase_units: [{ amount: { value: selected.dataset.price } }]
+            });
+        },
+        onApprove: function(data, actions) {
+            return actions.order.capture().then(function(details) {
+                // Leemos cuántos nodos añadir según el 'value' del botón seleccionado
+                const selected = document.querySelector('input[name="nodePackage"]:checked');
+                const addedNodes = parseInt(selected.value, 10);
+                
+                // Sumar los nodos al saldo actual
+                availableNodes += addedNodes;
+                
+                // Guardar en la cuenta correspondiente
+                if (currentUser) {
+                    localStorage.setItem(`gk_balance_${currentUser.id}`, availableNodes);
+                } else {
+                    localStorage.setItem('gk_guest_balance', availableNodes);
+                }
+                
+                updateCounterDisplay();
+                alert(`¡Éxito, ${details.payer.name.given_name}! Se han añadido ${addedNodes} nodos a tu cuenta.`);
+                
+                // Cerrar modal
+                document.getElementById('storeModal').classList.add('hidden');
+                document.getElementById('storeModal').classList.remove('flex');
+            });
+        }
+    }).render('#paypal-button-container');
+}
