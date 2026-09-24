@@ -511,22 +511,30 @@ btnToggleReader?.addEventListener('click', () => {
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
 });
 
-// Resizer 100% Funcional sin conflicto de Tailwind
+// Resizer 100% Funcional (Matemática relativa para que no brinque)
 let isResizing = false;
+let startX = 0;
+let startWidth = 0;
+
 panelResizer?.addEventListener('mousedown', (e) => {
     isResizing = true;
+    startX = e.clientX;
+    startWidth = readerPanel.offsetWidth; // Guardamos el ancho inicial real
     document.body.style.userSelect = 'none'; // Prevenir selección al arrastrar
     e.preventDefault();
 });
+
 document.addEventListener('mousemove', (e) => {
     if (!isResizing) return;
-    const newWidth = e.clientX;
+    // Usar la diferencia (delta) evita brincos sin importar cuántos paneles haya abiertos
+    const newWidth = startWidth + (e.clientX - startX); 
     if (newWidth > 250 && newWidth < window.innerWidth * 0.75) {
-        readerPanel.classList.remove('w-1/2'); // Quitar restricción de Tailwind
+        readerPanel.classList.remove('w-1/2'); 
         readerPanel.style.flex = 'none';
         readerPanel.style.width = `${newWidth}px`;
     }
 });
+
 document.addEventListener('mouseup', () => { 
     if (isResizing) {
         isResizing = false; 
@@ -766,3 +774,77 @@ welcomeScreen?.addEventListener('click', (e) => { if (e.target === welcomeScreen
 topicInput?.addEventListener('focus', dismissWelcomeScreen);
 document.getElementById('btnWelcomeReader')?.addEventListener('click', () => { dismissWelcomeScreen(); readerPanel.classList.remove('hidden'); });
 nodes.on('*', () => { if (nodes.length > 0 && !hasDismissedWelcomeScreen) dismissWelcomeScreen(); });
+
+
+// ==========================================
+// HERRAMIENTAS: ELIMINAR, LIMPIAR, ESCALA Y CAPTURAR
+// ==========================================
+document.getElementById('btnMenuDelete')?.addEventListener('click', () => {
+    if (selectedNodeId) nodes.remove(selectedNodeId);
+    actionMenu.classList.add('hidden');
+    selectedNodeId = null;
+});
+
+document.getElementById('btnClear')?.addEventListener('click', () => {
+    if (nodes.length === 0) return;
+    if (confirm("¿Deseas vaciar todo el esquema actual?")) {
+        nodes.clear();
+        edges.clear();
+        currentDocumentText = ""; 
+        actionMenu.classList.add('hidden');
+        if (connectionBanner) connectionBanner.classList.add('hidden');
+        sourceNodeForConnection = null;
+        selectedNodeId = null;
+    }
+});
+
+document.getElementById('btnCapture')?.addEventListener('click', () => {
+    if (nodes.length === 0) {
+        alert("El lienzo está vacío.");
+        return;
+    }
+    actionMenu.classList.add('hidden');
+    showLoader('Preparando captura...');
+    network.fit({ animation: false });
+
+    setTimeout(() => {
+        try {
+            const canvas = container.querySelector('canvas');
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = canvas.width;
+            exportCanvas.height = canvas.height;
+            const ctx = exportCanvas.getContext('2d');
+
+            ctx.fillStyle = '#f8fafc'; // Fondo elegante
+            ctx.fillRect(0, 0, exportCanvas.width, exportCanvas.height);
+            ctx.drawImage(canvas, 0, 0);
+
+            const downloadLink = document.createElement('a');
+            downloadLink.download = `Graphikosmos-${new Date().toISOString().slice(0, 10)}.png`;
+            downloadLink.href = exportCanvas.toDataURL('image/png');
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        } catch {
+            alert("Error al exportar la imagen.");
+        } finally {
+            hideLoader();
+        }
+    }, 150);
+});
+
+// Aumentar o reducir tamaño del nodo
+function resizeNode(increment) {
+    if (!selectedNodeId) return;
+    const currentNode = nodes.get(selectedNodeId);
+    if (currentNode && currentNode.isExpandedDef) {
+        const minW = (currentNode.widthConstraint?.minimum || 280) + increment;
+        nodes.update({ 
+            id: selectedNodeId,
+            widthConstraint: { minimum: minW, maximum: minW + 70 }
+        });
+    }
+}
+
+document.getElementById('btnSizePlus')?.addEventListener('click', () => resizeNode(40));
+document.getElementById('btnSizeMinus')?.addEventListener('click', () => resizeNode(-40));
