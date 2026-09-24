@@ -118,11 +118,14 @@ let currentProjectId = localStorage.getItem('gk_current_project_id');
 let nodesTracked = parseInt(localStorage.getItem('gk_nodes_tracked') || '0', 10);
 
 async function saveCurrentProjectToBin() {
-    if (isAdmin) return;
-    const userIdentifier = currentUser ? currentUser.id : sessionId;
-    const userName = currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : "Invitado";
-    const projectData = { owner: userName, email: currentUser?.email || null, nodes: nodes.get(), edges: edges.get() };
-    let projectTitle = nodes.get().length > 0 ? (nodes.get()[0].baseTitle || "Mi Esquema") : "Mapa Conceptual";
+    if (!currentUser) return; // BLOQUEO ESTRICTO: Invitados no guardan
+
+    const userIdentifier = currentUser.id;
+    const userName = currentUser.user_metadata?.full_name || currentUser.email;
+    const projectData = { owner: userName, email: currentUser.email, nodes: nodes.get(), edges: edges.get() };
+    
+    // Asignar título basado en el primer nodo raíz
+    let projectTitle = nodes.get().length > 0 ? (nodes.get()[0].baseTitle || "Mi Esquema") : "Esquema sin título";
 
     try {
         const response = await fetch('/.netlify/functions/db', {
@@ -131,11 +134,22 @@ async function saveCurrentProjectToBin() {
             body: JSON.stringify({ projectId: currentProjectId || null, title: projectTitle, data: projectData, user: userIdentifier })
         });
         const resData = await response.json();
+        
         if (response.ok && resData.projectId) {
             currentProjectId = resData.projectId;
             localStorage.setItem('gk_current_project_id', currentProjectId);
+
+            // Actualizar catálogo local de proyectos para este usuario
+            let catalog = JSON.parse(localStorage.getItem(`gk_projects_${userIdentifier}`) || '[]');
+            const existingIndex = catalog.findIndex(p => p.id === currentProjectId);
+            const updatedEntry = { id: currentProjectId, title: projectTitle, date: new Date().toISOString() };
+            
+            if (existingIndex >= 0) catalog[existingIndex] = updatedEntry;
+            else catalog.push(updatedEntry);
+            
+            localStorage.setItem(`gk_projects_${userIdentifier}`, JSON.stringify(catalog));
         }
-    } catch (err) {}
+    } catch (err) { console.error("Error al sincronizar:", err); }
 }
 
 nodes.on('*', () => {
@@ -194,13 +208,18 @@ function initializeBalance() {
 function updateAuthUI() {
     const loginText = document.getElementById('loginText');
     const userStatusDot = document.getElementById('userStatusDot');
+    const btnProjects = document.getElementById('btnProjects'); // Botón Proyectos
+    
     if (!loginText || !userStatusDot) return;
+    
     if (currentUser) {
         loginText.innerText = currentUser.user_metadata?.full_name?.split(' ')[0] || "Mi Cuenta";
         userStatusDot.className = 'w-2 h-2 rounded-full bg-indigo-500';
+        if (btnProjects) { btnProjects.classList.remove('hidden'); btnProjects.classList.add('flex'); }
     } else {
         loginText.innerText = "Iniciar Sesión";
         userStatusDot.className = 'w-2 h-2 rounded-full bg-slate-300';
+        if (btnProjects) { btnProjects.classList.add('hidden'); btnProjects.classList.remove('flex'); }
     }
 }
 
@@ -933,3 +952,136 @@ function resizeNode(increment) {
 
 document.getElementById('btnSizePlus')?.addEventListener('click', () => resizeNode(40));
 document.getElementById('btnSizeMinus')?.addEventListener('click', () => resizeNode(-40));
+
+// ==========================================
+// ACTIVADORES DE SINERGIA Y VINCULACIÓN MANUAL
+// ==========================================
+
+// 1. Iniciar Sinergia (Fusión)
+document.getElementById('btnMenuSynergy')?.addEventListener('click', () => {
+    sourceNodeForSynergy = selectedNodeId;
+    actionMenu.style.visibility = 'hidden'; 
+    actionMenu.classList.add('hidden');
+    
+    const banner = document.getElementById('synergyBanner');
+    if (banner) banner.classList.remove('hidden');
+});
+
+// Cancelar Sinergia tocando el banner
+document.getElementById('synergyBanner')?.addEventListener('click', (e) => {
+    sourceNodeForSynergy = null;
+    e.currentTarget.classList.add('hidden');
+});
+
+// 2. Iniciar Vinculación simple
+document.getElementById('btnMenuConnect')?.addEventListener('click', () => {
+    sourceNodeForConnection = selectedNodeId;
+    actionMenu.style.visibility = 'hidden'; 
+    actionMenu.classList.add('hidden');
+    
+    const banner = document.getElementById('connectionBanner');
+    if (banner) banner.classList.remove('hidden');
+});
+
+// Cancelar Vinculación tocando el banner
+document.getElementById('connectionBanner')?.addEventListener('click', (e) => {
+    sourceNodeForConnection = null;
+    e.currentTarget.classList.add('hidden');
+});
+
+// ==========================================
+// GESTOR DE PROYECTOS (CARGAR Y CREAR)
+// ==========================================
+const projectsModal = document.getElementById('projectsModal');
+
+document.getElementById('btnProjects')?.addEventListener('click', () => {
+    if (!currentUser) return;
+    renderProjectsList();
+    projectsModal.classList.remove('hidden');
+    projectsModal.classList.add('flex');
+});
+
+document.getElementById('closeProjectsModal')?.addEventListener('click', () => {
+    projectsModal.classList.add('hidden');
+    projectsModal.classList.remove('flex');
+});
+
+function renderProjectsList() {
+    const listContainer = document.getElementById('projectsList');
+    const noProjectsMsg = document.getElementById('noProjectsMsg');
+    const catalog = JSON.parse(localStorage.getItem(`gk_projects_${currentUser.id}`) || '[]');
+
+    listContainer.innerHTML = '';
+    if (catalog.length === 0) {
+        noProjectsMsg.classList.remove('hidden');
+    } else {
+        noProjectsMsg.classList.add('hidden');
+        // Ordenar del más reciente al más antiguo
+        catalog.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(proj => {
+            const item = document.createElement('div');
+            item.className = "flex justify-between items-center bg-white border border-slate-200 p-3 rounded-xl hover:border-indigo-300 transition-colors shadow-sm";
+            item.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">📄</div>
+                    <div>
+                        <h4 class="text-sm font-bold text-slate-800">${proj.title}</h4>
+                        <p class="text-[10px] text-slate-400">Última mod: ${new Date(proj.date).toLocaleDateString()}</p>
+                    </div>
+                </div>
+                <button class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors btn-load-proj" data-id="${proj.id}">
+                    Abrir
+                </button>
+            `;
+            listContainer.appendChild(item);
+        });
+
+        document.querySelectorAll('.btn-load-proj').forEach(btn => {
+            btn.addEventListener('click', (e) => loadProjectFromCloud(e.target.dataset.id));
+        });
+    }
+}
+
+async function loadProjectFromCloud(projectId) {
+    if (nodes.length > 0) {
+        if (!confirm("Se reemplazará el esquema actual. Asegúrate de haber guardado cambios. ¿Deseas continuar?")) return;
+    }
+
+    showLoader('Descargando proyecto desde la nube...');
+    try {
+        // Tu función Netlify /db debe soportar peticiones GET recibiendo el projectId
+        const response = await fetch(`/.netlify/functions/db?projectId=${projectId}`);
+        if (!response.ok) throw new Error("No se pudo obtener el proyecto");
+        
+        const resData = await response.json();
+        
+        nodes.clear();
+        edges.clear();
+        if (resData.data?.nodes) nodes.add(resData.data.nodes);
+        if (resData.data?.edges) edges.add(resData.data.edges);
+
+        currentProjectId = projectId;
+        localStorage.setItem('gk_current_project_id', currentProjectId);
+        
+        projectsModal.classList.add('hidden');
+        projectsModal.classList.remove('flex');
+        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+    } catch (err) {
+        alert('Error al cargar el proyecto. Revisa la consola o asegúrate de que el servidor responde a GET.');
+        console.error(err);
+    } finally {
+        hideLoader();
+    }
+}
+
+document.getElementById('btnNewProject')?.addEventListener('click', () => {
+    if (nodes.length > 0) {
+        if (!confirm("¿Deseas iniciar un esquema completamente en blanco?")) return;
+    }
+    nodes.clear();
+    edges.clear();
+    currentProjectId = null;
+    localStorage.removeItem('gk_current_project_id');
+    
+    projectsModal.classList.add('hidden');
+    projectsModal.classList.remove('flex');
+});
