@@ -335,7 +335,7 @@ function insertSingleNode(topic) {
 function handleTopicInput() {
     const topic = topicInput.value.trim();
     if (!topic) return;
-    if (nodes.length === 0) generateFullSchemaFromTopic(topic); else insertSingleNode(topic);
+    insertSingleNode(topic); 
 }
 
 document.getElementById('btnGenerate')?.addEventListener('click', handleTopicInput);
@@ -467,6 +467,28 @@ network.on('click', async function (params) {
         actionMenu.style.left = leftPos + 'px';
         actionMenu.style.top = topPos + 'px';
         actionMenu.style.visibility = 'visible';
+        actionMenu.style.left = leftPos + 'px';
+        actionMenu.style.top = topPos + 'px';
+        actionMenu.style.visibility = 'visible';
+        
+        // --- NUEVA LÓGICA DE VISIBILIDAD DE BOTONES ---
+        const isExpanded = clickedNode.isExpandedDef === true;
+        
+        const btnExpand = document.getElementById('btnMenuExpandDef');
+        const btnCollapse = document.getElementById('btnMenuCollapseDef');
+        const btnOpenPanel = document.getElementById('btnMenuOpenPanel');
+        
+        if (isExpanded) {
+            // Si está expandido: Ocultar "Expandir", mostrar "Usar en Panel" y "Contraer"
+            btnExpand.classList.add('hidden'); btnExpand.classList.remove('flex');
+            btnCollapse.classList.remove('hidden'); btnCollapse.classList.add('flex');
+            btnOpenPanel.classList.remove('hidden'); btnOpenPanel.classList.add('flex');
+        } else {
+            // Si está contraído: Mostrar "Expandir", ocultar "Usar en Panel" y "Contraer"
+            btnExpand.classList.remove('hidden'); btnExpand.classList.add('flex');
+            btnCollapse.classList.add('hidden'); btnCollapse.classList.remove('flex');
+            btnOpenPanel.classList.add('hidden'); btnOpenPanel.classList.remove('flex');
+        }        
     } else {
         actionMenu.classList.add('hidden');
         selectedNodeId = null;
@@ -508,6 +530,13 @@ docContextInput?.addEventListener('input', (e) => { globalDocumentContext = e.ta
 
 btnToggleReader?.addEventListener('click', () => {
     readerPanel.classList.toggle('hidden');
+    
+    // Cambiar texto según el estado del panel
+    const isHidden = readerPanel.classList.contains('hidden');
+    btnToggleReader.innerHTML = isHidden 
+        ? '<span>📖</span> Mostrar Modo Lector' 
+        : '<span>📖</span> Ocultar Modo Lector';
+        
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
 });
 
@@ -526,10 +555,9 @@ panelResizer?.addEventListener('mousedown', (e) => {
 
 document.addEventListener('mousemove', (e) => {
     if (!isResizing) return;
-    // Usar la diferencia (delta) evita brincos sin importar cuántos paneles haya abiertos
     const newWidth = startWidth + (e.clientX - startX); 
     if (newWidth > 250 && newWidth < window.innerWidth * 0.75) {
-        readerPanel.classList.remove('w-1/2'); 
+        readerPanel.classList.remove('w-1/3'); // <-- Actualizado para quitar w-1/3
         readerPanel.style.flex = 'none';
         readerPanel.style.width = `${newWidth}px`;
     }
@@ -658,7 +686,8 @@ document.getElementById('btnMenuExpandDef')?.addEventListener('click', async () 
         id: selectedNodeId, baseTitle: title, definition: definitionText, 
         label: `*${title}*\n────────────────────\n${definitionText}`,
         isExpandedDef: true, shape: 'box',
-        widthConstraint: { minimum: 280, maximum: 350 } 
+        widthConstraint: { minimum: 480, maximum: 550 }, // <-- Ahora nace muy ancho y no tan alto
+        heightConstraint: false // Permite que la altura se acomode sola al texto
     });
 });
 
@@ -763,18 +792,52 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
     } catch (err) { alert('No se pudo procesar.'); } finally { hideLoader(); }
 });
 
+// ==========================================
+// 15. PANTALLA DE BIENVENIDA Y SORPRÉNDEME
+// ==========================================
 const welcomeScreen = document.getElementById('welcomeScreen');
 let hasDismissedWelcomeScreen = false;
+
 function dismissWelcomeScreen() {
     if (hasDismissedWelcomeScreen) return;
     welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
     setTimeout(() => { welcomeScreen.classList.add('hidden'); hasDismissedWelcomeScreen = true; }, 500);
 }
+
 welcomeScreen?.addEventListener('click', (e) => { if (e.target === welcomeScreen) dismissWelcomeScreen(); });
 topicInput?.addEventListener('focus', dismissWelcomeScreen);
-document.getElementById('btnWelcomeReader')?.addEventListener('click', () => { dismissWelcomeScreen(); readerPanel.classList.remove('hidden'); });
+document.getElementById('btnWelcomeReader')?.addEventListener('click', () => { 
+    dismissWelcomeScreen(); 
+    readerPanel.classList.remove('hidden'); 
+});
 nodes.on('*', () => { if (nodes.length > 0 && !hasDismissedWelcomeScreen) dismissWelcomeScreen(); });
 
+// Temas precargados para la sorpresa
+const hookTopics = [
+    "La Paradoja de Fermi", "El Mito de la Caverna", "Computación Cuántica",
+    "Filosofía Estoica", "Neuroplasticidad", "Inteligencia Artificial General",
+    "Economía Conductual", "La Teoría de Cuerdas", "Imperio Romano"
+];
+
+// Generar los 3 botones de sugerencias al azar
+const chipsContainer = document.getElementById('suggestionChips');
+if (chipsContainer) {
+    const shuffled = [...hookTopics].sort(() => 0.5 - Math.random());
+    shuffled.slice(0, 3).forEach(topic => {
+        const chip = document.createElement('button');
+        chip.className = "bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:border-slate-400 hover:text-slate-900 transition-colors shadow-sm";
+        chip.innerText = topic;
+        chip.onclick = () => generateFullSchemaFromTopic(topic);
+        chipsContainer.appendChild(chip);
+    });
+}
+
+// Botón de Sorpréndeme
+document.getElementById('btnSurprise')?.addEventListener('click', () => {
+    const randomTopic = hookTopics[Math.floor(Math.random() * hookTopics.length)];
+    // Enviaremos el tema al azar directamente al generador principal
+    generateFullSchemaFromTopic(randomTopic);
+});
 
 // ==========================================
 // HERRAMIENTAS: ELIMINAR, LIMPIAR, ESCALA Y CAPTURAR
