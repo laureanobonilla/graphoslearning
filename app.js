@@ -1865,3 +1865,122 @@ nodeBtnExtractChild?.addEventListener('click', () => {
         consumeNodes(1);
     }
 });
+
+// ==========================================
+// 1. VER DEFINICIÓN EN EL PANEL IZQUIERDO
+// ==========================================
+document.getElementById('btnMenuOpenPanel')?.addEventListener('click', async () => {
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+
+    const currentNode = nodes.get(selectedNodeId);
+    const title = currentNode.baseTitle || selectedNodeId;
+
+    let definitionText = currentNode.definition;
+
+    // Si no la tiene guardada, la consultamos a la IA por primera vez
+    if (!definitionText) {
+        const contextPath = getContextPath(selectedNodeId);
+        showLoader('Redactando definición...');
+        try {
+            const response = await fetch('/.netlify/functions/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'define', 
+                    topic: title, 
+                    contextPath,
+                    documentContext: (globalDocumentContext || currentDocumentText || "").slice(0, 6000) 
+                })
+            });
+            const data = await response.json();
+            definitionText = data.definition;
+            
+            // Guardamos la definición en el nodo sin alterarlo visualmente en el grafo todavía
+            nodes.update({ id: selectedNodeId, definition: definitionText, baseTitle: title });
+        } catch (err) {
+            console.error(err);
+            alert("Error al obtener la definición.");
+            return;
+        } finally {
+            hideLoader();
+        }
+    }
+
+    // Abrimos exclusivamente el panel lateral izquierdo
+    detailNodeTitle.innerText = title;
+    nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${definitionText.replace(/\n/g, '<br>')}</p>`;
+    nodeDetailPanel.classList.remove('hidden');
+    activeNodeDetailId = selectedNodeId;
+});
+
+// ==========================================
+// 2. EXPANDIR DEFINICIÓN DENTRO DEL NODO (CUADRADA POR DEFECTO)
+// ==========================================
+document.getElementById('btnMenuExpandDef')?.addEventListener('click', async () => {
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+
+    const currentNode = nodes.get(selectedNodeId);
+    const title = currentNode.baseTitle || selectedNodeId;
+
+    let definitionText = currentNode.definition;
+
+    if (!definitionText) {
+        const contextPath = getContextPath(selectedNodeId);
+        showLoader('Redactando definición...');
+        try {
+            const response = await fetch('/.netlify/functions/gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'define', 
+                    topic: title, 
+                    contextPath,
+                    documentContext: (globalDocumentContext || currentDocumentText || "").slice(0, 6000) 
+                })
+            });
+            const data = await response.json();
+            definitionText = data.definition;
+        } catch (err) {
+            console.error(err);
+            alert("Error al obtener la definición.");
+            return;
+        } finally {
+            hideLoader();
+        }
+    }
+
+    // Forzamos un formato cuadrado simétrico mediante límites estrictos de canvas
+    const expandedLabel = `*${title}*\n────────────────────\n${definitionText}`;
+    nodes.update({ 
+        id: selectedNodeId, 
+        baseTitle: title,
+        definition: definitionText, 
+        label: expandedLabel,
+        isExpandedDef: true,
+        shape: 'box',
+        widthConstraint: { minimum: 240, maximum: 260 },  // Ancho fijo controlado
+        heightConstraint: { minimum: 200, maximum: 260 }  // Altura controlada para evitar estiramiento vertical excesivo
+    });
+});
+
+// ==========================================
+// 3. CONTRAER DEFINICIÓN EN EL NODO (DEJAR COMO ESTABA)
+// ==========================================
+document.getElementById('btnMenuCollapseDef')?.addEventListener('click', () => {
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+
+    const currentNode = nodes.get(selectedNodeId);
+    const title = currentNode.baseTitle || selectedNodeId;
+
+    // Regresa el nodo a su tamaño compacto original de título sin perder la definición en memoria
+    nodes.update({
+        id: selectedNodeId,
+        label: `*${title}*`,
+        isExpandedDef: false,
+        widthConstraint: { minimum: 150, maximum: 250 },
+        heightConstraint: { minimum: 50, maximum: 90 }
+    });
+});
