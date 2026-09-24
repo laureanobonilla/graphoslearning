@@ -1609,7 +1609,7 @@ network.on('dragStart', (params) => {
     }
 });
 // ==========================================
-// MODO LECTOR ACTIVO - TEXTO LIBRE Y CONTEXTO
+// MODO LECTOR ACTIVO - TEXTO LIBRE, CONTEXTO Y IA
 // ==========================================
 const btnToggleReader = document.getElementById('btnToggleReader');
 const readerPanel = document.getElementById('readerPanel');
@@ -1619,9 +1619,20 @@ const panelResizer = document.getElementById('panelResizer');
 const tooltipPreview = document.getElementById('tooltipSelectedTextPreview');
 const docContextInput = document.getElementById('docContextInput');
 
+const nodeDetailPanel = document.getElementById('nodeDetailPanel');
+const detailNodeTitle = document.getElementById('detailNodeTitle');
+const nodeDetailContent = document.getElementById('nodeDetailContent');
+const closeDetailPanel = document.getElementById('closeDetailPanel');
+const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
+const nodeTooltipPreview = document.getElementById('nodeTooltipPreview');
+const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
+
 let globalDocumentContext = "";
 let activeSelectedText = "";
 let activeSelectionRange = null;
+let activeNodeDetailId = null;
+let activeNodeSelectionRange = null;
+let activeNodeSelectedText = "";
 
 // Capturar el contexto global en tiempo real
 docContextInput?.addEventListener('input', (e) => {
@@ -1632,12 +1643,6 @@ docContextInput?.addEventListener('input', (e) => {
 btnToggleReader?.addEventListener('click', () => {
     readerPanel.classList.toggle('hidden');
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
-});
-
-// Acceso rápido desde la pantalla de bienvenida
-document.getElementById('btnWelcomeReader')?.addEventListener('click', () => {
-    dismissWelcomeScreen();
-    document.getElementById('btnToggleReader')?.click();
 });
 
 // Redimensionar panel izquierdo arrastrando el borde
@@ -1654,6 +1659,52 @@ window.addEventListener('mousemove', (e) => {
     }
 });
 window.addEventListener('mouseup', () => { isResizing = false; });
+
+// Redactar texto largo automáticamente con la IA para desmenuzarlo
+document.getElementById('btnAiGenerateText')?.addEventListener('click', async () => {
+    const topicIdea = prompt("¿Sobre qué tema deseas que la IA redacte un texto explicativo amplio para estudiar?");
+    if (!topicIdea) return;
+
+    showLoader('Redactando texto de estudio...');
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'define', 
+                topic: `Redacta un texto académico y profundo de varios párrafos sobre: ${topicIdea}`, 
+                contextPath: topicIdea,
+                documentContext: "" 
+            })
+        });
+        const data = await response.json();
+        if (data.definition) {
+            readerTextMode.innerText = data.definition;
+            currentDocumentText = data.definition;
+            if (!docContextInput.value) {
+                docContextInput.value = topicIdea;
+                globalDocumentContext = topicIdea;
+            }
+        }
+    } catch (err) {
+        console.error("Error al generar texto:", err);
+        alert("No se pudo generar el texto.");
+    } finally {
+        hideLoader();
+    }
+});
+
+// Detección de texto ingresado para calcular contexto automático de respaldo
+readerTextMode?.addEventListener('input', () => {
+    const content = readerTextMode.innerText.trim();
+    currentDocumentText = content;
+
+    if (!docContextInput.value && content.length > 20) {
+        const autoContext = content.split(/\s+/).slice(0, 6).join(' ') + '...';
+        docContextInput.value = autoContext;
+        globalDocumentContext = autoContext;
+    }
+});
 
 // Detectar selección de texto en el panel libre
 readerTextMode?.addEventListener('mouseup', (e) => {
@@ -1674,14 +1725,12 @@ readerTextMode?.addEventListener('mouseup', (e) => {
     }
 });
 
-// Ocultar tooltip al hacer clic fuera
 document.addEventListener('mousedown', (e) => {
     if (!selectionTooltip.contains(e.target) && !readerPanel.contains(e.target)) {
         selectionTooltip.classList.add('hidden');
     }
 });
 
-// Vincular texto seleccionado a nodo del grafo (Interacción bidireccional)
 function highlightAndBindSelectedText(spanElement, nodeId) {
     spanElement.style.cursor = 'pointer';
     spanElement.title = "Haz clic para enfocar este nodo en el grafo";
@@ -1768,42 +1817,110 @@ document.getElementById('tipBtnExamples')?.addEventListener('click', () => creat
 document.getElementById('tipBtnDefine')?.addEventListener('click', () => createNodeFromReader('define'));
 
 // ==========================================
-// PANEL LATERAL DE DEFINICIÓN Y EXTRACCIÓN DE NODOS
+// GESTIÓN DE DEFINICIONES, CONTRACCIÓN Y PANEL LATERAL
 // ==========================================
-const nodeDetailPanel = document.getElementById('nodeDetailPanel');
-const detailNodeTitle = document.getElementById('detailNodeTitle');
-const nodeDetailContent = document.getElementById('nodeDetailContent');
-const closeDetailPanel = document.getElementById('closeDetailPanel');
-const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
-const nodeTooltipPreview = document.getElementById('nodeTooltipPreview');
-const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
+document.getElementById('btnMenuDefine')?.addEventListener('click', async () => {
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
 
-let activeNodeDetailId = null;
-let activeNodeSelectionRange = null;
-let activeNodeSelectedText = "";
+    const currentNode = nodes.get(selectedNodeId);
+    const title = currentNode.baseTitle || selectedNodeId;
 
-// Cerrar panel de detalle
+    if (currentNode && currentNode.definition) {
+        if (currentNode.isExpandedDef) {
+            nodes.update({
+                id: selectedNodeId,
+                label: `*${title}*`,
+                isExpandedDef: false,
+                widthConstraint: { minimum: 150, maximum: 250 },
+                heightConstraint: { minimum: 50, maximum: 90 }
+            });
+            if (activeNodeDetailId === selectedNodeId) {
+                nodeDetailPanel.classList.add('hidden');
+                activeNodeDetailId = null;
+            }
+        } else {
+            const expandedLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
+            nodes.update({
+                id: selectedNodeId,
+                label: expandedLabel,
+                isExpandedDef: true,
+                widthConstraint: { minimum: 220, maximum: 280 },
+                heightConstraint: { minimum: 150, maximum: 220 }
+            });
+            
+            detailNodeTitle.innerText = title;
+            nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${currentNode.definition.replace(/\n/g, '<br>')}</p>`;
+            nodeDetailPanel.classList.remove('hidden');
+            activeNodeDetailId = selectedNodeId;
+        }
+        return;
+    }
+
+    const contextPath = getContextPath(selectedNodeId);
+    showLoader('Redactando definición...');
+
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'define', 
+                topic: title, 
+                contextPath,
+                documentContext: (globalDocumentContext || currentDocumentText || "").slice(0, 6000) 
+            })
+        });
+        
+        const responseText = await response.text();
+        if (!response.ok) throw new Error(responseText);
+        
+        const data = JSON.parse(responseText);
+        const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
+
+        nodes.update({ 
+            id: selectedNodeId, 
+            baseTitle: title,
+            definition: data.definition, 
+            label: newLabel,
+            isExpandedDef: true,
+            shape: 'box',
+            fixed: { x: false, y: false },
+            widthConstraint: { minimum: 220, maximum: 280 },
+            heightConstraint: { minimum: 150, maximum: 220 }
+        });
+
+        detailNodeTitle.innerText = title;
+        nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${data.definition.replace(/\n/g, '<br>')}</p>`;
+        nodeDetailPanel.classList.remove('hidden');
+        activeNodeDetailId = selectedNodeId;
+
+    } catch (err) {
+        console.error("Error al obtener la definición:", err);
+        alert("Error al obtener la definición. Revisa la consola.");
+    } finally {
+        hideLoader();
+    }
+});
+
 closeDetailPanel?.addEventListener('click', () => {
+    if (activeNodeDetailId) {
+        const currentNode = nodes.get(activeNodeDetailId);
+        if (currentNode) {
+            const title = currentNode.baseTitle || activeNodeDetailId;
+            nodes.update({
+                id: activeNodeDetailId,
+                label: `*${title}*`,
+                isExpandedDef: false,
+                widthConstraint: { minimum: 150, maximum: 250 },
+                heightConstraint: { minimum: 50, maximum: 90 }
+            });
+        }
+    }
     nodeDetailPanel.classList.add('hidden');
     activeNodeDetailId = null;
 });
 
-// Modificamos el evento de clic en los nodos para que además abra este panel si tiene definición
-// (O puedes abrirlo siempre que el nodo tenga definición o al hacer doble clic / opción del menú)
-document.getElementById('btnMenuDefine')?.addEventListener('click', () => {
-    // Cuando cargues la definición, además de actualizar el canvas, abrimos el panel lateral para lectura profunda
-    if (selectedNodeId) {
-        const node = nodes.get(selectedNodeId);
-        if (node && node.definition) {
-            detailNodeTitle.innerText = node.baseTitle || selectedNodeId;
-            nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${node.baseTitle}</p><p>${node.definition.replace(/\n/g, '<br>')}</p>`;
-            nodeDetailPanel.classList.remove('hidden');
-            activeNodeDetailId = selectedNodeId;
-        }
-    }
-});
-
-// Detectar selección de texto dentro del panel de definición del nodo
 nodeDetailContent?.addEventListener('mouseup', (e) => {
     const selection = window.getSelection();
     const text = selection.toString().trim();
@@ -1822,7 +1939,6 @@ nodeDetailContent?.addEventListener('mouseup', (e) => {
     }
 });
 
-// Crear nodo hijo a partir del texto seleccionado en la definición
 nodeBtnExtractChild?.addEventListener('click', () => {
     if (!activeNodeSelectedText || !activeNodeDetailId) return;
     nodeSelectionTooltip.classList.add('hidden');
@@ -1848,7 +1964,6 @@ nodeBtnExtractChild?.addEventListener('click', () => {
             heightConstraint: { minimum: 80, maximum: 160 }
         });
 
-        // Creamos la flecha directa desde el nodo padre (origen de la definición) hacia este nuevo sub-concepto
         edges.add({
             from: activeNodeDetailId,
             to: newId,

@@ -196,34 +196,34 @@
             <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear Nodo Hijo</button>
         </div>
     </div>
-<!-- Panel Izquierdo de Lectura Activa (Texto Libre y Contexto) -->
-    <div id="readerPanel" class="w-1/2 h-full bg-slate-900 border-r border-slate-800 flex flex-col z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">        
-        <!-- Cabecera del Panel y Contexto -->
+<!-- Panel Izquierdo de Lectura Activa (Único centro de texto y contexto) -->
+    <div id="readerPanel" class="w-1/2 h-full bg-slate-900 border-r border-slate-800 flex flex-col z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">
+        
+        <!-- Cabecera del Panel, Contexto y Herramienta de IA para Texto -->
         <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-2.5 select-none">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <h3 class="text-xs font-bold font-heading text-slate-200 uppercase tracking-wider">Lector Activo de Texto</h3>
+                    <h3 class="text-xs font-bold font-heading text-slate-200 uppercase tracking-wider">Lector y Sintetizador Activo</h3>
                 </div>
-                <span class="text-[11px] text-slate-400">Subraya cualquier texto para crear nodos</span>
+                <!-- Botón para pedirle a la IA un texto largo a partir de una idea -->
+                <button id="btnAiGenerateText" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors flex items-center gap-1 shadow-sm">
+                    <span>✨ Redactar texto con IA</span>
+                </button>
             </div>
 
-            <!-- Input de Contexto del Documento (Regla de oro para la IA) -->
+            <!-- Input de Contexto del Documento (Con cálculo automático si se deja vacío) -->
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap">Contexto:</span>
-                <input type="text" id="docContextInput" placeholder="Ej: Tesis sobre la economía colonial del siglo XIX..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
+                <input type="text" id="docContextInput" placeholder="Se detectará automáticamente o escríbelo aquí..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
             </div>
         </div>
 
-        <!-- Área de Lectura / Pegado de Texto Masivo (Soporta miles de caracteres) -->
+        <!-- Área de Lectura con Placeholder Real CSS -->
         <div id="readerContentContainer" class="flex-1 overflow-auto p-6 bg-slate-900 relative select-text">
-            <div id="readerTextMode" class="w-full h-full text-slate-200 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text" contenteditable="true" placeholder="Pega aquí tu texto largo o fragmentos de lectura...">
-Pega aquí el texto que deseas estudiar y analizar. 
-
-Puedes pegar fragmentos extensos, artículos completos o notas de investigación. Todo lo que subrayes o selecciones con el cursor activará un menú flotante inmediato para convertirlo en un nodo interactivo, enviar definiciones, ejemplos o conectarlo al grafo de la derecha bajo el contexto que definiste arriba.
-            </div>
+            <div id="readerTextMode" class="w-full h-full text-slate-200 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-500 empty:before:pointer-events-none" contenteditable="true" data-placeholder="Pega aquí tu texto largo o fragmentos de lectura para estudiar..."></div>
         </div>
 
-        <!-- Barra de Redimensionamiento (Resizer) -->
+        <!-- Barra de Redimensionamiento -->
         <div id="panelResizer" class="absolute top-0 right-0 w-1.5 h-full bg-transparent hover:bg-indigo-500 cursor-col-resize transition-colors"></div>
     </div>
 
