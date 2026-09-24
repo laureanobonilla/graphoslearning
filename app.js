@@ -27,11 +27,11 @@ let network = new vis.Network(container, { nodes, edges }, {
         },
         borderWidth: 2,
         color: {
-            border: '#f59e0b', // Naranja/Amarillo cálido
-            background: '#fef08a', // Fondo estilo Post-it amarillo
-            highlight: { border: '#ea580c', background: '#fde047' },
-            hover: { border: '#fb923c', background: '#fef9c3' }
-        },
+            border: '#cbd5e1', // Borde gris suave y elegante
+            background: '#fdfbf7', // Fondo crema marfil muy suave (adiós al amarillo chillón)
+            highlight: { border: '#94a3b8', background: '#fffbeb' },
+            hover: { border: '#94a3b8', background: '#f8fafc' }
+        }
         shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.15)', size: 10, x: 4, y: 4 },
         shapeProperties: { 
             borderRadius: 25, // Bordes muy redondeados (casi pastilla)
@@ -1669,7 +1669,10 @@ function highlightSelectedTextAndLink(nodeId) {
     }
 }
 
-function createNodeFromReader(actionType) {
+// ==========================================
+// ACCIÓN ÚNICA AL SUBRAYAR EN EL LECTOR
+// ==========================================
+function createNodeFromReader() {
     if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
 
@@ -1690,12 +1693,12 @@ function createNodeFromReader(actionType) {
     if (!nodes.get(nodeId)) {
         nodes.add({
             id: nodeId,
-            label: `*📄 Lector:*\n${topic}`,
+            label: `*${topic}*`,
             baseTitle: topic,
             x: spawnX,
             y: spawnY,
             fixed: { x: false, y: false },
-            color: { background: '#fef3c7', border: '#f59e0b' }
+            color: { background: '#fdfbf7', border: '#cbd5e1' } // Estilo elegante y suave
         });
         trackNodeUsage(topic);
         consumeNodes(1);
@@ -1703,16 +1706,10 @@ function createNodeFromReader(actionType) {
 
     activeSelectionRange = rangeToHighlight;
     highlightSelectedTextAndLink(nodeId);
-
     selectedNodeId = nodeId;
-    if (actionType === 'expand') {
-        document.getElementById('btnMenuExpand').click();
-    } else if (actionType === 'examples') {
-        document.getElementById('btnMenuExamples').click();
-    } else if (actionType === 'define') {
-        document.getElementById('btnMenuDefine').click();
-    }
 }
+
+document.getElementById('tipBtnCreateNode')?.addEventListener('click', createNodeFromReader);
 
 document.getElementById('tipBtnExpand')?.addEventListener('click', () => createNodeFromReader('expand'));
 document.getElementById('tipBtnExamples')?.addEventListener('click', () => createNodeFromReader('examples'));
@@ -1746,8 +1743,8 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
                 id: selectedNodeId,
                 label: expandedLabel,
                 isExpandedDef: true,
-                widthConstraint: { minimum: 220, maximum: 280 },
-                heightConstraint: { minimum: 150, maximum: 220 }
+                widthConstraint: { minimum: 250, maximum: 270 },
+                heightConstraint: { minimum: 220, maximum: 270 }
             });
         }
         return;
