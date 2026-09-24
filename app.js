@@ -721,6 +721,30 @@ document.getElementById('topicInput')?.addEventListener('keypress', (e) => {
 // 14. PANTALLA DE BIENVENIDA Y SORPRÉNDEME
 // ==========================================
 const welcomeScreen = document.getElementById('welcomeScreen');
+let hasDismissedWelcomeScreen = false;
+
+function dismissWelcomeScreen() {
+    if (hasDismissedWelcomeScreen) return;
+    welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
+    setTimeout(() => {
+        welcomeScreen.classList.add('hidden');
+        hasDismissedWelcomeScreen = true;
+    }, 500);
+}
+
+// Cerrar al hacer clic en cualquier parte fuera de la caja central del modal
+welcomeScreen?.addEventListener('click', (e) => {
+    if (e.target === welcomeScreen) {
+        dismissWelcomeScreen();
+    }
+});
+
+topicInput?.addEventListener('focus', dismissWelcomeScreen);
+nodes.on('*', () => {
+    if (nodes.length > 0 && !hasDismissedWelcomeScreen) {
+        dismissWelcomeScreen();
+    }
+});
 
 const hookTopics = [
     "La Paradoja de Fermi", "El Mito de la Caverna", "Computación Cuántica",
@@ -731,18 +755,6 @@ const hookTopics = [
 // Variable para controlar que la ventana de bienvenida solo salga al inicio
 let hasDismissedWelcomeScreen = false;
 
-function dismissWelcomeScreen() {
-    if (hasDismissedWelcomeScreen) return; // Si ya se fue, no vuelve a ejecutar
-    
-    welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => {
-        welcomeScreen.classList.add('hidden');
-        hasDismissedWelcomeScreen = true; // Marcamos como cerrada por el resto de la sesión
-    }, 500);
-}
-
-// Escuchamos si el usuario escribe o interactúa para quitarla preventivamente
-topicInput.addEventListener('focus', dismissWelcomeScreen);
 
 // Escuchamos cambios en el grafo para quitarla en cuanto se genera el primer nodo
 nodes.on('*', () => {
@@ -942,34 +954,52 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
 // 9. DEFINICIÓN, CONECTAR, ELIMINAR Y TAMAÑO
 // ==========================================
 // ==========================================
-// 9. DEFINICIÓN, CONECTAR, ELIMINAR Y TAMAÑO
+// GESTIÓN DE DEFINICIONES Y CONTRACCIÓN DE NODOS
 // ==========================================
-document.getElementById('btnMenuDefine').addEventListener('click', async () => {
+document.getElementById('btnMenuDefine')?.addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
 
     const currentNode = nodes.get(selectedNodeId);
     const title = currentNode.baseTitle || selectedNodeId;
 
-    // Si ya tiene definición precargada del documento, mostrarla de inmediato
+    // 1. SI YA TIENE DEFINICIÓN: Alternar entre contraer (solo título) o expandir (mostrar en grafo) y abrir panel lateral
     if (currentNode && currentNode.definition) {
-        if (!currentNode.label.includes('──────────')) {
-            const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
-
-                    nodes.update({ 
-                        id: selectedNodeId, 
-                        baseTitle: title,
-                        definition: data.definition, 
-                        label: newLabel,
-                        shape: 'box',
-                        fixed: { x: false, y: false },
-                        widthConstraint: { maximum: 300 }, // Ancho controlado para que no sea un hilo vertical
-                        heightConstraint: { maximum: 250, valign: 'top' } // Altura limitada inicial estilo tarjeta cuadrada
-                    });
+        if (currentNode.isExpandedDef) {
+            // Contraer el nodo en el grafo (mostrar solo título base)
+            nodes.update({
+                id: selectedNodeId,
+                label: `*${title}*`,
+                isExpandedDef: false,
+                widthConstraint: { minimum: 150, maximum: 250 },
+                heightConstraint: { minimum: 50, maximum: 90 }
+            });
+            // Si el panel lateral estaba mostrando este nodo, lo cerramos
+            if (activeNodeDetailId === selectedNodeId) {
+                nodeDetailPanel.classList.add('hidden');
+                activeNodeDetailId = null;
+            }
+        } else {
+            // Expandir el nodo en el grafo con su definición
+            const expandedLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
+            nodes.update({
+                id: selectedNodeId,
+                label: expandedLabel,
+                isExpandedDef: true,
+                widthConstraint: { minimum: 220, maximum: 280 },
+                heightConstraint: { minimum: 150, maximum: 220 }
+            });
+            
+            // Abrir panel lateral izquierdo de lectura profunda
+            detailNodeTitle.innerText = title;
+            nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${currentNode.definition.replace(/\n/g, '<br>')}</p>`;
+            nodeDetailPanel.classList.remove('hidden');
+            activeNodeDetailId = selectedNodeId;
         }
         return;
     }
 
+    // 2. SI NO TIENE DEFINICIÓN: Consultarla a la IA por primera vez
     const contextPath = getContextPath(selectedNodeId);
     showLoader('Redactando definición...');
 
@@ -979,7 +1009,7 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 action: 'define', 
-                topic: title, // Corregido: usamos 'title' en lugar de 'topicName'
+                topic: title, 
                 contextPath,
                 documentContext: (globalDocumentContext || currentDocumentText || "").slice(0, 6000) 
             })
@@ -991,22 +1021,50 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
         const data = JSON.parse(responseText);
         const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
 
+        // Guardamos la definición en el nodo y lo marcamos como expandido
         nodes.update({ 
             id: selectedNodeId, 
             baseTitle: title,
             definition: data.definition, 
             label: newLabel,
+            isExpandedDef: true,
             shape: 'box',
             fixed: { x: false, y: false },
-            widthConstraint: { minimum: 220, maximum: 280 }, // Ancho estricto controlado
-            heightConstraint: { minimum: 150, maximum: 220 } // Altura limitada para que no se estire verticalmente
+            widthConstraint: { minimum: 220, maximum: 280 },
+            heightConstraint: { minimum: 150, maximum: 220 }
         });
+
+        // Abrir panel lateral de lectura profunda automáticamente
+        detailNodeTitle.innerText = title;
+        nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${data.definition.replace(/\n/g, '<br>')}</p>`;
+        nodeDetailPanel.classList.remove('hidden');
+        activeNodeDetailId = selectedNodeId;
+
     } catch (err) {
         console.error("Error al obtener la definición:", err);
         alert("Error al obtener la definición. Revisa la consola.");
     } finally {
         hideLoader();
     }
+});
+
+// Al cerrar el panel lateral de detalles, contraemos opcionalmente el nodo vinculado
+closeDetailPanel?.addEventListener('click', () => {
+    if (activeNodeDetailId) {
+        const currentNode = nodes.get(activeNodeDetailId);
+        if (currentNode) {
+            const title = currentNode.baseTitle || activeNodeDetailId;
+            nodes.update({
+                id: activeNodeDetailId,
+                label: `*${title}*`,
+                isExpandedDef: false,
+                widthConstraint: { minimum: 150, maximum: 250 },
+                heightConstraint: { minimum: 50, maximum: 90 }
+            });
+        }
+    }
+    nodeDetailPanel.classList.add('hidden');
+    activeNodeDetailId = null;
 });
 
 document.getElementById('btnMenuConnect').addEventListener('click', () => {
