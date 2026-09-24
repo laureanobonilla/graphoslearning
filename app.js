@@ -31,7 +31,7 @@ let network = new vis.Network(container, { nodes, edges }, {
             background: '#fdfbf7', // Fondo crema marfil muy suave (adiós al amarillo chillón)
             highlight: { border: '#94a3b8', background: '#fffbeb' },
             hover: { border: '#94a3b8', background: '#f8fafc' }
-        }
+        },
         shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.15)', size: 10, x: 4, y: 4 },
         shapeProperties: { 
             borderRadius: 25, // Bordes muy redondeados (casi pastilla)
