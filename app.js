@@ -1613,13 +1613,116 @@ document.addEventListener('mousedown', (e) => {
 
 
 
-// 4. Acciones desde el menú flotante del lector hacia el grafo
+// ==========================================
+// MODO LECTOR ACTIVO - TEXTO LIBRE Y CONTEXTO
+// ==========================================
+const btnToggleReader = document.getElementById('btnToggleReader');
+const readerPanel = document.getElementById('readerPanel');
+const readerTextMode = document.getElementById('readerTextMode');
+const selectionTooltip = document.getElementById('selectionTooltip');
+const panelResizer = document.getElementById('panelResizer');
+const tooltipPreview = document.getElementById('tooltipSelectedTextPreview');
+const docContextInput = document.getElementById('docContextInput');
+
+let globalDocumentContext = "";
+let activeSelectedText = "";
+let activeSelectionRange = null;
+
+// Capturar el contexto global en tiempo real
+docContextInput?.addEventListener('input', (e) => {
+    globalDocumentContext = e.target.value.trim();
+});
+
+// Mostrar / Ocultar Panel Lector
+btnToggleReader?.addEventListener('click', () => {
+    readerPanel.classList.toggle('hidden');
+    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
+});
+
+// Redimensionar panel izquierdo arrastrando el borde
+let isResizing = false;
+panelResizer?.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    e.preventDefault();
+});
+window.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX;
+    if (newWidth > 250 && newWidth < window.innerWidth * 0.75) {
+        readerPanel.style.width = `${newWidth}px`;
+    }
+});
+window.addEventListener('mouseup', () => { isResizing = false; });
+
+// Detectar selección de texto en el panel libre
+readerTextMode?.addEventListener('mouseup', (e) => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+
+    if (text.length > 2) {
+        activeSelectedText = text;
+        activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+        if (tooltipPreview) tooltipPreview.innerText = `"${text.substring(0, 25)}..."`;
+
+        selectionTooltip.style.left = `${e.pageX - 60}px`;
+        selectionTooltip.style.top = `${e.pageY - 70}px`;
+        selectionTooltip.classList.remove('hidden');
+    } else {
+        selectionTooltip.classList.add('hidden');
+    }
+});
+
+// Ocultar tooltip al hacer clic fuera
+document.addEventListener('mousedown', (e) => {
+    if (!selectionTooltip.contains(e.target) && !readerPanel.contains(e.target)) {
+        selectionTooltip.classList.add('hidden');
+    }
+});
+
+// Vincular texto seleccionado a nodo del grafo
+function highlightAndBindSelectedText(spanElement, nodeId) {
+    spanElement.style.cursor = 'pointer';
+    spanElement.title = "Haz clic para enfocar este nodo en el grafo";
+    
+    spanElement.addEventListener('click', () => {
+        if (nodes.get(nodeId)) {
+            network.selectNodes([nodeId]);
+            network.focus(nodeId, {
+                scale: 1.2,
+                animation: { duration: 600, easingFunction: 'easeInOutQuad' }
+            });
+            
+            selectedNodeId = nodeId;
+            const pos = network.getPositions([nodeId])[nodeId];
+            const domCoords = network.canvasToDOM(pos);
+            actionMenu.style.left = domCoords.x + 'px';
+            actionMenu.style.top = (DOMCoords.y - 40) + 'px';
+            actionMenu.classList.remove('hidden');
+        }
+    });
+}
+
+function highlightSelectedTextAndLink(nodeId) {
+    if (!activeSelectionRange) return;
+    try {
+        const span = document.createElement('span');
+        span.className = "bg-amber-200/95 hover:bg-amber-300 text-slate-900 rounded px-1 transition-colors cursor-pointer border-b-2 border-amber-400";
+        span.appendChild(activeSelectionRange.extractContents());
+        activeSelectionRange.insertNode(span);
+        
+        highlightAndBindSelectedText(span, nodeId);
+    } catch (err) {
+        console.error("Error al resaltar texto:", err);
+    }
+}
+
 function createNodeFromReader(actionType) {
     if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
 
     const topic = activeSelectedText;
-    const rangeToHighlight = activeSelectionRange; // Guardamos referencia antes de limpiar
+    const rangeToHighlight = activeSelectionRange;
     
     activeSelectedText = "";
     activeSelectionRange = null;
@@ -1630,7 +1733,7 @@ function createNodeFromReader(actionType) {
     const spawnX = viewCenter.x + (Math.random() * 100 - 50);
     const spawnY = viewCenter.y + (Math.random() * 100 - 50);
 
-    const nodeId = topic; // Usamos el texto como ID único del nodo
+    const nodeId = topic;
 
     if (!nodes.get(nodeId)) {
         nodes.add({
@@ -1646,11 +1749,9 @@ function createNodeFromReader(actionType) {
         consumeNodes(1);
     }
 
-    // Aplicamos el resaltado y el enlace interactivo en el texto
     activeSelectionRange = rangeToHighlight;
     highlightSelectedTextAndLink(nodeId);
 
-    // Ejecutar la acción extra elegida (expandir, definir, etc.)
     selectedNodeId = nodeId;
     if (actionType === 'expand') {
         document.getElementById('btnMenuExpand').click();
@@ -1661,24 +1762,14 @@ function createNodeFromReader(actionType) {
     }
 }
 
-function highlightSelectedTextAndLink(nodeId) {
-    if (!activeSelectionRange) return;
-    try {
-        const span = document.createElement('span');
-        span.className = "bg-amber-200/95 hover:bg-amber-300 rounded px-1 transition-colors cursor-pointer border-b-2 border-amber-400";
-        span.appendChild(activeSelectionRange.extractContents());
-        activeSelectionRange.insertNode(span);
-        
-        // Conectamos el clic del span con el ID del nodo creado
-        highlightAndBindSelectedText(span, nodeId);
-    } catch (err) {
-        console.error("Error al resaltar texto:", err);
-    }
-}
-
 document.getElementById('tipBtnExpand')?.addEventListener('click', () => createNodeFromReader('expand'));
 document.getElementById('tipBtnExamples')?.addEventListener('click', () => createNodeFromReader('examples'));
 document.getElementById('tipBtnDefine')?.addEventListener('click', () => createNodeFromReader('define'));
+document.getElementById('btnWelcomeReader')?.addEventListener('click', () => {
+    dismissWelcomeScreen(); // Cierra la pantalla de bienvenida
+    // Simula un clic en el botón principal para abrir el panel lector de inmediato
+    document.getElementById('btnToggleReader')?.click();
+});
 
 // ==========================================
 // CARGADOR DE PDF EN EL MODO LECTOR ACTIVO

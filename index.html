@@ -182,48 +182,31 @@
 
 <div class="flex flex-1 h-full relative overflow-hidden">
         
-    <!-- Panel Izquierdo de Lectura Activa (Híbrido: Visor PDF + Texto Libre) -->
+<!-- Panel Izquierdo de Lectura Activa (Texto Libre y Contexto) -->
     <div id="readerPanel" class="w-1/2 h-full bg-slate-900 border-r border-slate-800 flex flex-col hidden z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">
         
-        <!-- Cabecera del Visor y Contexto -->
+        <!-- Cabecera del Panel y Contexto -->
         <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-2.5 select-none">
             <div class="flex justify-between items-center">
                 <div class="flex items-center gap-2">
-                    <h3 class="text-xs font-bold font-heading text-slate-200 uppercase tracking-wider">Lector Activo</h3>
-                    <!-- Selector de archivo PDF o botón para alternar -->
-                    <label class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded-md text-[11px] font-semibold cursor-pointer shadow-sm transition-colors flex items-center gap-1">
-                        <span>📁 Abrir PDF</span>
-                        <input type="file" id="readerPdfInput" class="hidden" accept=".pdf">
-                    </label>
+                    <h3 class="text-xs font-bold font-heading text-slate-200 uppercase tracking-wider">Lector Activo de Texto</h3>
                 </div>
-                <!-- Controles de Paginación (Solo activos para PDF) -->
-                <div id="pdfPaginationControls" class="flex items-center gap-2 text-xs text-slate-300 font-mono hidden">
-                    <button id="prevPage" class="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">◀</button>
-                    <span><span id="pageNum">1</span> / <span id="pageCount">-</span></span>
-                    <button id="nextPage" class="bg-slate-800 hover:bg-slate-700 px-2 py-1 rounded transition-colors">▶</button>
-                </div>
+                <span class="text-[11px] text-slate-400">Subraya cualquier texto para crear nodos</span>
             </div>
 
-            <!-- Input de Contexto del Documento -->
+            <!-- Input de Contexto del Documento (Regla de oro para la IA) -->
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap">Contexto:</span>
-                <input type="text" id="docContextInput" placeholder="Ej: Tesis sobre economía colonial..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
+                <input type="text" id="docContextInput" placeholder="Ej: Tesis sobre la economía colonial del siglo XIX..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
             </div>
         </div>
 
-        <!-- Contenedor Principal (Soporta PDF o Texto Libre Editable) -->
-        <div id="readerContentContainer" class="flex-1 overflow-auto p-4 flex flex-col bg-slate-900 relative select-text">
-            
-            <!-- Vista de Texto Libre (Por defecto para que se pueda pegar texto de inmediato) -->
-            <div id="readerTextMode" class="w-full h-full flex-1 bg-slate-900 text-slate-200 text-sm leading-relaxed font-sans outline-none p-2" contenteditable="true" placeholder="Pega tu texto aquí o abre un PDF arriba...">
-                Pega aquí el texto que deseas leer y estudiar, o bien haz clic en "Abrir PDF" en la parte superior para cargar un documento completo. Todo lo que subrayes activará el menú para crear nodos.
-            </div>
+        <!-- Área de Lectura / Pegado de Texto Masivo (Soporta miles de caracteres) -->
+        <div id="readerContentContainer" class="flex-1 overflow-auto p-6 bg-slate-900 relative select-text">
+            <div id="readerTextMode" class="w-full h-full text-slate-200 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text" contenteditable="true" placeholder="Pega aquí tu texto largo o fragmentos de lectura...">
+Pega aquí el texto que deseas estudiar y analizar. 
 
-            <!-- Vista de Canvas PDF (Se muestra solo cuando hay un PDF activo) -->
-            <div id="pdfCanvasWrapper" class="relative shadow-2xl bg-white mx-auto hidden">
-                <canvas id="pdfRenderCanvas" class="block"></canvas>
-                <!-- Capa invisible de texto para permitir la selección real sobre el PDF -->
-                <div id="pdfTextLayer" class="absolute inset-0 leading-none select-text pointer-events-auto"></div>
+Puedes pegar fragmentos extensos, artículos completos o notas de investigación. Todo lo que subrayes o selecciones con el cursor activará un menú flotante inmediato para convertirlo en un nodo interactivo, enviar definiciones, ejemplos o conectarlo al grafo de la derecha bajo el contexto que definiste arriba.
             </div>
         </div>
 
@@ -267,11 +250,15 @@
                     <button id="btnWelcomeDoc" class="bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 px-6 py-3 rounded-xl font-bold transition-all shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto text-sm">
                         <span class="text-base md:text-lg">📄</span> Extraer de Documento
                     </button>
+                    <!-- NUEVO: Botón de bienvenida para abrir el Modo Lector directamente -->
+                    <button id="btnWelcomeReader" class="bg-amber-50 border border-amber-200 text-amber-900 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-amber-100 transition-all shadow-sm flex items-center gap-2">
+                        <span>📖</span> Lector Activo
+                    </button>                    
                     <button id="btnSurprise" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto text-sm">
                         <span class="text-base md:text-lg">🎲</span> Sorpréndeme
                     </button>
                 </div>
-
+            
                 <div class="border-t border-slate-100 pt-5 md:pt-6">
                     <p class="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Temas sugeridos</p>
                     <div class="flex flex-wrap gap-2 justify-center" id="suggestionChips"></div>
