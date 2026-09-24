@@ -9,6 +9,21 @@ let selectedDensity = 'auto';
 let sourceNodeForSynergy = null;
 const synergyBanner = document.getElementById('synergyBanner');
 
+// Paleta de colores suaves y elegantes
+const elegantPalette = [
+    { background: '#fdfbf7', border: '#cbd5e1' }, // Crema / Marfil
+    { background: '#f8fafc', border: '#94a3b8' }, // Gris azulado
+    { background: '#f0f9ff', border: '#bae6fd' }, // Celeste muy suave
+    { background: '#f5f3ff', border: '#ddd6fe' }, // Lavanda pastel
+    { background: '#fffbeb', border: '#fcd34d' }, // Amarillo pastel muy sutil
+    { background: '#f0fdf4', border: '#bbf7d0' }, // Menta tenue
+    { background: '#fef2f2', border: '#fecaca' }  // Rosa pálido
+];
+
+function getRandomColor() {
+    return elegantPalette[Math.floor(Math.random() * elegantPalette.length)];
+}
+
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
     physics: {
@@ -27,32 +42,19 @@ let network = new vis.Network(container, { nodes, edges }, {
             bold: { color: '#0f172a', size: 18, face: 'Inter, sans-serif' } 
         },
         borderWidth: 1.5,
-        color: {
-            border: '#cbd5e1', // Gris suave
-            background: '#f8fafc', // Tono marfil/gris muy limpio y elegante
-            highlight: { border: '#94a3b8', background: '#f1f5f9' },
-            hover: { border: '#94a3b8', background: '#f1f5f9' }
-        },
         shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.08)', size: 8, x: 2, y: 2 },
-        shapeProperties: { 
-            borderRadius: 12,
-            borderDashes: false
-        }
+        shapeProperties: { borderRadius: 12 }
     },
     edges: { 
         arrows: { to: { enabled: true, scaleFactor: 0.8 } },
         color: { color: '#94a3b8', highlight: '#64748b', hover: '#cbd5e1' },
         font: { 
-            size: 14, 
-            face: 'Inter, sans-serif',
-            color: '#475569', 
-            strokeWidth: 3, 
-            strokeColor: '#fbfcfd',
-            align: 'middle'
+            size: 14, face: 'Inter, sans-serif', color: '#475569', strokeWidth: 3, 
+            strokeColor: '#fbfcfd', align: 'middle'
         },
         width: 1.5,
         dashes: [4, 4],
-        smooth: { type: 'curvedCW', roundness: 0.2 }
+        smooth: { type: 'dynamic' } // Curvatura orgánica y adaptativa para que no se vean todas iguales
     },
     interaction: { hover: true }
 });
@@ -133,7 +135,7 @@ async function saveCurrentProjectToBin() {
             currentProjectId = resData.projectId;
             localStorage.setItem('gk_current_project_id', currentProjectId);
         }
-    } catch (err) { console.error("Error al sincronizar:", err); }
+    } catch (err) {}
 }
 
 nodes.on('*', () => {
@@ -217,8 +219,6 @@ document.getElementById('closeAuthWall')?.addEventListener('click', () => {
 
 function requireAuth(actionDescription) {
     if (currentUser || isAdmin) return true;
-    const reasonEl = document.getElementById('authWallReason');
-    if(reasonEl) reasonEl.innerText = actionDescription;
     if (authWallModal) { authWallModal.classList.remove('hidden'); authWallModal.classList.add('flex'); }
     if (actionMenu) actionMenu.classList.add('hidden');
     return false;
@@ -285,7 +285,7 @@ async function generateFullSchemaFromTopic(topicText) {
         const rootX = viewCenter.x; const rootY = viewCenter.y - 120;
 
         const root = data.root;
-        nodes.add({ id: root.id, label: `*${root.label}*`, baseTitle: root.label, definition: root.definition || null, x: rootX, y: rootY, fixed: { x: false, y: false } });
+        nodes.add({ id: root.id, label: `*${root.label}*`, baseTitle: root.label, color: getRandomColor(), definition: root.definition || null, x: rootX, y: rootY, fixed: { x: false, y: false } });
         trackNodeUsage(root.label);
 
         const branches = data.branches || [];
@@ -298,7 +298,7 @@ async function generateFullSchemaFromTopic(topicText) {
         branches.forEach((branch, index) => {
             const bx = startBranchX + (index * branchSpacing);
             branchPositions[branch.id] = { x: bx, y: branchY, exampleCount: 0 };
-            nodes.add({ id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label, x: bx, y: branchY, fixed: { x: false, y: false } });
+            nodes.add({ id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label, color: getRandomColor(), x: bx, y: branchY, fixed: { x: false, y: false } });
             edges.add({ from: root.id, to: branch.id, label: branch.relationship });
             trackNodeUsage(branch.label);
         });
@@ -327,7 +327,7 @@ function insertSingleNode(topic) {
     const viewCenter = network.getViewPosition();
     const spawnX = viewCenter.x + 200 + (Math.random() * 50); 
     const spawnY = viewCenter.y + (Math.random() * 100 - 50);
-    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, x: spawnX, y: spawnY, fixed: { x: false, y: false } });
+    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(), x: spawnX, y: spawnY, fixed: { x: false, y: false } });
     trackNodeUsage(topic); consumeNodes(1); topicInput.value = '';
     setTimeout(() => { network.focus(topic, { scale: 1.0, animation: { duration: 600 }}); }, 50);
 }
@@ -341,9 +341,8 @@ function handleTopicInput() {
 document.getElementById('btnGenerate')?.addEventListener('click', handleTopicInput);
 document.getElementById('topicInput')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleTopicInput(); });
 
-
 // ==========================================
-// 7. EXPANDIR RAMAS MANUALMENTE (CON LÓGICA AUTO CORRECTA)
+// 7. EXPANDIR RAMAS MANUALMENTE (Lógica 'Auto')
 // ==========================================
 function getContextPath(nodeId) {
     let path = [nodeId]; let current = nodeId;
@@ -356,13 +355,12 @@ function getContextPath(nodeId) {
 }
 
 document.getElementById('btnMenuExpand')?.addEventListener('click', async () => {
-    actionMenu.classList.add('hidden');
+    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
     if (!requireAuth("profundizar en conceptos relacionados")) return; 
 
-    // Magia AUTO: Enviamos el prompt dinámico en vez de parseInt('auto')
     const nodeCountVal = document.getElementById('nodeCount').value;
-    const maxNodes = nodeCountVal === 'auto' ? 'entre 3 y 6 (según lo que consideres relevante)' : parseInt(nodeCountVal, 10);
+    const maxNodes = nodeCountVal === 'auto' ? 'entre 3 y 6 (según relevancia)' : parseInt(nodeCountVal, 10);
     const estimatedCost = nodeCountVal === 'auto' ? 4 : maxNodes;
     if (!checkBalance(estimatedCost)) return;
 
@@ -386,7 +384,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
         let createdCount = 0;
         (data.concepts || []).forEach(concept => {
             if (!nodes.get(concept.id)) {
-                nodes.add({ id: concept.id, label: `*${concept.label}*`, baseTitle: concept.label, expanded: false, x: parentPos.x, y: parentPos.y, fixed: { x: false, y: false } });
+                nodes.add({ id: concept.id, label: `*${concept.label}*`, baseTitle: concept.label, color: getRandomColor(), expanded: false, x: parentPos.x, y: parentPos.y, fixed: { x: false, y: false } });
                 edges.add({ from: selectedNodeId, to: concept.id, label: concept.relationship });
                 trackNodeUsage(concept.label); createdCount++;
             }
@@ -398,14 +396,14 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
 });
 
 // ==========================================
-// 8. GENERAR EJEMPLOS MANUALMENTE (CON LÓGICA AUTO CORRECTA)
+// 8. GENERAR EJEMPLOS MANUALMENTE
 // ==========================================
 document.getElementById('btnMenuExamples')?.addEventListener('click', async () => {
-    actionMenu.classList.add('hidden');
+    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
 
     const nodeCountVal = document.getElementById('nodeCount').value;
-    const maxNodes = nodeCountVal === 'auto' ? 'varios (entre 3 y 5 ejemplos representativos)' : parseInt(nodeCountVal, 10);
+    const maxNodes = nodeCountVal === 'auto' ? 'varios (entre 3 y 5 representativos)' : parseInt(nodeCountVal, 10);
     const estimatedCost = nodeCountVal === 'auto' ? 4 : maxNodes;
     if (!checkBalance(estimatedCost)) return;
 
@@ -442,50 +440,69 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
 });
 
 // ==========================================
-// 13. EVENTOS DEL CANVAS (MENÚ FLOTANTE Y SINERGIA)
+// 13. EVENTOS DEL CANVAS (MENÚ DINÁMICO)
 // ==========================================
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNode = params.nodes[0];
         
-        // MOSTRAR MENÚ FLOTANTE
         selectedNodeId = clickedNode;
         const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
         const DOMCoords = network.canvasToDOM(nodePosition);
         const containerRect = container.getBoundingClientRect();
         
-        actionMenu.style.left = (containerRect.left + DOMCoords.x - 40) + 'px';
-        actionMenu.style.top = (containerRect.top + DOMCoords.y - 60) + 'px';
+        actionMenu.style.visibility = 'hidden';
         actionMenu.classList.remove('hidden');
+        
+        const menuWidth = actionMenu.offsetWidth || 200;
+        const menuHeight = actionMenu.offsetHeight || 300;
+        
+        let topPos = containerRect.top + DOMCoords.y - menuHeight - 15;
+        let leftPos = containerRect.left + DOMCoords.x - (menuWidth / 2);
+        
+        if (topPos < 10) { topPos = containerRect.top + DOMCoords.y + 40; } // Desplegar debajo si no cabe arriba
+        if (leftPos < 10) leftPos = 10;
+        if (leftPos + menuWidth > window.innerWidth - 10) leftPos = window.innerWidth - menuWidth - 10;
+        
+        actionMenu.style.left = leftPos + 'px';
+        actionMenu.style.top = topPos + 'px';
+        actionMenu.style.visibility = 'visible';
     } else {
         actionMenu.classList.add('hidden');
         selectedNodeId = null;
     }
 });
-network.on('zoom', () => actionMenu.classList.add('hidden'));
+
+network.on('zoom', () => { actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden'); });
 network.on('dragStart', (params) => {
-    actionMenu.classList.add('hidden');
+    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (params.nodes.length > 0) nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
 });
 
 // ==========================================
-// MODO LECTOR ACTIVO - TEXTO LIBRE, CONTEXTO Y IA
+// MODO LECTOR ACTIVO - TEXTO LIBRE Y RESIZER
 // ==========================================
 const btnToggleReader = document.getElementById('btnToggleReader');
 const readerPanel = document.getElementById('readerPanel');
 const readerTextMode = document.getElementById('readerTextMode');
 const selectionTooltip = document.getElementById('selectionTooltip');
+const panelResizer = document.getElementById('panelResizer');
 const docContextInput = document.getElementById('docContextInput');
 
 const nodeDetailPanel = document.getElementById('nodeDetailPanel');
 const detailNodeTitle = document.getElementById('detailNodeTitle');
 const nodeDetailContent = document.getElementById('nodeDetailContent');
 const closeDetailPanel = document.getElementById('closeDetailPanel'); 
+const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
+const nodeTooltipPreview = document.getElementById('nodeTooltipPreview');
+const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
 
 let globalDocumentContext = "";
 let activeSelectedText = "";
 let activeSelectionRange = null;
 let activeNodeDetailId = null;
+let activeNodeSelectionRange = null;
+let activeNodeSelectedText = "";
 
 docContextInput?.addEventListener('input', (e) => { globalDocumentContext = e.target.value.trim(); });
 
@@ -494,32 +511,28 @@ btnToggleReader?.addEventListener('click', () => {
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
 });
 
-// IA REDACTAR TEXTO LARGO (Usando directamente el Contexto)
-document.getElementById('btnAiGenerateText')?.addEventListener('click', async () => {
-    const topicIdea = docContextInput.value.trim();
-    if (!topicIdea) {
-        alert("Por favor, escribe primero un tema o idea central en el campo de 'Contexto' superior.");
-        docContextInput.focus();
-        return;
+// Resizer 100% Funcional sin conflicto de Tailwind
+let isResizing = false;
+panelResizer?.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    document.body.style.userSelect = 'none'; // Prevenir selección al arrastrar
+    e.preventDefault();
+});
+document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const newWidth = e.clientX;
+    if (newWidth > 250 && newWidth < window.innerWidth * 0.75) {
+        readerPanel.classList.remove('w-1/2'); // Quitar restricción de Tailwind
+        readerPanel.style.flex = 'none';
+        readerPanel.style.width = `${newWidth}px`;
     }
-    showLoader('Redactando texto exhaustivo (esto puede tomar unos segundos)...');
-    try {
-        const response = await fetch('/.netlify/functions/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                action: 'define', 
-                topic: `Redacta un texto académico, sumamente detallado, profundo y extenso de al menos 5 a 8 párrafos completos sobre: ${topicIdea}. Explora antecedentes, conceptos clave, implicaciones y conclusiones para un análisis exhaustivo. No te limites, sé enciclopédico.`, 
-                contextPath: topicIdea,
-                documentContext: "" 
-            })
-        });
-        const data = await response.json();
-        if (data.definition) {
-            readerTextMode.innerText = data.definition;
-            currentDocumentText = data.definition;
-        }
-    } catch (err) { alert("No se pudo generar el texto masivo."); } finally { hideLoader(); }
+});
+document.addEventListener('mouseup', () => { 
+    if (isResizing) {
+        isResizing = false; 
+        document.body.style.userSelect = '';
+        setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 50);
+    }
 });
 
 readerTextMode?.addEventListener('input', () => {
@@ -566,7 +579,7 @@ function highlightSelectedTextAndLink(nodeId) {
     } catch (err) {}
 }
 
-// ÚNICO BOTÓN AL SUBRAYAR
+// ÚNICO BOTÓN AL SUBRAYAR EN EL LECTOR
 document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
     if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
@@ -580,7 +593,7 @@ document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
 
     if (!nodes.get(nodeId)) {
         nodes.add({
-            id: nodeId, label: `*${topic}*`, baseTitle: topic,
+            id: nodeId, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(),
             x: viewCenter.x + (Math.random() * 100 - 50), y: viewCenter.y + (Math.random() * 100 - 50),
             fixed: { x: false, y: false }
         });
@@ -594,9 +607,8 @@ document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
 // ==========================================
 // DEFINICIONES - TRES ACCIONES INDEPENDIENTES
 // ==========================================
-// 1. Ver en Panel Lateral
 document.getElementById('btnMenuOpenPanel')?.addEventListener('click', async () => {
-    actionMenu.classList.add('hidden');
+    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
     const currentNode = nodes.get(selectedNodeId);
     const title = currentNode.baseTitle || selectedNodeId;
@@ -618,9 +630,8 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', async () 
     activeNodeDetailId = selectedNodeId;
 });
 
-// 2. Expandir (Caja cuadrada en el grafo)
 document.getElementById('btnMenuExpandDef')?.addEventListener('click', async () => {
-    actionMenu.classList.add('hidden');
+    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
     const currentNode = nodes.get(selectedNodeId);
     const title = currentNode.baseTitle || selectedNodeId;
@@ -639,13 +650,12 @@ document.getElementById('btnMenuExpandDef')?.addEventListener('click', async () 
         id: selectedNodeId, baseTitle: title, definition: definitionText, 
         label: `*${title}*\n────────────────────\n${definitionText}`,
         isExpandedDef: true, shape: 'box',
-        widthConstraint: { minimum: 280, maximum: 350 } // Ancho masivo forzado = Adiós columna vertical
+        widthConstraint: { minimum: 280, maximum: 350 } 
     });
 });
 
-// 3. Contraer Local
 document.getElementById('btnMenuCollapseDef')?.addEventListener('click', () => {
-    actionMenu.classList.add('hidden');
+    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
     const currentNode = nodes.get(selectedNodeId);
     nodes.update({
@@ -657,6 +667,53 @@ document.getElementById('btnMenuCollapseDef')?.addEventListener('click', () => {
 closeDetailPanel?.addEventListener('click', () => {
     nodeDetailPanel.classList.add('hidden');
     activeNodeDetailId = null;
+});
+
+// EXTRACCIÓN DE NODOS DESDE EL PANEL DE DEFINICIÓN (PANEL DERECHO)
+nodeDetailContent?.addEventListener('mouseup', (e) => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+
+    if (text.length > 2) {
+        activeNodeSelectedText = text;
+        activeNodeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        if (nodeTooltipPreview) nodeTooltipPreview.innerText = `"${text.substring(0, 20)}..."`;
+        nodeSelectionTooltip.style.left = `${e.offsetX - 20}px`;
+        nodeSelectionTooltip.style.top = `${e.offsetY - 50}px`;
+        nodeSelectionTooltip.classList.remove('hidden');
+    } else {
+        nodeSelectionTooltip.classList.add('hidden');
+    }
+});
+
+document.addEventListener('mousedown', (e) => {
+    if (nodeSelectionTooltip && !nodeSelectionTooltip.contains(e.target) && !nodeDetailContent?.contains(e.target)) {
+        nodeSelectionTooltip.classList.add('hidden');
+    }
+});
+
+nodeBtnExtractChild?.addEventListener('click', () => {
+    if (!activeNodeSelectedText || !activeNodeDetailId) return;
+    nodeSelectionTooltip.classList.add('hidden');
+
+    const childTopic = activeNodeSelectedText;
+    activeNodeSelectedText = ""; activeNodeSelectionRange = null;
+
+    if (!checkBalance(1)) return;
+
+    const parentPos = network.getPositions([activeNodeDetailId])[activeNodeDetailId];
+    const newId = childTopic;
+
+    if (!nodes.get(newId)) {
+        nodes.add({
+            id: newId, label: `*${childTopic}*`, baseTitle: childTopic, color: getRandomColor(),
+            x: parentPos.x + 250, y: parentPos.y + (Math.random() * 100 - 50),
+            fixed: { x: false, y: false },
+            widthConstraint: { minimum: 150, maximum: 250 }, heightConstraint: { minimum: 50, maximum: 90 }
+        });
+        edges.add({ from: activeNodeDetailId, to: newId, label: 'deriva en' });
+        trackNodeUsage(childTopic); consumeNodes(1);
+    }
 });
 
 // ==========================================
@@ -678,13 +735,13 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
         if (nodes.length > 0) { nodes.clear(); edges.clear(); }
         
         const root = data.root; const rootX = network.getViewPosition().x; const rootY = network.getViewPosition().y - 120;
-        nodes.add({ id: root.id, label: `*${root.label}*`, baseTitle: root.label, x: rootX, y: rootY }); trackNodeUsage(root.label);
+        nodes.add({ id: root.id, label: `*${root.label}*`, baseTitle: root.label, color: getRandomColor(), x: rootX, y: rootY }); trackNodeUsage(root.label);
 
         const branches = data.branches || []; const branchSpacing = 280; const startBranchX = rootX - ((branches.length - 1) * branchSpacing / 2);
         const branchPositions = {};
         branches.forEach((branch, index) => {
             const bx = startBranchX + (index * branchSpacing); branchPositions[branch.id] = { x: bx, y: rootY + 160, exampleCount: 0 };
-            nodes.add({ id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label, x: bx, y: rootY + 160 });
+            nodes.add({ id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label, color: getRandomColor(), x: bx, y: rootY + 160 });
             edges.add({ from: root.id, to: branch.id, label: branch.relationship }); trackNodeUsage(branch.label);
         });
 
