@@ -1595,6 +1595,7 @@ document.getElementById('btnAiGenerateText')?.addEventListener('click', async ()
     }
 });
 
+
 // Detección de texto ingresado para calcular contexto automático de respaldo
 readerTextMode?.addEventListener('input', () => {
     const content = readerTextMode.innerText.trim();
@@ -1983,4 +1984,135 @@ document.getElementById('btnMenuCollapseDef')?.addEventListener('click', () => {
         widthConstraint: { minimum: 150, maximum: 250 },
         heightConstraint: { minimum: 50, maximum: 90 }
     });
+});
+
+// ==========================================
+// GENERAR ESQUEMA COMPLETO A PARTIR DEL TEXTO DEL LECTOR
+// ==========================================
+document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
+    const textContent = readerTextMode.innerText.trim();
+    if (!textContent || textContent.length < 15) {
+        alert("El lector está vacío o el texto es demasiado corto para generar un esquema.");
+        return;
+    }
+    
+    currentDocumentText = textContent;
+    
+    // Estimación de costo según la densidad seleccionada (Auto por defecto)
+    const density = getMaxNodesSetting ? getMaxNodesSetting() : 'auto';
+    const estimatedMinCost = 6;
+    if (!checkBalance(estimatedMinCost)) return;
+
+    showLoader(`Generando árbol estructurado desde el lector...`);
+
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                action: 'parse_text', 
+                text: textContent,
+                density: selectedDensity || 'auto' 
+            })
+        });
+        const data = await response.json();
+
+        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
+        if (!checkBalance(totalNodes)) return;
+
+        // Limpiar el lienzo actual para centrar la nueva estructura
+        if (nodes.length > 0) {
+            nodes.clear();
+            edges.clear();
+        }
+
+        const viewCenter = network.getViewPosition();
+        const rootX = viewCenter.x;
+        const rootY = viewCenter.y - 120;
+
+        // 1. Nodo Raíz
+        const root = data.root;
+        nodes.add({
+            id: root.id,
+            label: `*${root.label}*`,
+            baseTitle: root.label,
+            definition: root.definition || null,
+            x: rootX,
+            y: rootY,
+            fixed: { x: false, y: false }
+        });
+        trackNodeUsage(root.label);
+
+        // 2. Ramas en fila horizontal
+        const branches = data.branches || [];
+        const branchSpacing = 280;
+        const totalBranchWidth = (branches.length - 1) * branchSpacing;
+        const startBranchX = rootX - (totalBranchWidth / 2);
+        const branchY = rootY + 160;
+
+        const branchPositions = {};
+
+        branches.forEach((branch, index) => {
+            const bx = startBranchX + (index * branchSpacing);
+            const by = branchY;
+            branchPositions[branch.id] = { x: bx, y: by, exampleCount: 0 };
+
+            nodes.add({
+                id: branch.id,
+                label: `*${branch.label}*`,
+                baseTitle: branch.label,
+                definition: branch.definition || null,
+                x: bx,
+                y: by,
+                fixed: { x: false, y: false }
+            });
+            edges.add({ from: root.id, to: branch.id, label: branch.relationship });
+            trackNodeUsage(branch.label);
+        });
+
+        // 3. Ejemplos colgando de ramas
+        const examples = data.examples || [];
+        examples.forEach(ex => {
+            const parentPos = branchPositions[ex.targetId] || { x: rootX, y: branchY, exampleCount: 0 };
+            parentPos.exampleCount++;
+            
+            const exX = parentPos.x;
+            const exY = parentPos.y + (parentPos.exampleCount * 110);
+
+            nodes.add({
+                id: ex.id,
+                label: `*Ejemplo:*\n${ex.label}`,
+                baseTitle: ex.label,
+                definition: ex.definition || null,
+                x: exX,
+                y: exY,
+                fixed: { x: false, y: false },
+                color: {
+                    background: '#fafaf9', border: '#d6d3d1',
+                    highlight: { background: '#f5f5f4', border: '#78716c' },
+                    hover: { background: '#ffffff', border: '#a8a29e' }
+                },
+                font: { color: '#44403c', bold: { color: '#292524', size: 14 } },
+                shapeProperties: { borderRadius: 10, borderDashes: [4, 4] }
+            });
+
+            const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
+            edges.add({
+                from: target, to: ex.id, label: ex.relationship,
+                color: { color: '#cbd5e1', highlight: '#78716c' }, dashes: true
+            });
+            trackNodeUsage(ex.label);
+        });
+
+        consumeNodes(totalNodes);
+        
+        network.setOptions({ physics: { enabled: false } });
+        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+
+    } catch (err) {
+        console.error(err);
+        alert('No se pudo procesar el esquema desde el texto del lector.');
+    } finally {
+        hideLoader();
+    }
 });

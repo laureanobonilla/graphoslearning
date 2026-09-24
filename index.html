@@ -190,7 +190,7 @@
         <!-- Tooltip flotante específico para cuando seleccionas texto dentro de la definición -->
         <div id="nodeSelectionTooltip" class="hidden absolute bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-30 text-xs select-none">
             <span id="nodeTooltipPreview" class="text-slate-300 italic">"..."</span>
-            <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear Nodo Hijo</button>
+            <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear elemento en esquema</button>
         </div>
     </div>
 <!-- Panel Izquierdo de Lectura Activa (Único centro de texto y contexto) -->
@@ -207,7 +207,12 @@
                     <span>✨ Redactar texto con IA</span>
                 </button>
             </div>
-
+            <div class="px-4 py-2 bg-slate-950 border-t border-slate-800 flex justify-between items-center">
+                <span class="text-[10px] text-slate-400">Todo el texto del lector listo para procesar</span>
+                <button id="btnParseReaderText" class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5">
+                    <span>🌐 Generar Esquema del texto</span>
+                </button>
+            </div>
             <!-- Input de Contexto del Documento (Con cálculo automático si se deja vacío) -->
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap">Contexto:</span>
