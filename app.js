@@ -949,100 +949,6 @@ document.getElementById('btnMenuExamples').addEventListener('click', async () =>
     }
 });
 
-// ==========================================
-// GESTIÓN DE DEFINICIONES, CONTRACCIÓN Y PANEL LATERAL
-// ==========================================
-document.getElementById('btnMenuDefine')?.addEventListener('click', async () => {
-    actionMenu.classList.add('hidden');
-    if (!selectedNodeId) return;
-
-    const currentNode = nodes.get(selectedNodeId);
-    const title = currentNode.baseTitle || selectedNodeId;
-
-    // 1. SI YA TIENE DEFINICIÓN: Alternar expansión/contracción localmente sin reconsultar a la IA
-    if (currentNode && currentNode.definition) {
-        if (currentNode.isExpandedDef) {
-            // Contraer el nodo en el grafo (muestra solo el título base)
-            nodes.update({
-                id: selectedNodeId,
-                label: `*${title}*`,
-                isExpandedDef: false,
-                widthConstraint: { minimum: 150, maximum: 250 },
-                heightConstraint: { minimum: 50, maximum: 90 }
-            });
-            // Si el panel lateral estaba mostrando este nodo, lo cerramos
-            if (activeNodeDetailId === selectedNodeId) {
-                nodeDetailPanel.classList.add('hidden');
-                activeNodeDetailId = null;
-            }
-        } else {
-            // Expandir el nodo en el grafo con su definición guardada
-            const expandedLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
-            nodes.update({
-                id: selectedNodeId,
-                label: expandedLabel,
-                isExpandedDef: true,
-                widthConstraint: { minimum: 220, maximum: 280 },
-                heightConstraint: { minimum: 150, maximum: 220 }
-            });
-            
-            // Abrir panel lateral izquierdo de lectura profunda
-            detailNodeTitle.innerText = title;
-            nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${currentNode.definition.replace(/\n/g, '<br>')}</p>`;
-            nodeDetailPanel.classList.remove('hidden');
-            activeNodeDetailId = selectedNodeId;
-        }
-        return;
-    }
-
-    // 2. SI NO TIENE DEFINICIÓN: Consultarla a la IA por primera vez
-    const contextPath = getContextPath(selectedNodeId);
-    showLoader('Redactando definición...');
-
-    try {
-        const response = await fetch('/.netlify/functions/gemini', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                action: 'define', 
-                topic: title, 
-                contextPath,
-                documentContext: (globalDocumentContext || currentDocumentText || "").slice(0, 6000) 
-            })
-        });
-        
-        const responseText = await response.text();
-        if (!response.ok) throw new Error(responseText);
-        
-        const data = JSON.parse(responseText);
-        const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
-
-        // Guardamos la definición en el nodo y lo marcamos como expandido
-        nodes.update({ 
-            id: selectedNodeId, 
-            baseTitle: title,
-            definition: data.definition, 
-            label: newLabel,
-            isExpandedDef: true,
-            shape: 'box',
-            fixed: { x: false, y: false },
-            widthConstraint: { minimum: 220, maximum: 280 },
-            heightConstraint: { minimum: 150, maximum: 220 }
-        });
-
-        // Abrir panel lateral de lectura profunda automáticamente
-        detailNodeTitle.innerText = title;
-        nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${data.definition.replace(/\n/g, '<br>')}</p>`;
-        nodeDetailPanel.classList.remove('hidden');
-        activeNodeDetailId = selectedNodeId;
-
-    } catch (err) {
-        console.error("Error al obtener la definición:", err);
-        alert("Error al obtener la definición. Revisa la consola.");
-    } finally {
-        hideLoader();
-    }
-});
 
 
 
@@ -1623,8 +1529,8 @@ let activeNodeSelectionRange = null;
 let activeNodeSelectedText = "";
 
 function getMaxNodesSetting() {
-    const select = document.getElementById('nodeCountSelect');
-    if (!select || select.value === 'auto') return 4; 
+    const select = document.getElementById('nodeCount');
+    if (!select || select.value === 'auto') return 4; // Valor dinámico por defecto para Auto
     return parseInt(select.value, 10) || 3;
 }
 
@@ -1655,18 +1561,23 @@ window.addEventListener('mousemove', (e) => {
 window.addEventListener('mouseup', () => { isResizing = false; });
 
 // Redactar texto largo automáticamente con la IA para desmenuzarlo
+// Redactar texto largo, detallado y masivo usando el Contexto como tema
 document.getElementById('btnAiGenerateText')?.addEventListener('click', async () => {
-    const topicIdea = prompt("¿Sobre qué tema deseas que la IA redacte un texto explicativo amplio para estudiar?");
-    if (!topicIdea) return;
+    const topicIdea = docContextInput.value.trim();
+    if (!topicIdea) {
+        alert("Por favor, escribe primero un tema o idea en el campo de 'Contexto' superior.");
+        docContextInput.focus();
+        return;
+    }
 
-    showLoader('Redactando texto de estudio...');
+    showLoader('Redactando texto exhaustivo (esto puede tomar unos segundos)...');
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 action: 'define', 
-                topic: `Redacta un texto académico y profundo de varios párrafos sobre: ${topicIdea}`, 
+                topic: `Redacta un texto académico, sumamente detallado, profundo y extenso de al menos 5 a 8 párrafos completos sobre: ${topicIdea}. Explora antecedentes, conceptos clave, implicaciones y conclusiones para un análisis exhaustivo.`, 
                 contextPath: topicIdea,
                 documentContext: "" 
             })
@@ -1675,13 +1586,9 @@ document.getElementById('btnAiGenerateText')?.addEventListener('click', async ()
         if (data.definition) {
             readerTextMode.innerText = data.definition;
             currentDocumentText = data.definition;
-            if (!docContextInput.value) {
-                docContextInput.value = topicIdea;
-                globalDocumentContext = topicIdea;
-            }
         }
     } catch (err) {
-        console.error("Error al generar texto:", err);
+        console.error("Error al generar texto masivo:", err);
         alert("No se pudo generar el texto.");
     } finally {
         hideLoader();
@@ -1811,7 +1718,7 @@ document.getElementById('tipBtnExamples')?.addEventListener('click', () => creat
 document.getElementById('tipBtnDefine')?.addEventListener('click', () => createNodeFromReader('define'));
 
 // ==========================================
-// GESTIÓN DE DEFINICIONES, CONTRACCIÓN Y PANEL LATERAL
+// GESTIÓN DE DEFINICIONES Y CONTRACCIÓN LOCAL DE NODOS
 // ==========================================
 document.getElementById('btnMenuDefine')?.addEventListener('click', async () => {
     actionMenu.classList.add('hidden');
@@ -1820,8 +1727,10 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
     const currentNode = nodes.get(selectedNodeId);
     const title = currentNode.baseTitle || selectedNodeId;
 
+    // 1. SI YA TIENE DEFINICIÓN: Alternar expansión / contracción local sin reconsultar a la IA
     if (currentNode && currentNode.definition) {
         if (currentNode.isExpandedDef) {
+            // Contraer nodo (muestra solo título base)
             nodes.update({
                 id: selectedNodeId,
                 label: `*${title}*`,
@@ -1829,11 +1738,8 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
                 widthConstraint: { minimum: 150, maximum: 250 },
                 heightConstraint: { minimum: 50, maximum: 90 }
             });
-            if (activeNodeDetailId === selectedNodeId) {
-                nodeDetailPanel.classList.add('hidden');
-                activeNodeDetailId = null;
-            }
         } else {
+            // Expandir nodo con su definición guardada localmente
             const expandedLabel = `*${title}*\n────────────────────\n${currentNode.definition}`;
             nodes.update({
                 id: selectedNodeId,
@@ -1842,15 +1748,11 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
                 widthConstraint: { minimum: 220, maximum: 280 },
                 heightConstraint: { minimum: 150, maximum: 220 }
             });
-            
-            detailNodeTitle.innerText = title;
-            nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${currentNode.definition.replace(/\n/g, '<br>')}</p>`;
-            nodeDetailPanel.classList.remove('hidden');
-            activeNodeDetailId = selectedNodeId;
         }
         return;
     }
 
+    // 2. SI NO TIENE DEFINICIÓN: Consultarla a la IA por primera vez (Solo se muestra en el nodo, sin abrir panel izquierdo)
     const contextPath = getContextPath(selectedNodeId);
     showLoader('Redactando definición...');
 
@@ -1872,6 +1774,7 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
         const data = JSON.parse(responseText);
         const newLabel = `*${title}*\n────────────────────\n${data.definition}`;
 
+        // Guardamos la definición en el nodo y lo marcamos como expandido
         nodes.update({ 
             id: selectedNodeId, 
             baseTitle: title,
@@ -1884,11 +1787,6 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
             heightConstraint: { minimum: 150, maximum: 220 }
         });
 
-        detailNodeTitle.innerText = title;
-        nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${title}</p><p>${data.definition.replace(/\n/g, '<br>')}</p>`;
-        nodeDetailPanel.classList.remove('hidden');
-        activeNodeDetailId = selectedNodeId;
-
     } catch (err) {
         console.error("Error al obtener la definición:", err);
         alert("Error al obtener la definición. Revisa la consola.");
@@ -1896,7 +1794,6 @@ document.getElementById('btnMenuDefine')?.addEventListener('click', async () => 
         hideLoader();
     }
 });
-
 closeDetailPanel?.addEventListener('click', () => {
     if (activeNodeDetailId) {
         const currentNode = nodes.get(activeNodeDetailId);
