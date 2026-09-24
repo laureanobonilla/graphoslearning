@@ -444,9 +444,9 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
 // ==========================================
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
-        const clickedNode = params.nodes[0];
+        const clickedNodeId = params.nodes[0];
         
-        selectedNodeId = clickedNode;
+        selectedNodeId = clickedNodeId;
         const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
         const DOMCoords = network.canvasToDOM(nodePosition);
         const containerRect = container.getBoundingClientRect();
@@ -467,28 +467,28 @@ network.on('click', async function (params) {
         actionMenu.style.left = leftPos + 'px';
         actionMenu.style.top = topPos + 'px';
         actionMenu.style.visibility = 'visible';
-        actionMenu.style.left = leftPos + 'px';
-        actionMenu.style.top = topPos + 'px';
-        actionMenu.style.visibility = 'visible';
-        
-        // --- NUEVA LÓGICA DE VISIBILIDAD DE BOTONES ---
-        const isExpanded = clickedNode.isExpandedDef === true;
+
+        // --- LÓGICA CORREGIDA DE VISIBILIDAD DE BOTONES ---
+        // Extraemos el nodo real de la base de datos usando su ID
+        const actualNode = nodes.get(selectedNodeId);
+        const isExpanded = actualNode && actualNode.isExpandedDef === true;
         
         const btnExpand = document.getElementById('btnMenuExpandDef');
         const btnCollapse = document.getElementById('btnMenuCollapseDef');
         const btnOpenPanel = document.getElementById('btnMenuOpenPanel');
         
         if (isExpanded) {
-            // Si está expandido: Ocultar "Expandir", mostrar "Usar en Panel" y "Contraer"
-            btnExpand.classList.add('hidden'); btnExpand.classList.remove('flex');
-            btnCollapse.classList.remove('hidden'); btnCollapse.classList.add('flex');
-            btnOpenPanel.classList.remove('hidden'); btnOpenPanel.classList.add('flex');
+            // Si el nodo SÍ está expandido, ocultamos "Expandir" y mostramos los otros dos
+            if (btnExpand) { btnExpand.classList.add('hidden'); btnExpand.classList.remove('flex'); }
+            if (btnCollapse) { btnCollapse.classList.remove('hidden'); btnCollapse.classList.add('flex'); }
+            if (btnOpenPanel) { btnOpenPanel.classList.remove('hidden'); btnOpenPanel.classList.add('flex'); }
         } else {
-            // Si está contraído: Mostrar "Expandir", ocultar "Usar en Panel" y "Contraer"
-            btnExpand.classList.remove('hidden'); btnExpand.classList.add('flex');
-            btnCollapse.classList.add('hidden'); btnCollapse.classList.remove('flex');
-            btnOpenPanel.classList.add('hidden'); btnOpenPanel.classList.remove('flex');
-        }        
+            // Si el nodo NO está expandido, mostramos "Expandir" y ocultamos los otros dos
+            if (btnExpand) { btnExpand.classList.remove('hidden'); btnExpand.classList.add('flex'); }
+            if (btnCollapse) { btnCollapse.classList.add('hidden'); btnCollapse.classList.remove('flex'); }
+            if (btnOpenPanel) { btnOpenPanel.classList.add('hidden'); btnOpenPanel.classList.remove('flex'); }
+        }
+
     } else {
         actionMenu.classList.add('hidden');
         selectedNodeId = null;
@@ -848,6 +848,11 @@ document.getElementById('btnMenuDelete')?.addEventListener('click', () => {
     selectedNodeId = null;
 });
 
+// ==========================================
+// HERRAMIENTAS: ELIMINAR, LIMPIAR GRAFO, LIMPIAR LECTOR Y CAPTURAR
+// ==========================================
+
+// 1. Limpiar el Grafo (Botón de la barra superior)
 document.getElementById('btnClear')?.addEventListener('click', () => {
     if (nodes.length === 0) return;
     if (confirm("¿Deseas vaciar todo el esquema actual?")) {
@@ -855,9 +860,26 @@ document.getElementById('btnClear')?.addEventListener('click', () => {
         edges.clear();
         currentDocumentText = ""; 
         actionMenu.classList.add('hidden');
-        if (connectionBanner) connectionBanner.classList.add('hidden');
+        if (typeof connectionBanner !== 'undefined' && connectionBanner) {
+            connectionBanner.classList.add('hidden');
+        }
         sourceNodeForConnection = null;
         selectedNodeId = null;
+    }
+});
+
+// 2. Limpiar SOLO el panel del Lector (Botón nuevo a la par de Generar Esquema)
+document.getElementById('btnClearReader')?.addEventListener('click', () => {
+    const hasText = readerTextMode && readerTextMode.innerText.trim() !== "";
+    const hasContext = docContextInput && docContextInput.value.trim() !== "";
+
+    if (!hasText && !hasContext) return; 
+
+    if (confirm("¿Deseas limpiar el texto y el contexto del panel de lectura?")) {
+        currentDocumentText = ""; 
+        globalDocumentContext = "";
+        if (readerTextMode) readerTextMode.innerText = "";
+        if (docContextInput) docContextInput.value = "";
     }
 });
 

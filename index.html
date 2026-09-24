@@ -199,10 +199,19 @@
     </div>
 
     <!-- Panel Izquierdo de Lectura Activa (Limpio y directo) -->
-        <div id="readerPanel" class="w-1/3 h-full bg-slate-900 border-r border-slate-800 flex flex-col z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">        <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-3 select-none">
-            <button id="btnParseReaderText" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+    <div id="readerPanel" class="w-1/3 h-full bg-slate-900 border-r border-slate-800 flex flex-col z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">
+        <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex flex-col gap-3 select-none">
+            
+            <!-- Contenedor Flex para alinear "Generar" y "Limpiar Lector" -->
+            <div class="flex gap-2 w-full">
+                <button id="btnParseReaderText" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
                     <span>🌐 Generar Esquema del texto o tema</span>
                 </button>
+                <button id="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-3.5 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center">
+                    <span>🧹</span>
+                </button>
+            </div>
+
             <div class="flex items-center gap-2">
                 <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider whitespace-nowrap">Contexto:</span>
                 <input type="text" id="docContextInput" placeholder="Detectado automático o escríbelo..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
