@@ -181,7 +181,21 @@
     </header>
 
 <div class="flex flex-1 h-full relative overflow-hidden">
-        
+    <div id="nodeDetailPanel" class="w-96 h-full bg-slate-900 border-l border-slate-800 flex flex-col hidden z-20 shadow-2xl relative select-text">
+        <div class="px-4 py-3 bg-slate-950 border-b border-slate-800 flex justify-between items-center select-none">
+            <h3 id="detailNodeTitle" class="text-xs font-bold font-heading text-amber-400 uppercase tracking-wider">Detalle del Nodo</h3>
+            <button id="closeDetailPanel" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded bg-slate-800 transition-colors">✕ Cerrar</button>
+        </div>
+        <!-- Contenedor con texto de definición real y seleccionable -->
+        <div id="nodeDetailContent" class="flex-1 overflow-auto p-5 text-slate-200 text-sm leading-relaxed font-sans select-text">
+            Haz clic en un nodo para leer su definición completa, seleccionarla y extraer nuevos sub-conceptos.
+        </div>
+        <!-- Tooltip flotante específico para cuando seleccionas texto dentro de la definición -->
+        <div id="nodeSelectionTooltip" class="hidden absolute bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-30 text-xs select-none">
+            <span id="nodeTooltipPreview" class="text-slate-300 italic">"..."</span>
+            <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear Nodo Hijo</button>
+        </div>
+    </div>
 <!-- Panel Izquierdo de Lectura Activa (Texto Libre y Contexto) -->
     <div id="readerPanel" class="w-1/2 h-full bg-slate-900 border-r border-slate-800 flex flex-col hidden z-10 shadow-lg relative min-w-[300px] max-w-[75vw]">
         
@@ -227,7 +241,7 @@ Puedes pegar fragmentos extensos, artículos completos o notas de investigación
                     <span class="text-amber-600 text-[10px]">Ej</span>
                 </button>
                 <button id="tipBtnDefine" class="w-full px-3.5 py-1.5 hover:bg-slate-100 text-slate-800 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>Definición IA</span>
+                    <span>Definición</span>
                     <span class="text-slate-400 text-[10px]">⌘D</span>
                 </button>
             </div>

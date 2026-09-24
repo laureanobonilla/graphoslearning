@@ -998,8 +998,8 @@ document.getElementById('btnMenuDefine').addEventListener('click', async () => {
             label: newLabel,
             shape: 'box',
             fixed: { x: false, y: false },
-            widthConstraint: { maximum: 240 },
-            heightConstraint: { maximum: 240, valign: 'top' }
+            widthConstraint: { minimum: 220, maximum: 280 }, // Ancho estricto controlado
+            heightConstraint: { minimum: 150, maximum: 220 } // Altura limitada para que no se estire verticalmente
         });
     } catch (err) {
         console.error("Error al obtener la definición:", err);
@@ -1712,3 +1712,96 @@ function createNodeFromReader(actionType) {
 document.getElementById('tipBtnExpand')?.addEventListener('click', () => createNodeFromReader('expand'));
 document.getElementById('tipBtnExamples')?.addEventListener('click', () => createNodeFromReader('examples'));
 document.getElementById('tipBtnDefine')?.addEventListener('click', () => createNodeFromReader('define'));
+
+// ==========================================
+// PANEL LATERAL DE DEFINICIÓN Y EXTRACCIÓN DE NODOS
+// ==========================================
+const nodeDetailPanel = document.getElementById('nodeDetailPanel');
+const detailNodeTitle = document.getElementById('detailNodeTitle');
+const nodeDetailContent = document.getElementById('nodeDetailContent');
+const closeDetailPanel = document.getElementById('closeDetailPanel');
+const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
+const nodeTooltipPreview = document.getElementById('nodeTooltipPreview');
+const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
+
+let activeNodeDetailId = null;
+let activeNodeSelectionRange = null;
+let activeNodeSelectedText = "";
+
+// Cerrar panel de detalle
+closeDetailPanel?.addEventListener('click', () => {
+    nodeDetailPanel.classList.add('hidden');
+    activeNodeDetailId = null;
+});
+
+// Modificamos el evento de clic en los nodos para que además abra este panel si tiene definición
+// (O puedes abrirlo siempre que el nodo tenga definición o al hacer doble clic / opción del menú)
+document.getElementById('btnMenuDefine')?.addEventListener('click', () => {
+    // Cuando cargues la definición, además de actualizar el canvas, abrimos el panel lateral para lectura profunda
+    if (selectedNodeId) {
+        const node = nodes.get(selectedNodeId);
+        if (node && node.definition) {
+            detailNodeTitle.innerText = node.baseTitle || selectedNodeId;
+            nodeDetailContent.innerHTML = `<p class="mb-3 font-semibold text-amber-200">${node.baseTitle}</p><p>${node.definition.replace(/\n/g, '<br>')}</p>`;
+            nodeDetailPanel.classList.remove('hidden');
+            activeNodeDetailId = selectedNodeId;
+        }
+    }
+});
+
+// Detectar selección de texto dentro del panel de definición del nodo
+nodeDetailContent?.addEventListener('mouseup', (e) => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
+
+    if (text.length > 2) {
+        activeNodeSelectedText = text;
+        activeNodeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+        if (nodeTooltipPreview) nodeTooltipPreview.innerText = `"${text.substring(0, 20)}..."`;
+
+        nodeSelectionTooltip.style.left = `${e.offsetX - 20}px`;
+        nodeSelectionTooltip.style.top = `${e.offsetY - 50}px`;
+        nodeSelectionTooltip.classList.remove('hidden');
+    } else {
+        nodeSelectionTooltip.classList.add('hidden');
+    }
+});
+
+// Crear nodo hijo a partir del texto seleccionado en la definición
+nodeBtnExtractChild?.addEventListener('click', () => {
+    if (!activeNodeSelectedText || !activeNodeDetailId) return;
+    nodeSelectionTooltip.classList.add('hidden');
+
+    const childTopic = activeNodeSelectedText;
+    activeNodeSelectedText = "";
+    activeNodeSelectionRange = null;
+
+    if (!checkBalance(1)) return;
+
+    const parentPos = network.getPositions([activeNodeDetailId])[activeNodeDetailId];
+    const newId = childTopic;
+
+    if (!nodes.get(newId)) {
+        nodes.add({
+            id: newId,
+            label: `*${childTopic}*`,
+            baseTitle: childTopic,
+            x: parentPos.x + 250,
+            y: parentPos.y + (Math.random() * 100 - 50),
+            fixed: { x: false, y: false },
+            widthConstraint: { minimum: 200, maximum: 260 },
+            heightConstraint: { minimum: 80, maximum: 160 }
+        });
+
+        // Creamos la flecha directa desde el nodo padre (origen de la definición) hacia este nuevo sub-concepto
+        edges.add({
+            from: activeNodeDetailId,
+            to: newId,
+            label: 'deriva en'
+        });
+
+        trackNodeUsage(childTopic);
+        consumeNodes(1);
+    }
+});
