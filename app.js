@@ -459,12 +459,119 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
 });
 
 // ==========================================
-// 13. EVENTOS DEL CANVAS (MENÚ DINÁMICO)
+// 13. EVENTOS DEL CANVAS (MENÚ DINÁMICO, VÍNCULOS Y SINERGIA)
 // ==========================================
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNodeId = params.nodes[0];
         
+        // --- 1. LÓGICA DE SINERGIA (FUSIÓN) ---
+        if (sourceNodeForSynergy && sourceNodeForSynergy !== clickedNodeId) {
+            const nodeA = nodes.get(sourceNodeForSynergy);
+            const nodeB = nodes.get(clickedNodeId);
+            const topicA = nodeA.baseTitle || sourceNodeForSynergy;
+            const topicB = nodeB.baseTitle || clickedNodeId;
+            
+            sourceNodeForSynergy = null;
+            const banner = document.getElementById('synergyBanner');
+            if(banner) banner.classList.add('hidden');
+
+            showLoader('Calculando convergencia...');
+            try {
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'synergy', topic: topicA, topicB: topicB, density: document.getElementById('nodeCount')?.value || 'auto' })
+                });
+                if(!response.ok) throw new Error("Error de red");
+                const data = await response.json();
+
+                const totalNodes = 1 + (data.pathsFromA?.length || 0) + (data.pathsFromB?.length || 0);
+                if (!checkBalance(totalNodes)) return;
+
+                nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+                network.setOptions({ physics: { enabled: true } });
+
+                const posA = network.getPositions([nodeA.id])[nodeA.id];
+                const posB = network.getPositions([nodeB.id])[nodeB.id];
+                const midX = (posA.x + posB.x) / 2;
+                const midY = (posA.y + posB.y) / 2;
+
+                const synNode = data.synergy;
+                if (!nodes.get(synNode.id)) {
+                    nodes.add({
+                        id: synNode.id, label: `*🌟 Sinergia:*\n${synNode.label}`, baseTitle: synNode.label,
+                        x: midX, y: midY, fixed: { x: false, y: false },
+                        color: { background: '#faf5ff', border: '#d946ef', highlight: { background: '#fdf4ff', border: '#c026d3' } },
+                        font: { color: '#4a044e', bold: { color: '#701a75', size: 16 } },
+                        borderWidth: 2, shadow: { enabled: true, color: 'rgba(217, 70, 239, 0.2)', size: 20 }
+                    });
+                    trackNodeUsage(synNode.label);
+                }
+
+                (data.pathsFromA || []).forEach(bridge => {
+                    if (!nodes.get(bridge.id)) {
+                        nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: posA.x + (midX - posA.x)/2 + (Math.random()*40-20), y: posA.y + (midY - posA.y)/2 + (Math.random()*40-20), fixed: { x: false, y: false }, color: getRandomColor() });
+                        trackNodeUsage(bridge.label);
+                    }
+                    edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
+                    edges.add({ from: bridge.id, to: synNode.id, label: bridge.relToSynergy });
+                });
+
+                (data.pathsFromB || []).forEach(bridge => {
+                    if (!nodes.get(bridge.id)) {
+                        nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: posB.x + (midX - posB.x)/2 + (Math.random()*40-20), y: posB.y + (midY - posB.y)/2 + (Math.random()*40-20), fixed: { x: false, y: false }, color: getRandomColor() });
+                        trackNodeUsage(bridge.label);
+                    }
+                    edges.add({ from: nodeB.id, to: bridge.id, label: bridge.relFromB });
+                    edges.add({ from: bridge.id, to: synNode.id, label: bridge.relToSynergy });
+                });
+
+                consumeNodes(totalNodes);
+                setTimeout(() => { stopPhysicsAndUnlock(); }, 1800);
+            } catch (err) { alert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
+            return; // ¡Este return detiene el código para que NO abra el menú!
+        }
+
+        // --- 2. LÓGICA DE VINCULAR CON... ---
+        if (sourceNodeForConnection && sourceNodeForConnection !== clickedNodeId) {
+            const nodeA = nodes.get(sourceNodeForConnection);
+            const nodeB = nodes.get(clickedNodeId);
+            const topicA = nodeA.baseTitle || sourceNodeForConnection;
+            const topicB = nodeB.baseTitle || clickedNodeId;
+            
+            sourceNodeForConnection = null;
+            const banner = document.getElementById('connectionBanner');
+            if(banner) banner.classList.add('hidden');
+
+            if (!checkBalance(1)) return;
+
+            showLoader('Generando puente conceptual...');
+            try {
+                const response = await fetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'connect', topic: topicA, topicB: topicB })
+                });
+                if(!response.ok) throw new Error("Error de red");
+                const data = await response.json();
+
+                const posA = network.getPositions([nodeA.id])[nodeA.id];
+                const posB = network.getPositions([nodeB.id])[nodeB.id];
+                const midX = (posA.x + posB.x) / 2;
+                const midY = (posA.y + posB.y) / 2;
+
+                const bridge = data.bridge;
+                if (!nodes.get(bridge.id)) {
+                    nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: midX, y: midY, fixed: { x: false, y: false }, color: getRandomColor() });
+                    trackNodeUsage(bridge.label);
+                    consumeNodes(1);
+                }
+                edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
+                edges.add({ from: bridge.id, to: nodeB.id, label: bridge.relToB });
+            } catch (err) { alert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
+            return; // ¡Este return detiene el código para que NO abra el menú!
+        }
+
+        // --- 3. MOSTRAR MENÚ CONTEXTUAL ---
         selectedNodeId = clickedNodeId;
         const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
         const DOMCoords = network.canvasToDOM(nodePosition);
@@ -487,8 +594,7 @@ network.on('click', async function (params) {
         actionMenu.style.top = topPos + 'px';
         actionMenu.style.visibility = 'visible';
 
-        // --- LÓGICA CORREGIDA DE VISIBILIDAD DE BOTONES ---
-        // Extraemos el nodo real de la base de datos usando su ID
+        // LÓGICA DE VISIBILIDAD DE BOTONES
         const actualNode = nodes.get(selectedNodeId);
         const isExpanded = actualNode && actualNode.isExpandedDef === true;
         
@@ -497,12 +603,10 @@ network.on('click', async function (params) {
         const btnOpenPanel = document.getElementById('btnMenuOpenPanel');
         
         if (isExpanded) {
-            // Si el nodo SÍ está expandido, ocultamos "Expandir" y mostramos los otros dos
             if (btnExpand) { btnExpand.classList.add('hidden'); btnExpand.classList.remove('flex'); }
             if (btnCollapse) { btnCollapse.classList.remove('hidden'); btnCollapse.classList.add('flex'); }
             if (btnOpenPanel) { btnOpenPanel.classList.remove('hidden'); btnOpenPanel.classList.add('flex'); }
         } else {
-            // Si el nodo NO está expandido, mostramos "Expandir" y ocultamos los otros dos
             if (btnExpand) { btnExpand.classList.remove('hidden'); btnExpand.classList.add('flex'); }
             if (btnCollapse) { btnCollapse.classList.add('hidden'); btnCollapse.classList.remove('flex'); }
             if (btnOpenPanel) { btnOpenPanel.classList.add('hidden'); btnOpenPanel.classList.remove('flex'); }
@@ -778,16 +882,25 @@ nodeBtnExtractChild?.addEventListener('click', () => {
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     const textContent = readerTextMode.innerText.trim();
     if (!textContent || textContent.length < 15) return alert("El lector está vacío.");
+    
     currentDocumentText = textContent;
     if (!checkBalance(6)) return;
+    
     showLoader(`Generando árbol estructurado desde el lector...`);
+    
     try {
         const response = await fetch('/.netlify/functions/gemini', {
-            method: 'POST', body: JSON.stringify({ action: 'parse_text', text: textContent, density: document.getElementById('nodeCount').value || 'auto' })
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'parse_text', text: textContent, density: document.getElementById('nodeCount')?.value || 'auto' })
         });
+        
+        if (!response.ok) throw new Error("Timeout o error del servidor");
+        
         const data = await response.json();
         const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
         if (!checkBalance(totalNodes)) return;
+        
         if (nodes.length > 0) { nodes.clear(); edges.clear(); }
         
         const root = data.root; const rootX = network.getViewPosition().x; const rootY = network.getViewPosition().y - 120;
@@ -795,6 +908,7 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
 
         const branches = data.branches || []; const branchSpacing = 280; const startBranchX = rootX - ((branches.length - 1) * branchSpacing / 2);
         const branchPositions = {};
+        
         branches.forEach((branch, index) => {
             const bx = startBranchX + (index * branchSpacing); branchPositions[branch.id] = { x: bx, y: rootY + 160, exampleCount: 0 };
             nodes.add({ id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label, color: getRandomColor(), x: bx, y: rootY + 160 });
@@ -806,9 +920,16 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
             nodes.add({ id: ex.id, label: `*Ejemplo:*\n${ex.label}`, baseTitle: ex.label, x: p.x, y: p.y + (p.exampleCount * 110), color: { background: '#ffffff', border: '#e2e8f0' }, shapeProperties: { borderRadius: 8, borderDashes: [4, 4] } });
             edges.add({ from: ex.targetId || root.id, to: ex.id, label: ex.relationship, color: { color: '#cbd5e1' }, dashes: true }); trackNodeUsage(ex.label);
         });
+        
         consumeNodes(totalNodes);
         network.setOptions({ physics: { enabled: false } }); network.fit({ animation: { duration: 600 } });
-    } catch (err) { alert('No se pudo procesar.'); } finally { hideLoader(); }
+        
+    } catch (err) { 
+        console.error(err);
+        alert("Intenta de nuevo en unos segundos"); 
+    } finally { 
+        hideLoader(); 
+    }
 });
 
 // ==========================================
