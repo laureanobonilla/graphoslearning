@@ -318,7 +318,7 @@
             </div>
         </div>
 
-        <div class="border-t border-slate-200/60 p-1">
+       <div class="border-t border-slate-200/60 p-1">
             <button id="btnMenuDelete" class="w-full px-3 py-1.5 hover:bg-red-50 text-red-600 font-medium text-[11px] rounded text-left transition-colors flex items-center gap-1.5">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 Eliminar
@@ -326,8 +326,24 @@
         </div>
     </div>
 
-    <!-- Modales de Sistema (Tienda, Auth, etc) -->
-    <div id="storeModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[100] hidden items-center justify-center p-3 md:p-4">
+</div> <!-- CIERRA EL CONTENEDOR PRINCIPAL DEL CANVAS (Esto quita la franja negra) -->
+
+    <!-- Modal: Tienda / Recargas -->
+    <div id="storeModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
+        <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div>
+                    <h2 class="text-xl font-bold font-heading text-slate-900 flex items-center gap-2">
+                        <span>✨</span> Amplía tu Cosmos
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Adquiere más nodos para seguir creando.</p>
+                </div>
+                <button id="closeStore" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            
+            <div class="p-6 flex flex-col gap-3 bg-white">
                 <!-- Opción 1 -->
                 <label class="flex justify-between items-center p-4 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-all">
                     <div class="flex items-center gap-3">
@@ -364,12 +380,38 @@
                     </div>
                     <span class="font-extrabold text-slate-900 text-lg">$59.99</span>
                 </label>
+            </div>
+
+            <div class="px-6 pb-6 pt-2 bg-white">
+                <div id="paypal-button-container" class="min-h-[100px] w-full flex items-center justify-center relative z-0"></div>
+                <p class="text-[10px] text-slate-400 text-center mt-3 flex items-center justify-center gap-1 font-medium">
+                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path></svg>
+                    Transacción segura cifrada
+                </p>
+            </div>
+        </div>
     </div>
-    
-    <p class="text-sm text-slate-500 mb-6 px-4">
-        Para <span id="authWallReason" class="font-bold text-slate-700">continuar explorando</span>, inicia sesión gratis. Guardaremos tu progreso en la nube y desbloquearemos tus <span class="font-bold text-emerald-600">15 nodos de bienvenida</span>.
-    </p>
-<!-- Modal: Mis Proyectos -->
+
+    <!-- Modal: Muro de Autenticación -->
+    <div id="authWallModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col border border-slate-200 text-center p-6">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl mx-auto mb-4">🚀</div>
+            <h3 class="text-lg font-bold text-slate-900 mb-2">Continúa explorando</h3>
+            <p class="text-sm text-slate-500 mb-6 px-2">
+                Para <span id="authWallReason" class="font-bold text-slate-700">continuar explorando</span>, inicia sesión gratis. Guardaremos tu progreso en la nube y desbloquearemos tus <span class="font-bold text-emerald-600">15 nodos de bienvenida</span>.
+            </p>
+            <div class="flex flex-col gap-2">
+                <button id="btnTriggerNetlifyLogin" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all shadow-md">
+                    Iniciar Sesión / Registrarse
+                </button>
+                <button id="closeAuthWall" class="w-full text-slate-400 hover:text-slate-600 py-2 text-xs font-semibold">
+                    Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Mis Proyectos -->
     <div id="projectsModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
         <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col border border-slate-200 max-h-[85vh]">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 rounded-t-3xl">
@@ -381,9 +423,7 @@
             </div>
             
             <div class="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
-                <div id="projectsList" class="flex flex-col gap-2">
-                    <!-- Aquí se inyectarán los proyectos -->
-                </div>
+                <div id="projectsList" class="flex flex-col gap-2"></div>
                 <div id="noProjectsMsg" class="hidden text-center py-8 text-slate-400 text-sm font-medium">
                     No tienes proyectos guardados aún.
                 </div>
