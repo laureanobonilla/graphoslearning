@@ -328,18 +328,18 @@
 
 </div> <!-- CIERRA EL CONTENEDOR PRINCIPAL DEL CANVAS (Esto quita la franja negra) -->
 
-<!-- Modal: Tienda / Recargas -->
+<!-- Modal: Tienda / Recargas (Con Anclaje de Lanzamiento) -->
     <div id="storeModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
-        <!-- Se cambió overflow-hidden por max-h-[90vh] para limitar la altura -->
         <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col border border-slate-200 max-h-[90vh]">
             
             <!-- Cabecera Fija -->
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 rounded-t-3xl">
                 <div>
-                    <h2 class="text-xl font-bold font-heading text-slate-900 flex items-center gap-2">
-                        <span>✨</span> Amplía tu Cosmos
-                    </h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Adquiere más nodos para seguir creando.</p>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-xl font-bold font-heading text-slate-900">Amplía tu Cosmos</h2>
+                        <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Lanzamiento</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">Tarifas preferenciales para primeros investigadores.</p>
                 </div>
                 <button id="closeStore" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -348,43 +348,55 @@
             
             <!-- Contenedor con Scroll Automático para PayPal -->
             <div class="flex-1 overflow-y-auto rounded-b-3xl">
-                <!-- Opciones de Compra -->
-                <div class="p-6 flex flex-col gap-3 bg-white">
+                <div class="p-6 flex flex-col gap-3.5 bg-white">
+                    
                     <!-- Opción 1 -->
                     <label class="flex justify-between items-center p-4 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="radio" name="nodePackage" value="50" data-price="7.99" class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500" checked>
+                        <div class="flex items-center gap-3 pr-2">
+                            <input type="radio" name="nodePackage" value="50" data-price="7.99" class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0" checked>
                             <div>
-                                <p class="font-bold text-slate-800 text-sm">Paquete Básico</p>
-                                <p class="text-xs text-slate-500 font-medium">+50 Nodos</p>
+                                <p class="font-bold text-slate-800 text-sm">Pase de Estudio</p>
+                                <p class="text-xs text-indigo-600 font-semibold">+50 Nodos de análisis</p>
+                                <p class="text-[11px] text-slate-400 mt-0.5 leading-tight">Ideal para desglosar de 2 a 4 ensayos o artículos.</p>
                             </div>
                         </div>
-                        <span class="font-extrabold text-slate-900 text-lg">$7.99</span>
+                        <div class="text-right shrink-0">
+                            <span class="block text-xs text-slate-400 line-through font-medium">$14.99</span>
+                            <span class="font-extrabold text-slate-900 text-lg">$7.99</span>
+                        </div>
                     </label>
 
                     <!-- Opción 2 (Destacada) -->
                     <label class="flex justify-between items-center p-4 border-2 border-indigo-500 rounded-xl cursor-pointer shadow-sm bg-indigo-50/20 relative">
-                        <div class="absolute -top-2.5 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">Más Popular</div>
-                        <div class="flex items-center gap-3">
-                            <input type="radio" name="nodePackage" value="120" data-price="14.99" class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500">
+                        <div class="absolute -top-2.5 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">Más Elegido</div>
+                        <div class="flex items-center gap-3 pr-2">
+                            <input type="radio" name="nodePackage" value="120" data-price="14.99" class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0">
                             <div>
-                                <p class="font-bold text-indigo-900 text-sm">Paquete Creador</p>
-                                <p class="text-xs text-indigo-600/70 font-medium">+120 Nodos</p>
+                                <p class="font-bold text-indigo-950 text-sm">Nivel Investigador</p>
+                                <p class="text-xs text-indigo-600 font-semibold">+120 Nodos de análisis</p>
+                                <p class="text-[11px] text-slate-500 mt-0.5 leading-tight">Para estructurar libros, tesis y cruces complejos.</p>
                             </div>
                         </div>
-                        <span class="font-extrabold text-indigo-900 text-lg">$14.99</span>
+                        <div class="text-right shrink-0">
+                            <span class="block text-xs text-indigo-400 line-through font-medium">$29.99</span>
+                            <span class="font-extrabold text-indigo-950 text-lg">$14.99</span>
+                        </div>
                     </label>
 
                     <!-- Opción 3 -->
                     <label class="flex justify-between items-center p-4 border-2 border-slate-200 rounded-xl cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/30 transition-all">
-                        <div class="flex items-center gap-3">
-                            <input type="radio" name="nodePackage" value="600" data-price="59.99" class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500">
+                        <div class="flex items-center gap-3 pr-2">
+                            <input type="radio" name="nodePackage" value="600" data-price="59.99" class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500 shrink-0">
                             <div>
-                                <p class="font-bold text-slate-800 text-sm">Paquete Épico</p>
-                                <p class="text-xs text-slate-500 font-medium">+600 Nodos</p>
+                                <p class="font-bold text-slate-800 text-sm">Nivel Polímata</p>
+                                <p class="text-xs text-indigo-600 font-semibold">+600 Nodos de análisis</p>
+                                <p class="text-[11px] text-slate-400 mt-0.5 leading-tight">Capacidad intensiva para proyectos de largo alcance.</p>
                             </div>
                         </div>
-                        <span class="font-extrabold text-slate-900 text-lg">$59.99</span>
+                        <div class="text-right shrink-0">
+                            <span class="block text-xs text-slate-400 line-through font-medium">$99.99</span>
+                            <span class="font-extrabold text-slate-900 text-lg">$59.99</span>
+                        </div>
                     </label>
                 </div>
 
