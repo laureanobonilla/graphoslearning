@@ -1359,19 +1359,21 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
     const customRequest = customPromptInput.value.trim();
     if (!customRequest || !selectedNodeId) return;
 
+    const originNodeId = selectedNodeId;
+
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');
     customPromptBox.classList.add('hidden');
     customPromptBox.classList.remove('flex');
 
-    if (!requireAuth("realizar peticiones personalizadas a la IA")) return;
+    if (!requireAuth("realizar peticiones personalizadas")) return;
     if (!checkBalance(1)) return;
 
-    const currentNode = nodes.get(selectedNodeId);
-    const topicName = currentNode.baseTitle || selectedNodeId;
-    const contextPath = getContextPath(selectedNodeId);
+    const currentNode = nodes.get(originNodeId);
+    const topicName = currentNode.baseTitle || originNodeId;
+    const contextPath = getContextPath(originNodeId);
 
-    showLoader('Procesando tu solicitud...');
+    showLoader('Desarrollando tu petición...');
 
     try {
         const response = await fetch('/.netlify/functions/gemini', {
@@ -1392,18 +1394,47 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
 
         if (!checkBalance(generatedItems.length)) return;
 
+        // Bloquear nodos existentes temporalmente para que no salten
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
-        const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
+        const parentPos = network.getPositions([originNodeId])[originNodeId];
         network.setOptions({ physics: { enabled: true } });
 
+        // 1. CREAR NODO INTERMEDIO CON LA PETICIÓN DEL USUARIO
+        const queryNodeId = `query_${Date.now()}`;
+        const queryX = parentPos.x;
+        const queryY = parentPos.y + 130;
+
+        nodes.add({
+            id: queryNodeId,
+            label: `*✨ Petición:*\n"${customRequest}"`,
+            baseTitle: customRequest,
+            x: queryX,
+            y: queryY,
+            fixed: { x: false, y: false },
+            color: { background: '#eef2ff', border: '#818cf8' }, // Tono índigo suave distintivo
+            shapeProperties: { borderRadius: 10, borderDashes: [3, 3] },
+            widthConstraint: { minimum: 160, maximum: 240 }
+        });
+
+        edges.add({
+            from: originNodeId,
+            to: queryNodeId,
+            label: 'consulta',
+            color: { color: '#818cf8' },
+            dashes: true
+        });
+
+        // 2. CREAR LOS NODOS DE RESPUESTA CONECTADOS AL NODO INTERMEDIO
         let createdCount = 0;
         generatedItems.forEach((item, idx) => {
-            const newNodeId = item.id || `${selectedNodeId}_custom_${Date.now()}_${idx}`;
+            const newNodeId = item.id || `${originNodeId}_res_${Date.now()}_${idx}`;
             if (!nodes.get(newNodeId)) {
                 const hasLongContent = item.content && item.content.trim().length > 0;
                 const nodeLabel = hasLongContent 
                     ? `*${item.title}*\n────────────────────\n${item.content}`
                     : `*${item.title}*`;
+
+                const offsetX = (idx - ((generatedItems.length - 1) / 2)) * 220;
 
                 nodes.add({
                     id: newNodeId,
@@ -1412,14 +1443,14 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
                     definition: item.content || null,
                     isExpandedDef: hasLongContent,
                     color: getRandomColor(),
-                    x: parentPos.x + (Math.random() * 80 - 40),
-                    y: parentPos.y + 150,
+                    x: queryX + offsetX,
+                    y: queryY + 150,
                     fixed: { x: false, y: false },
                     widthConstraint: hasLongContent ? { minimum: 420, maximum: 500 } : { minimum: 150, maximum: 250 }
                 });
 
                 edges.add({
-                    from: selectedNodeId,
+                    from: queryNodeId,
                     to: newNodeId,
                     label: item.relationship
                 });
