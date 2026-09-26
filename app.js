@@ -293,23 +293,32 @@ function checkBalance(cost) {
 function renderThreeLevelTree(data) {
     if (nodes.length > 0) { nodes.clear(); edges.clear(); }
     
+    // 1. Reducir el Modo Lector a su tamaño mínimo (300px) para maximizar el lienzo
+    if (readerPanel && !readerPanel.classList.contains('hidden')) {
+        readerPanel.classList.remove('w-1/3');
+        readerPanel.style.flex = 'none';
+        readerPanel.style.width = '300px';
+        if (typeof network !== 'undefined') network.redraw();
+    }
+
     const viewCenter = network.getViewPosition();
     const rootX = viewCenter.x;
-    const rootY = viewCenter.y - 220;
+    const rootY = viewCenter.y - 200;
 
     const root = data.root;
     const branches = data.branches || [];
     const subBranches = data.subBranches || [];
 
-    // 1. Crear Raíz (Nivel 1)
+    // 2. Crear Raíz (Nivel 1) con ancho controlado para mantener compacidad
     nodes.add({
         id: root.id, label: `*${root.label}*`, baseTitle: root.label,
         color: getRandomColor(), definition: root.definition || null,
-        x: rootX, y: rootY, fixed: { x: false, y: false }
+        x: rootX, y: rootY, fixed: { x: false, y: false },
+        widthConstraint: { minimum: 140, maximum: 220 }
     });
     trackNodeUsage(root.label);
 
-    // 2. Agrupar Sub-ramas (Nivel 3) por cada Rama (Nivel 2) para calcular el ancho real
+    // 3. Agrupar Sub-ramas (Nivel 3) por cada Rama (Nivel 2)
     const childrenByBranch = {};
     branches.forEach(b => { childrenByBranch[b.id] = []; });
     subBranches.forEach(sb => {
@@ -320,19 +329,24 @@ function renderThreeLevelTree(data) {
         }
     });
 
-    const subSpacing = 230; // Espacio horizontal entre nodos de Nivel 3
+    // Distribuimos las sub-ramas en máximo 2 columnas por rama para que el árbol no se estire a lo ancho
+    const colSpacing = 185; 
+    const rowSpacing = 95;  
+    const branchGap = 60;   // Separación limpia entre grupos de ramas
+
     const branchWidths = branches.map(b => {
         const count = childrenByBranch[b.id].length;
-        return Math.max(1, count) * subSpacing;
+        const cols = count <= 1 ? 1 : 2; // Máximo 2 columnas por cada rama de Nivel 2
+        return (cols * colSpacing) + branchGap;
     });
 
     const totalTreeWidth = branchWidths.reduce((sum, w) => sum + w, 0);
     let currentLeftX = rootX - (totalTreeWidth / 2);
 
-    const branchY = rootY + 180;
-    const subBranchY = branchY + 180;
+    const branchY = rootY + 150;
+    const subBranchBaseY = branchY + 140;
 
-    // 3. Posicionar Nivel 2 y Nivel 3 simétricamente sin colisiones
+    // 4. Posicionar Nivel 2 y Nivel 3 en bloques compactos
     branches.forEach((branch, idx) => {
         const sectionWidth = branchWidths[idx];
         const branchX = currentLeftX + (sectionWidth / 2);
@@ -340,21 +354,31 @@ function renderThreeLevelTree(data) {
         nodes.add({
             id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label,
             color: getRandomColor(), definition: branch.definition || null,
-            x: branchX, y: branchY, fixed: { x: false, y: false }
+            x: branchX, y: branchY, fixed: { x: false, y: false },
+            widthConstraint: { minimum: 130, maximum: 200 }
         });
         edges.add({ from: root.id, to: branch.id, label: branch.relationship });
         trackNodeUsage(branch.label);
 
         const subs = childrenByBranch[branch.id];
-        const startSubX = branchX - (((subs.length - 1) * subSpacing) / 2);
+        const cols = subs.length <= 1 ? 1 : 2;
 
         subs.forEach((sub, sIdx) => {
-            const subX = startSubX + (sIdx * subSpacing);
+            const row = Math.floor(sIdx / cols);
+            const col = sIdx % cols;
+            
+            // Si es la última fila y quedó un nodo impar suelto, lo centramos bajo su rama
+            const isLastOdd = (sIdx === subs.length - 1) && (subs.length % 2 !== 0) && (cols === 2);
+            const offsetX = isLastOdd ? 0 : (col === 0 ? -colSpacing / 2 : colSpacing / 2);
+
+            const subX = branchX + (cols === 1 ? 0 : offsetX);
+            const subY = subBranchBaseY + (row * rowSpacing);
+
             nodes.add({
                 id: sub.id, label: `*${sub.label}*`, baseTitle: sub.label,
                 color: getRandomColor(), definition: sub.definition || null,
-                x: subX, y: subBranchY + (sIdx % 2 === 0 ? 0 : 35), // Ligero escalonado para legibilidad
-                fixed: { x: false, y: false }
+                x: subX, y: subY, fixed: { x: false, y: false },
+                widthConstraint: { minimum: 120, maximum: 185 }
             });
             edges.add({ from: branch.id, to: sub.id, label: sub.relationship });
             trackNodeUsage(sub.label);
@@ -364,7 +388,11 @@ function renderThreeLevelTree(data) {
     });
 
     network.setOptions({ physics: { enabled: false } });
-    network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+    
+    // Esperamos un instante a que el DOM reajuste los 300px del lector para encuadrar de cerca
+    setTimeout(() => {
+        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+    }, 60);
 }
 
 async function generateFullSchemaFromTopic(topicText) {
@@ -995,11 +1023,46 @@ document.getElementById('btnSurprise')?.addEventListener('click', () => {
     generateFullSchemaFromTopic(randomTopic);
 });
 
-// ==========================================
-// HERRAMIENTAS: ELIMINAR, LIMPIAR, ESCALA Y CAPTURAR
-// ==========================================
+// Función auxiliar para encontrar todos los descendientes (hijos, nietos, etc.) de un nodo
+function getAllDescendants(parentNodeId) {
+    const descendants = new Set();
+    const queue = [parentNodeId];
+
+    while (queue.length > 0) {
+        const currentId = queue.shift();
+        const childEdges = edges.get({ filter: e => e.from === currentId });
+        
+        childEdges.forEach(edge => {
+            if (!descendants.has(edge.to) && edge.to !== parentNodeId) {
+                descendants.add(edge.to);
+                queue.push(edge.to);
+            }
+        });
+    }
+    return Array.from(descendants);
+}
+
 document.getElementById('btnMenuDelete')?.addEventListener('click', () => {
-    if (selectedNodeId) nodes.remove(selectedNodeId);
+    if (!selectedNodeId) return;
+
+    const descendants = getAllDescendants(selectedNodeId);
+
+    if (descendants.length > 0) {
+        const deleteAll = confirm(
+            `Este nodo tiene ${descendants.length} sub-nodo(s) conectado(s).\n\n` +
+            `• Presiona "Aceptar" para eliminar el nodo y TODOS sus hijos.\n` +
+            `• Presiona "Cancelar" para eliminar ÚNICAMENTE este nodo y conservar sus hijos.`
+        );
+
+        if (deleteAll) {
+            nodes.remove([selectedNodeId, ...descendants]);
+        } else {
+            nodes.remove(selectedNodeId);
+        }
+    } else {
+        nodes.remove(selectedNodeId);
+    }
+
     actionMenu.classList.add('hidden');
     selectedNodeId = null;
 });
