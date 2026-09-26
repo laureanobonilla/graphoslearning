@@ -288,64 +288,112 @@ function checkBalance(cost) {
 }
 
 // ==========================================
-// 6. GENERACIÓN DESDE BARRA SUPERIOR O INPUT
+// 6. GENERACIÓN DE ESQUEMA EN 3 NIVELES Y NODOS
 // ==========================================
+function renderThreeLevelTree(data) {
+    if (nodes.length > 0) { nodes.clear(); edges.clear(); }
+    
+    const viewCenter = network.getViewPosition();
+    const rootX = viewCenter.x;
+    const rootY = viewCenter.y - 220;
+
+    const root = data.root;
+    const branches = data.branches || [];
+    const subBranches = data.subBranches || [];
+
+    // 1. Crear Raíz (Nivel 1)
+    nodes.add({
+        id: root.id, label: `*${root.label}*`, baseTitle: root.label,
+        color: getRandomColor(), definition: root.definition || null,
+        x: rootX, y: rootY, fixed: { x: false, y: false }
+    });
+    trackNodeUsage(root.label);
+
+    // 2. Agrupar Sub-ramas (Nivel 3) por cada Rama (Nivel 2) para calcular el ancho real
+    const childrenByBranch = {};
+    branches.forEach(b => { childrenByBranch[b.id] = []; });
+    subBranches.forEach(sb => {
+        if (childrenByBranch[sb.parentId]) {
+            childrenByBranch[sb.parentId].push(sb);
+        } else if (branches.length > 0) {
+            childrenByBranch[branches[0].id].push(sb);
+        }
+    });
+
+    const subSpacing = 230; // Espacio horizontal entre nodos de Nivel 3
+    const branchWidths = branches.map(b => {
+        const count = childrenByBranch[b.id].length;
+        return Math.max(1, count) * subSpacing;
+    });
+
+    const totalTreeWidth = branchWidths.reduce((sum, w) => sum + w, 0);
+    let currentLeftX = rootX - (totalTreeWidth / 2);
+
+    const branchY = rootY + 180;
+    const subBranchY = branchY + 180;
+
+    // 3. Posicionar Nivel 2 y Nivel 3 simétricamente sin colisiones
+    branches.forEach((branch, idx) => {
+        const sectionWidth = branchWidths[idx];
+        const branchX = currentLeftX + (sectionWidth / 2);
+
+        nodes.add({
+            id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label,
+            color: getRandomColor(), definition: branch.definition || null,
+            x: branchX, y: branchY, fixed: { x: false, y: false }
+        });
+        edges.add({ from: root.id, to: branch.id, label: branch.relationship });
+        trackNodeUsage(branch.label);
+
+        const subs = childrenByBranch[branch.id];
+        const startSubX = branchX - (((subs.length - 1) * subSpacing) / 2);
+
+        subs.forEach((sub, sIdx) => {
+            const subX = startSubX + (sIdx * subSpacing);
+            nodes.add({
+                id: sub.id, label: `*${sub.label}*`, baseTitle: sub.label,
+                color: getRandomColor(), definition: sub.definition || null,
+                x: subX, y: subBranchY + (sIdx % 2 === 0 ? 0 : 35), // Ligero escalonado para legibilidad
+                fixed: { x: false, y: false }
+            });
+            edges.add({ from: branch.id, to: sub.id, label: sub.relationship });
+            trackNodeUsage(sub.label);
+        });
+
+        currentLeftX += sectionWidth;
+    });
+
+    network.setOptions({ physics: { enabled: false } });
+    network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+}
+
 async function generateFullSchemaFromTopic(topicText) {
     if (!topicText) return;
-    if (!checkBalance(10)) return;
-    showLoader(`Estructurando esquema...`);
-    topicInput.value = '';
+    // Verificamos que tenga al menos saldo disponible para iniciar
+    if (!checkBalance(1)) return;
+    
+    showLoader(`Estructurando esquema de 3 niveles...`);
+    if (topicInput) topicInput.value = '';
 
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'parse_text', text: topicText, density: 'auto' })
+            body: JSON.stringify({ action: 'parse_text', text: topicText })
         });
+        if (!response.ok) throw new Error("Error en el servidor");
+        
         const data = await response.json();
-        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
-        if (!checkBalance(totalNodes)) return;
+        const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
-        if (nodes.length > 0) { nodes.clear(); edges.clear(); }
-        const viewCenter = network.getViewPosition();
-        const rootX = viewCenter.x; const rootY = viewCenter.y - 120;
-
-        const root = data.root;
-        nodes.add({ id: root.id, label: `*${root.label}*`, baseTitle: root.label, color: getRandomColor(), definition: root.definition || null, x: rootX, y: rootY, fixed: { x: false, y: false } });
-        trackNodeUsage(root.label);
-
-        const branches = data.branches || [];
-        const branchSpacing = 280;
-        const totalBranchWidth = (branches.length - 1) * branchSpacing;
-        const startBranchX = rootX - (totalBranchWidth / 2);
-        const branchY = rootY + 160;
-        const branchPositions = {};
-
-        branches.forEach((branch, index) => {
-            const bx = startBranchX + (index * branchSpacing);
-            branchPositions[branch.id] = { x: bx, y: branchY, exampleCount: 0 };
-            nodes.add({ id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label, color: getRandomColor(), x: bx, y: branchY, fixed: { x: false, y: false } });
-            edges.add({ from: root.id, to: branch.id, label: branch.relationship });
-            trackNodeUsage(branch.label);
-        });
-
-        const examples = data.examples || [];
-        examples.forEach(ex => {
-            const parentPos = branchPositions[ex.targetId] || { x: rootX, y: branchY, exampleCount: 0 };
-            parentPos.exampleCount++;
-            nodes.add({
-                id: ex.id, label: `*Ejemplo:*\n${ex.label}`, baseTitle: ex.label, x: parentPos.x, y: parentPos.y + (parentPos.exampleCount * 110), fixed: { x: false, y: false },
-                color: { background: '#ffffff', border: '#e2e8f0' }, shapeProperties: { borderRadius: 8, borderDashes: [4, 4] }
-            });
-            const target = nodes.get(ex.targetId) ? ex.targetId : root.id;
-            edges.add({ from: target, to: ex.id, label: ex.relationship, color: { color: '#cbd5e1' }, dashes: true });
-            trackNodeUsage(ex.label);
-        });
-
+        renderThreeLevelTree(data);
         consumeNodes(totalNodes);
-        network.setOptions({ physics: { enabled: false } });
-        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
-    } catch (err) { alert('Hubo un error al generar el esquema.'); } finally { hideLoader(); }
+    } catch (err) {
+        console.error(err);
+        alert('Intenta de nuevo en unos segundos');
+    } finally {
+        hideLoader();
+    }
 }
 
 function insertSingleNode(topic) {
@@ -361,11 +409,17 @@ function insertSingleNode(topic) {
 function handleTopicInput() {
     const topic = topicInput.value.trim();
     if (!topic) return;
-    insertSingleNode(topic); 
+    // Si el lienzo está vacío, el primer nodo genera un esquema completo de 3 niveles
+    if (nodes.length === 0) {
+        generateFullSchemaFromTopic(topic);
+    } else {
+        insertSingleNode(topic);
+    }
 }
 
 document.getElementById('btnGenerate')?.addEventListener('click', handleTopicInput);
 document.getElementById('topicInput')?.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleTopicInput(); });
+
 
 // ==========================================
 // 7. EXPANDIR RAMAS MANUALMENTE (Lógica 'Auto')
@@ -888,55 +942,10 @@ nodeBtnExtractChild?.addEventListener('click', () => {
 // ==========================================
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     const textContent = readerTextMode.innerText.trim();
-    if (!textContent || textContent.length < 15) return alert("El lector está vacío.");
+    if (!textContent || textContent.length < 3) return alert("Escribe un tema o pega un texto en el lector.");
     
     currentDocumentText = textContent;
-    if (!checkBalance(6)) return;
-    
-    showLoader(`Generando árbol estructurado desde el lector...`);
-    
-    try {
-        const response = await fetch('/.netlify/functions/gemini', {
-            method: 'POST', 
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'parse_text', text: textContent, density: document.getElementById('nodeCount')?.value || 'auto' })
-        });
-        
-        if (!response.ok) throw new Error("Timeout o error del servidor");
-        
-        const data = await response.json();
-        const totalNodes = 1 + (data.branches?.length || 0) + (data.examples?.length || 0);
-        if (!checkBalance(totalNodes)) return;
-        
-        if (nodes.length > 0) { nodes.clear(); edges.clear(); }
-        
-        const root = data.root; const rootX = network.getViewPosition().x; const rootY = network.getViewPosition().y - 120;
-        nodes.add({ id: root.id, label: `*${root.label}*`, baseTitle: root.label, color: getRandomColor(), x: rootX, y: rootY }); trackNodeUsage(root.label);
-
-        const branches = data.branches || []; const branchSpacing = 280; const startBranchX = rootX - ((branches.length - 1) * branchSpacing / 2);
-        const branchPositions = {};
-        
-        branches.forEach((branch, index) => {
-            const bx = startBranchX + (index * branchSpacing); branchPositions[branch.id] = { x: bx, y: rootY + 160, exampleCount: 0 };
-            nodes.add({ id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label, color: getRandomColor(), x: bx, y: rootY + 160 });
-            edges.add({ from: root.id, to: branch.id, label: branch.relationship }); trackNodeUsage(branch.label);
-        });
-
-        (data.examples || []).forEach(ex => {
-            const p = branchPositions[ex.targetId] || { x: rootX, y: rootY + 160, exampleCount: 0 }; p.exampleCount++;
-            nodes.add({ id: ex.id, label: `*Ejemplo:*\n${ex.label}`, baseTitle: ex.label, x: p.x, y: p.y + (p.exampleCount * 110), color: { background: '#ffffff', border: '#e2e8f0' }, shapeProperties: { borderRadius: 8, borderDashes: [4, 4] } });
-            edges.add({ from: ex.targetId || root.id, to: ex.id, label: ex.relationship, color: { color: '#cbd5e1' }, dashes: true }); trackNodeUsage(ex.label);
-        });
-        
-        consumeNodes(totalNodes);
-        network.setOptions({ physics: { enabled: false } }); network.fit({ animation: { duration: 600 } });
-        
-    } catch (err) { 
-        console.error(err);
-        alert("Intenta de nuevo en unos segundos"); 
-    } finally { 
-        hideLoader(); 
-    }
+    await generateFullSchemaFromTopic(textContent);
 });
 
 // ==========================================
@@ -1257,3 +1266,113 @@ if (window.paypal) {
         }
     }).render('#paypal-button-container');
 }
+
+// ==========================================
+// 17. PETICIÓN PERSONALIZADA POR NODO
+// ==========================================
+const btnMenuCustom = document.getElementById('btnMenuCustom');
+const customPromptBox = document.getElementById('customPromptBox');
+const customPromptInput = document.getElementById('customPromptInput');
+const btnSendCustomPrompt = document.getElementById('btnSendCustomPrompt');
+
+btnMenuCustom?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    customPromptBox.classList.toggle('hidden');
+    customPromptBox.classList.toggle('flex');
+    if (!customPromptBox.classList.contains('hidden')) {
+        customPromptInput.focus();
+    }
+});
+
+// Ocultar el cuadro de texto cuando se cierre o abra el menú en otro nodo
+network.on('click', () => {
+    if (customPromptBox) {
+        customPromptBox.classList.add('hidden');
+        customPromptBox.classList.remove('flex');
+    }
+});
+
+btnSendCustomPrompt?.addEventListener('click', async () => {
+    const customRequest = customPromptInput.value.trim();
+    if (!customRequest || !selectedNodeId) return;
+
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    customPromptBox.classList.add('hidden');
+    customPromptBox.classList.remove('flex');
+
+    if (!requireAuth("realizar peticiones personalizadas a la IA")) return;
+    if (!checkBalance(1)) return;
+
+    const currentNode = nodes.get(selectedNodeId);
+    const topicName = currentNode.baseTitle || selectedNodeId;
+    const contextPath = getContextPath(selectedNodeId);
+
+    showLoader('Procesando tu solicitud...');
+
+    try {
+        const response = await fetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'custom_prompt',
+                topic: topicName,
+                contextPath,
+                customRequest,
+                documentContext: globalDocumentContext || currentDocumentText
+            })
+        });
+
+        if (!response.ok) throw new Error("Error en la respuesta");
+        const data = await response.json();
+        const generatedItems = data.nodes || [];
+
+        if (!checkBalance(generatedItems.length)) return;
+
+        nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
+        const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
+        network.setOptions({ physics: { enabled: true } });
+
+        let createdCount = 0;
+        generatedItems.forEach((item, idx) => {
+            const newNodeId = item.id || `${selectedNodeId}_custom_${Date.now()}_${idx}`;
+            if (!nodes.get(newNodeId)) {
+                const hasLongContent = item.content && item.content.trim().length > 0;
+                const nodeLabel = hasLongContent 
+                    ? `*${item.title}*\n────────────────────\n${item.content}`
+                    : `*${item.title}*`;
+
+                nodes.add({
+                    id: newNodeId,
+                    label: nodeLabel,
+                    baseTitle: item.title,
+                    definition: item.content || null,
+                    isExpandedDef: hasLongContent,
+                    color: getRandomColor(),
+                    x: parentPos.x + (Math.random() * 80 - 40),
+                    y: parentPos.y + 150,
+                    fixed: { x: false, y: false },
+                    widthConstraint: hasLongContent ? { minimum: 420, maximum: 500 } : { minimum: 150, maximum: 250 }
+                });
+
+                edges.add({
+                    from: selectedNodeId,
+                    to: newNodeId,
+                    label: item.relationship
+                });
+
+                trackNodeUsage(item.title);
+                createdCount++;
+            }
+        });
+
+        customPromptInput.value = '';
+        consumeNodes(createdCount);
+        setTimeout(() => { stopPhysicsAndUnlock(); }, 1400);
+    } catch (err) {
+        console.error(err);
+        alert("Intenta de nuevo en unos segundos");
+    } finally {
+        hideLoader();
+    }
+});

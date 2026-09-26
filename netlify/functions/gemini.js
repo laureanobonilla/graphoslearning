@@ -231,36 +231,24 @@ exports.handler = async function(event, context) {
             return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
         }
 
-        // ==========================================
-        // 5. PARSEAR TEXTO A ESQUEMA JERÁRQUICO
-        // ==========================================
-        // ==========================================
-        // 5. SINTETIZAR ESQUEMA (TEXTO LARGO O TEMA CORTO)
+// ==========================================
+        // 5. SINTETIZAR ESQUEMA INICIAL (3 NIVELES, SIN EJEMPLOS)
         // ==========================================
         if (action === 'parse_text') {
-            let densityGuideline = '';
+            const isShortTopic = text.trim().split(/\s+/).length < 25;
             
-            if (density === 'low') {
-                densityGuideline = 'DENSIDAD BAJA: Genera 2-3 ramas principales y 1 ejemplo global. Máximo 5 nodos en total.';
-            } else if (density === 'high') {
-                densityGuideline = 'DENSIDAD ALTA: Genera 4-6 ramas detalladas y 3-4 ejemplos específicos. Máximo 10 nodos en total.';
-            } else if (density === 'medium') {
-                densityGuideline = 'DENSIDAD MEDIA: Genera 3-4 ramas centrales y 2-3 ejemplos. Máximo 8 nodos en total.';
-            } else {
-                densityGuideline = 'DENSIDAD INTELIGENTE (AUTO): Evalúa la complejidad del tema. Si es simple, usa densidad baja. Si es un tema amplio o científico, despliega ramas y ejemplos exhaustivos sin superar JAMÁS los 10 nodos generados (ramas + ejemplos).';
-            }
-
-            // Detectar si es un documento largo o solo el nombre de un tema
-            const isShortTopic = text.trim().split(/\s+/).length < 20;
             const inputContext = isShortTopic 
-                ? `Construye un esquema conceptual experto sobre este tema: "${text}"`
-                : `Analiza minuciosamente el siguiente documento y estructura un mapa conceptual fiel a su contenido:\n"""${text}"""`;
+                ? `Construye un esquema conceptual exhaustivo de 3 niveles sobre el tema: "${text}".
+                   REGLA DE EXHAUSTIVIDAD: Si el concepto o sus sub-ramas tienen fases, partes, clasificaciones o elementos canónicos definidos (ej. "Fases de la división celular", "Poderes del Estado"), DEBES incluir TODOS los elementos reales que componen cada nivel sin omitir ninguno. Si es un tema abierto (ej. "Política Exterior de Colombia"), despliega un abanico completo con todas las dimensiones y sub-elementos clave.`
+                : `Analiza minuciosamente el siguiente documento y estructura un mapa conceptual de 3 niveles estrictamente fiel a su contenido:\n"""${text}"""\n
+                   REGLA DE FIDELIDAD AL TEXTO: Descompón el esquema únicamente en las fases, categorías y sub-elementos que mencione o desarrolle la lectura.`;
 
             const schema = {
                 type: 'OBJECT',
                 properties: {
                     root: {
                         type: 'OBJECT',
+                        description: 'Nivel 1: Nodo central o título general.',
                         properties: {
                             id: { type: 'STRING' },
                             label: { type: 'STRING' },
@@ -270,51 +258,101 @@ exports.handler = async function(event, context) {
                     },
                     branches: {
                         type: 'ARRAY',
+                        description: 'Nivel 2: Categorías principales, fases o pilares que se desprenden de la raíz.',
                         items: {
                             type: 'OBJECT',
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                relationship: { type: 'STRING' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' },
                                 definition: { type: 'STRING', nullable: true }
                             },
                             required: ["id", "label", "relationship"]
                         }
                     },
-                    examples: {
+                    subBranches: {
                         type: 'ARRAY',
+                        description: 'Nivel 3: Sub-conceptos, etapas específicas o componentes que se desprenden de cada nodo del Nivel 2.',
                         items: {
                             type: 'OBJECT',
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                targetId: { type: 'STRING' },
-                                relationship: { type: 'STRING' },
+                                parentId: { type: 'STRING', description: 'ID exacto del nodo en "branches" (Nivel 2) al que pertenece.' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' },
                                 definition: { type: 'STRING', nullable: true }
                             },
-                            required: ["id", "label", "targetId", "relationship"]
+                            required: ["id", "label", "parentId", "relationship"]
                         }
                     }
                 },
-                required: ["root", "branches", "examples"]
+                required: ["root", "branches", "subBranches"]
             };
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
                 contents: `${inputContext}
 
-                PAUTAS DE DENSIDAD:
-                ${densityGuideline}
-
-                PROHIBICIÓN ESTRICTA DE PLACEHOLDERS:
-                - Queda terminantemente PROHIBIDO inventar textos comodín como: "Ejemplo Específico A", "Caso de Uso B", "Concepto 1".
-                - Los "label" DEBEN ser términos, teorías, datos o situaciones reales (ej. en lugar de "Ejemplo 1", usa "El colapso de Wall Street de 1929").
-                - Si analizas un texto largo, extrae los datos del texto. Si es un tema corto, extrae de tu conocimiento experto.
-                - "relationship" usa únicamente 1 a 3 palabras.`,
+                REGLAS ESTRICTAS DE ESTRUCTURA:
+                1. ESTRUCTURA DE 3 NIVELES: Genera el nodo raíz (Nivel 1), todas sus ramas principales correspondientes (Nivel 2) y desglosa cada rama principal en sus sub-nodos correspondientes (Nivel 3).
+                2. CERO NODOS DE EJEMPLO: Está PROHIBIDO incluir nodos de "Ejemplo:" en este esquema inicial. Todos los nodos deben ser conceptos, fases, componentes o categorías teóricas/fácticas del tema.
+                3. PROHIBICIÓN DE PLACEHOLDERS: Nunca uses textos genéricos como "Subconcepto 1" o "Fase A". Usa los nombres reales.
+                4. "relationship": Usa conectores precisos de 1 a 3 palabras.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
                     temperature: 0.15
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
+        // ==========================================
+        // 6. PETICIÓN ABIERTA / PERSONALIZADA A UN NODO
+        // ==========================================
+        if (action === 'custom_prompt') {
+            const { customRequest } = JSON.parse(event.body);
+
+            const docPrompt = documentContext 
+                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nTen en cuenta el documento si es relevante para responder a la petición, o usa conocimiento experto riguroso si el usuario pide una perspectiva externa.`
+                : 'Usa conocimiento experto, riguroso y profundo.';
+
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    nodes: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                title: { type: 'STRING', description: 'Título corto del nodo o concepto.' },
+                                content: { type: 'STRING', nullable: true, description: 'Si el usuario pidió una explicación amplia o desarrollo detallado, pon aquí el párrafo explicativo. Si solo pidió conceptos o ejemplos puntuales, déjalo null.' },
+                                relationship: { type: 'STRING', description: 'Conector lógico de 1 a 3 palabras desde el nodo origen.' }
+                            },
+                            required: ["id", "title", "relationship"]
+                        }
+                    }
+                },
+                required: ["nodes"]
+            };
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Nodo seleccionado: "${topic}".
+                Contexto en el esquema: "${contextPath}".
+                PETICIÓN DEL USUARIO: "${customRequest}".
+                ${docPrompt}
+
+                INSTRUCCIONES:
+                1. Cumple exactamente lo que pide el usuario respecto al nodo "${topic}".
+                2. Si pide una explicación más amplia, análisis profundo o síntesis (ej. "haz una explicación más amplia"), genera 1 nodo (o los necesarios) incluyendo un "title" claro y desarrolla el texto completo dentro de "content".
+                3. Si pide una lista de elementos, ejemplos bajo un autor o causas (ej. "dame ejemplos desde la perspectiva de Max Weber"), genera todos los nodos correspondientes que respondan a la solicitud.
+                4. "relationship" debe tener de 1 a 3 palabras conectando el nodo origen con cada resultado.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.25
                 }
             });
             return { statusCode: 200, body: response.text };
