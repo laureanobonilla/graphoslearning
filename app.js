@@ -87,14 +87,30 @@ const mainHeader = document.getElementById('mainHeader');
 let selectedNodeId = null;
 let sourceNodeForConnection = null;
 
+let loaderInterval = null;
+
 function showLoader(msg) {
     if (loaderText && loaderOverlay) {
         loaderText.innerText = msg;
         loaderOverlay.classList.add('show');
+        
+        const steps = [
+            msg,
+            "Analizando jerarquía conceptual...",
+            "Conectando nodos y relaciones...",
+            "Organizando niveles en el lienzo..."
+        ];
+        let stepIdx = 0;
+        clearInterval(loaderInterval);
+        loaderInterval = setInterval(() => {
+            stepIdx = (stepIdx + 1) % steps.length;
+            loaderText.innerText = steps[stepIdx];
+        }, 2200);
     }
 }
 
 function hideLoader() {
+    clearInterval(loaderInterval);
     if (loaderOverlay) {
         loaderOverlay.classList.remove('show');
     }
@@ -291,9 +307,22 @@ function checkBalance(cost) {
 // 6. GENERACIÓN DE ESQUEMA EN 3 NIVELES Y NODOS
 // ==========================================
 function renderThreeLevelTree(data) {
-    if (nodes.length > 0) { nodes.clear(); edges.clear(); }
+    let offsetX = 0;
+
+    if (nodes.length > 1) {
+        const shouldClear = confirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?\n\n• Aceptar: Limpia el lienzo y crea el nuevo.\n• Cancelar: Conserva tus nodos actuales y agrega el nuevo esquema a un lado.");
+        if (shouldClear) {
+            nodes.clear();
+            edges.clear();
+        } else {
+            offsetX = 900; // Desplaza el nuevo esquema a la derecha para no encimarlo
+        }
+    } else if (nodes.length === 1) {
+        nodes.clear();
+        edges.clear();
+    }
     
-    // 1. Reducir el Modo Lector a su tamaño mínimo (300px) para maximizar el lienzo
+    // Reducir el Modo Lector a su tamaño mínimo (300px) para maximizar el lienzo
     if (readerPanel && !readerPanel.classList.contains('hidden')) {
         readerPanel.classList.remove('w-1/3');
         readerPanel.style.flex = 'none';
@@ -302,7 +331,7 @@ function renderThreeLevelTree(data) {
     }
 
     const viewCenter = network.getViewPosition();
-    const rootX = viewCenter.x;
+    const rootX = viewCenter.x + offsetX;
     const rootY = viewCenter.y - 200;
 
     const root = data.root;
@@ -400,7 +429,7 @@ async function generateFullSchemaFromTopic(topicText) {
     // Verificamos que tenga al menos saldo disponible para iniciar
     if (!checkBalance(1)) return;
     
-    showLoader(`Estructurando esquema de 3 niveles...`);
+    showLoader(`Estructurando esquema...`);
     if (topicInput) topicInput.value = '';
 
     try {
@@ -1469,4 +1498,29 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
     } finally {
         hideLoader();
     }
+});
+// ==========================================
+// 19. MODAL DE AYUDA / GUÍA DE USO
+// ==========================================
+const helpModal = document.getElementById('helpModal');
+
+function openHelpModal() {
+    if (!helpModal) return;
+    helpModal.classList.remove('hidden');
+    helpModal.classList.add('flex');
+}
+
+function closeHelp() {
+    if (!helpModal) return;
+    helpModal.classList.add('hidden');
+    helpModal.classList.remove('flex');
+}
+
+document.getElementById('btnHelp')?.addEventListener('click', openHelpModal);
+document.getElementById('closeHelpModal')?.addEventListener('click', closeHelp);
+document.getElementById('btnGotItHelp')?.addEventListener('click', closeHelp);
+
+// Cerrar también si el usuario hace clic en el fondo oscuro fuera de la tarjeta
+helpModal?.addEventListener('click', (e) => {
+    if (e.target === helpModal) closeHelp();
 });
