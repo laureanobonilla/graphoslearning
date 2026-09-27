@@ -213,14 +213,14 @@ function initializeBalance() {
     if (currentUser) {
         let storedBalance = parseInt(localStorage.getItem(`gk_balance_${currentUser.id}`), 10);
         if (isNaN(storedBalance)) { 
-            storedBalance = 15; // <-- Reducido a 15 para usuarios logueados
+            storedBalance = 50; 
             localStorage.setItem(`gk_balance_${currentUser.id}`, storedBalance); 
         }
         availableNodes = storedBalance;
     } else {
         let guestBalance = parseInt(localStorage.getItem('gk_guest_balance'), 10);
         if (isNaN(guestBalance)) { 
-            guestBalance = 15; 
+            guestBalance = 50; 
             localStorage.setItem('gk_guest_balance', guestBalance); 
         }
         availableNodes = guestBalance;
@@ -1101,19 +1101,38 @@ document.getElementById('btnMenuDelete')?.addEventListener('click', () => {
 // ==========================================
 
 // 1. Limpiar el Grafo (Botón de la barra superior)
-document.getElementById('btnClear')?.addEventListener('click', () => {
+// 1. Limpiar el Grafo y preguntar si se inicia un Nuevo Proyecto aparte
+document.getElementById('btnClear')?.addEventListener('click', async () => {
     if (nodes.length === 0) return;
-    if (confirm("¿Deseas vaciar todo el esquema actual?")) {
-        nodes.clear();
-        edges.clear();
-        currentDocumentText = ""; 
-        actionMenu.classList.add('hidden');
-        if (typeof connectionBanner !== 'undefined' && connectionBanner) {
-            connectionBanner.classList.add('hidden');
-        }
-        sourceNodeForConnection = null;
-        selectedNodeId = null;
+
+    // Asegurar que el estado actual quede guardado antes de limpiar
+    await saveCurrentProjectToBin();
+
+    const createNewProject = confirm(
+        "Vas a limpiar el lienzo actual.\n\n" +
+        "¿Deseas generar un NUEVO proyecto para lo próximo que hagas?\n\n" +
+        "• Aceptar: Conserva este esquema en 'Mis Proyectos' y empieza a guardar en un proyecto aparte.\n" +
+        "• Cancelar: Limpia el lienzo pero sigue guardando sobre este mismo proyecto."
+    );
+
+    isClearingCanvas = true;
+    clearTimeout(window._binSaveTimer);
+
+    if (createNewProject) {
+        currentProjectId = null;
+        localStorage.removeItem('gk_current_project_id');
     }
+
+    nodes.clear();
+    edges.clear();
+    currentDocumentText = "";
+    actionMenu.classList.add('hidden');
+    if (typeof connectionBanner !== 'undefined' && connectionBanner) {
+        connectionBanner.classList.add('hidden');
+    }
+    sourceNodeForConnection = null;
+    selectedNodeId = null;
+    isClearingCanvas = false;
 });
 
 // 2. Limpiar SOLO el panel del Lector (Botón nuevo a la par de Generar Esquema)
@@ -1235,71 +1254,212 @@ document.getElementById('closeProjectsModal')?.addEventListener('click', () => {
     projectsModal.classList.remove('flex');
 });
 
+// ==========================================
+// GUARDADO AUTOMÁTICO Y GESTOR DE PROYECTOS
+// ==========================================
+let isClearingCanvas = false;
+
+function getActiveUserKey() {
+    return currentUser ? currentUser.id : 'guest_local';
+}
+
+function showSaveFeedback(state) {
+    const icon = document.getElementById('saveStatusIcon');
+    const text = document.getElementById('saveStatusText');
+    if (!icon || !text) return;
+
+    if (state === 'saving') {
+        icon.innerText = '⏳';
+        text.innerText = 'Guardando...';
+    } else if (state === 'saved') {
+        icon.innerText = '✅';
+        text.innerText = 'Guardado';
+        setTimeout(() => {
+            icon.innerText = '📁';
+            text.innerText = 'Mis Proyectos';
+        }, 1800);
+    }
+}
+
+async function saveCurrentProjectToBin() {
+    if (isClearingCanvas || nodes.length === 0) return;
+
+    showSaveFeedback('saving');
+    const userKey = getActiveUserKey();
+    const allNodes = nodes.get();
+    const allEdges = edges.get();
+
+    const firstNode = allNodes[0];
+    const projectTitle = firstNode.baseTitle || firstNode.label?.replace(/\*/g, '').split('\n')[0] || "Mi Esquema";
+
+    // Si aún no tiene ID de proyecto, le generamos uno local temporal o definitivo
+    if (!currentProjectId) {
+        currentProjectId = `local_${Date.now()}`;
+        localStorage.setItem('gk_current_project_id', currentProjectId);
+    }
+
+    const projectData = {
+        owner: currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : 'Invitado',
+        email: currentUser ? currentUser.email : 'local',
+        nodes: allNodes,
+        edges: allEdges
+    };
+
+    // 1. Guardado instantáneo en catálogo local (respaldo inmediato)
+    let catalog = JSON.parse(localStorage.getItem(`gk_projects_${userKey}`) || '[]');
+    const existingIndex = catalog.findIndex(p => p.id === currentProjectId);
+    const entry = {
+        id: currentProjectId,
+        title: projectTitle,
+        date: new Date().toISOString(),
+        nodeCount: allNodes.length
+    };
+
+    if (existingIndex >= 0) catalog[existingIndex] = entry;
+    else catalog.push(entry);
+
+    localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(catalog));
+    localStorage.setItem(`gk_proj_snapshot_${currentProjectId}`, JSON.stringify(projectData));
+
+    // 2. Si el usuario está logueado, sincroniza también en la nube (JSONBin)
+    if (currentUser) {
+        try {
+            const isCloudId = !currentProjectId.startsWith('local_');
+            const response = await fetch('/.netlify/functions/db', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectId: isCloudId ? currentProjectId : null,
+                    title: projectTitle,
+                    data: projectData,
+                    user: currentUser.id
+                })
+            });
+            const resData = await response.json();
+
+            if (response.ok && resData.projectId) {
+                const oldId = currentProjectId;
+                currentProjectId = resData.projectId;
+                localStorage.setItem('gk_current_project_id', currentProjectId);
+
+                // Actualizar el ID local por el ID de la nube si era nuevo
+                if (oldId !== currentProjectId) {
+                    const idx = catalog.findIndex(p => p.id === oldId);
+                    if (idx >= 0) catalog[idx].id = currentProjectId;
+                    localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(catalog));
+                    localStorage.setItem(`gk_proj_snapshot_${currentProjectId}`, JSON.stringify(projectData));
+                }
+            }
+        } catch (err) {
+            console.error("Error al sincronizar en la nube:", err);
+        }
+    }
+
+    showSaveFeedback('saved');
+}
+
+function triggerAutoSave() {
+    if (isClearingCanvas || nodes.length === 0) return;
+    clearTimeout(window._binSaveTimer);
+    window._binSaveTimer = setTimeout(() => saveCurrentProjectToBin(), 1200);
+}
+
+// Disparar guardado automático al crear/modificar nodos o conexiones
+nodes.on('*', triggerAutoSave);
+edges.on('*', triggerAutoSave);
+
+// Abrir modal de Mis Proyectos
+const projectsModal = document.getElementById('projectsModal');
+document.getElementById('btnProjects')?.addEventListener('click', () => {
+    renderProjectsList();
+    projectsModal.classList.remove('hidden');
+    projectsModal.classList.add('flex');
+});
+
+document.getElementById('closeProjectsModal')?.addEventListener('click', () => {
+    projectsModal.classList.add('hidden');
+    projectsModal.classList.remove('flex');
+});
+
 function renderProjectsList() {
     const listContainer = document.getElementById('projectsList');
     const noProjectsMsg = document.getElementById('noProjectsMsg');
-    const catalog = JSON.parse(localStorage.getItem(`gk_projects_${currentUser.id}`) || '[]');
+    const userKey = getActiveUserKey();
+    const catalog = JSON.parse(localStorage.getItem(`gk_projects_${userKey}`) || '[]');
 
     listContainer.innerHTML = '';
     if (catalog.length === 0) {
         noProjectsMsg.classList.remove('hidden');
     } else {
         noProjectsMsg.classList.add('hidden');
-        // Ordenar del más reciente al más antiguo
         catalog.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(proj => {
+            const isCurrent = proj.id === currentProjectId;
             const item = document.createElement('div');
-            item.className = "flex justify-between items-center bg-white border border-slate-200 p-3 rounded-xl hover:border-indigo-300 transition-colors shadow-sm";
+            item.className = `flex justify-between items-center bg-white border ${isCurrent ? 'border-indigo-500 bg-indigo-50/20' : 'border-slate-200'} p-3 rounded-xl hover:border-indigo-300 transition-colors shadow-sm`;
             item.innerHTML = `
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">📄</div>
                     <div>
-                        <h4 class="text-sm font-bold text-slate-800">${proj.title}</h4>
-                        <p class="text-[10px] text-slate-400">Última mod: ${new Date(proj.date).toLocaleDateString()}</p>
+                        <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            ${proj.title}
+                            ${isCurrent ? '<span class="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">Actual</span>' : ''}
+                        </h4>
+                        <p class="text-[10px] text-slate-400">Último guardado: ${new Date(proj.date).toLocaleString()}</p>
                     </div>
                 </div>
-                <button class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors btn-load-proj" data-id="${proj.id}">
-                    Abrir
-                </button>
+                <div class="flex items-center gap-1.5">
+                    <button class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors btn-load-proj" data-id="${proj.id}">
+                        Abrir
+                    </button>
+                </div>
             `;
             listContainer.appendChild(item);
         });
 
         document.querySelectorAll('.btn-load-proj').forEach(btn => {
-            btn.addEventListener('click', (e) => loadProjectFromCloud(e.target.dataset.id));
+            btn.addEventListener('click', (e) => loadProjectById(e.currentTarget.dataset.id));
         });
     }
 }
 
-async function loadProjectFromCloud(projectId) {
-    if (nodes.length > 0) {
-        if (!confirm("Se reemplazará el esquema actual. Asegúrate de haber guardado cambios. ¿Deseas continuar?")) return;
-    }
+async function loadProjectById(projectId) {
+    projectsModal.classList.add('hidden');
+    projectsModal.classList.remove('flex');
+    showLoader("Cargando tu proyecto...");
 
-    showLoader('Descargando proyecto desde la nube...');
     try {
-        // Tu función Netlify /db debe soportar peticiones GET recibiendo el projectId
-        const response = await fetch(`/.netlify/functions/db?projectId=${projectId}`);
-        if (!response.ok) throw new Error("No se pudo obtener el proyecto");
-        
-        const resData = await response.json();
-        
-        nodes.clear();
-        edges.clear();
-        if (resData.data?.nodes) nodes.add(resData.data.nodes);
-        if (resData.data?.edges) edges.add(resData.data.edges);
+        // 1. Intentar cargar desde respaldo instantáneo local
+        const localRaw = localStorage.getItem(`gk_proj_snapshot_${projectId}`);
+        if (localRaw) {
+            const record = JSON.parse(localRaw);
+            applyLoadedProject(projectId, record);
+            return;
+        }
 
-        currentProjectId = projectId;
-        localStorage.setItem('gk_current_project_id', currentProjectId);
-        
-        projectsModal.classList.add('hidden');
-        projectsModal.classList.remove('flex');
-        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+        // 2. Si no está en local, pedirlo a la nube
+        const response = await fetch(`/.netlify/functions/db?projectId=${projectId}`);
+        if (!response.ok) throw new Error("No se pudo cargar");
+        const resData = await response.json();
+        if (resData.data) {
+            applyLoadedProject(projectId, resData.data);
+        }
     } catch (err) {
-        alert('Error al cargar el proyecto. Revisa la consola o asegúrate de que el servidor responde a GET.');
-        console.error(err);
+        alert("Error al abrir el proyecto.");
     } finally {
         hideLoader();
     }
+}
+
+function applyLoadedProject(projectId, record) {
+    isClearingCanvas = true;
+    nodes.clear();
+    edges.clear();
+    if (record.nodes) nodes.add(record.nodes);
+    if (record.edges) edges.add(record.edges);
+    currentProjectId = projectId;
+    localStorage.setItem('gk_current_project_id', currentProjectId);
+    isClearingCanvas = false;
+    network.fit({ animation: { duration: 600 } });
 }
 
 document.getElementById('btnNewProject')?.addEventListener('click', () => {

@@ -2,6 +2,40 @@ const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+// Lista de modelos en orden de prioridad (si el 1º está saturado con 503, usa el 2º al instante)
+const FALLBACK_MODELS = [
+    'gemini-3.6-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash'
+];
+
+async function generateWithFallback(payload) {
+    let lastError = null;
+
+    for (const modelName of FALLBACK_MODELS) {
+        try {
+            return await ai.models.generateContent({
+                ...payload,
+                model: modelName
+            });
+        } catch (err) {
+            lastError = err;
+            const errMsg = err.message || JSON.stringify(err);
+            const isOverloaded = errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('429') || errMsg.includes('high demand');
+
+            console.warn(`[!] Modelo ${modelName} saturado o con fallo. Probando siguiente modelo...`);
+
+            // Si no es un error de saturación o modelo, detenemos el bucle
+            if (!isOverloaded && !errMsg.includes('not found')) {
+                throw err;
+            }
+            // Pequeña pausa de 400ms antes de saltar al modelo de respaldo
+            await new Promise(resolve => setTimeout(resolve, 400));
+        }
+    }
+    throw lastError;
+}
+
 exports.handler = async function(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
@@ -57,8 +91,7 @@ exports.handler = async function(event, context) {
                 ? `3. "curiosityHook": Formula 1 pregunta provocadora o paradoja real sobre "${topic}" que invite a investigar más a fondo.`
                 : '';
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Tema a expandir: "${topic}".
                 Contexto jerárquico: "${contextPath}".
                 ${docPrompt}
@@ -129,8 +162,7 @@ exports.handler = async function(event, context) {
                 required: ["synergy", "pathsFromA", "pathsFromB"]
             };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Descubre la sinergia profunda entre Tema A: "${topic}" y Tema B: "${topicB}".
                 
                 INSTRUCCIONES:
@@ -173,8 +205,7 @@ exports.handler = async function(event, context) {
                 ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nREGLA DE PRIORIDAD: Busca casos, experimentos, aplicaciones o situaciones mencionadas en el documento para "${topic}". Solo si el documento carece de ejemplos concretos, genera ejemplos reales del mundo exterior.`
                 : 'Genera ejemplos reales y específicos del mundo exterior.';
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Concepto: "${topic}".
                 Contexto jerárquico: "${contextPath}".
                 ${docPrompt}
@@ -213,8 +244,7 @@ exports.handler = async function(event, context) {
                 required: ["bridge"]
             };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Conecta lógicamente Tema A: "${topic}" con Tema B: "${topicB}".
                 Genera un concepto puente intermedio concreto (no genérico). Conectores de 1 a 3 palabras.`,
                 config: {
@@ -243,8 +273,7 @@ exports.handler = async function(event, context) {
                 ? `3. PISTAS INTERACTIVAS: Dentro de tu explicación, encierra entre dobles corchetes exactamente de 3 a 4 términos técnicos, sub-conceptos o autores clave que merezcan ser explorados como nuevos nodos (ejemplo: [[Destrucción Creativa]], [[Contrato Social]]).`
                 : `3. Solo texto plano, sin asteriscos ni markdown decorativo.`;
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Define el concepto: "${topic}".
                 Ruta contextual: "${contextPath}".
                 ${docPrompt}
@@ -316,8 +345,7 @@ exports.handler = async function(event, context) {
                 required: ["root", "branches", "subBranches"]
             };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `${inputContext}
 
                 REGLAS ESTRICTAS DE ESTRUCTURA:
@@ -364,8 +392,7 @@ exports.handler = async function(event, context) {
                 required: ["nodes"]
             };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Nodo seleccionado: "${topic}".
                 Contexto en el esquema: "${contextPath}".
                 PETICIÓN DEL USUARIO: "${customRequest}".
@@ -407,8 +434,7 @@ exports.handler = async function(event, context) {
                 required: ["critiques"]
             };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Analiza críticamente el concepto: "${topic}" (Contexto: "${contextPath}").
                 Genera entre 2 y 3 antítesis reales: posturas filosóficas o científicas opuestas, críticas históricas, paradojas o límites donde este concepto falla.
                 PROHIBIDO usar nombres genéricos como "Crítica 1". Nombra la teoría, autor o fenómeno real.`,
@@ -425,8 +451,7 @@ exports.handler = async function(event, context) {
         // 8. RETO SOCRÁTICO (GENERAR Y EVALUAR)
         // ==========================================
         if (action === 'socratic_question') {
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Formula UNA pregunta socrática breve, desafiante y fascinante (máximo 2 oraciones) sobre "${topic}" (en el contexto de "${contextPath}") para poner a prueba la comprensión profunda del usuario. No hagas preguntas de memoria básica, sino de causa, implicación o aplicación.`,
                 config: { temperature: 0.4 }
             });
@@ -444,8 +469,7 @@ exports.handler = async function(event, context) {
                 required: ["feedback", "masteryNodeTitle"]
             };
 
-            const response = await ai.models.generateContent({
-                model: 'gemini-3.6-flash',
+            const response = await generateWithFallback({
                 contents: `Concepto: "${topic}".
                 Pregunta planteada: "${question}".
                 Respuesta del usuario: "${userAnswer}".
