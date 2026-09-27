@@ -56,7 +56,7 @@ let network = new vis.Network(container, { nodes, edges }, {
         dashes: [4, 4],
         smooth: { type: 'dynamic' } // Curvatura orgánica y adaptativa para que no se vean todas iguales
     },
-    interaction: { hover: true }
+    interaction: { hover: true, multiselect: true, selectConnectedEdges: true }
 });
 
 function stopPhysicsAndUnlock() {
@@ -192,18 +192,21 @@ function initializeBalance() {
 function updateAuthUI() {
     const loginText = document.getElementById('loginText');
     const userStatusDot = document.getElementById('userStatusDot');
-    const btnProjects = document.getElementById('btnProjects'); // Botón Proyectos
+    const btnProjects = document.getElementById('btnProjects');
     
     if (!loginText || !userStatusDot) return;
     
     if (currentUser) {
         loginText.innerText = currentUser.user_metadata?.full_name?.split(' ')[0] || "Mi Cuenta";
         userStatusDot.className = 'w-2 h-2 rounded-full bg-indigo-500';
-        if (btnProjects) { btnProjects.classList.remove('hidden'); btnProjects.classList.add('flex'); }
     } else {
         loginText.innerText = "Iniciar Sesión";
         userStatusDot.className = 'w-2 h-2 rounded-full bg-slate-300';
-        if (btnProjects) { btnProjects.classList.add('hidden'); btnProjects.classList.remove('flex'); }
+    }
+    // El botón Mis Proyectos permanece siempre visible
+    if (btnProjects) {
+        btnProjects.classList.remove('hidden');
+        btnProjects.classList.add('flex');
     }
 }
 
@@ -271,16 +274,22 @@ function renderThreeLevelTree(data) {
     let offsetX = 0;
 
     if (nodes.length > 1) {
-        const shouldClear = confirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?\n\n• Aceptar: Limpia el lienzo y crea el nuevo.\n• Cancelar: Conserva tus nodos actuales y agrega el nuevo esquema a un lado.");
+        const shouldClear = confirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?\n\n• Aceptar: Crea un proyecto nuevo aparte.\n• Cancelar: Conserva tus nodos actuales y agrega el nuevo esquema a un lado.");
         if (shouldClear) {
+            isClearingCanvas = true;
+            currentProjectId = null;
+            localStorage.removeItem('gk_current_project_id');
             nodes.clear();
             edges.clear();
+            isClearingCanvas = false;
         } else {
-            offsetX = 900; // Desplaza el nuevo esquema a la derecha para no encimarlo
+            offsetX = 900;
         }
     } else if (nodes.length === 1) {
+        isClearingCanvas = true;
         nodes.clear();
         edges.clear();
+        isClearingCanvas = false;
     }
     
     // Reducir el Modo Lector a su tamaño mínimo (300px) para maximizar el lienzo
@@ -1198,22 +1207,7 @@ document.getElementById('connectionBanner')?.addEventListener('click', (e) => {
     e.currentTarget.classList.add('hidden');
 });
 
-// ==========================================
-// GESTOR DE PROYECTOS (CARGAR Y CREAR)
-// ==========================================
-const projectsModal = document.getElementById('projectsModal');
 
-document.getElementById('btnProjects')?.addEventListener('click', () => {
-    if (!currentUser) return;
-    renderProjectsList();
-    projectsModal.classList.remove('hidden');
-    projectsModal.classList.add('flex');
-});
-
-document.getElementById('closeProjectsModal')?.addEventListener('click', () => {
-    projectsModal.classList.add('hidden');
-    projectsModal.classList.remove('flex');
-});
 
 // ==========================================
 // GUARDADO AUTOMÁTICO Y GESTOR DE PROYECTOS
@@ -1425,13 +1419,16 @@ function applyLoadedProject(projectId, record) {
 
 document.getElementById('btnNewProject')?.addEventListener('click', () => {
     if (nodes.length > 0) {
-        if (!confirm("¿Deseas iniciar un esquema completamente en blanco?")) return;
+        if (!confirm("¿Deseas iniciar un esquema completamente en blanco en un proyecto aparte?")) return;
     }
-    nodes.clear();
-    edges.clear();
+    isClearingCanvas = true;
+    clearTimeout(window._binSaveTimer);
     currentProjectId = null;
     localStorage.removeItem('gk_current_project_id');
-    
+    nodes.clear();
+    edges.clear();
+    isClearingCanvas = false;
+
     projectsModal.classList.add('hidden');
     projectsModal.classList.remove('flex');
 });

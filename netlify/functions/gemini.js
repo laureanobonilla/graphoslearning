@@ -307,8 +307,7 @@ exports.handler = async function(event, context) {
                         description: 'Nivel 1: Nodo central o título general.',
                         properties: {
                             id: { type: 'STRING' },
-                            label: { type: 'STRING' },
-                            definition: { type: 'STRING', nullable: true }
+                            label: { type: 'STRING' }
                         },
                         required: ["id", "label"]
                     },
@@ -320,8 +319,7 @@ exports.handler = async function(event, context) {
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' },
-                                definition: { type: 'STRING', nullable: true }
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' }
                             },
                             required: ["id", "label", "relationship"]
                         }
@@ -335,8 +333,7 @@ exports.handler = async function(event, context) {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
                                 parentId: { type: 'STRING', description: 'ID exacto del nodo en "branches" (Nivel 2) al que pertenece.' },
-                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' },
-                                definition: { type: 'STRING', nullable: true }
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' }
                             },
                             required: ["id", "label", "parentId", "relationship"]
                         }
