@@ -3,10 +3,11 @@ const { GoogleGenAI } = require('@google/genai');
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Lista de modelos en orden de prioridad (si el 1º está saturado con 503, usa el 2º al instante)
+// Lista actualizada con los modelos vigentes en orden de prioridad
 const FALLBACK_MODELS = [
+    'gemini-3.8-flash',
     'gemini-3.6-flash',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash'
+    'gemini-3.8-pro'
 ];
 
 async function generateWithFallback(payload) {
@@ -20,17 +21,25 @@ async function generateWithFallback(payload) {
             });
         } catch (err) {
             lastError = err;
-            const errMsg = err.message || JSON.stringify(err);
-            const isOverloaded = errMsg.includes('503') || errMsg.includes('UNAVAILABLE') || errMsg.includes('429') || errMsg.includes('high demand');
+            // Pasamos todo a minúsculas para detectar 503, 429 o 404 (NOT_FOUND) sin fallar
+            const errMsg = (err.message || JSON.stringify(err)).toLowerCase();
+            const shouldRetryNext = 
+                errMsg.includes('503') || 
+                errMsg.includes('unavailable') || 
+                errMsg.includes('429') || 
+                errMsg.includes('high demand') || 
+                errMsg.includes('not_found') || 
+                errMsg.includes('not found') || 
+                errMsg.includes('404') ||
+                errMsg.includes('no longer available');
 
-            console.warn(`[!] Modelo ${modelName} saturado o con fallo. Probando siguiente modelo...`);
+            console.warn(`[!] Modelo ${modelName} no disponible o saturado. Saltando al siguiente...`);
 
-            // Si no es un error de saturación o modelo, detenemos el bucle
-            if (!isOverloaded && !errMsg.includes('not found')) {
+            if (!shouldRetryNext) {
                 throw err;
             }
-            // Pequeña pausa de 400ms antes de saltar al modelo de respaldo
-            await new Promise(resolve => setTimeout(resolve, 400));
+            // Pausa breve de 300ms antes de probar el siguiente modelo
+            await new Promise(resolve => setTimeout(resolve, 300));
         }
     }
     throw lastError;
