@@ -13,32 +13,49 @@ exports.handler = async function(event, context) {
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
         // ==========================================
+        // ==========================================
+        // 1. EXPANDIR RAMAS (CONCEPTOS + BRECHA DE CURIOSIDAD OPCIONAL)
+        // ==========================================
         if (action === 'expand') {
-            const schema = {
-                type: 'OBJECT',
-                properties: {
-                    concepts: {
-                        type: 'ARRAY',
-                        items: {
-                            type: 'OBJECT',
-                            properties: {
-                                id: { type: 'STRING' },
-                                label: { type: 'STRING' },
-                                relationship: { 
-                                    type: 'STRING', 
-                                    description: 'Verbo o enlace ultracorto (1 a 3 palabras).' 
-                                }
-                            },
-                            required: ["id", "label", "relationship"]
-                        }
+            const { includeCuriosity } = JSON.parse(event.body);
+
+            const schemaProperties = {
+                concepts: {
+                    type: 'ARRAY',
+                    items: {
+                        type: 'OBJECT',
+                        properties: {
+                            id: { type: 'STRING' },
+                            label: { type: 'STRING' },
+                            relationship: { type: 'STRING', description: 'Verbo o enlace ultracorto (1 a 3 palabras).' }
+                        },
+                        required: ["id", "label", "relationship"]
                     }
-                },
-                required: ["concepts"]
+                }
             };
 
+            const requiredFields = ["concepts"];
+
+            if (includeCuriosity) {
+                schemaProperties.curiosityHook = {
+                    type: 'OBJECT',
+                    description: 'Una pregunta fascinante, paradoja o misterio sin resolver derivado de este concepto que despierte curiosidad inmediata.',
+                    properties: {
+                        id: { type: 'STRING' },
+                        question: { type: 'STRING', description: 'Pregunta corta e intrigante (máx 12 palabras).' }
+                    },
+                    required: ["id", "question"]
+                };
+                requiredFields.push("curiosityHook");
+            }
+
             const docPrompt = documentContext 
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nREGLA DE PRIORIDAD: Extrae las derivaciones a partir de los hechos y argumentos presentes en el documento. Si el documento no contiene suficiente detalle específico para este nodo, complementa con conocimiento riguroso del tema.`
+                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nExtrae las derivaciones a partir del documento o complementa con conocimiento riguroso.`
                 : 'Usa conocimiento riguroso del tema.';
+
+            const curiosityInstruction = includeCuriosity
+                ? `3. "curiosityHook": Formula 1 pregunta provocadora o paradoja real sobre "${topic}" que invite a investigar más a fondo.`
+                : '';
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
@@ -47,16 +64,17 @@ exports.handler = async function(event, context) {
                 ${docPrompt}
                 
                 REGLAS CRÍTICAS:
-                1. Genera entre 1 y ${maxNodes} conceptos reales y sustanciales. PROHIBIDO usar etiquetas genéricas o placeholders como "Concepto A", "Paso 1", "Elemento clave". Nombra el concepto explícito.
-                2. "relationship": Estrictamente de 1 a 3 palabras (ej: "deriva en", "regulado por", "incluye").`,
+                1. Genera entre 1 y ${maxNodes} conceptos reales y sustanciales. PROHIBIDO usar etiquetas genéricas.
+                2. "relationship": Estrictamente de 1 a 3 palabras.
+                ${curiosityInstruction}`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: { type: 'OBJECT', properties: schemaProperties, required: requiredFields },
+                    temperature: 0.25
                 }
             });
             return { statusCode: 200, body: response.text };
-        } 
+        }
 // ==========================================
         // SINERGIA (FUSIÓN DE DOS NODOS)
         // ==========================================
@@ -211,10 +229,19 @@ exports.handler = async function(event, context) {
         // ==========================================
         // 4. CARGAR DEFINICIÓN
         // ==========================================
+// ==========================================
+        // 4. CARGAR DEFINICIÓN (CON PISTAS INTERACTIVAS OPCIONALES)
+        // ==========================================
         if (action === 'define') {
+            const { interactive } = JSON.parse(event.body);
+
             const docPrompt = documentContext 
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nSi el documento explica o describe "${topic}", extrae y sintetiza esa explicación explícita. Si no se menciona con profundidad en el texto, proporciona una definición rigurosa y directa.`
+                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nSintetiza la explicación del texto o proporciona una definición rigurosa.`
                 : `Proporciona una definición conceptual clara y directa.`;
+
+            const interactiveRule = interactive
+                ? `3. PISTAS INTERACTIVAS: Dentro de tu explicación, encierra entre dobles corchetes exactamente de 3 a 4 términos técnicos, sub-conceptos o autores clave que merezcan ser explorados como nuevos nodos (ejemplo: [[Destrucción Creativa]], [[Contrato Social]]).`
+                : `3. Solo texto plano, sin asteriscos ni markdown decorativo.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-3.6-flash',
@@ -224,8 +251,8 @@ exports.handler = async function(event, context) {
                 
                 INSTRUCCIONES:
                 1. Redacta 1 o 2 párrafos concisos, precisos y sustanciales.
-                2. PROHIBIDO redactar definiciones vacías o genéricas ("Este es un concepto que representa un elemento en el sistema"). Explica qué es exactamente.
-                3. Solo texto plano, sin asteriscos ni markdown decorativo.`,
+                2. PROHIBIDO redactar definiciones vacías o genéricas. Explica qué es exactamente.
+                ${interactiveRule}`,
                 config: { temperature: 0.2 }
             });
             return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
@@ -357,7 +384,80 @@ exports.handler = async function(event, context) {
             });
             return { statusCode: 200, body: response.text };
         }
+// ==========================================
+        // 7. ANTÍTESIS / CONTRADICCIÓN Y PENSAMIENTO CRÍTICO
+        // ==========================================
+        if (action === 'antithesis') {
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    critiques: {
+                        type: 'ARRAY',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING', description: 'Crítica, escuela opuesta, anomalía o límite teórico concreto.' },
+                                relationship: { type: 'STRING', description: 'Conector de tensión (1-3 palabras, ej: "refutado por", "entra en tensión con", "limitado por").' }
+                            },
+                            required: ["id", "label", "relationship"]
+                        }
+                    }
+                },
+                required: ["critiques"]
+            };
 
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Analiza críticamente el concepto: "${topic}" (Contexto: "${contextPath}").
+                Genera entre 2 y 3 antítesis reales: posturas filosóficas o científicas opuestas, críticas históricas, paradojas o límites donde este concepto falla.
+                PROHIBIDO usar nombres genéricos como "Crítica 1". Nombra la teoría, autor o fenómeno real.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.25
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
+        // ==========================================
+        // 8. RETO SOCRÁTICO (GENERAR Y EVALUAR)
+        // ==========================================
+        if (action === 'socratic_question') {
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Formula UNA pregunta socrática breve, desafiante y fascinante (máximo 2 oraciones) sobre "${topic}" (en el contexto de "${contextPath}") para poner a prueba la comprensión profunda del usuario. No hagas preguntas de memoria básica, sino de causa, implicación o aplicación.`,
+                config: { temperature: 0.4 }
+            });
+            return { statusCode: 200, body: JSON.stringify({ question: response.text }) };
+        }
+
+        if (action === 'socratic_evaluate') {
+            const { question, userAnswer } = JSON.parse(event.body);
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    feedback: { type: 'STRING', description: 'Retroalimentación breve (2-3 oraciones), estimulante y constructiva sobre la respuesta del usuario.' },
+                    masteryNodeTitle: { type: 'STRING', description: 'Título corto (2-5 palabras) que sintetiza el aprendizaje o conclusión alcanzada.' }
+                },
+                required: ["feedback", "masteryNodeTitle"]
+            };
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-3.6-flash',
+                contents: `Concepto: "${topic}".
+                Pregunta planteada: "${question}".
+                Respuesta del usuario: "${userAnswer}".
+                Evalúa con rigor intelectual pero tono motivador la respuesta del usuario, señala qué acertó o qué matiz importante puede sumar, y otorga un título de síntesis para su nuevo Nodo de Dominio.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.3
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
         return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 
     } catch (error) {
