@@ -130,7 +130,8 @@ landscapeToggle?.addEventListener('click', () => {
 // ==========================================
 let sessionId = localStorage.getItem('gk_session_id') || ('s_' + Math.random().toString(36).substring(2, 9));
 localStorage.setItem('gk_session_id', sessionId);
-let currentProjectId = localStorage.getItem('gk_current_project_id');
+let currentProjectId = null;
+localStorage.removeItem('gk_current_project_id');
 let nodesTracked = parseInt(localStorage.getItem('gk_nodes_tracked') || '0', 10);
 
 
@@ -277,16 +278,21 @@ function renderThreeLevelTree(data) {
         const shouldClear = confirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?\n\n• Aceptar: Crea un proyecto nuevo aparte.\n• Cancelar: Conserva tus nodos actuales y agrega el nuevo esquema a un lado.");
         if (shouldClear) {
             isClearingCanvas = true;
+            clearTimeout(window._binSaveTimer);
             currentProjectId = null;
             localStorage.removeItem('gk_current_project_id');
             nodes.clear();
             edges.clear();
             isClearingCanvas = false;
         } else {
-            offsetX = 900;
+            offsetX = 900; // Si cancela, se suma al mismo proyecto actual
         }
-    } else if (nodes.length === 1) {
+    } else {
+        // Si el lienzo tenía 0 o 1 nodo, SIEMPRE inicia como un proyecto nuevo independiente
         isClearingCanvas = true;
+        clearTimeout(window._binSaveTimer);
+        currentProjectId = null;
+        localStorage.removeItem('gk_current_project_id');
         nodes.clear();
         edges.clear();
         isClearingCanvas = false;
@@ -1247,11 +1253,14 @@ async function saveCurrentProjectToBin() {
     const firstNode = allNodes[0];
     const projectTitle = firstNode.baseTitle || firstNode.label?.replace(/\*/g, '').split('\n')[0] || "Mi Esquema";
 
-    // Si aún no tiene ID de proyecto, le generamos uno local temporal o definitivo
+    // Si aún no tiene ID de proyecto, generamos uno nuevo único
     if (!currentProjectId) {
-        currentProjectId = `local_${Date.now()}`;
+        currentProjectId = `local_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         localStorage.setItem('gk_current_project_id', currentProjectId);
     }
+
+    // Congelamos el ID de este proyecto específico para esta operación
+    const targetProjectId = currentProjectId;
 
     const projectData = {
         owner: currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : 'Invitado',
@@ -1260,31 +1269,34 @@ async function saveCurrentProjectToBin() {
         edges: allEdges
     };
 
-    // 1. Guardado instantáneo en catálogo local (respaldo inmediato)
+    // 1. Guardado instantáneo en catálogo local
     let catalog = JSON.parse(localStorage.getItem(`gk_projects_${userKey}`) || '[]');
-    const existingIndex = catalog.findIndex(p => p.id === currentProjectId);
+    const existingIndex = catalog.findIndex(p => p.id === targetProjectId);
     const entry = {
-        id: currentProjectId,
+        id: targetProjectId,
         title: projectTitle,
         date: new Date().toISOString(),
         nodeCount: allNodes.length
     };
 
-    if (existingIndex >= 0) catalog[existingIndex] = entry;
-    else catalog.push(entry);
+    if (existingIndex >= 0) {
+        catalog[existingIndex] = entry;
+    } else {
+        catalog.push(entry);
+    }
 
     localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(catalog));
-    localStorage.setItem(`gk_proj_snapshot_${currentProjectId}`, JSON.stringify(projectData));
+    localStorage.setItem(`gk_proj_snapshot_${targetProjectId}`, JSON.stringify(projectData));
 
-    // 2. Si el usuario está logueado, sincroniza también en la nube (JSONBin)
+    // 2. Sincronización en la nube (JSONBin) si está logueado
     if (currentUser) {
         try {
-            const isCloudId = !currentProjectId.startsWith('local_');
+            const isCloudId = !targetProjectId.startsWith('local_');
             const response = await fetch('/.netlify/functions/db', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    projectId: isCloudId ? currentProjectId : null,
+                    projectId: isCloudId ? targetProjectId : null,
                     title: projectTitle,
                     data: projectData,
                     user: currentUser.id
@@ -1293,16 +1305,21 @@ async function saveCurrentProjectToBin() {
             const resData = await response.json();
 
             if (response.ok && resData.projectId) {
-                const oldId = currentProjectId;
-                currentProjectId = resData.projectId;
-                localStorage.setItem('gk_current_project_id', currentProjectId);
+                const cloudId = resData.projectId;
 
-                // Actualizar el ID local por el ID de la nube si era nuevo
-                if (oldId !== currentProjectId) {
-                    const idx = catalog.findIndex(p => p.id === oldId);
-                    if (idx >= 0) catalog[idx].id = currentProjectId;
-                    localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(catalog));
-                    localStorage.setItem(`gk_proj_snapshot_${currentProjectId}`, JSON.stringify(projectData));
+                // Reemplazar el ID temporal por el ID de la nube en el catálogo
+                let freshCatalog = JSON.parse(localStorage.getItem(`gk_projects_${userKey}`) || '[]');
+                const idx = freshCatalog.findIndex(p => p.id === targetProjectId);
+                if (idx >= 0) {
+                    freshCatalog[idx].id = cloudId;
+                    localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(freshCatalog));
+                }
+                localStorage.setItem(`gk_proj_snapshot_${cloudId}`, JSON.stringify(projectData));
+
+                // Solo actualizar currentProjectId si el usuario sigue trabajando en este mismo mapa
+                if (currentProjectId === targetProjectId) {
+                    currentProjectId = cloudId;
+                    localStorage.setItem('gk_current_project_id', cloudId);
                 }
             }
         } catch (err) {

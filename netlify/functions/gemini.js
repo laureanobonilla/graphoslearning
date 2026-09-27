@@ -2,18 +2,19 @@ const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// Lista de modelos en orden de prioridad (si el 1º está saturado con 503, usa el 2º al instante)
-// Lista actualizada con los modelos vigentes en orden de prioridad
+// Ciclo de reintentos únicamente con los modelos Flash válidos y activos
 const FALLBACK_MODELS = [
     'gemini-3.8-flash',
     'gemini-3.6-flash',
-    'gemini-3.8-pro'
+    'gemini-3.8-flash',
+    'gemini-3.6-flash'
 ];
 
 async function generateWithFallback(payload) {
     let lastError = null;
 
-    for (const modelName of FALLBACK_MODELS) {
+    for (let i = 0; i < FALLBACK_MODELS.length; i++) {
+        const modelName = FALLBACK_MODELS[i];
         try {
             return await ai.models.generateContent({
                 ...payload,
@@ -21,25 +22,25 @@ async function generateWithFallback(payload) {
             });
         } catch (err) {
             lastError = err;
-            // Pasamos todo a minúsculas para detectar 503, 429 o 404 (NOT_FOUND) sin fallar
             const errMsg = (err.message || JSON.stringify(err)).toLowerCase();
-            const shouldRetryNext = 
+            const isRetryable = 
                 errMsg.includes('503') || 
                 errMsg.includes('unavailable') || 
                 errMsg.includes('429') || 
                 errMsg.includes('high demand') || 
-                errMsg.includes('not_found') || 
-                errMsg.includes('not found') || 
-                errMsg.includes('404') ||
-                errMsg.includes('no longer available');
+                errMsg.includes('overloaded') ||
+                errMsg.includes('internal');
 
-            console.warn(`[!] Modelo ${modelName} no disponible o saturado. Saltando al siguiente...`);
+            console.warn(`[Intento ${i + 1}/${FALLBACK_MODELS.length}] Modelo ${modelName} ocupado (${err.status || '503'}). Reintentando...`);
 
-            if (!shouldRetryNext) {
+            if (!isRetryable) {
                 throw err;
             }
-            // Pausa breve de 300ms antes de probar el siguiente modelo
-            await new Promise(resolve => setTimeout(resolve, 300));
+
+            // Pausa de 800ms antes del siguiente intento para dejar pasar el pico de demanda
+            if (i < FALLBACK_MODELS.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 800));
+            }
         }
     }
     throw lastError;
