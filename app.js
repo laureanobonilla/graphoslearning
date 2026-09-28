@@ -510,7 +510,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                     topic: topicName,
                     contextPath: getContextPath(selectedNodeId),
                     customRequest: `Responde de forma clara, reveladora y directa a esta incógnita: ${topicName}`,
-                    documentContext: globalDocumentContext || currentDocumentText
+                    documentContext: getFullDocumentContext()
                 })
             });
             const data = await response.json();
@@ -556,7 +556,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 contextPath: getContextPath(selectedNodeId),
                 maxNodes,
                 includeCuriosity: true,
-                documentContext: globalDocumentContext || currentDocumentText
+                documentContext: documentContext: getFullDocumentContext()
             })
         });
         const data = await response.json();
@@ -620,7 +620,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: globalDocumentContext || currentDocumentText })
+            body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: documentContext: getFullDocumentContext() })
         });
         const data = await response.json();
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
@@ -974,7 +974,7 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', async () 
                     topic: title,
                     interactive: true,
                     contextPath: getContextPath(selectedNodeId),
-                    documentContext: globalDocumentContext || currentDocumentText
+                    documentContext: documentContext: getFullDocumentContext()
                 })
             });
             const data = await response.json();
@@ -1028,7 +1028,7 @@ document.getElementById('btnMenuExpandDef')?.addEventListener('click', async () 
         showLoader('Redactando definición...');
         try {
             const response = await fetch('/.netlify/functions/gemini', {
-                method: 'POST', body: JSON.stringify({ action: 'define', topic: title, contextPath: getContextPath(selectedNodeId), documentContext: globalDocumentContext || currentDocumentText })
+                method: 'POST', body: JSON.stringify({ action: 'define', topic: title, contextPath: getContextPath(selectedNodeId), documentContext: documentContext: getFullDocumentContext() })
             });
             const data = await response.json(); definitionText = data.definition;
         } catch (err) { alert("Error al obtener definición."); return; } finally { hideLoader(); }
@@ -1711,7 +1711,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
                 topic: topicName,
                 contextPath,
                 customRequest,
-                documentContext: globalDocumentContext || currentDocumentText
+                documentContext: documentContext: getFullDocumentContext()
             })
         });
 
@@ -1937,3 +1937,12 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
         });
     } catch { alert("Error al iniciar el reto."); } finally { hideLoader(); }
 });
+
+function getFullDocumentContext() {
+    const fullText = (currentDocumentText || readerTextMode?.innerText || "").trim();
+    const contextNote = (globalDocumentContext || "").trim();
+    if (fullText && contextNote && !fullText.startsWith(contextNote.replace('...', ''))) {
+        return `CONTEXTO INDICADO: ${contextNote}\n\nTEXTO COMPLETO:\n${fullText}`;
+    }
+    return fullText || contextNote || "";
+}

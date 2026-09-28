@@ -52,8 +52,17 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);
 
+        // REGLA MAESTRA: Agotar siempre la capacidad del documento antes de usar conocimiento externo
+        const hasLongDoc = documentContext && documentContext.trim().length > 80;
+        const docDirective = hasLongDoc
+            ? `DOCUMENTO DE REFERENCIA OBLIGATORIA:\n"""${documentContext.slice(0, 25000)}"""\n
+               REGLA ESTRICTA DE AGOTAMIENTO DEL TEXTO:
+               1. PRIORIDAD ABSOLUTA AL TEXTO: Debes extraer los conceptos, definiciones, relaciones, ejemplos o argumentos EXPRIMIENDO AL MÁXIMO la información explícita e implícita del DOCUMENTO DE REFERENCIA.
+               2. EVALUACIÓN DE SUFICIENCIA: Analiza primero si el documento contiene elementos que aún no se han mencionado en la ruta ("${contextPath || ''}") para responder a esta solicitud sobre "${topic}". Mientras el texto tenga material útil o sub-ideas por desglosar, úsalo exclusivamente.
+               3. CRITERIO DE SALIDA AL CONOCIMIENTO EXTERNO: ÚNICAMENTE si tras analizar el texto compruebas que ya se agotó su contenido sobre este punto, o que el documento no aborda lo que se pide (por ejemplo, casos prácticos o críticas que no figuran en la lectura), estás autorizado a generar la respuesta a partir de tu conocimiento experto universal, conectándolo de forma coherente con la tesis del documento.`
+            : `Usa conocimiento experto, riguroso y profundo sobre el tema.`;
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
         // ==========================================
@@ -93,9 +102,7 @@ exports.handler = async function(event, context) {
                 requiredFields.push("curiosityHook");
             }
 
-            const docPrompt = documentContext 
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nExtrae las derivaciones a partir del documento o complementa con conocimiento riguroso.`
-                : 'Usa conocimiento riguroso del tema.';
+            const docPrompt = docDirective;
 
             const curiosityInstruction = includeCuriosity
                 ? `3. "curiosityHook": Formula 1 pregunta provocadora o paradoja real sobre "${topic}" que invite a investigar más a fondo.`
@@ -174,6 +181,7 @@ exports.handler = async function(event, context) {
 
             const response = await generateWithFallback({
                 contents: `Descubre la sinergia profunda entre Tema A: "${topic}" y Tema B: "${topicB}".
+                ${docDirective}
                 
                 INSTRUCCIONES:
                 1. "synergy": Define el concepto definitivo, la intersección más importante o el resultado innovador de unir ambos campos.
@@ -211,9 +219,7 @@ exports.handler = async function(event, context) {
                 required: ["examples"]
             };
 
-            const docPrompt = documentContext 
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nREGLA DE PRIORIDAD: Busca casos, experimentos, aplicaciones o situaciones mencionadas en el documento para "${topic}". Solo si el documento carece de ejemplos concretos, genera ejemplos reales del mundo exterior.`
-                : 'Genera ejemplos reales y específicos del mundo exterior.';
+            const docPrompt = docDirective;
 
             const response = await generateWithFallback({
                 contents: `Concepto: "${topic}".
@@ -255,8 +261,9 @@ exports.handler = async function(event, context) {
             };
 
             const response = await generateWithFallback({
-                contents: `Conecta lógicamente Tema A: "${topic}" con Tema B: "${topicB}".
-                Genera un concepto puente intermedio concreto (no genérico). Conectores de 1 a 3 palabras.`,
+            contents: `Conecta lógicamente Tema A: "${topic}" con Tema B: "${topicB}".
+            ${docDirective}
+            Genera un concepto puente intermedio concreto (no genérico). Conectores de 1 a 3 palabras.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
@@ -275,9 +282,7 @@ exports.handler = async function(event, context) {
         if (action === 'define') {
             const { interactive } = JSON.parse(event.body);
 
-            const docPrompt = documentContext 
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nSintetiza la explicación del texto o proporciona una definición rigurosa.`
-                : `Proporciona una definición conceptual clara y directa.`;
+            const docPrompt = docDirective;
 
             const interactiveRule = interactive
                 ? `3. PISTAS INTERACTIVAS: Dentro de tu explicación, encierra entre dobles corchetes exactamente de 3 a 4 términos técnicos, sub-conceptos o autores clave que merezcan ser explorados como nuevos nodos (ejemplo: [[Destrucción Creativa]], [[Contrato Social]]).`
@@ -375,9 +380,7 @@ exports.handler = async function(event, context) {
         if (action === 'custom_prompt') {
             const { customRequest } = JSON.parse(event.body);
 
-            const docPrompt = documentContext 
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nTen en cuenta el documento si es relevante para responder a la petición, o usa conocimiento experto riguroso si el usuario pide una perspectiva externa.`
-                : 'Usa conocimiento experto, riguroso y profundo.';
+            const docPrompt = docDirective;
 
             const schema = {
                 type: 'OBJECT',
@@ -444,7 +447,7 @@ exports.handler = async function(event, context) {
             const response = await generateWithFallback({
                 contents: `Analiza críticamente el concepto: "${topic}" (Contexto: "${contextPath}").
                 Genera entre 2 y 3 antítesis reales: posturas filosóficas o científicas opuestas, críticas históricas, paradojas o límites donde este concepto falla.
-                PROHIBIDO usar nombres genéricos como "Crítica 1". Nombra la teoría, autor o fenómeno real.`,
+                PROHIBIDO usar nombres genéricos como "Crítica 1". Nombra la teoría, autor o fenómeno real.` ,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
