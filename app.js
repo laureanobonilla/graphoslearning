@@ -139,6 +139,8 @@ function trackNodeUsage(topicName) {
     if (nodesTracked >= 50) return;
     nodesTracked++;
     localStorage.setItem('gk_nodes_tracked', nodesTracked.toString());
+    updateSurpriseButtonVisibility(); // Oculta el botón de prueba tras el primer uso
+
     fetch('/.netlify/functions/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,6 +192,22 @@ function initializeBalance() {
     updateCounterDisplay();
 }
 
+function updateSurpriseButtonVisibility() {
+    const btnSurprise = document.getElementById('btnSurprise');
+    if (!btnSurprise) return;
+
+    const hasUsedAppBefore = parseInt(localStorage.getItem('gk_nodes_tracked') || '0', 10) > 0;
+
+    // Solo mostrar si NO está logueado y es la primera vez que usa la app
+    if (!currentUser && !hasUsedAppBefore) {
+        btnSurprise.classList.remove('hidden');
+        btnSurprise.classList.add('flex');
+    } else {
+        btnSurprise.classList.add('hidden');
+        btnSurprise.classList.remove('flex');
+    }
+}
+
 function updateAuthUI() {
     const loginText = document.getElementById('loginText');
     const userStatusDot = document.getElementById('userStatusDot');
@@ -204,11 +222,14 @@ function updateAuthUI() {
         loginText.innerText = "Iniciar Sesión";
         userStatusDot.className = 'w-2 h-2 rounded-full bg-slate-300';
     }
-    // El botón Mis Proyectos permanece siempre visible
+
     if (btnProjects) {
         btnProjects.classList.remove('hidden');
         btnProjects.classList.add('flex');
     }
+
+    // Verificar si debe mostrarse "Generar esquema de prueba"
+    updateSurpriseButtonVisibility();
 }
 
 document.getElementById('btnLogin')?.addEventListener('click', () => {
