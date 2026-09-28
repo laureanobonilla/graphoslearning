@@ -1116,15 +1116,28 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
 });
 
 // ==========================================
-// 15. PANTALLA DE BIENVENIDA Y SORPRÉNDEME
+// 15. PANTALLA DE BIENVENIDA (SOLO EN LA PRIMERA VISITA)
 // ==========================================
 const welcomeScreen = document.getElementById('welcomeScreen');
-let hasDismissedWelcomeScreen = false;
+const isFirstTimeUser = !localStorage.getItem('gk_has_visited') && parseInt(localStorage.getItem('gk_nodes_tracked') || '0', 10) === 0;
+let hasDismissedWelcomeScreen = !isFirstTimeUser;
+
+// Solo mostramos el cuadro "¿Qué vamos a explorar hoy?" si es su primera vez entrando
+if (isFirstTimeUser && welcomeScreen) {
+    welcomeScreen.classList.remove('hidden');
+    welcomeScreen.classList.add('flex');
+    localStorage.setItem('gk_has_visited', 'true');
+}
 
 function dismissWelcomeScreen() {
-    if (hasDismissedWelcomeScreen) return;
+    if (hasDismissedWelcomeScreen || !welcomeScreen) return;
+    localStorage.setItem('gk_has_visited', 'true');
     welcomeScreen.classList.add('opacity-0', 'pointer-events-none');
-    setTimeout(() => { welcomeScreen.classList.add('hidden'); hasDismissedWelcomeScreen = true; }, 500);
+    setTimeout(() => { 
+        welcomeScreen.classList.add('hidden'); 
+        welcomeScreen.classList.remove('flex');
+        hasDismissedWelcomeScreen = true; 
+    }, 500);
 }
 
 welcomeScreen?.addEventListener('click', (e) => { if (e.target === welcomeScreen) dismissWelcomeScreen(); });
