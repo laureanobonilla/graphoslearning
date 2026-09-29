@@ -52,8 +52,7 @@ exports.handler = async function(event, context) {
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);
-
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);
         // REGLA MAESTRA: Agotar siempre la capacidad del documento antes de usar conocimiento externo
         const hasLongDoc = documentContext && documentContext.trim().length > 80;
         const docDirective = hasLongDoc
