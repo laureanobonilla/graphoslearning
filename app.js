@@ -556,7 +556,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 contextPath: getContextPath(selectedNodeId),
                 maxNodes,
                 includeCuriosity: true,
-                documentContext: documentContext: getFullDocumentContext()
+                documentContext: getFullDocumentContext()
             })
         });
         const data = await response.json();
@@ -620,7 +620,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: documentContext: getFullDocumentContext() })
+            body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: getFullDocumentContext() })
         });
         const data = await response.json();
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
@@ -974,7 +974,7 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', async () 
                     topic: title,
                     interactive: true,
                     contextPath: getContextPath(selectedNodeId),
-                    documentContext: documentContext: getFullDocumentContext()
+                    documentContext: getFullDocumentContext()
                 })
             });
             const data = await response.json();
@@ -1028,7 +1028,7 @@ document.getElementById('btnMenuExpandDef')?.addEventListener('click', async () 
         showLoader('Redactando definición...');
         try {
             const response = await fetch('/.netlify/functions/gemini', {
-                method: 'POST', body: JSON.stringify({ action: 'define', topic: title, contextPath: getContextPath(selectedNodeId), documentContext: documentContext: getFullDocumentContext() })
+                method: 'POST', body: JSON.stringify({ action: 'define', topic: title, contextPath: getContextPath(selectedNodeId), documentContext: getFullDocumentContext() })
             });
             const data = await response.json(); definitionText = data.definition;
         } catch (err) { alert("Error al obtener definición."); return; } finally { hideLoader(); }
@@ -1711,7 +1711,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
                 topic: topicName,
                 contextPath,
                 customRequest,
-                documentContext: documentContext: getFullDocumentContext()
+                documentContext: getFullDocumentContext()
             })
         });
 
