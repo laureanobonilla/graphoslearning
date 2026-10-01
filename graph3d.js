@@ -98,6 +98,79 @@
         return String(label || '').replace(/\*/g, '');
     }
 
+    // ---------- Jerarquía por profundidad (para que el árbol se note en 3D) ----------
+    // El layout de fuerzas por sí solo no sabe qué es "padre" y qué es "hijo": todos
+    // los nodos se repelen igual y el árbol se vuelve una nube sin orden. Para que
+    // 1) los hijos queden pegados visualmente a su padre y
+    // 2) se note una jerarquía clara (capas por profundidad alrededor de cada raíz),
+    // calculamos la profundidad (BFS) de cada nodo respecto a la raíz de SU propio
+    // árbol (un nodo sin padres entrantes) y la usamos en una fuerza radial propia:
+    // cada nodo es empujado a mantenerse a una distancia de ~profundidad*radialStep
+    // de su raíz, en vez de dejarlo flotar a cualquier distancia. Como puede haber
+    // varios esquemas independientes a la vez en el mismo lienzo (ver "offsetX" en
+    // app.js), cada árbol calcula su radio respecto a SU PROPIA raíz, no al origen
+    // global del lienzo, así los esquemas no se atraen entre sí.
+    function computeHierarchy(nodeList, linkList) {
+        const childrenOf = new Map();
+        const hasParent = new Set();
+        nodeList.forEach(n => childrenOf.set(n.id, []));
+        linkList.forEach(l => {
+            const from = (l.from !== undefined) ? l.from : l.source;
+            const to = (l.to !== undefined) ? l.to : l.target;
+            if (childrenOf.has(from)) childrenOf.get(from).push(to);
+            hasParent.add(to);
+        });
+        const idToNode = new Map(nodeList.map(n => [n.id, n]));
+        const roots = nodeList.filter(n => !hasParent.has(n.id)).map(n => n.id);
+        const visited = new Set();
+        roots.forEach(rootId => {
+            const queue = [{ id: rootId, depth: 0 }];
+            while (queue.length) {
+                const { id, depth } = queue.shift();
+                if (visited.has(id)) continue;
+                visited.add(id);
+                const node = idToNode.get(id);
+                if (node) { node.__depth = depth; node.__rootId = rootId; }
+                (childrenOf.get(id) || []).forEach(childId => {
+                    if (!visited.has(childId)) queue.push({ id: childId, depth: depth + 1 });
+                });
+            }
+        });
+        // Nodos sueltos que ninguna BFS tocó (p.ej. ciclos raros): raíz de sí mismos.
+        nodeList.forEach(n => {
+            if (!visited.has(n.id)) { n.__depth = 0; n.__rootId = n.id; }
+        });
+    }
+
+    // Fuerza d3 personalizada: empuja cada nodo a quedar a distancia
+    // depth * radialStep de la posición ACTUAL de su raíz (no de un punto fijo), para
+    // que varios esquemas en el mismo lienzo no se junten entre sí.
+    function makeHierarchicalRadialForce(radialStep) {
+        let nodes = [];
+        let byId = new Map();
+        function force(alpha) {
+            for (const n of nodes) {
+                const depth = n.__depth || 0;
+                if (!depth) continue; // la raíz no se empuja a sí misma
+                const anchor = byId.get(n.__rootId) || { x: 0, y: 0, z: 0 };
+                const dx = (n.x || 0) - (anchor.x || 0);
+                const dy = (n.y || 0) - (anchor.y || 0);
+                const dz = (n.z || 0) - (anchor.z || 0);
+                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
+                const targetR = depth * radialStep;
+                const k = (targetR - dist) / dist * alpha * 0.9;
+                n.vx = (n.vx || 0) + dx * k;
+                n.vy = (n.vy || 0) + dy * k;
+                n.vz = (n.vz || 0) + dz * k;
+            }
+        }
+        force.initialize = (_nodes) => {
+            nodes = _nodes;
+            byId = new Map(nodes.map(n => [n.id, n]));
+        };
+        return force;
+    }
+
     // ---------- NetworkShim: reemplazo de vis.Network sobre ForceGraph3D ----------
     class Graph3DNetworkShim {
         constructor(container, data, options) {
@@ -151,6 +224,22 @@
             this.graph.d3VelocityDecay(0.35);
             this._physicsEnabled = true;
 
+            // Ajuste de fuerzas para que se note la jerarquía en vez de una nube pareja:
+            // - link: corto y firme, para que cada hijo quede pegado visualmente a su padre.
+            // - charge: repulsión suave, solo para separar hermanos, no para dispersar el árbol.
+            // - center: SE DESACTIVA. Por defecto 3d-force-graph atrae todo al origen del
+            //   lienzo; con varios esquemas en la misma pantalla (ver "offsetX" en app.js)
+            //   eso los iría juntando entre sí con el tiempo. Cada árbol ya se mantiene
+            //   compacto solo con "hierRadial" (ver abajo), centrado en SU propia raíz.
+            // - hierRadial: fuerza propia que acomoda a cada nodo en "capas" (una esfera
+            //   por nivel de profundidad) alrededor de la raíz de su propio árbol.
+            const linkForce = this.graph.d3Force('link');
+            if (linkForce) { linkForce.distance(55).strength(0.85); }
+            const chargeForce = this.graph.d3Force('charge');
+            if (chargeForce) { chargeForce.strength(-45).distanceMax(240); }
+            this.graph.d3Force('center', null);
+            this.graph.d3Force('hierRadial', makeHierarchicalRadialForce(68));
+
             // Semilla de profundidad: sin un empuje inicial en Z, muchos layouts de fuerza
             // caen en un plano casi plano. El jitter de spawn en syncGraphData (más abajo)
             // le da a la simulación libertad real de usar los tres ejes desde el principio
@@ -191,6 +280,7 @@
                     return merged;
                 });
                 const linkList = this.edgesDS.get().map(e => ({ ...e }));
+                computeHierarchy(nodeList, linkList); // asigna __depth/__rootId por nodo
                 this.graph.graphData({ nodes: nodeList, links: linkList });
             };
             this._findNode = id => (this.graph.graphData().nodes || []).find(n => n.id === id);
