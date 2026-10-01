@@ -27,7 +27,23 @@
 
 (function () {
     if (typeof THREE === 'undefined' || typeof ForceGraph3D === 'undefined' || typeof SpriteText === 'undefined') {
-        console.error('[graph3d] Faltan three.js / 3d-force-graph / three-spritetext. Revisa los <script> en el HTML.');
+        const missing = [
+            typeof THREE === 'undefined' && 'three.js',
+            typeof ForceGraph3D === 'undefined' && '3d-force-graph',
+            typeof SpriteText === 'undefined' && 'three-spritetext'
+        ].filter(Boolean).join(', ');
+        console.error(`[graph3d] No cargaron estas librerías: ${missing}. Revisa los <script> en el HTML (y la consola, por si una de ellas dio su propio error antes de este).`);
+        // Mensaje visible en pantalla en vez de un lienzo negro mudo: así, si vuelve a
+        // romperse por otra razón (CDN caído, versión incompatible, etc.), se nota de
+        // inmediato en vez de parecer que la app "no hace nada".
+        const container = document.getElementById('network-container');
+        if (container) {
+            container.innerHTML = `<div style="color:#fca5a5;background:#1e293b;height:100%;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:sans-serif;font-size:13px;">
+                No se pudo cargar el lienzo 3D (faltó: ${missing}).<br>Revisa la consola del navegador para más detalle.
+            </div>`;
+        }
+        // No definimos Graph3DDataSet/Graph3DNetworkShim: app.js fallará al construirlos.
+        // Es preferible un error claro de "faltó cargar la librería" a uno silencioso.
         return;
     }
 
