@@ -1,11 +1,14 @@
 // ==========================================
-// 1. INICIALIZACIÓN DEL GRAFO (VIS.JS)
+// 1. INICIALIZACIÓN DEL GRAFO (3D, vía graph3d.js sobre 3d-force-graph)
 // ==========================================
+// nodes/edges y network conservan la misma API que tenían con vis-network
+// (ver graph3d.js para el porqué de este enfoque); todo lo demás en este archivo
+// sigue funcionando sin cambios.
 const container = document.getElementById('network-container');
-let nodes = new vis.DataSet([]);
-let edges = new vis.DataSet([]);
+let nodes = new Graph3DDataSet([]);
+let edges = new Graph3DDataSet([]);
 let currentDocumentText = "";
-let selectedDensity = 'auto'; 
+let selectedDensity = 'auto';
 let sourceNodeForSynergy = null;
 const synergyBanner = document.getElementById('synergyBanner');
 
@@ -24,40 +27,7 @@ function getRandomColor() {
     return elegantPalette[Math.floor(Math.random() * elegantPalette.length)];
 }
 
-let network = new vis.Network(container, { nodes, edges }, {
-    layout: { hierarchical: false },
-    physics: {
-        enabled: false,
-        solver: 'repulsion',
-        repulsion: { nodeDistance: 220, springLength: 200, springConstant: 0.05 }
-    },
-    nodes: { 
-        shape: 'box', 
-        margin: { top: 16, bottom: 16, left: 20, right: 20 },
-        font: { 
-            multi: 'md', 
-            size: 16, 
-            face: 'Inter, sans-serif', 
-            color: '#334155',
-            bold: { color: '#0f172a', size: 18, face: 'Inter, sans-serif' } 
-        },
-        borderWidth: 1.5,
-        shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.08)', size: 8, x: 2, y: 2 },
-        shapeProperties: { borderRadius: 12 }
-    },
-    edges: { 
-        arrows: { to: { enabled: true, scaleFactor: 0.8 } },
-        color: { color: '#94a3b8', highlight: '#64748b', hover: '#cbd5e1' },
-        font: { 
-            size: 14, face: 'Inter, sans-serif', color: '#475569', strokeWidth: 3, 
-            strokeColor: '#fbfcfd', align: 'middle'
-        },
-        width: 1.5,
-        dashes: [4, 4],
-        smooth: { type: 'dynamic' } // Curvatura orgánica y adaptativa para que no se vean todas iguales
-    },
-    interaction: { hover: true, multiselect: true, selectConnectedEdges: true }
-});
+let network = new Graph3DNetworkShim(container, { nodes, edges }, {});
 
 function stopPhysicsAndUnlock() {
     network.setOptions({ physics: { enabled: false } });
@@ -150,46 +120,130 @@ function trackNodeUsage(topicName) {
 
 // ==========================================
 // 4. AUTENTICACIÓN Y SALDOS
+// El saldo real vive en el servidor (Supabase). El cliente solo refleja el último
+// valor que el servidor le confirmó; nunca lo calcula ni lo decide por su cuenta.
 // ==========================================
 let currentUser = null;
-let isAdmin = localStorage.getItem('gk_is_admin') === 'true';
+let isAdmin = false;          // Ahora la confirma el servidor (rol/email en el JWT), no localStorage.
 let availableNodes = 0;
+let isGuestUser = true;       // true = sin sesión; el saldo de invitado lo controla una cookie HttpOnly.
+let balanceKnown = false;     // evita parpadeos de "0 Nodos" antes de la primera respuesta del servidor.
+
+// Cabeceras de autenticación para toda llamada a nuestras funciones de Netlify.
+// Con sesión, incluye el JWT de Netlify Identity; el servidor lo verifica por su cuenta.
+function authHeaders(extra = {}) {
+    const headers = { 'Content-Type': 'application/json', ...extra };
+    const token = currentUser?.token?.access_token;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return headers;
+}
+
+// Wrapper único para llamar a nuestras funciones: agrega auth y cookies, y nunca lanza
+// si la función responde con un error controlado (402/429/503) — deja que el llamador decida.
+async function apiFetch(path, options = {}) {
+    const res = await fetch(path, {
+        ...options,
+        credentials: 'same-origin',
+        headers: authHeaders(options.headers)
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* respuesta sin cuerpo JSON */ }
+    return { ok: res.ok, status: res.status, data: data || {} };
+}
+
+// Interceptor de red: en vez de editar cada uno de los ~18 fetch() a gemini.js/db.js/
+// balance.js repartidos por app.js y lab.js (cada uno maneja sus errores distinto),
+// añadimos aquí el token de sesión a todos ellos y capturamos en un solo lugar los
+// errores de saldo/sesión (402/429/401) que ahora decide el servidor.
+(function installBillingFetchInterceptor() {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = function (url, options = {}) {
+        const target = typeof url === 'string' ? url : (url?.url || '');
+        const isOurFn = target.includes('/.netlify/functions/gemini')
+            || target.includes('/.netlify/functions/db')
+            || target.includes('/.netlify/functions/balance');
+        if (!isOurFn) return nativeFetch(url, options);
+
+        const finalOptions = { ...options, credentials: 'same-origin', headers: authHeaders(options.headers) };
+
+        return nativeFetch(url, finalOptions).then(res => {
+            const isBillingError = target.includes('/.netlify/functions/gemini')
+                && (res.status === 402 || res.status === 429 || res.status === 401);
+            if (!isBillingError) return res;
+
+            return res.clone().json().catch(() => ({})).then(data => {
+                handleBillingError(res.status, data);
+                // El código que llamó a fetch() sigue en su propio try/catch: lanzamos para
+                // que ese catch corra (y oculte el loader), sin dejar que intente leer
+                // data.branches/data.concepts/etc. de un cuerpo que no los tiene.
+                throw new Error('billing_blocked');
+            });
+        });
+    };
+})();
 
 if (window.netlifyIdentity) {
     netlifyIdentity.init({ locale: 'es' });
     currentUser = netlifyIdentity.currentUser();
-    initializeBalance();
+    refreshBalanceFromServer();
     updateAuthUI();
-    
-    netlifyIdentity.on('init', user => { currentUser = user; initializeBalance(); updateAuthUI(); });
-    netlifyIdentity.on('login', user => { 
-        currentUser = user; 
-        authWallModal?.classList.add('hidden'); 
-        netlifyIdentity.close(); 
-        initializeBalance(); updateAuthUI(); 
+
+    netlifyIdentity.on('init', user => { currentUser = user; refreshBalanceFromServer(); updateAuthUI(); });
+    netlifyIdentity.on('login', user => {
+        currentUser = user;
+        authWallModal?.classList.add('hidden');
+        netlifyIdentity.close();
+        refreshBalanceFromServer(); updateAuthUI();
     });
-    netlifyIdentity.on('logout', () => { currentUser = null; initializeBalance(); updateAuthUI(); });
+    netlifyIdentity.on('logout', () => { currentUser = null; refreshBalanceFromServer(); updateAuthUI(); });
 }
 
-function initializeBalance() {
-    if (isAdmin) { updateCounterDisplay(); return; }
-    
-    if (currentUser) {
-        let storedBalance = parseInt(localStorage.getItem(`gk_balance_${currentUser.id}`), 10);
-        if (isNaN(storedBalance)) { 
-            storedBalance = 50; 
-            localStorage.setItem(`gk_balance_${currentUser.id}`, storedBalance); 
-        }
-        availableNodes = storedBalance;
-    } else {
-        let guestBalance = parseInt(localStorage.getItem('gk_guest_balance'), 10);
-        if (isNaN(guestBalance)) { 
-            guestBalance = 50; 
-            localStorage.setItem('gk_guest_balance', guestBalance); 
-        }
-        availableNodes = guestBalance;
-    }
+// Pide el saldo real al servidor. No gasta nodos: solo consulta.
+async function refreshBalanceFromServer() {
+    const { ok, data } = await apiFetch('/.netlify/functions/balance');
+    if (!ok) { balanceKnown = false; return; }
+
+    isAdmin = data.kind === 'admin';
+    isGuestUser = data.kind === 'guest';
+    availableNodes = typeof data.balance === 'number' ? data.balance : 0;
+    balanceKnown = true;
     updateCounterDisplay();
+}
+
+// Aplica el saldo que ya vino en la respuesta de una acción de IA (gemini.js lo incluye
+// siempre), para no tener que hacer una llamada extra a /balance tras cada acción.
+function applyServerBalance(data) {
+    if (!data) return;
+    if (typeof data.balance === 'number') availableNodes = data.balance;
+    isAdmin = !!data.admin;
+    isGuestUser = !!data.guest;
+    balanceKnown = true;
+    updateCounterDisplay();
+}
+
+// Interpreta un error 402/429 devuelto por gemini.js y muestra el panel correcto.
+// Devuelve true si ya se manejó (el llamador no debe seguir con su propio alert()).
+function handleBillingError(status, data) {
+    if (status === 402 && data?.error === 'guest_limit_reached') {
+        if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
+        requireAuth('procesar este esquema');
+        return true;
+    }
+    if (status === 402 && data?.error === 'insufficient_balance') {
+        if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
+        if (actionMenu) actionMenu.classList.add('hidden');
+        storeModal?.classList.remove('hidden'); storeModal?.classList.add('flex');
+        return true;
+    }
+    if (status === 429) {
+        alert('Estás generando muy rápido. Espera un minuto y vuelve a intentar.');
+        return true;
+    }
+    if (status === 401) {
+        requireAuth('procesar este esquema');
+        return true;
+    }
+    return false;
 }
 
 function updateSurpriseButtonVisibility() {
@@ -267,19 +321,19 @@ function updateCounterDisplay() {
     else dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
 }
 
-function consumeNodes(amount) {
-    if (isAdmin) return;
-    availableNodes -= amount;
-    if (availableNodes < 0) availableNodes = 0;
-    if (currentUser) localStorage.setItem(`gk_balance_${currentUser.id}`, availableNodes);
-    else localStorage.setItem('gk_guest_balance', availableNodes);
-    updateCounterDisplay();
-}
+// Ya NO descuenta nada por su cuenta: el saldo real que devuelve gemini.js (vía
+// applyServerBalance) es la única fuente de verdad. Esto solo queda por compatibilidad
+// con el resto de app.js/lab.js, que sigue llamando consumeNodes(n) tras cada acción.
+function consumeNodes(_amount) { /* no-op: ver applyServerBalance() */ }
 
+// Chequeo optimista en el cliente, solo para evitar una llamada de red innecesaria
+// cuando es obvio que no alcanza. El servidor vuelve a validar todo en cada llamada
+// y es quien realmente decide (ver handleBillingError).
 function checkBalance(cost) {
     if (isAdmin) return true;
+    if (!balanceKnown) return true; // aún no sabemos el saldo real: dejamos que el servidor decida
     if (availableNodes < cost) {
-        if (!currentUser) requireAuth("procesar este esquema");
+        if (isGuestUser) requireAuth("procesar este esquema");
         else {
             if (actionMenu) actionMenu.classList.add('hidden');
             storeModal?.classList.remove('hidden'); storeModal?.classList.add('flex');
@@ -441,7 +495,7 @@ async function generateFullSchemaFromTopic(topicText) {
         const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
         renderThreeLevelTree(data);
-        consumeNodes(totalNodes);
+        applyServerBalance(data); consumeNodes(totalNodes);
     } catch (err) {
         console.error(err);
         alert('Intenta de nuevo en unos segundos');
@@ -510,30 +564,33 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                     topic: topicName,
                     contextPath: getContextPath(selectedNodeId),
                     customRequest: `Responde de forma clara, reveladora y directa a esta incógnita: ${topicName}`,
-                    documentContext: getFullDocumentContext()
+                    documentContext: globalDocumentContext || currentDocumentText
                 })
             });
             const data = await response.json();
             const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
             let createdCount = 0;
+            let firstAnswer = null;
+            // El nodo se mantiene pequeño siempre (sin inflarse con el contenido);
+            // el contenido real se abre en su propio panel flotante a continuación.
             (data.nodes || []).forEach((item, idx) => {
                 const newId = item.id || `ans_${Date.now()}_${idx}`;
-                const hasContent = item.content && item.content.trim().length > 0;
                 nodes.update({
                     id: newId,
-                    label: hasContent ? `*💡 ${item.title}*\n────────────────────\n${item.content}` : `*💡 ${item.title}*`,
+                    label: `*💡 ${item.title}*`,
                     baseTitle: item.title,
                     definition: item.content || null,
-                    isExpandedDef: hasContent,
                     color: { background: '#fffbeb', border: '#f59e0b' },
                     x: parentPos.x, y: parentPos.y + 140,
-                    widthConstraint: hasContent ? { minimum: 380, maximum: 460 } : { minimum: 150, maximum: 240 }
+                    widthConstraint: { minimum: 150, maximum: 240 }
                 });
                 edges.add({ from: selectedNodeId, to: newId, label: 'se explica por' });
+                if (!firstAnswer) firstAnswer = { id: newId, title: item.title, content: item.content };
                 createdCount++;
             });
             nodes.update({ id: selectedNodeId, isMystery: false });
-            consumeNodes(createdCount);
+            applyServerBalance(data); consumeNodes(createdCount);
+            if (firstAnswer) showContentInFloatingPanel(firstAnswer.id, firstAnswer.title, firstAnswer.content);
         } catch { alert("Error al resolver la incógnita."); } finally { hideLoader(); }
         return;
     }
@@ -556,7 +613,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 contextPath: getContextPath(selectedNodeId),
                 maxNodes,
                 includeCuriosity: true,
-                documentContext: getFullDocumentContext()
+                documentContext: globalDocumentContext || currentDocumentText
             })
         });
         const data = await response.json();
@@ -594,7 +651,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
         }
 
         nodes.update({ id: selectedNodeId, expanded: true });
-        consumeNodes(createdCount);
+        applyServerBalance(data); consumeNodes(createdCount);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
     } catch { alert("Error al conectar con el servicio."); } finally { hideLoader(); }
 });
@@ -620,7 +677,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
     try {
         const response = await fetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: getFullDocumentContext() })
+            body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: globalDocumentContext || currentDocumentText })
         });
         const data = await response.json();
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
@@ -638,7 +695,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
                 trackNodeUsage(example.label); createdCount++;
             }
         });
-        consumeNodes(createdCount);
+        applyServerBalance(data); consumeNodes(createdCount);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
     } catch { alert("Error al conectar con el servicio."); } finally { hideLoader(); }
 });
@@ -711,7 +768,7 @@ network.on('click', async function (params) {
                     edges.add({ from: bridge.id, to: synNode.id, label: bridge.relToSynergy });
                 });
 
-                consumeNodes(totalNodes);
+                applyServerBalance(data); consumeNodes(totalNodes);
                 setTimeout(() => { stopPhysicsAndUnlock(); }, 1800);
             } catch (err) { alert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
             return; // ¡Este return detiene el código para que NO abra el menú!
@@ -748,7 +805,7 @@ network.on('click', async function (params) {
                 if (!nodes.get(bridge.id)) {
                     nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: midX, y: midY, fixed: { x: false, y: false }, color: getRandomColor() });
                     trackNodeUsage(bridge.label);
-                    consumeNodes(1);
+                    applyServerBalance(data); consumeNodes(1);
                 }
                 edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
                 edges.add({ from: bridge.id, to: nodeB.id, label: bridge.relToB });
@@ -778,24 +835,9 @@ network.on('click', async function (params) {
         actionMenu.style.left = leftPos + 'px';
         actionMenu.style.top = topPos + 'px';
         actionMenu.style.visibility = 'visible';
-
-        // LÓGICA DE VISIBILIDAD DE BOTONES
-        const actualNode = nodes.get(selectedNodeId);
-        const isExpanded = actualNode && actualNode.isExpandedDef === true;
-        
-        const btnExpand = document.getElementById('btnMenuExpandDef');
-        const btnCollapse = document.getElementById('btnMenuCollapseDef');
-        const btnOpenPanel = document.getElementById('btnMenuOpenPanel');
-        
-        if (isExpanded) {
-            if (btnExpand) { btnExpand.classList.add('hidden'); btnExpand.classList.remove('flex'); }
-            if (btnCollapse) { btnCollapse.classList.remove('hidden'); btnCollapse.classList.add('flex'); }
-            if (btnOpenPanel) { btnOpenPanel.classList.remove('hidden'); btnOpenPanel.classList.add('flex'); }
-        } else {
-            if (btnExpand) { btnExpand.classList.remove('hidden'); btnExpand.classList.add('flex'); }
-            if (btnCollapse) { btnCollapse.classList.add('hidden'); btnCollapse.classList.remove('flex'); }
-            if (btnOpenPanel) { btnOpenPanel.classList.add('hidden'); btnOpenPanel.classList.remove('flex'); }
-        }
+        // "Ver definición" ya no alterna entre expandir-en-el-nodo y colapsar: siempre
+        // abre (o enfoca) el panel flotante de este nodo, así que no necesita lógica
+        // de visibilidad condicional como antes.
 
     } else {
         actionMenu.classList.add('hidden');
@@ -819,13 +861,88 @@ const selectionTooltip = document.getElementById('selectionTooltip');
 const panelResizer = document.getElementById('panelResizer');
 const docContextInput = document.getElementById('docContextInput');
 
-const nodeDetailPanel = document.getElementById('nodeDetailPanel');
-const detailNodeTitle = document.getElementById('detailNodeTitle');
-const nodeDetailContent = document.getElementById('nodeDetailContent');
-const closeDetailPanel = document.getElementById('closeDetailPanel'); 
+const floatingPanelsLayer = document.getElementById('floatingPanelsLayer');
 const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
 const nodeTooltipPreview = document.getElementById('nodeTooltipPreview');
 const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
+
+// ==========================================
+// PANELES FLOTANTES DE DEFINICIÓN
+// Ya no hay un panel único "nodeDetailPanel" que se reemplaza cada vez (eso forzaba
+// a elegir entre perder la definición anterior o recargar visualmente el esquema).
+// Cada "Ver definición" abre su propia ventana flotante, apilada en cascada, que el
+// usuario puede arrastrar, minimizar o cerrar sin afectar a las demás ni al lienzo.
+// ==========================================
+let floatingPanelCount = 0;
+const openFloatingPanels = new Map(); // nodeId -> { el, contentEl, titleEl }
+
+function closeFloatingPanel(nodeId) {
+    const panel = openFloatingPanels.get(nodeId);
+    if (!panel) return;
+    panel.el.remove();
+    openFloatingPanels.delete(nodeId);
+}
+
+function focusFloatingPanel(nodeId) {
+    const panel = openFloatingPanels.get(nodeId);
+    if (!panel) return;
+    floatingPanelCount++;
+    panel.el.style.zIndex = String(500 + floatingPanelCount);
+}
+
+// Crea (o enfoca, si ya existe) la ventana flotante de un nodo y devuelve sus
+// referencias de título/contenido para que el llamador las rellene.
+function openFloatingPanel(nodeId, title) {
+    const existing = openFloatingPanels.get(nodeId);
+    if (existing) { focusFloatingPanel(nodeId); return existing; }
+
+    const offset = openFloatingPanels.size % 6;
+    const el = document.createElement('div');
+    el.className = 'absolute w-80 max-h-[70vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col pointer-events-auto select-text';
+    el.style.left = `${24 + offset * 36}px`;
+    el.style.top = `${24 + offset * 36}px`;
+    el.style.zIndex = String(500 + (++floatingPanelCount));
+
+    el.innerHTML = `
+        <div class="fp-header px-3 py-2 bg-slate-950 border-b border-slate-800 rounded-t-xl flex justify-between items-center gap-2 cursor-move select-none">
+            <h3 class="fp-title text-xs font-bold font-heading text-amber-400 uppercase tracking-wider truncate flex-1"></h3>
+            <button class="fp-minimize text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Minimizar">—</button>
+            <button class="fp-close text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Cerrar">✕</button>
+        </div>
+        <div class="fp-content flex-1 overflow-auto p-4 text-slate-200 text-sm leading-relaxed font-sans select-text"></div>
+    `;
+    floatingPanelsLayer.appendChild(el);
+
+    const titleEl = el.querySelector('.fp-title');
+    const contentEl = el.querySelector('.fp-content');
+    const headerEl = el.querySelector('.fp-header');
+    titleEl.innerText = title;
+
+    el.querySelector('.fp-close').addEventListener('click', () => closeFloatingPanel(nodeId));
+    el.querySelector('.fp-minimize').addEventListener('click', () => {
+        contentEl.classList.toggle('hidden');
+    });
+    el.addEventListener('mousedown', () => focusFloatingPanel(nodeId));
+
+    // Arrastre simple: el usuario puede reposicionar cada panel para aprovechar el
+    // espacio de pantalla y comparar varias definiciones a la vez lado a lado.
+    let dragState = null;
+    headerEl.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button')) return;
+        dragState = { startX: e.clientX, startY: e.clientY, left: el.offsetLeft, top: el.offsetTop };
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!dragState) return;
+        el.style.left = `${dragState.left + (e.clientX - dragState.startX)}px`;
+        el.style.top = `${dragState.top + (e.clientY - dragState.startY)}px`;
+    });
+    document.addEventListener('mouseup', () => { dragState = null; });
+
+    const panel = { el, contentEl, titleEl };
+    openFloatingPanels.set(nodeId, panel);
+    return panel;
+}
 
 let globalDocumentContext = "";
 let activeSelectedText = "";
@@ -955,44 +1072,58 @@ function formatInteractiveDefinition(rawText, parentNodeId) {
     });
 }
 
-document.getElementById('btnMenuOpenPanel')?.addEventListener('click', async () => {
-    actionMenu.style.visibility = 'hidden';
-    actionMenu.classList.add('hidden');
-    if (!selectedNodeId) return;
-    const currentNode = nodes.get(selectedNodeId);
-    const title = currentNode.baseTitle || selectedNodeId;
+// Muestra contenido YA GENERADO (respuesta de una incógnita, resultado de un prompt
+// personalizado, síntesis de un reto socrático) en un panel flotante, sin volver a
+// llamar a la IA. A diferencia de showDefinitionInFloatingPanel, nunca sobreescribe
+// node.definition ni pasa por el flujo de "definición interactiva".
+function showContentInFloatingPanel(nodeId, title, content) {
+    const panel = openFloatingPanel(nodeId, title);
+    panel.el.dataset.nodeId = nodeId;
+    const safeHtml = String(content || '').replace(/\n/g, '<br>');
+    panel.contentEl.innerHTML = `<div class="leading-relaxed text-slate-200">${safeHtml}</div>`;
+}
+
+// Pide (o reutiliza) la definición interactiva de un nodo y la muestra en su propio
+// panel flotante, sin tocar el nodo en el lienzo. Se usa desde el menú "Ver definición"
+// para conceptos normales (no para contenido ya generado, ver función anterior).
+async function showDefinitionInFloatingPanel(nodeId) {
+    const currentNode = nodes.get(nodeId);
+    if (!currentNode) return;
+    const title = currentNode.baseTitle || nodeId;
     let definitionText = currentNode.definition;
 
+    const panel = openFloatingPanel(nodeId, title);
+    panel.el.dataset.nodeId = nodeId;
+
     if (!definitionText || !definitionText.includes('[[')) {
-        showLoader('Redactando definición interactiva...');
+        panel.contentEl.innerHTML = `<p class="text-slate-400 text-xs italic">Redactando definición…</p>`;
         try {
-            const response = await fetch('/.netlify/functions/gemini', {
+            const { ok, data } = await apiFetch('/.netlify/functions/gemini', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'define',
                     topic: title,
                     interactive: true,
-                    contextPath: getContextPath(selectedNodeId),
-                    documentContext: getFullDocumentContext()
+                    contextPath: getContextPath(nodeId),
+                    documentContext: globalDocumentContext || currentDocumentText
                 })
             });
-            const data = await response.json();
+            if (!ok) { panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">No se pudo obtener la definición.</p>`; return; }
+            applyServerBalance(data);
             definitionText = data.definition;
-            nodes.update({ id: selectedNodeId, definition: definitionText, baseTitle: title });
-        } catch (err) { alert("Error al obtener definición."); return; } finally { hideLoader(); }
+            nodes.update({ id: nodeId, definition: definitionText, baseTitle: title });
+        } catch (err) {
+            panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">Error al obtener definición.</p>`;
+            return;
+        }
     }
 
-    detailNodeTitle.innerText = title;
-    nodeDetailContent.innerHTML = `
-        <p class="mb-2 font-bold text-amber-400 text-base">${title}</p>
-        <p class="text-[11px] text-slate-400 mb-4">💡 Haz clic en los conceptos resaltados con ⚡ para agregarlos al mapa.</p>
-        <div class="leading-relaxed text-slate-200">${formatInteractiveDefinition(definitionText, selectedNodeId)}</div>
+    panel.contentEl.innerHTML = `
+        <p class="text-[11px] text-slate-400 mb-3">💡 Haz clic en los conceptos resaltados con ⚡ para agregarlos al mapa.</p>
+        <div class="leading-relaxed text-slate-200">${formatInteractiveDefinition(definitionText, nodeId)}</div>
     `;
-    nodeDetailPanel.classList.remove('hidden');
-    activeNodeDetailId = selectedNodeId;
 
-    nodeDetailContent.querySelectorAll('.btn-inline-concept').forEach(btn => {
+    panel.contentEl.querySelectorAll('.btn-inline-concept').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const term = e.currentTarget.dataset.term;
             const parentId = e.currentTarget.dataset.parent;
@@ -1015,59 +1146,31 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', async () 
             e.currentTarget.innerText = `✓ ${term}`;
         });
     });
-});
+}
 
-document.getElementById('btnMenuExpandDef')?.addEventListener('click', async () => {
-    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
+document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
-    const currentNode = nodes.get(selectedNodeId);
-    const title = currentNode.baseTitle || selectedNodeId;
-    let definitionText = currentNode.definition;
-
-    if (!definitionText) {
-        showLoader('Redactando definición...');
-        try {
-            const response = await fetch('/.netlify/functions/gemini', {
-                method: 'POST', body: JSON.stringify({ action: 'define', topic: title, contextPath: getContextPath(selectedNodeId), documentContext: getFullDocumentContext() })
-            });
-            const data = await response.json(); definitionText = data.definition;
-        } catch (err) { alert("Error al obtener definición."); return; } finally { hideLoader(); }
-    }
-    nodes.update({ 
-        id: selectedNodeId, baseTitle: title, definition: definitionText, 
-        label: `*${title}*\n────────────────────\n${definitionText}`,
-        isExpandedDef: true, shape: 'box',
-        widthConstraint: { minimum: 480, maximum: 550 }, // <-- Ahora nace muy ancho y no tan alto
-        heightConstraint: false // Permite que la altura se acomode sola al texto
-    });
+    showDefinitionInFloatingPanel(selectedNodeId);
 });
 
-document.getElementById('btnMenuCollapseDef')?.addEventListener('click', () => {
-    actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
-    if (!selectedNodeId) return;
-    const currentNode = nodes.get(selectedNodeId);
-    nodes.update({
-        id: selectedNodeId, label: `*${currentNode.baseTitle || selectedNodeId}*`, isExpandedDef: false,
-        widthConstraint: { minimum: 150, maximum: 250 }, heightConstraint: false
-    });
-});
-
-closeDetailPanel?.addEventListener('click', () => {
-    nodeDetailPanel.classList.add('hidden');
-    activeNodeDetailId = null;
-});
-
-// EXTRACCIÓN DE NODOS DESDE EL PANEL DE DEFINICIÓN (PANEL DERECHO)
-nodeDetailContent?.addEventListener('mouseup', (e) => {
+// EXTRACCIÓN DE NODOS DESDE CUALQUIER PANEL FLOTANTE ABIERTO.
+// Antes esto escuchaba sobre un único nodeDetailContent; ahora puede haber varios
+// paneles abiertos a la vez, así que delegamos el evento sobre la capa que los
+// contiene a todos y resolvemos a cuál pertenece la selección.
+floatingPanelsLayer?.addEventListener('mouseup', (e) => {
+    const panelEl = e.target.closest('[data-node-id]');
     const selection = window.getSelection();
     const text = selection.toString().trim();
 
-    if (text.length > 2) {
+    if (panelEl && text.length > 2) {
         activeNodeSelectedText = text;
+        activeNodeDetailId = panelEl.dataset.nodeId;
         activeNodeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
         if (nodeTooltipPreview) nodeTooltipPreview.innerText = `"${text.substring(0, 20)}..."`;
-        nodeSelectionTooltip.style.left = `${e.offsetX - 20}px`;
-        nodeSelectionTooltip.style.top = `${e.offsetY - 50}px`;
+        nodeSelectionTooltip.style.left = `${e.clientX - 20}px`;
+        nodeSelectionTooltip.style.top = `${e.clientY - 50}px`;
         nodeSelectionTooltip.classList.remove('hidden');
     } else {
         nodeSelectionTooltip.classList.add('hidden');
@@ -1075,7 +1178,7 @@ nodeDetailContent?.addEventListener('mouseup', (e) => {
 });
 
 document.addEventListener('mousedown', (e) => {
-    if (nodeSelectionTooltip && !nodeSelectionTooltip.contains(e.target) && !nodeDetailContent?.contains(e.target)) {
+    if (nodeSelectionTooltip && !nodeSelectionTooltip.contains(e.target) && !floatingPanelsLayer?.contains(e.target)) {
         nodeSelectionTooltip.classList.add('hidden');
     }
 });
@@ -1308,21 +1411,9 @@ document.getElementById('btnCapture')?.addEventListener('click', () => {
     }, 150);
 });
 
-// Aumentar o reducir tamaño del nodo
-function resizeNode(increment) {
-    if (!selectedNodeId) return;
-    const currentNode = nodes.get(selectedNodeId);
-    if (currentNode && currentNode.isExpandedDef) {
-        const minW = (currentNode.widthConstraint?.minimum || 280) + increment;
-        nodes.update({ 
-            id: selectedNodeId,
-            widthConstraint: { minimum: minW, maximum: minW + 70 }
-        });
-    }
-}
-
-document.getElementById('btnSizePlus')?.addEventListener('click', () => resizeNode(40));
-document.getElementById('btnSizeMinus')?.addEventListener('click', () => resizeNode(-40));
+// (El escalado +/- de nodos "expandidos en el lienzo" ya no existe: ningún nodo se
+// infla con contenido ahora, todo el contenido vive en paneles flotantes. Los botones
+// +/- del menú siguen en el HTML pero ya no tienen listener — ver LEEME_ETAPA_2.md.)
 
 // ==========================================
 // ACTIVADORES DE SINERGIA Y VINCULACIÓN MANUAL
@@ -1711,7 +1802,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
                 topic: topicName,
                 contextPath,
                 customRequest,
-                documentContext: getFullDocumentContext()
+                documentContext: globalDocumentContext || currentDocumentText
             })
         });
 
@@ -1752,28 +1843,26 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
         });
 
         // 2. CREAR LOS NODOS DE RESPUESTA CONECTADOS AL NODO INTERMEDIO
+        // Los nodos se mantienen pequeños siempre; el contenido largo (si lo hay) se
+        // abre en su propio panel flotante, sin inflar el nodo en el lienzo.
         let createdCount = 0;
+        let firstLongAnswer = null;
         generatedItems.forEach((item, idx) => {
             const newNodeId = item.id || `${originNodeId}_res_${Date.now()}_${idx}`;
             if (!nodes.get(newNodeId)) {
                 const hasLongContent = item.content && item.content.trim().length > 0;
-                const nodeLabel = hasLongContent 
-                    ? `*${item.title}*\n────────────────────\n${item.content}`
-                    : `*${item.title}*`;
-
                 const offsetX = (idx - ((generatedItems.length - 1) / 2)) * 220;
 
                 nodes.add({
                     id: newNodeId,
-                    label: nodeLabel,
+                    label: `*${item.title}*`,
                     baseTitle: item.title,
                     definition: item.content || null,
-                    isExpandedDef: hasLongContent,
                     color: getRandomColor(),
                     x: queryX + offsetX,
                     y: queryY + 150,
                     fixed: { x: false, y: false },
-                    widthConstraint: hasLongContent ? { minimum: 420, maximum: 500 } : { minimum: 150, maximum: 250 }
+                    widthConstraint: { minimum: 150, maximum: 250 }
                 });
 
                 edges.add({
@@ -1784,11 +1873,15 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
 
                 trackNodeUsage(item.title);
                 createdCount++;
+                if (hasLongContent && !firstLongAnswer) {
+                    firstLongAnswer = { id: newNodeId, title: item.title, content: item.content };
+                }
             }
         });
 
         customPromptInput.value = '';
-        consumeNodes(createdCount);
+        applyServerBalance(data); consumeNodes(createdCount);
+        if (firstLongAnswer) showContentInFloatingPanel(firstLongAnswer.id, firstLongAnswer.title, firstLongAnswer.content);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1400);
     } catch (err) {
         console.error(err);
@@ -1864,7 +1957,7 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
             trackNodeUsage(crit.label);
             count++;
         });
-        consumeNodes(count);
+        applyServerBalance(data); consumeNodes(count);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
     } catch { alert("Error al generar antítesis."); } finally { hideLoader(); }
 });
@@ -1887,8 +1980,12 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
         });
         const data = await response.json();
 
-        detailNodeTitle.innerText = `🧠 Reto Socrático: ${topicName}`;
-        nodeDetailContent.innerHTML = `
+        // Panel propio para el reto (no es la definición de ningún nodo existente,
+        // así que usa un id sintético para no chocar con el panel de otro nodo).
+        const challengePanelId = `socratic_${originId}_${Date.now()}`;
+        const panel = openFloatingPanel(challengePanelId, `🧠 Reto Socrático: ${topicName}`);
+        panel.el.dataset.nodeId = challengePanelId;
+        panel.contentEl.innerHTML = `
             <div class="bg-slate-800/90 border border-emerald-500/40 rounded-xl p-4 mb-4">
                 <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Desafío de Comprensión</p>
                 <p class="text-slate-100 text-sm font-medium leading-relaxed">${data.question}</p>
@@ -1899,10 +1996,9 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
             </button>
             <div id="socraticFeedbackBox" class="hidden mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-200 leading-relaxed"></div>
         `;
-        nodeDetailPanel.classList.remove('hidden');
 
-        document.getElementById('btnSubmitSocratic')?.addEventListener('click', async () => {
-            const userAnswer = document.getElementById('socraticInput').value.trim();
+        panel.contentEl.querySelector('#btnSubmitSocratic')?.addEventListener('click', async () => {
+            const userAnswer = panel.contentEl.querySelector('#socraticInput').value.trim();
             if (userAnswer.length < 5) return alert("Escribe una respuesta breve para evaluar.");
             if (!checkBalance(1)) return;
 
@@ -1915,34 +2011,28 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
                 });
                 const evalData = await evalRes.json();
 
-                const fbBox = document.getElementById('socraticFeedbackBox');
+                const fbBox = panel.contentEl.querySelector('#socraticFeedbackBox');
                 fbBox.innerHTML = `<p class="font-bold text-amber-400 mb-1">🌟 Veredicto:</p><p>${evalData.feedback}</p>`;
                 fbBox.classList.remove('hidden');
 
                 const parentPos = network.getPositions([originId])[originId];
                 const masteryId = `mastery_${Date.now()}`;
+                const masterySynthesis = `Tu síntesis: "${userAnswer}"\n\nRetroalimentación: ${evalData.feedback}`;
+                // Nodo pequeño como el resto; la síntesis completa se abre en su propio panel.
                 nodes.update({
                     id: masteryId,
                     label: `*🏆 Dominio:*\n${evalData.masteryNodeTitle}`,
                     baseTitle: evalData.masteryNodeTitle,
-                    definition: `Tu síntesis: "${userAnswer}"\n\nRetroalimentación: ${evalData.feedback}`,
+                    definition: masterySynthesis,
                     color: { background: '#fefce8', border: '#eab308' },
                     borderWidth: 2.5,
                     x: parentPos.x, y: parentPos.y + 150,
                     fixed: { x: false, y: false }
                 });
                 edges.add({ from: originId, to: masteryId, label: 'síntesis propia', color: { color: '#eab308' } });
-                consumeNodes(1);
+                applyServerBalance(evalData); consumeNodes(1);
+                showContentInFloatingPanel(masteryId, `🏆 ${evalData.masteryNodeTitle}`, masterySynthesis);
             } catch { alert("Error al evaluar."); } finally { hideLoader(); }
         });
     } catch { alert("Error al iniciar el reto."); } finally { hideLoader(); }
 });
-
-function getFullDocumentContext() {
-    const fullText = (currentDocumentText || readerTextMode?.innerText || "").trim();
-    const contextNote = (globalDocumentContext || "").trim();
-    if (fullText && contextNote && !fullText.startsWith(contextNote.replace('...', ''))) {
-        return `CONTEXTO INDICADO: ${contextNote}\n\nTEXTO COMPLETO:\n${fullText}`;
-    }
-    return fullText || contextNote || "";
-}

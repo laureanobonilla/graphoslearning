@@ -1,99 +1,75 @@
-exports.handler = async function(event, context) {
-    const JSONBIN_KEY = process.env.JSONBIN_KEY;
-    const COLLECTION_ID = process.env.JSONBIN_COLLECTION_ID;
-    const MASTER_BIN_ID = process.env.JSONBIN_MASTER_BIN_ID;
+const { getUser } = require('./_lib/auth');
+const store = require('./_lib/store');
 
-    const headers = {
-        'Content-Type': 'application/json',
-        'X-Master-Key': JSONBIN_KEY,
-        'X-Collection-Id': COLLECTION_ID
-    };
+const json = (statusCode, obj) => ({
+    statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj)
+});
+
+exports.handler = async function (event, context) {
+    const user = getUser(context);
+    if (!user) return json(401, { error: 'auth_required' });
 
     // ==========================================
-    // 1. CARGAR PROYECTO (MÉTODO GET)
+    // LISTAR MIS PROYECTOS (?list=1)
+    // Reemplaza el catálogo que antes vivía solo en localStorage.
+    // ==========================================
+    if (event.httpMethod === 'GET' && event.queryStringParameters?.list) {
+        try {
+            const rows = await store.listProjects(user.id);
+            return json(200, {
+                projects: rows.map(r => ({
+                    id: r.id, title: r.title, nodeCount: r.node_count, date: r.updated_at
+                }))
+            });
+        } catch (err) {
+            console.error('[db] list', err.message);
+            return json(503, { error: 'db_unavailable' });
+        }
+    }
+
+    // ==========================================
+    // CARGAR PROYECTO (GET ?projectId=...)
     // ==========================================
     if (event.httpMethod === 'GET') {
-        const projectId = event.queryStringParameters.projectId;
-        
-        if (!projectId) {
-            return { statusCode: 400, body: JSON.stringify({ error: "Falta el ID del proyecto" }) };
-        }
+        const projectId = event.queryStringParameters?.projectId;
+        if (!projectId) return json(400, { error: 'Falta el ID del proyecto' });
 
         try {
-            const response = await fetch(`https://api.jsonbin.io/v3/b/${projectId}`, {
-                method: 'GET',
-                headers: { 'X-Master-Key': JSONBIN_KEY }
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                return { statusCode: response.status, body: JSON.stringify({ error: errorData.message || "Error al leer de JSONBin" }) };
-            }
-            
-            const data = await response.json();
-            
-            // JSONBin V3 devuelve los datos reales dentro del objeto 'record'
-            return { statusCode: 200, body: JSON.stringify({ data: data.record }) };
-        } catch (error) {
-            return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+            // getProject ya filtra por owner=user.id: si el proyecto es de otra persona, esto da null.
+            const row = await store.getProject(projectId, user.id);
+            if (!row) return json(404, { error: 'Proyecto no encontrado' });
+            return json(200, { data: row.data, title: row.title });
+        } catch (err) {
+            console.error('[db] get', err.message);
+            return json(503, { error: 'db_unavailable' });
         }
     }
 
     // ==========================================
-    // 2. GUARDAR PROYECTO (MÉTODO POST)
+    // GUARDAR PROYECTO (POST)
     // ==========================================
     if (event.httpMethod === 'POST') {
+        let body;
+        try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
+
+        const { projectId, title, data } = body;
+        const safeTitle = String(title || 'Sin título').slice(0, 120);
+        const nodeCount = Array.isArray(data?.nodes) ? data.nodes.length : 0;
+
         try {
-            // Es vital hacer el parse AQUÍ adentro, porque las peticiones GET no tienen 'body'
-            const { projectId, title, data, user } = JSON.parse(event.body);
-            let binId = projectId;
-
-            // 1. Crear o Actualizar el Bin del mapa conceptual
-            if (binId) {
-                // Actualizar Bin existente
-                await fetch(`https://api.jsonbin.io/v3/b/${binId}`, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify(data)
-                });
-            } else {
-                // Crear nuevo Bin
-                const createRes = await fetch('https://api.jsonbin.io/v3/b', {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify(data)
-                });
-                const createData = await createRes.json();
-                binId = createData.metadata.id;
-
-                // 2. Si es nuevo, agregarlo al Master Index
-                const masterRes = await fetch(`https://api.jsonbin.io/v3/b/${MASTER_BIN_ID}/latest`, { headers });
-                const masterData = await masterRes.json();
-                
-                let index = Array.isArray(masterData.record.proyectos) ? masterData.record.proyectos : [];
-                const ownerName = data.owner || "Invitado";
-
-                index.push({ 
-                    id: binId, 
-                    title, 
-                    user, 
-                    ownerName, 
-                    date: new Date().toISOString() 
-                });
-
-                await fetch(`https://api.jsonbin.io/v3/b/${MASTER_BIN_ID}`, {
-                    method: 'PUT',
-                    headers,
-                    body: JSON.stringify({ proyectos: index })
-                });
+            if (projectId) {
+                const updated = await store.updateProject(projectId, user.id, safeTitle, data, nodeCount);
+                if (updated) return json(200, { success: true, projectId: updated.id });
+                // No existía o no era del usuario: lo tratamos como proyecto nuevo en vez de
+                // sobrescribir silenciosamente el de otra persona.
             }
-
-            return { statusCode: 200, body: JSON.stringify({ success: true, projectId: binId }) };
-        } catch (error) {
-            return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+            const created = await store.createProject(user.id, safeTitle, data, nodeCount);
+            return json(200, { success: true, projectId: created.id });
+        } catch (err) {
+            console.error('[db] save', err.message);
+            return json(503, { error: 'db_unavailable' });
         }
     }
 
-    // Si llega una petición que no es ni GET ni POST
     return { statusCode: 405, body: 'Method Not Allowed' };
 };
