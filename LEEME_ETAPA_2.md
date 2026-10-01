@@ -1,5 +1,38 @@
 # Etapa 2 — Paneles flotantes + subesquemas + rediseño + YouTube/Wikipedia
 
+## 6. Últimos arreglos (sesión de hoy)
+
+- **401 en `/.netlify/functions/db`**: la causa era que `authHeaders()` leía el
+  token de sesión (`currentUser.token.access_token`) cacheado desde el login,
+  que expira (~1h). Ahora usa `await currentUser.jwt()`, el método de Netlify
+  Identity que **refresca el token automáticamente** si ya venció, con el
+  valor cacheado solo como respaldo si `.jwt()` llega a fallar. `authHeaders`,
+  `apiFetch` y el interceptor global de `fetch` pasaron a ser `async` para
+  poder esperar ese refresco antes de cada llamada.
+- **422 "ese video no tiene subtítulos" en videos que sí los tienen**: la
+  extracción leía el HTML de la página del video y buscaba `"captionTracks"`
+  con una expresión regular — YouTube ya no siempre embebe ese bloque ahí, así
+  que fallaba aunque el video tuviera subtítulos reales. Se cambió a usar el
+  endpoint interno que usa el propio reproductor web de YouTube
+  (`youtubei/v1/player`), que devuelve esa información como JSON limpio en vez
+  de tener que escarbar HTML. Sigue sin ser una API oficial documentada (ver
+  limitación en la sección 4), pero es la misma fuente que usa YouTube.com, así
+  que debería ser notablemente más confiable que el scraping anterior.
+- **Miniatura del subesquema y navegación dentro de él**: tres ajustes a lo ya
+  descrito en la sección 2:
+  1. La miniatura ya no fuerza un rectángulo de 150×150 distinto a los demás
+     nodos: ahora usa el mismo mecanismo de tamaño (`size`) que cualquier nodo
+     imagen de vis-network, así que se ve del mismo tamaño que un nodo normal
+     del lienzo.
+  2. Al entrar a un subesquema aparece, dentro del propio lienzo, un nodo
+     "⬅ Volver" (línea punteada violeta) — un link rápido para salir sin tener
+     que usar la pastilla de arriba. Hace lo mismo que esa pastilla.
+  3. Las conexiones que ese grupo tenía con el resto del esquema (las que se
+     redirigen al nodo colapsado cuando se ve desde afuera) ahora también se
+     ven **desde adentro**: se dibujan como flechas punteadas hacia/desde el
+     nodo "⬅ Volver", en la misma dirección que tenían originalmente, para no
+     perder de vista cómo se conecta este fragmento con el resto del mapa.
+
 ## 3. Rediseño visual ("consola futurista", sin 3D)
 
 Se mantiene `vis-network` 2D (nada de 3D), pero se rehizo el aspecto general:

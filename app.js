@@ -167,11 +167,24 @@ let availableNodes = 0;
 let isGuestUser = true;       // true = sin sesión; el saldo de invitado lo controla una cookie HttpOnly.
 let balanceKnown = false;     // evita parpadeos de "0 Nodos" antes de la primera respuesta del servidor.
 
+// El JWT de Netlify Identity cacheado en currentUser.token.access_token se emite al
+// iniciar sesión y expira (normalmente en 1h); usarlo tal cual causaba 401 en
+// sesiones largas. currentUser.jwt() lo refresca sola si hace falta — por eso
+// authHeaders ahora es async y todo lo que la llama hace await.
+async function getAuthToken() {
+    if (!currentUser) return null;
+    try {
+        if (typeof currentUser.jwt === 'function') return await currentUser.jwt();
+    } catch (_err) { /* si falla el refresco, se cae al token cacheado */ }
+    return currentUser?.token?.access_token || null;
+}
+
 // Cabeceras de autenticación para toda llamada a nuestras funciones de Netlify.
-// Con sesión, incluye el JWT de Netlify Identity; el servidor lo verifica por su cuenta.
-function authHeaders(extra = {}) {
+// Con sesión, incluye el JWT de Netlify Identity (recién refrescado si hacía
+// falta); el servidor lo verifica por su cuenta.
+async function authHeaders(extra = {}) {
     const headers = { 'Content-Type': 'application/json', ...extra };
-    const token = currentUser?.token?.access_token;
+    const token = await getAuthToken();
     if (token) headers['Authorization'] = `Bearer ${token}`;
     return headers;
 }
@@ -182,7 +195,7 @@ async function apiFetch(path, options = {}) {
     const res = await fetch(path, {
         ...options,
         credentials: 'same-origin',
-        headers: authHeaders(options.headers)
+        headers: await authHeaders(options.headers)
     });
     let data = null;
     try { data = await res.json(); } catch { /* respuesta sin cuerpo JSON */ }
@@ -190,19 +203,19 @@ async function apiFetch(path, options = {}) {
 }
 
 // Interceptor de red: en vez de editar cada uno de los ~18 fetch() a gemini.js/db.js/
-// balance.js repartidos por app.js y lab.js (cada uno maneja sus errores distinto),
+// balance.js repartidos por app.js (cada uno maneja sus errores distinto),
 // añadimos aquí el token de sesión a todos ellos y capturamos en un solo lugar los
 // errores de saldo/sesión (402/429/401) que ahora decide el servidor.
 (function installBillingFetchInterceptor() {
     const nativeFetch = window.fetch.bind(window);
-    window.fetch = function (url, options = {}) {
+    window.fetch = async function (url, options = {}) {
         const target = typeof url === 'string' ? url : (url?.url || '');
         const isOurFn = target.includes('/.netlify/functions/gemini')
             || target.includes('/.netlify/functions/db')
             || target.includes('/.netlify/functions/balance');
         if (!isOurFn) return nativeFetch(url, options);
 
-        const finalOptions = { ...options, credentials: 'same-origin', headers: authHeaders(options.headers) };
+        const finalOptions = { ...options, credentials: 'same-origin', headers: await authHeaders(options.headers) };
 
         return nativeFetch(url, finalOptions).then(res => {
             const isBillingError = target.includes('/.netlify/functions/gemini')
@@ -744,7 +757,15 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNodeId = params.nodes[0];
-        
+
+        // --- 0. NODO SINTÉTICO "VOLVER AL ESQUEMA PRINCIPAL" (ver SUBESQUEMAS) ---
+        // Solo existe mientras se está dentro de un subesquema; es el link rápido
+        // en el propio lienzo para salir, además de la pastilla de arriba.
+        if (clickedNodeId === '__exit__') {
+            exitSubscheme();
+            return;
+        }
+
         // --- 1. LÓGICA DE SINERGIA (FUSIÓN) ---
         if (sourceNodeForSynergy && sourceNodeForSynergy !== clickedNodeId) {
             const nodeA = nodes.get(sourceNodeForSynergy);
@@ -908,7 +929,9 @@ const btnMenuExpandSub = document.getElementById('btnMenuExpandSub');
 // Dibuja una miniatura muy simple (puntos = nodos, líneas = conexiones) del
 // subesquema, para mostrarla dentro del nodo colapsado en el lienzo principal.
 function generateSubschemeThumbnail(subNodes, subEdges, positions) {
-    const W = 150, H = 94;
+    // Resolución del canvas más alta que el tamaño visual final en el lienzo
+    // (ver `size` en el nodo colapsado) para que no se vea borroso al escalar.
+    const W = 160, H = 160;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -1014,6 +1037,20 @@ function convertSelectionToSubscheme() {
     const subId = `subscheme_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const thumbnail = generateSubschemeThumbnail(innerNodes, internalEdges, positions);
 
+    // Antes de redirigir/eliminar los "puentes" (conexiones hacia fuera del
+    // grupo), se guarda a qué nodo INTERNO se conectaba cada uno y en qué
+    // dirección. Esto es lo que permite, al entrar al subesquema, dibujar esas
+    // mismas flechas apuntando al link de "volver" (ver enterSubscheme).
+    const entryLinks = bridgeEdges.map(e => {
+        const fromInside = selectedSet.has(e.from);
+        return {
+            innerNodeId: fromInside ? e.from : e.to,
+            outerLabel: (nodes.get(fromInside ? e.to : e.from) || {}).baseTitle || null,
+            label: e.label || null,
+            direction: fromInside ? 'out' : 'in' // 'out' = sale del grupo, 'in' = entra al grupo
+        };
+    });
+
     // Quita del lienzo los nodos agrupados y SOLO sus conexiones internas
     // (las que van hacia fuera del grupo se conservan, ver más abajo).
     const internalIds = internalEdges.map(e => e.id);
@@ -1025,12 +1062,16 @@ function convertSelectionToSubscheme() {
         label: `*📦 ${subTitle}*\n(${innerNodes.length} nodos)`,
         baseTitle: subTitle,
         isSubscheme: true,
-        subSchemeData: { nodes: innerNodes, edges: internalEdges },
+        subSchemeData: { nodes: innerNodes, edges: internalEdges, entryLinks },
         x: centerX, y: centerY, fixed: { x: false, y: false },
-        shape: 'image', image: thumbnail,
-        widthConstraint: { minimum: 150, maximum: 150 },
+        // Mismo footprint visual que un nodo normal: en vez de forzar un
+        // rectángulo fijo de 150x150 con widthConstraint, se usa `size` (como
+        // cualquier nodo shape:'image'/'circularImage'), que vis-network
+        // escala igual que el resto de nodos del lienzo.
+        shape: 'image', image: thumbnail, size: 32,
+        shapeProperties: { useBorderWithImage: true },
         color: { background: '#eef2ff', border: '#6366f1' },
-        font: { color: '#312e81', size: 13 }
+        font: { color: '#312e81', size: 13, vadjust: 6 }
     });
 
     // Las conexiones que iban hacia un nodo ahora agrupado se redirigen al
@@ -1063,11 +1104,42 @@ function enterSubscheme(nodeId) {
         label: node.baseTitle || 'Subesquema'
     });
 
+    const innerNodes = (node.subSchemeData.nodes || []).map(n => ({ ...n }));
+    const innerEdges = (node.subSchemeData.edges || []).map(e => ({ ...e }));
+    const entryLinks = node.subSchemeData.entryLinks || [];
+
     isClearingCanvas = true;
     nodes.clear();
     edges.clear();
-    nodes.add((node.subSchemeData.nodes || []).map(n => ({ ...n })));
-    edges.add((node.subSchemeData.edges || []).map(e => ({ ...e })));
+    nodes.add(innerNodes);
+    edges.add(innerEdges);
+
+    // Link rápido EN EL LIENZO para volver al esquema principal (además de la
+    // pastilla de arriba), más las flechas "puente" que este subesquema tenía
+    // con el resto del mapa — visibles aquí, apuntando hacia/desde ese link.
+    nodes.add({
+        id: '__exit__',
+        label: `*⬅ Volver*\n(${node.baseTitle || 'esquema principal'})`,
+        shape: 'box',
+        shapeProperties: { borderRadius: 12, borderDashes: [4, 4] },
+        color: { background: '#1b2140', border: '#8b7cf6', highlight: { background: '#232a52', border: '#8b7cf6' } },
+        font: { color: '#c7d2e8', size: 13 },
+        x: 0, y: -220, fixed: false
+    });
+    entryLinks.forEach(link => {
+        if (!innerNodes.some(n => n.id === link.innerNodeId)) return; // nodo ya no existe
+        const edgeDef = {
+            label: link.label || undefined,
+            dashes: true,
+            color: { color: '#6670a0', highlight: '#8b7cf6' },
+            font: { color: '#8a92b2' }
+        };
+        if (link.direction === 'out') {
+            edges.add({ ...edgeDef, from: link.innerNodeId, to: '__exit__' });
+        } else {
+            edges.add({ ...edgeDef, from: '__exit__', to: link.innerNodeId });
+        }
+    });
     isClearingCanvas = false;
 
     actionMenu.style.visibility = 'hidden';
@@ -1082,15 +1154,18 @@ function exitSubscheme() {
     if (schemeStack.length === 0) return;
     const frame = schemeStack.pop();
 
-    const freshNodes = nodes.get();
-    const freshEdges = edges.get();
+    // El nodo sintético "__exit__" (y las flechas-puente que entran/salen de
+    // él) son solo una ayuda de navegación dentro del subesquema: se quitan
+    // antes de guardar, para no duplicarlos cada vez que se entra/sale.
+    const freshNodes = nodes.get().filter(n => n.id !== '__exit__');
+    const freshEdges = edges.get().filter(e => e.from !== '__exit__' && e.to !== '__exit__');
     const freshPositions = network.getPositions(freshNodes.map(n => n.id));
 
     const restoredNodes = frame.nodes.map(n => {
         if (n.id !== frame.collapsedNodeId) return n;
         return {
             ...n,
-            subSchemeData: { nodes: freshNodes, edges: freshEdges },
+            subSchemeData: { nodes: freshNodes, edges: freshEdges, entryLinks: (n.subSchemeData && n.subSchemeData.entryLinks) || [] },
             label: `*📦 ${n.baseTitle || 'Subesquema'}*\n(${freshNodes.length} nodos)`,
             image: generateSubschemeThumbnail(freshNodes, freshEdges, freshPositions)
         };

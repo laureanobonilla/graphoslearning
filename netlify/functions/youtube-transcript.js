@@ -7,10 +7,17 @@
 // devuelve como texto plano. Ese texto es el que luego se "agota" con Gemini,
 // igual que si el usuario hubiera pegado un artículo.
 //
-// No usa ninguna librería de terceros: solo fetch nativo (Node 18+) contra la
-// página pública del video y el endpoint de subtítulos (timedtext), ambos sin
-// autenticación. Si YouTube cambia el formato de su página, esto puede
-// romperse — es scraping de una estructura no documentada, no una API oficial.
+// No usa ninguna librería de terceros: solo fetch nativo (Node 18+). Para
+// encontrar los subtítulos se usa el endpoint interno "innertube" que el
+// propio reproductor web de YouTube usa (youtubei/v1/player) en vez de leer
+// el HTML de la página — escarbar el HTML (regex sobre "captionTracks") dejó
+// de ser confiable porque YouTube ya no siempre embebe esos datos ahí. La
+// INNERTUBE_API_KEY de abajo es la clave pública que usa cualquier navegador
+// al cargar youtube.com, no una credencial nuestra ni un secreto.
+// Si YouTube cambia este endpoint interno, esto puede romperse — sigue sin
+// ser una API oficial documentada, solo una más estable que la anterior.
+const INNERTUBE_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 function extractVideoId(input) {
     const trimmed = String(input || '').trim();
@@ -34,27 +41,36 @@ function decodeEntities(str) {
         .replace(/&gt;/g, '>');
 }
 
-function extractTitle(html) {
-    const m = html.match(/<meta name="title" content="([^"]*)"/);
-    return m ? decodeEntities(m[1]) : null;
-}
-
 async function fetchCaptionTracks(videoId) {
-    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    const res = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_API_KEY}`, {
+        method: 'POST',
         headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Content-Type': 'application/json',
+            'User-Agent': BROWSER_UA,
             'Accept-Language': 'es,es-419;q=0.9,en;q=0.8'
-        }
+        },
+        body: JSON.stringify({
+            videoId,
+            context: {
+                client: {
+                    clientName: 'WEB',
+                    clientVersion: '2.20240826.01.00',
+                    hl: 'es'
+                }
+            }
+        })
     });
-    if (!res.ok) throw new Error('No se pudo abrir la página del video.');
-    const html = await res.text();
+    if (!res.ok) throw new Error('YouTube no respondió correctamente para ese video.');
+    const data = await res.json();
 
-    const match = html.match(/"captionTracks":(\[[^\]]*\])/);
-    if (!match) return { tracks: [], title: extractTitle(html) };
+    const playability = data?.playabilityStatus?.status;
+    if (playability && playability !== 'OK') {
+        throw new Error('Ese video no está disponible (puede ser privado, restringido por edad o haber sido eliminado).');
+    }
 
-    let tracks = [];
-    try { tracks = JSON.parse(match[1]); } catch { tracks = []; }
-    return { tracks, title: extractTitle(html) };
+    const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+    const title = data?.videoDetails?.title ? decodeEntities(data.videoDetails.title) : null;
+    return { tracks, title };
 }
 
 function pickTrack(tracks, preferredLangs) {
