@@ -151,7 +151,7 @@ variables), además de las que ya tenías de Etapa 1:
 
 | Variable | Valor |
 |---|---|
-| `PAYPAL_CLIENT_ID` | El **mismo** Client ID que ya está en `index.html` (línea del `<script src="https://www.paypal.com/sdk/js?client-id=...">`) |
+| `PAYPAL_CLIENT_ID` | El Client ID de tu app de PayPal. **Ya no hace falta tocar `index.html` para esto** (ver abajo) — con poner esta variable alcanza para que el botón y los cobros reales usen el mismo id. |
 | `PAYPAL_CLIENT_SECRET` | El "Secret" de esa misma app, en el [Dashboard de PayPal Developer](https://developer.paypal.com/dashboard/applications) → Apps & Credentials |
 | `PAYPAL_ENV` | Déjala sin definir (o en cualquier valor que no sea `sandbox`) para cobros reales. Ponla en `sandbox` solo mientras pruebes con una cuenta de prueba. |
 
@@ -159,6 +159,18 @@ variables), además de las que ya tenías de Etapa 1:
   entorno** (los dos de "Live", o los dos de "Sandbox"). Si mezclas un Client
   ID de Live con un Secret de Sandbox (o viceversa), la creación de la orden
   fallará.
+
+  **Novedad de esta sesión**: antes, el Client ID vivía hardcodeado en
+  `index.html` (en el `<script src="https://www.paypal.com/sdk/js?client-id=...">`)
+  — totalmente aparte de `PAYPAL_CLIENT_ID`, que ya existía para las llamadas
+  reales a la API. Eran dos copias del mismo dato en dos lugares distintos:
+  fácil que alguien cambiara uno para probar en Sandbox y se le olvidara el
+  otro, y el pago quedara roto a medias (el botón de un entorno, el cobro real
+  de otro). Ahora **solo existe `PAYPAL_CLIENT_ID`**: una función nueva,
+  `paypal-config.js`, se lo entrega al navegador (es un dato público, no hay
+  problema en exponerlo — el Client ID siempre va visible en la URL del SDK en
+  cualquier sitio que use PayPal), y `app.js` carga el botón de PayPal con ese
+  mismo id dinámicamente, en vez de con uno fijo escrito en el HTML.
 
 **2. Confirmar que la tabla `payments` y la función `credit_nodes` existen en
 tu Supabase real.** Están en `supabase/schema.sql`, pero es posible que nunca
@@ -174,11 +186,13 @@ que lo verifiques tú: compra el paquete más barato, confirma que el saldo que
 aparece en la app sube, y revisa en Supabase (tabla `payments`) que quedó un
 registro con el `order_id` de esa compra.
   - Si quieres probar sin arriesgar dinero real primero: crea una app de
-    "Sandbox" en el dashboard de PayPal, cambia temporalmente el `client-id`
-    del `<script>` en `index.html` por el de esa app de prueba, pon
-    `PAYPAL_ENV=sandbox` y usa `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET` de esa
-    misma app de prueba. Cuando confirmes que funciona, revierte el
-    `client-id` del HTML al real y quita (o cambia) `PAYPAL_ENV`.
+    "Sandbox" en el dashboard de PayPal, y en Netlify cambia temporalmente
+    `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET` por los de esa app de prueba, más
+    `PAYPAL_ENV=sandbox`. Como ahora todo sale de esas mismas variables (ya no
+    hay nada que editar en `index.html`), con cambiar esas tres variables en
+    Netlify y volver a desplegar alcanza. Cuando confirmes que funciona,
+    vuelve a poner el `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET` reales y quita
+    (o cambia) `PAYPAL_ENV`.
 
 ### Otras cosas que revisé antes de decir "ya puedes promocionar"
 

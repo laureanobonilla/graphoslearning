@@ -2194,7 +2194,41 @@ document.getElementById('closeStore')?.addEventListener('click', () => {
 // suma nodos por su cuenta: solo muestra el botón y refleja el saldo que el
 // servidor confirme. Antes esto se calculaba enteramente en el cliente y se
 // guardaba en localStorage — cualquiera podía regalarse nodos desde la consola.
-if (window.paypal) {
+//
+// El SDK de PayPal mismo tampoco viene con un client-id fijo en el HTML: se pide a
+// /.netlify/functions/paypal-config (que lee PAYPAL_CLIENT_ID del servidor) y se
+// carga aquí dinámicamente — así el id que usa el botón del navegador y el que usan
+// las llamadas reales a la API de PayPal son siempre el mismo, sin tener que
+// recordar actualizar dos lugares a mano.
+async function loadPaypalSdk() {
+    if (window.paypal) return true;
+    try {
+        const res = await fetch('/.netlify/functions/paypal-config');
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.clientId) {
+            console.error('[paypal] no se pudo obtener el client-id de PayPal', data);
+            return false;
+        }
+        await new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(data.clientId)}&currency=USD`;
+            s.onload = resolve;
+            s.onerror = () => reject(new Error('No se pudo cargar el SDK de PayPal.'));
+            document.head.appendChild(s);
+        });
+        return !!window.paypal;
+    } catch (err) {
+        console.error('[paypal] no se pudo cargar el SDK', err);
+        return false;
+    }
+}
+
+(async function initPaypalButtons() {
+    const loaded = await loadPaypalSdk();
+    // Sin SDK (ej. PAYPAL_CLIENT_ID no configurado todavía), el contenedor de
+    // botones simplemente queda vacío en vez de romper el resto de la tienda.
+    if (!loaded) return;
+
     paypal.Buttons({
         createOrder: async function () {
             if (!requireAuth('comprar nodos')) {
@@ -2243,7 +2277,7 @@ if (window.paypal) {
             }
         }
     }).render('#paypal-button-container');
-}
+})();
 
 // ==========================================
 // 17. PETICIÓN PERSONALIZADA POR NODO

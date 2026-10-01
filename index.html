@@ -12,7 +12,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://www.paypal.com/sdk/js?client-id=BAAoSqwffH3QBaBX37mWEhxTqnuTNANyr2qtNUPlGViCBrx1rLw1NDyOa9pkDZzRa7kIVcdPDZTDj_PrdY&currency=USD"></script>
+    <!-- El SDK de PayPal ya NO se carga aquí con un client-id fijo: app.js lo pide a
+         /.netlify/functions/paypal-config (que lee PAYPAL_CLIENT_ID del servidor) y
+         crea este <script> dinámicamente, para que exista un solo lugar donde cambiar
+         ese id — no uno en el servidor y otro distinto, a mano, aquí en el HTML. -->
     <style>
         /* Fondo blanco impecable para el área de texto del lector */
         #readerTextMode {
