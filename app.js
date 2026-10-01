@@ -565,14 +565,31 @@ function insertSingleNode(topic) {
     setTimeout(() => { network.focus(topic, { scale: 1.0, animation: { duration: 600 }}); }, 50);
 }
 
-function handleTopicInput() {
-    const topic = topicInput.value.trim();
-    if (!topic) return;
-    // Si el lienzo está vacío, el primer nodo genera un esquema completo de 3 niveles
-    if (nodes.length === 0) {
-        generateFullSchemaFromTopic(topic);
+// Campo pequeño de la cabecera: es el único punto de entrada para "generar",
+// esté el lienzo vacío o no. Un tema corto se investiga (esquema completo);
+// un texto largo o un enlace de YouTube se usa tal cual, fiel a ese contenido
+// (igual que el Modo Lector, solo que sin tener que abrir ese panel aparte).
+// Si el lienzo YA tiene contenido y lo escrito es un tema corto, se mantiene
+// el agregado rápido de un solo nodo suelto (no gasta tokens de IA de más).
+async function handleTopicInput() {
+    const raw = topicInput.value.trim();
+    if (!raw) return;
+
+    if (looksLikeYouTubeLink(raw)) {
+        topicInput.value = '';
+        const text = await resolveTextOrYouTubeLink(raw);
+        if (text === null) return;
+        currentDocumentText = text;
+        await generateFullSchemaFromTopic(text);
+        return;
+    }
+
+    const isLongText = raw.split(/\s+/).length >= 25;
+    if (nodes.length === 0 || isLongText) {
+        if (isLongText) currentDocumentText = raw;
+        generateFullSchemaFromTopic(raw);
     } else {
-        insertSingleNode(topic);
+        insertSingleNode(raw);
     }
 }
 
@@ -1205,10 +1222,13 @@ network.on('doubleClick', (params) => {
 // ==========================================
 const btnToggleReader = document.getElementById('btnToggleReader');
 const readerPanel = document.getElementById('readerPanel');
+const readerPanelHeader = document.getElementById('readerPanelHeader');
 const readerTextMode = document.getElementById('readerTextMode');
 const selectionTooltip = document.getElementById('selectionTooltip');
-const panelResizer = document.getElementById('panelResizer');
 const docContextInput = document.getElementById('docContextInput');
+const docContextChip = document.getElementById('docContextChip');
+const docContextChipText = document.getElementById('docContextChipText');
+const docContextEditRow = document.getElementById('docContextEditRow');
 
 const floatingPanelsLayer = document.getElementById('floatingPanelsLayer');
 const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
@@ -1300,42 +1320,68 @@ let activeNodeDetailId = null;
 let activeNodeSelectionRange = null;
 let activeNodeSelectedText = "";
 
-docContextInput?.addEventListener('input', (e) => { globalDocumentContext = e.target.value.trim(); });
+// El contexto ya no se le pide al usuario de entrada: se detecta solo (del texto
+// pegado o del título del video) y solo se muestra como una línea discreta con
+// un link de "editar" para quien quiera ajustarlo a mano.
+function updateDocContextChip() {
+    if (!docContextChip) return;
+    if (globalDocumentContext) {
+        docContextChip.classList.remove('hidden');
+        docContextChip.classList.add('flex');
+        if (docContextChipText) docContextChipText.innerText = globalDocumentContext.length > 60 ? globalDocumentContext.slice(0, 60) + '…' : globalDocumentContext;
+    } else {
+        docContextChip.classList.add('hidden');
+        docContextChip.classList.remove('flex');
+    }
+}
+
+docContextInput?.addEventListener('input', (e) => {
+    globalDocumentContext = e.target.value.trim();
+    updateDocContextChip();
+});
+
+document.getElementById('btnEditContext')?.addEventListener('click', () => {
+    docContextEditRow.classList.remove('hidden');
+    docContextEditRow.classList.add('flex');
+    if (docContextInput) { docContextInput.value = globalDocumentContext; docContextInput.focus(); }
+});
+
+// Panel flotante de Lectura: abrir/cerrar, traer al frente y arrastrar — mismo
+// espíritu que los paneles flotantes de definición, pero con su propio marcado
+// estático en el HTML en vez de crearse dinámicamente.
+function openReaderPanel() {
+    readerPanel.classList.remove('hidden');
+    readerPanel.style.zIndex = String(500 + (++floatingPanelCount));
+    btnToggleReader.innerHTML = '<span>📖</span> Ocultar Modo Lector';
+    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
+}
+function closeReaderPanel() {
+    readerPanel.classList.add('hidden');
+    btnToggleReader.innerHTML = '<span>📖</span> Pegar documento / video (Modo Lector)';
+    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
+}
 
 btnToggleReader?.addEventListener('click', () => {
-    readerPanel.classList.toggle('hidden');
-    
-    // Cambiar texto según el estado del panel
-    const isHidden = readerPanel.classList.contains('hidden');
-    btnToggleReader.innerHTML = isHidden 
-        ? '<span>📖</span> Mostrar Modo Lector' 
-        : '<span>📖</span> Ocultar Modo Lector';
-        
-    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
+    if (readerPanel.classList.contains('hidden')) openReaderPanel(); else closeReaderPanel();
+});
+document.getElementById('btnCloseReader')?.addEventListener('click', closeReaderPanel);
+readerPanel?.addEventListener('mousedown', () => {
+    readerPanel.style.zIndex = String(500 + (++floatingPanelCount));
 });
 
-// Resizer 100% Funcional (Matemática relativa para que no brinque)
-let isResizing = false;
-let startX = 0;
-let startWidth = 0;
-
-panelResizer?.addEventListener('mousedown', (e) => {
-    isResizing = true;
-    startX = e.clientX;
-    startWidth = readerPanel.offsetWidth; // Guardamos el ancho inicial real
-    document.body.style.userSelect = 'none'; // Prevenir selección al arrastrar
+// Arrastre del panel flotante desde su cabecera (igual que los paneles de definición).
+let readerDragState = null;
+readerPanelHeader?.addEventListener('mousedown', (e) => {
+    if (e.target.closest('button') || e.target.closest('input')) return;
+    readerDragState = { startX: e.clientX, startY: e.clientY, left: readerPanel.offsetLeft, top: readerPanel.offsetTop };
     e.preventDefault();
 });
-
 document.addEventListener('mousemove', (e) => {
-    if (!isResizing) return;
-    const newWidth = startWidth + (e.clientX - startX); 
-    if (newWidth > 250 && newWidth < window.innerWidth * 0.75) {
-        readerPanel.classList.remove('w-1/3'); // <-- Actualizado para quitar w-1/3
-        readerPanel.style.flex = 'none';
-        readerPanel.style.width = `${newWidth}px`;
-    }
+    if (!readerDragState) return;
+    readerPanel.style.left = `${Math.max(0, readerDragState.left + (e.clientX - readerDragState.startX))}px`;
+    readerPanel.style.top = `${Math.max(0, readerDragState.top + (e.clientY - readerDragState.startY))}px`;
 });
+document.addEventListener('mouseup', () => { readerDragState = null; });
 
 document.addEventListener('mouseup', () => { 
     if (isResizing) {
@@ -1348,9 +1394,10 @@ document.addEventListener('mouseup', () => {
 readerTextMode?.addEventListener('input', () => {
     const content = readerTextMode.innerText.trim();
     currentDocumentText = content;
-    if (!docContextInput.value && content.length > 20) {
-        docContextInput.value = content.split(/\s+/).slice(0, 6).join(' ') + '...';
-        globalDocumentContext = docContextInput.value;
+    if (!globalDocumentContext && content.length > 20) {
+        globalDocumentContext = content.split(/\s+/).slice(0, 6).join(' ') + '...';
+        if (docContextInput) docContextInput.value = globalDocumentContext;
+        updateDocContextChip();
     }
 });
 
@@ -1588,36 +1635,43 @@ function looksLikeYouTubeLink(str) {
     return t.length > 0 && t.length < 300 && !/\s/.test(t) && /(youtube\.com\/|youtu\.be\/)/i.test(t);
 }
 
+// Si lo que se pasó es un enlace de YouTube, extrae sus subtítulos y devuelve
+// ESE texto en su lugar (mismo mecanismo para el Modo Lector y para el campo
+// pequeño de arriba, así ambos pueden recibir un enlace indistintamente).
+// Devuelve null si falló (y ya mostró la alerta correspondiente).
+async function resolveTextOrYouTubeLink(raw, { fillReaderPanel } = {}) {
+    if (!looksLikeYouTubeLink(raw)) return raw;
+
+    showLoader('Extrayendo subtítulos del video...');
+    try {
+        const resp = await fetch('/.netlify/functions/youtube-transcript', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url: raw })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'No se pudo obtener la transcripción de ese video.');
+        if (fillReaderPanel && readerTextMode) readerTextMode.innerText = data.text;
+        if (data.title && !globalDocumentContext) {
+            globalDocumentContext = data.title;
+            if (docContextInput) docContextInput.value = data.title;
+            updateDocContextChip();
+        }
+        return data.text;
+    } catch (err) {
+        alert(err.message || "No se pudo extraer el texto de ese video.");
+        return null;
+    } finally {
+        hideLoader();
+    }
+}
+
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     let textContent = readerTextMode.innerText.trim();
     if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de un video de YouTube en el lector.");
 
-    // Enlace de YouTube en vez de texto: se extraen los subtítulos del video y
-    // ESO se usa como el texto a agotar (en vez de gastar tokens de Gemini
-    // transcribiendo el video, se usan sus subtítulos reales).
-    if (looksLikeYouTubeLink(textContent)) {
-        showLoader('Extrayendo subtítulos del video...');
-        try {
-            const resp = await fetch('/.netlify/functions/youtube-transcript', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: textContent })
-            });
-            const data = await resp.json();
-            if (!resp.ok) throw new Error(data.error || 'No se pudo obtener la transcripción de ese video.');
-            textContent = data.text;
-            readerTextMode.innerText = textContent;
-            if (data.title && docContextInput && !docContextInput.value.trim()) {
-                docContextInput.value = data.title;
-                globalDocumentContext = data.title;
-            }
-        } catch (err) {
-            hideLoader();
-            alert(err.message || "No se pudo extraer el texto de ese video.");
-            return;
-        }
-        hideLoader();
-    }
+    textContent = await resolveTextOrYouTubeLink(textContent, { fillReaderPanel: true });
+    if (textContent === null) return;
 
     currentDocumentText = textContent;
     await generateFullSchemaFromTopic(textContent);
@@ -1650,9 +1704,9 @@ function dismissWelcomeScreen() {
 
 welcomeScreen?.addEventListener('click', (e) => { if (e.target === welcomeScreen) dismissWelcomeScreen(); });
 topicInput?.addEventListener('focus', dismissWelcomeScreen);
-document.getElementById('btnWelcomeReader')?.addEventListener('click', () => { 
-    dismissWelcomeScreen(); 
-    readerPanel.classList.remove('hidden'); 
+document.getElementById('btnWelcomeReader')?.addEventListener('click', () => {
+    dismissWelcomeScreen();
+    openReaderPanel();
 });
 nodes.on('*', () => { if (nodes.length > 0 && !hasDismissedWelcomeScreen) dismissWelcomeScreen(); });
 
@@ -1771,15 +1825,17 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
 // 2. Limpiar SOLO el panel del Lector (Botón nuevo a la par de Generar Esquema)
 document.getElementById('btnClearReader')?.addEventListener('click', () => {
     const hasText = readerTextMode && readerTextMode.innerText.trim() !== "";
-    const hasContext = docContextInput && docContextInput.value.trim() !== "";
+    const hasContext = !!globalDocumentContext;
 
-    if (!hasText && !hasContext) return; 
+    if (!hasText && !hasContext) return;
 
     if (confirm("¿Deseas limpiar el texto y el contexto del panel de lectura?")) {
-        currentDocumentText = ""; 
+        currentDocumentText = "";
         globalDocumentContext = "";
         if (readerTextMode) readerTextMode.innerText = "";
         if (docContextInput) docContextInput.value = "";
+        docContextEditRow?.classList.add('hidden');
+        updateDocContextChip();
     }
 });
 

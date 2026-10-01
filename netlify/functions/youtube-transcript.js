@@ -1,29 +1,38 @@
 // ==========================================
 // EXTRACCIÓN DE SUBTÍTULOS DE YOUTUBE (gratuito, sin API key)
 // ==========================================
-// Se usa desde el Modo Lector: en vez de pedirle a Gemini que "transcriba" un
-// video (imposible sin audio, y caro si se usara Whisper), este endpoint lee
-// los subtítulos públicos que YouTube ya expone en la página del video y los
-// devuelve como texto plano. Ese texto es el que luego se "agota" con Gemini,
-// igual que si el usuario hubiera pegado un artículo.
+// Se usa desde el Modo Lector (y desde el campo pequeño de la cabecera): en vez
+// de pedirle a Gemini que "transcriba" un video (imposible sin audio, y caro si
+// se usara Whisper), este endpoint lee los subtítulos públicos que YouTube ya
+// expone y los devuelve como texto plano. Ese texto es el que luego se "agota"
+// con Gemini, igual que si el usuario hubiera pegado un artículo.
 //
-// No usa ninguna librería de terceros: solo fetch nativo (Node 18+). Para
-// encontrar los subtítulos se usa el endpoint interno "innertube" que el
-// propio reproductor web de YouTube usa (youtubei/v1/player) en vez de leer
-// el HTML de la página — escarbar el HTML (regex sobre "captionTracks") dejó
-// de ser confiable porque YouTube ya no siempre embebe esos datos ahí. La
-// INNERTUBE_API_KEY de abajo es la clave pública que usa cualquier navegador
-// al cargar youtube.com, no una credencial nuestra ni un secreto.
-// Si YouTube cambia este endpoint interno, esto puede romperse — sigue sin
-// ser una API oficial documentada, solo una más estable que la anterior.
+// No usa ninguna librería de terceros: solo fetch nativo (Node 18+). YouTube no
+// ofrece una API pública oficial para esto, así que se intentan varias formas
+// de pedirle la misma información que le pide su propio reproductor, en orden,
+// hasta que una funcione:
+//   1) El endpoint interno "innertube" (youtubei/v1/player) simulando el cliente
+//      de la app de Android — en la práctica es el que menos bloqueos tiene
+//      desde un servidor (sin navegador real detrás), a diferencia del cliente
+//      "WEB" que cada vez exige más verificaciones anti-bot.
+//   2) El mismo endpoint pero simulando el cliente web, por si el de Android
+//      falla para ese video en particular.
+//   3) Como último recurso, leer el HTML de la página del video y extraer el
+//      bloque `ytInitialPlayerResponse` (la misma información, pero haciendo
+//      scraping en vez de pedirla directamente).
+// La INNERTUBE_API_KEY de abajo es una clave pública que usa cualquier
+// navegador/app al cargar YouTube, no una credencial nuestra ni un secreto.
+// Nada de esto es una API oficial documentada — si YouTube cambia estos
+// mecanismos internos, esto puede romperse y habría que ajustarlo de nuevo.
 const INNERTUBE_API_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const WEB_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const ANDROID_UA = 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip';
 
 function extractVideoId(input) {
-    const trimmed = String(input || '').trim();
+    const trimmed = String(input || '').trim().replace(/^["']|["']$/g, '');
     if (/^[\w-]{11}$/.test(trimmed)) return trimmed;
     const patterns = [
-        /(?:youtube\.com\/watch\?[^#]*\bv=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]{11})/
+        /(?:youtube\.com\/watch\?[^#]*\bv=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/|youtube\.com\/live\/|m\.youtube\.com\/watch\?[^#]*\bv=)([\w-]{11})/
     ];
     for (const re of patterns) {
         const m = trimmed.match(re);
@@ -41,36 +50,84 @@ function decodeEntities(str) {
         .replace(/&gt;/g, '>');
 }
 
-async function fetchCaptionTracks(videoId) {
+// --- Estrategia 1 y 2: endpoint interno "innertube", con distintos clientes ---
+async function fetchViaInnertube(videoId, client) {
+    const isAndroid = client === 'ANDROID';
+    const context = isAndroid
+        ? { client: { clientName: 'ANDROID', clientVersion: '19.09.37', androidSdkVersion: 30, hl: 'es', gl: 'US' } }
+        : { client: { clientName: 'WEB', clientVersion: '2.20240826.01.00', hl: 'es', gl: 'US' } };
+
     const res = await fetch(`https://www.youtube.com/youtubei/v1/player?key=${INNERTUBE_API_KEY}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'User-Agent': BROWSER_UA,
-            'Accept-Language': 'es,es-419;q=0.9,en;q=0.8'
+            'User-Agent': isAndroid ? ANDROID_UA : WEB_UA,
+            'Accept-Language': 'es,es-419;q=0.9,en;q=0.8',
+            ...(isAndroid ? { 'X-YouTube-Client-Name': '3', 'X-YouTube-Client-Version': '19.09.37' } : {})
         },
-        body: JSON.stringify({
-            videoId,
-            context: {
-                client: {
-                    clientName: 'WEB',
-                    clientVersion: '2.20240826.01.00',
-                    hl: 'es'
-                }
-            }
-        })
+        body: JSON.stringify({ videoId, context })
     });
-    if (!res.ok) throw new Error('YouTube no respondió correctamente para ese video.');
+    if (!res.ok) throw new Error(`YouTube respondió ${res.status} al pedir datos del video (cliente ${client}).`);
     const data = await res.json();
 
     const playability = data?.playabilityStatus?.status;
     if (playability && playability !== 'OK') {
-        throw new Error('Ese video no está disponible (puede ser privado, restringido por edad o haber sido eliminado).');
+        const reason = data?.playabilityStatus?.reason || '';
+        throw new Error(`Ese video no está disponible (${playability}${reason ? ': ' + reason : ''}).`);
     }
 
     const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
     const title = data?.videoDetails?.title ? decodeEntities(data.videoDetails.title) : null;
     return { tracks, title };
+}
+
+// --- Estrategia 3: scraping del HTML de la página como último recurso ---
+async function fetchViaWatchPageHtml(videoId) {
+    const res = await fetch(`https://www.youtube.com/watch?v=${videoId}&hl=es`, {
+        headers: { 'User-Agent': WEB_UA, 'Accept-Language': 'es,es-419;q=0.9,en;q=0.8' }
+    });
+    if (!res.ok) throw new Error(`YouTube respondió ${res.status} al pedir la página del video.`);
+    const html = await res.text();
+
+    const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\})\s*;\s*(?:var |<\/script>)/s);
+    if (!m) throw new Error('No se encontró información del reproductor en la página del video.');
+
+    let data;
+    try { data = JSON.parse(m[1]); } catch { throw new Error('No se pudo interpretar la información del reproductor.'); }
+
+    const playability = data?.playabilityStatus?.status;
+    if (playability && playability !== 'OK') {
+        throw new Error(`Ese video no está disponible (${playability}).`);
+    }
+
+    const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks || [];
+    const titleMatch = html.match(/<meta name="title" content="([^"]*)">/);
+    const title = titleMatch ? decodeEntities(titleMatch[1]) : (data?.videoDetails?.title ? decodeEntities(data.videoDetails.title) : null);
+    return { tracks, title };
+}
+
+// Prueba las tres estrategias en orden y se queda con la primera que devuelva
+// al menos una pista de subtítulos (o la última información obtenida, si
+// ninguna tuvo pistas pero tampoco lanzó error, para poder reportar bien).
+async function fetchCaptionTracks(videoId) {
+    const strategies = [
+        () => fetchViaInnertube(videoId, 'ANDROID'),
+        () => fetchViaInnertube(videoId, 'WEB'),
+        () => fetchViaWatchPageHtml(videoId)
+    ];
+    let lastResult = null;
+    let lastError = null;
+    for (const strategy of strategies) {
+        try {
+            const result = await strategy();
+            lastResult = result;
+            if (result.tracks && result.tracks.length) return result;
+        } catch (err) {
+            lastError = err;
+        }
+    }
+    if (lastResult) return lastResult; // sin pistas, pero al menos sabemos el título / que el video existe
+    throw lastError || new Error('No se pudo obtener información de ese video por ningún medio disponible.');
 }
 
 function pickTrack(tracks, preferredLangs) {
@@ -84,8 +141,10 @@ function pickTrack(tracks, preferredLangs) {
 }
 
 async function fetchTranscriptText(track) {
-    const res = await fetch(track.baseUrl);
-    if (!res.ok) throw new Error('No se pudo descargar los subtítulos.');
+    const res = await fetch(track.baseUrl, {
+        headers: { 'User-Agent': WEB_UA, 'Accept-Language': 'es,es-419;q=0.9,en;q=0.8' }
+    });
+    if (!res.ok) throw new Error('No se pudo descargar los subtítulos (HTTP ' + res.status + ').');
     const xml = await res.text();
     const lines = [...xml.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)]
         .map(m => decodeEntities(m[1]).replace(/\n/g, ' ').replace(/<[^>]+>/g, '').trim())
@@ -103,7 +162,7 @@ exports.handler = async (event) => {
 
     const videoId = extractVideoId(payload.url);
     if (!videoId) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'No reconozco ese enlace como un video de YouTube válido.' }) };
+        return { statusCode: 400, body: JSON.stringify({ error: 'No reconozco ese enlace como un video de YouTube válido. Pega el enlace completo (youtube.com/watch?v=... o youtu.be/...).' }) };
     }
 
     try {
@@ -111,14 +170,14 @@ exports.handler = async (event) => {
         if (!tracks.length) {
             return {
                 statusCode: 422,
-                body: JSON.stringify({ error: 'Ese video no tiene subtítulos disponibles (ni automáticos). Prueba con otro, o pega el texto directamente.' })
+                body: JSON.stringify({ error: 'Ese video no tiene subtítulos disponibles (ni automáticos) según lo que YouTube reportó. Prueba con otro video, o pega el texto directamente.' })
             };
         }
 
         const track = pickTrack(tracks, ['es', 'en']);
         const text = await fetchTranscriptText(track);
         if (!text) {
-            return { statusCode: 422, body: JSON.stringify({ error: 'No se pudo extraer texto de los subtítulos de ese video.' }) };
+            return { statusCode: 422, body: JSON.stringify({ error: 'YouTube reportó subtítulos para ese video, pero no se pudo extraer el texto (puede ser temporal: intenta de nuevo).' }) };
         }
 
         return {

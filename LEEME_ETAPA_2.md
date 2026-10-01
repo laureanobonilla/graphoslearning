@@ -1,5 +1,42 @@
 # Etapa 2 — Paneles flotantes + subesquemas + rediseño + YouTube/Wikipedia
 
+## 7. Modo Lector flotante + un solo campo de "generar" (sesión de hoy)
+
+- **El Modo Lector ya no va fijo a un costado** ocupando siempre un tercio de
+  la pantalla: ahora es una **ventana flotante** (como los paneles de
+  definición), que se abre solo cuando se necesita — con "📖 Pegar documento /
+  video" en la segunda fila de la cabecera, o "Abrir Lector Activo" en la
+  pantalla de bienvenida — y se puede arrastrar, redimensionar (desde la
+  esquina inferior derecha) y cerrar. Al estar cerrada, el lienzo usa toda la
+  pantalla.
+- **Se quitó el campo "Contexto:" de la vista principal.** El contexto para
+  desambiguar definiciones (ej. distinguir "Mercurio" el planeta del elemento)
+  sigue detectándose solo, igual que antes, pero ya no es un campo que haya
+  que mirar o llenar: ahora es una línea muy discreta ("📎 Contexto: ...") que
+  solo aparece una vez que hay algo detectado, con un link de "editar" para
+  quien quiera ajustarlo a mano. Antes ocupaba espacio y atención aunque el
+  usuario nunca necesitara tocarlo.
+- **Un solo campo para "generar", siempre visible, funcione el lienzo vacío o
+  no:** el campo pequeño de la cabecera (antes "Agregar") ahora:
+  - Si escribes un **tema corto** (ej. "La célula"): investiga y genera un
+    esquema completo de 3 niveles — igual si el lienzo está vacío o si ya
+    tiene otros esquemas.
+    - *Excepción deliberada:* si el lienzo ya tiene contenido y el texto es
+      corto, se agrega un solo nodo suelto (sin gastar IA de más) — tú decides
+      si expandirlo luego desde el menú del nodo ("Conceptos Relacionados").
+      Esto es a propósito, para no disparar un esquema completo cada vez que
+      quieres agregar una sola idea a un mapa que ya tienes armado.
+  - Si pegas un **texto largo** (25+ palabras) o un **enlace de YouTube**:
+    genera el esquema fiel a ESE contenido exactamente como el Modo Lector —
+    ya no hace falta abrir el panel del lector solo para eso.
+  - Un texto de ayuda (al pasar el mouse sobre el campo, y una pista discreta
+    en la segunda fila de la cabecera) explica esta regla, para que sepas qué
+    esperar sin tener que adivinarlo.
+  - El Modo Lector (ahora flotante) sigue existiendo para cuando de verdad
+    quieres **leer y resaltar** un documento largo mientras construyes el
+    esquema (seleccionar texto → "⚡ Crear elemento en esquema"), no solo para
+    generarlo una vez.
+
 ## 6. Últimos arreglos (sesión de hoy)
 
 - **401 en `/.netlify/functions/db`**: la causa era que `authHeaders()` leía el
@@ -9,15 +46,28 @@
   valor cacheado solo como respaldo si `.jwt()` llega a fallar. `authHeaders`,
   `apiFetch` y el interceptor global de `fetch` pasaron a ser `async` para
   poder esperar ese refresco antes de cada llamada.
-- **422 "ese video no tiene subtítulos" en videos que sí los tienen**: la
-  extracción leía el HTML de la página del video y buscaba `"captionTracks"`
-  con una expresión regular — YouTube ya no siempre embebe ese bloque ahí, así
-  que fallaba aunque el video tuviera subtítulos reales. Se cambió a usar el
-  endpoint interno que usa el propio reproductor web de YouTube
-  (`youtubei/v1/player`), que devuelve esa información como JSON limpio en vez
-  de tener que escarbar HTML. Sigue sin ser una API oficial documentada (ver
-  limitación en la sección 4), pero es la misma fuente que usa YouTube.com, así
-  que debería ser notablemente más confiable que el scraping anterior.
+- **422 "ese video no tiene subtítulos" en videos que sí los tienen (ahora con
+  más intentos)**: el primer intento de arreglo (usar el endpoint interno
+  `youtubei/v1/player` simulando el cliente "WEB") seguía fallando — lo más
+  probable es que YouTube bloquee cada vez más ese cliente específico cuando
+  la petición no viene de un navegador real (sin eso, YouTube a veces devuelve
+  "no disponible" aunque el video sí tenga subtítulos). Ahora se intentan
+  **tres estrategias en orden**, quedándose con la primera que funcione:
+  1. El mismo endpoint interno, pero simulando el cliente de la **app de
+     Android** de YouTube — en la práctica, el que menos verificaciones
+     anti-bot tiene desde un servidor.
+  2. El mismo endpoint simulando el cliente "WEB" (el intento anterior).
+  3. Como último recurso, leer el HTML de la página del video y extraer el
+     bloque de datos del reproductor de ahí.
+  - **Importante — no pude verificarlo en vivo**: este entorno de trabajo no
+    tiene salida a youtube.com (lo confirmé al intentarlo), así que no puedo
+    probar si YouTube efectivamente acepta estas peticiones en este momento.
+    Avísame con el mensaje de error exacto si sigue sin funcionar con algún
+    video — esa es la única forma de que yo sepa qué estrategia sigue
+    fallando y pueda ajustarla.
+  - Sigue sin ser una API oficial documentada — es inherentemente frágil
+    porque depende de mecanismos internos de YouTube que pueden cambiar sin
+    avisar.
 - **Miniatura del subesquema y navegación dentro de él**: tres ajustes a lo ya
   descrito en la sección 2:
   1. La miniatura ya no fuerza un rectángulo de 150×150 distinto a los demás
