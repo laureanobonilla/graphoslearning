@@ -98,18 +98,11 @@
         return String(label || '').replace(/\*/g, '');
     }
 
-    // ---------- Jerarquía por profundidad (para que el árbol se note en 3D) ----------
-    // El layout de fuerzas por sí solo no sabe qué es "padre" y qué es "hijo": todos
-    // los nodos se repelen igual y el árbol se vuelve una nube sin orden. Para que
-    // 1) los hijos queden pegados visualmente a su padre y
-    // 2) se note una jerarquía clara (capas por profundidad alrededor de cada raíz),
-    // calculamos la profundidad (BFS) de cada nodo respecto a la raíz de SU propio
-    // árbol (un nodo sin padres entrantes) y la usamos en una fuerza radial propia:
-    // cada nodo es empujado a mantenerse a una distancia de ~profundidad*radialStep
-    // de su raíz, en vez de dejarlo flotar a cualquier distancia. Como puede haber
-    // varios esquemas independientes a la vez en el mismo lienzo (ver "offsetX" en
-    // app.js), cada árbol calcula su radio respecto a SU PROPIA raíz, no al origen
-    // global del lienzo, así los esquemas no se atraen entre sí.
+    // ---------- Jerarquía por profundidad y por padre ----------
+    // BFS desde cada raíz (nodo sin padres entrantes) para saber, de cada nodo:
+    // su profundidad (__depth), la raíz de su árbol (__rootId, por si hay varios
+    // esquemas en el mismo lienzo) y su padre inmediato (__parentId, para agrupar
+    // hermanos juntos al calcular el layout).
     function computeHierarchy(nodeList, linkList) {
         const childrenOf = new Map();
         const hasParent = new Set();
@@ -124,51 +117,109 @@
         const roots = nodeList.filter(n => !hasParent.has(n.id)).map(n => n.id);
         const visited = new Set();
         roots.forEach(rootId => {
-            const queue = [{ id: rootId, depth: 0 }];
+            const queue = [{ id: rootId, depth: 0, parentId: null }];
             while (queue.length) {
-                const { id, depth } = queue.shift();
+                const { id, depth, parentId } = queue.shift();
                 if (visited.has(id)) continue;
                 visited.add(id);
                 const node = idToNode.get(id);
-                if (node) { node.__depth = depth; node.__rootId = rootId; }
+                if (node) { node.__depth = depth; node.__rootId = rootId; node.__parentId = parentId; }
                 (childrenOf.get(id) || []).forEach(childId => {
-                    if (!visited.has(childId)) queue.push({ id: childId, depth: depth + 1 });
+                    if (!visited.has(childId)) queue.push({ id: childId, depth: depth + 1, parentId: id });
                 });
             }
         });
         // Nodos sueltos que ninguna BFS tocó (p.ej. ciclos raros): raíz de sí mismos.
         nodeList.forEach(n => {
-            if (!visited.has(n.id)) { n.__depth = 0; n.__rootId = n.id; }
+            if (!visited.has(n.id)) { n.__depth = 0; n.__rootId = n.id; n.__parentId = null; }
         });
     }
 
-    // Fuerza d3 personalizada: empuja cada nodo a quedar a distancia
-    // depth * radialStep de la posición ACTUAL de su raíz (no de un punto fijo), para
-    // que varios esquemas en el mismo lienzo no se junten entre sí.
-    function makeHierarchicalRadialForce(radialStep) {
-        let nodes = [];
-        let byId = new Map();
-        function force(alpha) {
-            for (const n of nodes) {
-                const depth = n.__depth || 0;
-                if (!depth) continue; // la raíz no se empuja a sí misma
-                const anchor = byId.get(n.__rootId) || { x: 0, y: 0, z: 0 };
-                const dx = (n.x || 0) - (anchor.x || 0);
-                const dy = (n.y || 0) - (anchor.y || 0);
-                const dz = (n.z || 0) - (anchor.z || 0);
-                const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.01;
-                const targetR = depth * radialStep;
-                const k = (targetR - dist) / dist * alpha * 0.9;
-                n.vx = (n.vx || 0) + dx * k;
-                n.vy = (n.vy || 0) + dy * k;
-                n.vz = (n.vz || 0) + dz * k;
+    // ---------- Layout jerárquico "igual que antes, pero en 3D" ----------
+    // Pedido explícito: la raíz arriba, los hijos hacia abajo (árbol clásico), y
+    // SOLO cuando un nivel no cabe en línea recta en pantalla, el excedente se
+    // curva hacia atrás (profundidad, eje Z) en vez de seguir ensanchando a los
+    // lados. Esto se calcula de forma determinista (no con física libre) para que
+    // el árbol se vea siempre ordenado, como en la versión 2D original.
+    const LEVEL_HEIGHT = 130;      // separación vertical entre niveles (profundidad del árbol)
+    const SIBLING_SPACING = 85;    // separación horizontal entre nodos de un mismo nivel
+    const ROW_CAPACITY = 7;        // cuántos nodos de un nivel caben "de frente" antes de curvarse
+
+    function layoutLevel(entries, anchorX, anchorZ, baseY) {
+        // entries: [{ node, parentId }] del mismo (rootId, depth), ya agrupados por padre.
+        const n = entries.length;
+        if (n === 0) return;
+        if (n === 1) {
+            entries[0].node.__lx = anchorX; entries[0].node.__ly = baseY; entries[0].node.__lz = anchorZ;
+            return;
+        }
+        const frontCount = Math.min(n, ROW_CAPACITY);
+        const halfWidth = ((frontCount - 1) * SIBLING_SPACING) / 2;
+        // Fila frontal: línea recta, tal como el árbol 2D de antes (z = anchorZ).
+        for (let i = 0; i < frontCount; i++) {
+            const node = entries[i].node;
+            node.__lx = anchorX + (frontCount === 1 ? 0 : (i * SIBLING_SPACING) - halfWidth);
+            node.__ly = baseY;
+            node.__lz = anchorZ;
+        }
+        // Lo que no cupo de frente se curva hacia atrás, en un arco que empalma
+        // exactamente con los dos extremos de la fila frontal (mismo radio = halfWidth).
+        const overflow = n - frontCount;
+        if (overflow > 0) {
+            for (let j = 0; j < overflow; j++) {
+                const node = entries[frontCount + j].node;
+                const t = overflow === 1 ? 0.5 : j / (overflow - 1);
+                const theta = -Math.PI / 2 + t * Math.PI; // -90°..+90°
+                node.__lx = anchorX + halfWidth * Math.sin(theta);
+                node.__ly = baseY;
+                node.__lz = anchorZ - halfWidth * Math.cos(theta); // 0 en los extremos, máximo atrás al centro
             }
         }
-        force.initialize = (_nodes) => {
-            nodes = _nodes;
-            byId = new Map(nodes.map(n => [n.id, n]));
-        };
-        return force;
+    }
+
+    function applyHierarchicalLayout(nodeList, manualPins) {
+        // Ancla de cada árbol = la posición X/Z que ya tenía su raíz (así se respeta
+        // el "offsetX" con el que app.js separa varios esquemas en el mismo lienzo).
+        const anchorByRoot = new Map();
+        nodeList.forEach(n => {
+            if (n.__depth === 0) anchorByRoot.set(n.__rootId, { x: n.x || 0, z: n.z || 0 });
+        });
+
+        // Agrupa nodos por (rootId, depth), ordenados por padre para que los
+        // hermanos de un mismo nodo queden contiguos (y por tanto visualmente juntos).
+        const buckets = new Map(); // key "rootId|depth" -> [{node, parentId}]
+        nodeList.forEach(n => {
+            if (n.__depth === 0) return; // la raíz se posiciona aparte, no entra en la rejilla
+            const key = `${n.__rootId}|${n.__depth}`;
+            if (!buckets.has(key)) buckets.set(key, []);
+            buckets.get(key).push({ node: n, parentId: n.__parentId });
+        });
+        buckets.forEach(entries => entries.sort((a, b) => String(a.parentId).localeCompare(String(b.parentId))));
+
+        // Raíces: siempre arriba (y=0) y en su propio ancla X/Z.
+        nodeList.forEach(n => {
+            if (n.__depth === 0) {
+                n.__lx = (anchorByRoot.get(n.__rootId) || { x: n.x || 0 }).x;
+                n.__ly = 0;
+                n.__lz = (anchorByRoot.get(n.__rootId) || { z: n.z || 0 }).z;
+            }
+        });
+
+        buckets.forEach((entries, key) => {
+            const [rootId, depthStr] = key.split('|');
+            const depth = parseInt(depthStr, 10);
+            const anchor = anchorByRoot.get(rootId) || { x: 0, z: 0 };
+            layoutLevel(entries, anchor.x, anchor.z, -depth * LEVEL_HEIGHT);
+        });
+
+        // Aplica lo calculado, salvo en nodos que el usuario arrastró a mano (esos
+        // quedan exactamente donde los soltó hasta que se vuelvan a arrastrar).
+        nodeList.forEach(n => {
+            if (manualPins.has(n.id)) return;
+            if (n.__lx === undefined) return; // no participó del layout (no debería pasar)
+            n.x = n.__lx; n.y = n.__ly; n.z = n.__lz;
+            n.fx = n.__lx; n.fy = n.__ly; n.fz = n.__lz;
+        });
     }
 
     // ---------- NetworkShim: reemplazo de vis.Network sobre ForceGraph3D ----------
@@ -179,6 +230,7 @@
             this._listeners = {}; // { eventName: [cb, ...] }
             this._highlightedId = null;
             this._dragging = false;
+            this._manualPins = new Set(); // ids que el usuario fijó a mano arrastrando
             this._sourceMenuEl = document.getElementById('actionMenu');
 
             const self = this;
@@ -211,39 +263,25 @@
                 })
                 .onNodeDragEnd(node => {
                     self._dragging = false;
-                    // Al soltar, el nodo queda fijo donde cayó (igual que vis-network);
-                    // el resto del código lo "libera" explícitamente cuando corresponde.
+                    // Al soltar, el nodo queda fijo donde cayó y se excluye del layout
+                    // jerárquico automático (si no, el siguiente cambio en el árbol lo
+                    // regresaría a su posición calculada).
                     node.fx = node.x; node.fy = node.y; node.fz = node.z;
+                    self._manualPins.add(node.id);
                 })
                 .onEngineStop(() => { self._dispatch('stabilizationIterationsDone'); self._dispatch('stabilized'); });
 
             this.graph.graphData({ nodes: [], links: [] });
 
-            // Física: arranca "caliente" para que los primeros nodos encuentren sitio;
-            // setOptions({physics:{enabled:false}}) la enfría (ver stopPhysicsAndUnlock).
-            this.graph.d3VelocityDecay(0.35);
-            this._physicsEnabled = true;
-
-            // Ajuste de fuerzas para que se note la jerarquía en vez de una nube pareja:
-            // - link: corto y firme, para que cada hijo quede pegado visualmente a su padre.
-            // - charge: repulsión suave, solo para separar hermanos, no para dispersar el árbol.
-            // - center: SE DESACTIVA. Por defecto 3d-force-graph atrae todo al origen del
-            //   lienzo; con varios esquemas en la misma pantalla (ver "offsetX" en app.js)
-            //   eso los iría juntando entre sí con el tiempo. Cada árbol ya se mantiene
-            //   compacto solo con "hierRadial" (ver abajo), centrado en SU propia raíz.
-            // - hierRadial: fuerza propia que acomoda a cada nodo en "capas" (una esfera
-            //   por nivel de profundidad) alrededor de la raíz de su propio árbol.
-            const linkForce = this.graph.d3Force('link');
-            if (linkForce) { linkForce.distance(55).strength(0.85); }
-            const chargeForce = this.graph.d3Force('charge');
-            if (chargeForce) { chargeForce.strength(-45).distanceMax(240); }
+            // El layout ya NO lo decide la física: se calcula de forma determinista
+            // en applyHierarchicalLayout (raíz arriba, hijos debajo, y el excedente de
+            // cada nivel se curva hacia atrás). Cada nodo queda "fijo" (fx/fy/fz) en su
+            // posición calculada, así que desactivamos las fuerzas de d3 para que no
+            // compitan con eso ni muevan nada por su cuenta.
+            this.graph.d3Force('link', null);
+            this.graph.d3Force('charge', null);
             this.graph.d3Force('center', null);
-            this.graph.d3Force('hierRadial', makeHierarchicalRadialForce(68));
-
-            // Semilla de profundidad: sin un empuje inicial en Z, muchos layouts de fuerza
-            // caen en un plano casi plano. El jitter de spawn en syncGraphData (más abajo)
-            // le da a la simulación libertad real de usar los tres ejes desde el principio
-            // (así los nodos "quedan atrás" cuando el esquema crece).
+            this._physicsEnabled = false;
 
             // Rotación orbital libre en todas direcciones: ya viene con OrbitControls.
             const controls = this.graph.controls();
@@ -257,30 +295,28 @@
             resize();
 
             // Sincroniza nodesDS/edgesDS (nuestro DataSet shim) -> graphData real.
+            // El "fixed" de vis-network que pone/quita app.js (congelar mientras se
+            // generan nodos nuevos, etc.) ya no decide la posición: el layout es
+            // siempre determinista (applyHierarchicalLayout). La única excepción real
+            // es el arrastre manual del usuario (ver onNodeDragEnd / this._manualPins).
             const syncGraphData = () => {
                 const nodeList = this.nodesDS.get().map(n => {
                     const existing = this._findNode(n.id);
-                    const base = existing || {
-                        x: (Math.random() - 0.5) * 60,
-                        y: (Math.random() - 0.5) * 60,
-                        z: (Math.random() - 0.5) * 60 // jitter de profundidad inicial, ver nota arriba
-                    };
+                    const base = existing || { x: 0, y: 0, z: 0 };
                     const merged = { ...base, ...n };
-                    // Traducción del "fixed" de vis-network al pineo nativo fx/fy/fz.
-                    if (n.fixed && (n.fixed.x || n.fixed.y)) {
-                        merged.fx = base.x; merged.fy = base.y; merged.fz = base.z;
-                    } else if (n.fixed && n.fixed.x === false && n.fixed.y === false) {
-                        delete merged.fx; delete merged.fy; delete merged.fz;
-                    } else if (existing) {
-                        // conserva el pineo que ya tuviera si no se especifica fixed de nuevo
-                        if ('fx' in existing) merged.fx = existing.fx;
-                        if ('fy' in existing) merged.fy = existing.fy;
+                    if (existing) {
+                        // Conserva posición/pineo ya calculados si este update puntual
+                        // (p.ej. "expanded:true") no trae coordenadas nuevas.
+                        if (!('x' in n) && 'fx' in existing) merged.fx = existing.fx;
+                        if (!('y' in n) && 'fy' in existing) merged.fy = existing.fy;
                         if ('fz' in existing) merged.fz = existing.fz;
+                        if (!('z' in n) && 'z' in existing) merged.z = existing.z;
                     }
                     return merged;
                 });
                 const linkList = this.edgesDS.get().map(e => ({ ...e }));
-                computeHierarchy(nodeList, linkList); // asigna __depth/__rootId por nodo
+                computeHierarchy(nodeList, linkList); // __depth/__rootId/__parentId por nodo
+                applyHierarchicalLayout(nodeList, this._manualPins); // posiciona y fija (fx/fy/fz)
                 this.graph.graphData({ nodes: nodeList, links: linkList });
             };
             this._findNode = id => (this.graph.graphData().nodes || []).find(n => n.id === id);
