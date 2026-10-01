@@ -11,9 +11,19 @@
     
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lienzo 3D: three.js + three-spritetext + 3d-force-graph (ver graph3d.js) -->
-    <script src="https://unpkg.com/three"></script>
-    <script src="https://unpkg.com/three-spritetext"></script>
-    <script src="https://unpkg.com/3d-force-graph"></script>
+    <!-- Polyfill mínimo: three-spritetext/3d-force-graph revisan process.env.NODE_ENV
+         (una convención de bundlers tipo webpack) pero aquí se cargan como <script>
+         plano en el navegador, donde "process" no existe. Sin esto, su sola carga
+         lanza "process is not defined" y ninguna de las tres librerías llega a
+         definirse como global. -->
+    <script>window.process = window.process || { env: { NODE_ENV: 'production' } };</script>
+    <!-- Versiones fijas (no "latest"): unpkg sin versión resuelve hoy a una three.js
+         que ya no publica build UMD para <script> plano (solo ES Modules desde la
+         r150), lo que rompe three-spritetext y 3d-force-graph igual. Estas tres
+         versiones son mutuamente compatibles y sí traen UMD. -->
+    <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three-spritetext@1.8.2/dist/three-spritetext.min.js"></script>
+    <script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://www.paypal.com/sdk/js?client-id=BAAoSqwffH3QBaBX37mWEhxTqnuTNANyr2qtNUPlGViCBrx1rLw1NDyOa9pkDZzRa7kIVcdPDZTDj_PrdY&currency=USD"></script>
     <style>
