@@ -1,4 +1,81 @@
-# Etapa 2 — Paneles flotantes + subesquemas (sin 3D, app unificada)
+# Etapa 2 — Paneles flotantes + subesquemas + rediseño + YouTube/Wikipedia
+
+## 3. Rediseño visual ("consola futurista", sin 3D)
+
+Se mantiene `vis-network` 2D (nada de 3D), pero se rehizo el aspecto general:
+
+- **Tipografía**: `Sora` para títulos (antes Plus Jakarta Sans), `Inter` para
+  cuerpo (igual que antes), y `IBM Plex Mono` solo para números reales
+  (contador de nodos) — no decorativo, es telemetría real.
+- **Paleta**: la app pasa a un tema oscuro "cosmos" (`#0a0e1a`/`#11162b`) con
+  dos acentos — cian `#4fd1c5` y violeta `#8b7cf6` — en vez de un solo color
+  neón. Los nodos del mapa siguen siendo tarjetas claras (como antes), pero
+  ahora se leen como fichas iluminadas flotando sobre el fondo oscuro, con un
+  resplandor sutil en vez de la sombra gris que no se veía sobre negro.
+- **Lienzo**: fondo con una retícula fina de puntos (como una carta estelar) y
+  una "aurora" de dos manchas de color que deriva muy lento detrás de los
+  nodos — es el único efecto de movimiento no disparado por el usuario, sutil
+  y en bucle largo (36s), y respeta `prefers-reduced-motion`.
+- **Cabecera**: se rediseñó el layout de arriba. Antes eran dos filas con el
+  buscador compitiendo en tamaño con "Limpiar". Ahora la fila principal tiene
+  al buscador como protagonista (con resplandor cian al enfocar), con el logo
+  a la izquierda y un clúster compacto de estado a la derecha (sesión,
+  proyectos, capturar, ayuda, contador de nodos con punto pulsante). La
+  segunda fila queda solo para "Modo Lector" y "Limpiar", como acciones
+  discretas de texto, no botones compitiendo por atención.
+- **Menú contextual de nodos**: pasa a ser parte de la "consola" (oscuro, con
+  borde fino cian), igual que los paneles flotantes de definición (que ya
+  eran oscuros). Los modales de lectura (Ayuda, Tienda, Mis Proyectos,
+  Bienvenida) se dejaron como tarjetas claras a propósito: son "documentos"
+  que se leen, no parte del instrumento — library de diseño deliberada, no
+  un rediseño a medias.
+
+## 4. YouTube → subtítulos → esquema (Modo Lector)
+
+En vez de pegar texto, ahora puedes pegar el enlace de un video de YouTube en
+el Modo Lector y presionar "Generar Esquema": el backend extrae los
+subtítulos públicos del video (`netlify/functions/youtube-transcript.js`) y
+ESE texto es el que se usa para "agotar" el esquema — exactamente como si
+hubieras pegado un artículo.
+
+- No usa Whisper ni ninguna API de pago: lee los subtítulos que YouTube ya
+  expone públicamente en la página del video (sin API key). Si el video no
+  tiene subtítulos (ni automáticos), se avisa con un mensaje claro para que
+  pegues el texto a mano.
+- Prioriza subtítulos en español; si no hay, usa los que estén disponibles
+  (incluyendo autogenerados).
+- El título del video se autocompleta como "Contexto" si ese campo estaba
+  vacío, para ayudar a desambiguar definiciones después.
+- **Limitación conocida**: esto es scraping de una estructura pública de
+  YouTube, no una API oficial documentada — si YouTube cambia el formato de
+  su página, esta función puede dejar de funcionar y habría que ajustarla.
+
+## 5. Definiciones gratis y factualmente precisas vía Wikipedia
+
+Para "Ver definición", el orden de prioridad ahora es:
+
+1. **Si hay un documento de base** (texto pegado, o transcripción de un video
+   ya cargada en el Modo Lector): la definición se agota de ESE texto con
+   Gemini, igual que antes. Wikipedia no entra en juego aquí — el texto que
+   trajiste manda.
+2. **Si NO hay documento de base**: antes de llamar a Gemini, el backend
+   (`netlify/functions/_lib/wikipedia.js`) intenta traer el resumen de
+   Wikipedia para ese concepto — gratis, sin gastar tokens, y con la
+   precisión factual de una fuente real en vez de lo que el LLM "recuerde".
+   Si el nodo es una entidad reconocida (persona, lugar, evento, obra), el
+   panel muestra el primer párrafo de Wikipedia **con su foto principal** y
+   un enlace de atribución abajo.
+   - Si el título no existe tal cual o es una página de desambiguación
+     (ej. "Mercurio"), se usa el nodo raíz del esquema como pista de contexto
+     para buscar el artículo correcto (ej. "Mercurio" + "Sistema Solar" →
+     el planeta, no el elemento ni el dios romano).
+   - Prueba primero en español, y si no encuentra nada razonable, en inglés.
+   - Si Wikipedia no tiene nada razonable, se recurre a Gemini exactamente
+     como antes (con sus pistas interactivas "[[término]]" para seguir
+     explorando desde la definición).
+3. Esta acción sigue siendo gratuita para el usuario en ambos casos (ya lo
+   era desde Etapa 1); lo que cambia es que ahora, cuando aplica, no le
+   cuesta tokens de Gemini a la app tampoco.
 
 ## 0. Qué cambió de rumbo en esta etapa (importante)
 

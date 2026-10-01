@@ -9,15 +9,17 @@ let selectedDensity = 'auto';
 let sourceNodeForSynergy = null;
 const synergyBanner = document.getElementById('synergyBanner');
 
-// Paleta de colores suaves y elegantes
+// Paleta pensada para flotar sobre el lienzo oscuro ("cosmos"): tarjetas claras
+// que se leen como pequeñas fichas iluminadas, no el pastel tenue de antes
+// (que estaba calibrado para un fondo blanco).
 const elegantPalette = [
     { background: '#fdfbf7', border: '#cbd5e1' }, // Crema / Marfil
-    { background: '#f8fafc', border: '#94a3b8' }, // Gris azulado
-    { background: '#f0f9ff', border: '#bae6fd' }, // Celeste muy suave
-    { background: '#f5f3ff', border: '#ddd6fe' }, // Lavanda pastel
-    { background: '#fffbeb', border: '#fcd34d' }, // Amarillo pastel muy sutil
-    { background: '#f0fdf4', border: '#bbf7d0' }, // Menta tenue
-    { background: '#fef2f2', border: '#fecaca' }  // Rosa pálido
+    { background: '#eef2ff', border: '#a5b4fc' }, // Lavanda-azul
+    { background: '#ecfeff', border: '#67e8f9' }, // Celeste cristal
+    { background: '#f5f3ff', border: '#c4b5fd' }, // Lavanda
+    { background: '#fffbeb', border: '#fcd34d' }, // Amarillo cálido
+    { background: '#ecfdf5', border: '#6ee7b7' }, // Menta
+    { background: '#fff1f2', border: '#fda4af' }  // Rosa
 ];
 
 function getRandomColor() {
@@ -42,15 +44,17 @@ let network = new vis.Network(container, { nodes, edges }, {
             bold: { color: '#0f172a', size: 18, face: 'Inter, sans-serif' }
         },
         borderWidth: 1.5,
-        shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.08)', size: 8, x: 2, y: 2 },
+        // Sombra oscura clásica → resplandor: sobre fondo negro una sombra negra
+        // es invisible; un halo tenue es lo que hace que la tarjeta "flote".
+        shadow: { enabled: true, color: 'rgba(79, 209, 197, 0.18)', size: 14, x: 0, y: 0 },
         shapeProperties: { borderRadius: 12 }
     },
     edges: {
         arrows: { to: { enabled: true, scaleFactor: 0.8 } },
-        color: { color: '#94a3b8', highlight: '#64748b', hover: '#cbd5e1' },
+        color: { color: '#4a5178', highlight: '#4fd1c5', hover: '#8b7cf6' },
         font: {
-            size: 14, face: 'Inter, sans-serif', color: '#475569', strokeWidth: 3,
-            strokeColor: '#fbfcfd', align: 'middle'
+            size: 14, face: 'Inter, sans-serif', color: '#c7d2e8', strokeWidth: 3,
+            strokeColor: '#0a0e1a', align: 'middle'
         },
         width: 1.5,
         dashes: [4, 4],
@@ -1175,7 +1179,7 @@ function openFloatingPanel(nodeId, title) {
 
     el.innerHTML = `
         <div class="fp-header px-3 py-2 bg-slate-950 border-b border-slate-800 rounded-t-xl flex justify-between items-center gap-2 cursor-move select-none">
-            <h3 class="fp-title text-xs font-bold font-heading text-amber-400 uppercase tracking-wider truncate flex-1"></h3>
+            <h3 class="fp-title text-xs font-bold font-heading text-[#4fd1c5] uppercase tracking-wider truncate flex-1"></h3>
             <button class="fp-minimize text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Minimizar">—</button>
             <button class="fp-close text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Cerrar">✕</button>
         </div>
@@ -1361,11 +1365,17 @@ async function showDefinitionInFloatingPanel(nodeId) {
     if (!currentNode) return;
     const title = currentNode.baseTitle || nodeId;
     let definitionText = currentNode.definition;
+    // "gemini" trae pistas interactivas "[[término]]"; "wikipedia" es un
+    // extracto plano con imagen/atribución (ver gemini.js → lookupWikipedia).
+    let defSource = currentNode.definitionSource || 'gemini';
+    let wikiImage = currentNode.wikiImage || null;
+    let wikiUrl = currentNode.wikiUrl || null;
 
     const panel = openFloatingPanel(nodeId, title);
     panel.el.dataset.nodeId = nodeId;
 
-    if (!definitionText || !definitionText.includes('[[')) {
+    const cacheIsUsable = definitionText && (defSource === 'wikipedia' || definitionText.includes('[['));
+    if (!cacheIsUsable) {
         panel.contentEl.innerHTML = `<p class="text-slate-400 text-xs italic">Redactando definición…</p>`;
         try {
             const { ok, data } = await apiFetch('/.netlify/functions/gemini', {
@@ -1381,11 +1391,26 @@ async function showDefinitionInFloatingPanel(nodeId) {
             if (!ok) { panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">No se pudo obtener la definición.</p>`; return; }
             applyServerBalance(data);
             definitionText = data.definition;
-            nodes.update({ id: nodeId, definition: definitionText, baseTitle: title });
+            defSource = data.source || 'gemini';
+            wikiImage = data.image || null;
+            wikiUrl = data.sourceUrl || null;
+            nodes.update({
+                id: nodeId, baseTitle: title, definition: definitionText,
+                definitionSource: defSource, wikiImage, wikiUrl
+            });
         } catch (err) {
             panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">Error al obtener definición.</p>`;
             return;
         }
+    }
+
+    if (defSource === 'wikipedia') {
+        panel.contentEl.innerHTML = `
+            ${wikiImage ? `<img src="${wikiImage}" alt="${title}" class="w-full h-32 object-cover rounded-lg mb-3 border border-slate-700">` : ''}
+            <p class="leading-relaxed text-slate-200">${definitionText}</p>
+            <p class="mt-3 text-[10px] text-slate-500">Fuente: ${wikiUrl ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="underline hover:text-slate-300">Wikipedia</a>` : 'Wikipedia'}</p>
+        `;
+        return;
     }
 
     panel.contentEl.innerHTML = `
@@ -1480,10 +1505,45 @@ nodeBtnExtractChild?.addEventListener('click', () => {
 // ==========================================
 // GENERAR ESQUEMA COMPLETO A PARTIR DEL TEXTO DEL LECTOR
 // ==========================================
+// Detecta (en el cliente, sin validar a fondo) si lo pegado es un enlace de
+// YouTube en vez de texto, para decidir si hay que pedirle al backend la
+// transcripción antes de generar el esquema.
+function looksLikeYouTubeLink(str) {
+    const t = (str || '').trim();
+    return t.length > 0 && t.length < 300 && !/\s/.test(t) && /(youtube\.com\/|youtu\.be\/)/i.test(t);
+}
+
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
-    const textContent = readerTextMode.innerText.trim();
-    if (!textContent || textContent.length < 3) return alert("Escribe un tema o pega un texto en el lector.");
-    
+    let textContent = readerTextMode.innerText.trim();
+    if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de un video de YouTube en el lector.");
+
+    // Enlace de YouTube en vez de texto: se extraen los subtítulos del video y
+    // ESO se usa como el texto a agotar (en vez de gastar tokens de Gemini
+    // transcribiendo el video, se usan sus subtítulos reales).
+    if (looksLikeYouTubeLink(textContent)) {
+        showLoader('Extrayendo subtítulos del video...');
+        try {
+            const resp = await fetch('/.netlify/functions/youtube-transcript', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: textContent })
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'No se pudo obtener la transcripción de ese video.');
+            textContent = data.text;
+            readerTextMode.innerText = textContent;
+            if (data.title && docContextInput && !docContextInput.value.trim()) {
+                docContextInput.value = data.title;
+                globalDocumentContext = data.title;
+            }
+        } catch (err) {
+            hideLoader();
+            alert(err.message || "No se pudo extraer el texto de ese video.");
+            return;
+        }
+        hideLoader();
+    }
+
     currentDocumentText = textContent;
     await generateFullSchemaFromTopic(textContent);
 });

@@ -275,7 +275,33 @@ async function rawHandler(event, context) {
         if (action === 'define') {
             const { interactive } = JSON.parse(event.body);
 
-            const docPrompt = documentContext 
+            // Sin documento de base del que "agotar" la definición: antes de
+            // gastar una llamada a Gemini, se intenta con Wikipedia (gratis y
+            // factualmente confiable para entidades reconocidas). Si hay un
+            // documento o un video transcrito, ESO manda y Wikipedia no aplica
+            // — la prioridad sigue siendo siempre agotar el texto disponible.
+            if (!documentContext) {
+                try {
+                    const { lookupWikipedia } = require('./_lib/wikipedia');
+                    const rootHint = (contextPath || '').split('>').map(s => s.trim()).filter(Boolean)[0];
+                    const wiki = await lookupWikipedia(topic, rootHint && rootHint !== topic ? rootHint : null);
+                    if (wiki) {
+                        return {
+                            statusCode: 200,
+                            body: JSON.stringify({
+                                definition: wiki.extract,
+                                source: 'wikipedia',
+                                image: wiki.image,
+                                sourceUrl: wiki.url
+                            })
+                        };
+                    }
+                } catch (err) {
+                    console.error('[define] Wikipedia no disponible, se usa Gemini:', err.message);
+                }
+            }
+
+            const docPrompt = documentContext
                 ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nSintetiza la explicación del texto o proporciona una definición rigurosa.`
                 : `Proporciona una definición conceptual clara y directa.`;
 
@@ -294,7 +320,7 @@ async function rawHandler(event, context) {
                 ${interactiveRule}`,
                 config: { temperature: 0.2 }
             });
-            return { statusCode: 200, body: JSON.stringify({ definition: response.text }) };
+            return { statusCode: 200, body: JSON.stringify({ definition: response.text, source: 'gemini' }) };
         }
 
 // ==========================================
