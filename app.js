@@ -202,6 +202,51 @@ async function apiFetch(path, options = {}) {
     return { ok: res.ok, status: res.status, data: data || {} };
 }
 
+// ==========================================
+// REGISTRO DE EVENTOS (embudo de uso): ver netlify/functions/track-event.js.
+// "Dispara y olvida" a propósito — nunca se espera su resultado ni se deja
+// que un fallo de red lo note el usuario. anonId identifica el NAVEGADOR
+// (no a la persona) para poder seguir "qué hizo antes de tener cuenta" aunque
+// pase de invitado a usuario logueado a mitad de sesión.
+function getAnonId() {
+    try {
+        let id = localStorage.getItem('gk_anon_id');
+        if (!id) { id = crypto.randomUUID(); localStorage.setItem('gk_anon_id', id); }
+        return id;
+    } catch { return null; }
+}
+function track(eventName, metadata = {}) {
+    (async () => {
+        try {
+            const headers = await authHeaders();
+            await fetch('/.netlify/functions/track-event', {
+                method: 'POST',
+                credentials: 'same-origin',
+                keepalive: true, // para que sobreviva si el usuario navega fuera justo después
+                headers,
+                body: JSON.stringify({ event: eventName, anonId: getAnonId(), metadata })
+            });
+        } catch (_err) { /* nunca debe notarse en la UI */ }
+    })();
+}
+
+// Señal de "se fue" (no de "se rindió": eso no se puede saber con certeza, se
+// infiere después viendo cuál fue su último evento antes de este). `sendBeacon`
+// no permite mandar el header de sesión, así que esto siempre queda atribuido
+// como invitado aunque haya cuenta — es una limitación aceptada a cambio de
+// que SÍ llegue al servidor incluso si la pestaña se cierra en ese instante.
+let pageEnterTime = Date.now();
+document.addEventListener('pagehide', () => {
+    try {
+        const body = JSON.stringify({
+            event: 'page_left',
+            anonId: getAnonId(),
+            metadata: { seconds_on_page: Math.round((Date.now() - pageEnterTime) / 1000), had_nodes: typeof nodes !== 'undefined' ? nodes.length > 0 : null }
+        });
+        navigator.sendBeacon?.('/.netlify/functions/track-event', new Blob([body], { type: 'application/json' }));
+    } catch (_err) { /* nunca debe notarse en la UI */ }
+});
+
 // Interceptor de red: en vez de editar cada uno de los ~18 fetch() a gemini.js/db.js/
 // balance.js repartidos por app.js (cada uno maneja sus errores distinto),
 // añadimos aquí el token de sesión a todos ellos y capturamos en un solo lugar los
@@ -245,6 +290,7 @@ if (window.netlifyIdentity) {
         authWallModal?.classList.add('hidden');
         netlifyIdentity.close();
         refreshBalanceFromServer(); updateAuthUI();
+        track('login_success');
     });
     netlifyIdentity.on('logout', () => { currentUser = null; refreshBalanceFromServer(); updateAuthUI(); });
 }
@@ -277,12 +323,13 @@ function applyServerBalance(data) {
 function handleBillingError(status, data) {
     if (status === 402 && data?.error === 'guest_limit_reached') {
         if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
-        requireAuth('procesar este esquema');
+        requireAuth('guest_limit_reached');
         return true;
     }
     if (status === 402 && data?.error === 'insufficient_balance') {
         if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
         if (actionMenu) actionMenu.classList.add('hidden');
+        track('paywall_shown', { reason: 'insufficient_balance' });
         storeModal?.classList.remove('hidden'); storeModal?.classList.add('flex');
         return true;
     }
@@ -354,6 +401,7 @@ function requireAuth(actionDescription) {
     if (currentUser || isAdmin) return true;
     if (authWallModal) { authWallModal.classList.remove('hidden'); authWallModal.classList.add('flex'); }
     if (actionMenu) actionMenu.classList.add('hidden');
+    track('login_wall_shown', { reason: actionDescription || null });
     return false;
 }
 
@@ -387,6 +435,7 @@ function checkBalance(cost) {
         if (isGuestUser) requireAuth("procesar este esquema");
         else {
             if (actionMenu) actionMenu.classList.add('hidden');
+            track('paywall_shown', { reason: 'checkBalance_client_side' });
             storeModal?.classList.remove('hidden'); storeModal?.classList.add('flex');
         }
         return false;
@@ -530,7 +579,10 @@ async function generateFullSchemaFromTopic(topicText) {
     if (!topicText) return;
     // Verificamos que tenga al menos saldo disponible para iniciar
     if (!checkBalance(1)) return;
-    
+
+    const isLong = topicText.trim().split(/\s+/).length >= 25;
+    track('schema_generate_attempt', { mode: isLong ? 'text' : 'topic', length: topicText.length });
+
     showLoader(`Estructurando esquema...`);
     if (topicInput) topicInput.value = '';
 
@@ -541,14 +593,16 @@ async function generateFullSchemaFromTopic(topicText) {
             body: JSON.stringify({ action: 'parse_text', text: topicText })
         });
         if (!response.ok) throw new Error("Error en el servidor");
-        
+
         const data = await response.json();
         const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
         renderThreeLevelTree(data);
         applyServerBalance(data); consumeNodes(totalNodes);
+        track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes });
     } catch (err) {
         console.error(err);
+        track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120) });
         alert('Intenta de nuevo en unos segundos');
     } finally {
         hideLoader();
@@ -775,14 +829,6 @@ network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNodeId = params.nodes[0];
 
-        // --- 0. NODO SINTÉTICO "VOLVER AL ESQUEMA PRINCIPAL" (ver SUBESQUEMAS) ---
-        // Solo existe mientras se está dentro de un subesquema; es el link rápido
-        // en el propio lienzo para salir, además de la pastilla de arriba.
-        if (clickedNodeId === '__exit__') {
-            exitSubscheme();
-            return;
-        }
-
         // --- 1. LÓGICA DE SINERGIA (FUSIÓN) ---
         if (sourceNodeForSynergy && sourceNodeForSynergy !== clickedNodeId) {
             const nodeA = nodes.get(sourceNodeForSynergy);
@@ -948,7 +994,7 @@ const btnMenuExpandSub = document.getElementById('btnMenuExpandSub');
 function generateSubschemeThumbnail(subNodes, subEdges, positions) {
     // Resolución del canvas más alta que el tamaño visual final en el lienzo
     // (ver `size` en el nodo colapsado) para que no se vea borroso al escalar.
-    const W = 160, H = 160;
+    const W = 220, H = 220;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -1054,20 +1100,6 @@ function convertSelectionToSubscheme() {
     const subId = `subscheme_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const thumbnail = generateSubschemeThumbnail(innerNodes, internalEdges, positions);
 
-    // Antes de redirigir/eliminar los "puentes" (conexiones hacia fuera del
-    // grupo), se guarda a qué nodo INTERNO se conectaba cada uno y en qué
-    // dirección. Esto es lo que permite, al entrar al subesquema, dibujar esas
-    // mismas flechas apuntando al link de "volver" (ver enterSubscheme).
-    const entryLinks = bridgeEdges.map(e => {
-        const fromInside = selectedSet.has(e.from);
-        return {
-            innerNodeId: fromInside ? e.from : e.to,
-            outerLabel: (nodes.get(fromInside ? e.to : e.from) || {}).baseTitle || null,
-            label: e.label || null,
-            direction: fromInside ? 'out' : 'in' // 'out' = sale del grupo, 'in' = entra al grupo
-        };
-    });
-
     // Quita del lienzo los nodos agrupados y SOLO sus conexiones internas
     // (las que van hacia fuera del grupo se conservan, ver más abajo).
     const internalIds = internalEdges.map(e => e.id);
@@ -1076,19 +1108,18 @@ function convertSelectionToSubscheme() {
 
     nodes.add({
         id: subId,
-        label: `*📦 ${subTitle}*\n(${innerNodes.length} nodos)`,
+        // Título corto y directo sobre qué hay adentro, sin relleno.
+        label: `📦 ${subTitle}`,
         baseTitle: subTitle,
         isSubscheme: true,
-        subSchemeData: { nodes: innerNodes, edges: internalEdges, entryLinks },
+        subSchemeData: { nodes: innerNodes, edges: internalEdges },
         x: centerX, y: centerY, fixed: { x: false, y: false },
-        // Mismo footprint visual que un nodo normal: en vez de forzar un
-        // rectángulo fijo de 150x150 con widthConstraint, se usa `size` (como
-        // cualquier nodo shape:'image'/'circularImage'), que vis-network
-        // escala igual que el resto de nodos del lienzo.
-        shape: 'image', image: thumbnail, size: 32,
+        // Más grande que un nodo normal a propósito: adentro lleva una miniatura
+        // pintada del subesquema, que necesita espacio para distinguirse.
+        shape: 'image', image: thumbnail, size: 60,
         shapeProperties: { useBorderWithImage: true },
         color: { background: '#eef2ff', border: '#6366f1' },
-        font: { color: '#312e81', size: 13, vadjust: 6 }
+        font: { color: '#eef1fb', size: 15, bold: { color: '#ffffff', size: 15 }, vadjust: 14 }
     });
 
     // Las conexiones que iban hacia un nodo ahora agrupado se redirigen al
@@ -1123,40 +1154,12 @@ function enterSubscheme(nodeId) {
 
     const innerNodes = (node.subSchemeData.nodes || []).map(n => ({ ...n }));
     const innerEdges = (node.subSchemeData.edges || []).map(e => ({ ...e }));
-    const entryLinks = node.subSchemeData.entryLinks || [];
 
     isClearingCanvas = true;
     nodes.clear();
     edges.clear();
     nodes.add(innerNodes);
     edges.add(innerEdges);
-
-    // Link rápido EN EL LIENZO para volver al esquema principal (además de la
-    // pastilla de arriba), más las flechas "puente" que este subesquema tenía
-    // con el resto del mapa — visibles aquí, apuntando hacia/desde ese link.
-    nodes.add({
-        id: '__exit__',
-        label: `*⬅ Volver*\n(${node.baseTitle || 'esquema principal'})`,
-        shape: 'box',
-        shapeProperties: { borderRadius: 12, borderDashes: [4, 4] },
-        color: { background: '#1b2140', border: '#8b7cf6', highlight: { background: '#232a52', border: '#8b7cf6' } },
-        font: { color: '#c7d2e8', size: 13 },
-        x: 0, y: -220, fixed: false
-    });
-    entryLinks.forEach(link => {
-        if (!innerNodes.some(n => n.id === link.innerNodeId)) return; // nodo ya no existe
-        const edgeDef = {
-            label: link.label || undefined,
-            dashes: true,
-            color: { color: '#6670a0', highlight: '#8b7cf6' },
-            font: { color: '#8a92b2' }
-        };
-        if (link.direction === 'out') {
-            edges.add({ ...edgeDef, from: link.innerNodeId, to: '__exit__' });
-        } else {
-            edges.add({ ...edgeDef, from: '__exit__', to: link.innerNodeId });
-        }
-    });
     isClearingCanvas = false;
 
     actionMenu.style.visibility = 'hidden';
@@ -1171,19 +1174,16 @@ function exitSubscheme() {
     if (schemeStack.length === 0) return;
     const frame = schemeStack.pop();
 
-    // El nodo sintético "__exit__" (y las flechas-puente que entran/salen de
-    // él) son solo una ayuda de navegación dentro del subesquema: se quitan
-    // antes de guardar, para no duplicarlos cada vez que se entra/sale.
-    const freshNodes = nodes.get().filter(n => n.id !== '__exit__');
-    const freshEdges = edges.get().filter(e => e.from !== '__exit__' && e.to !== '__exit__');
+    const freshNodes = nodes.get();
+    const freshEdges = edges.get();
     const freshPositions = network.getPositions(freshNodes.map(n => n.id));
 
     const restoredNodes = frame.nodes.map(n => {
         if (n.id !== frame.collapsedNodeId) return n;
         return {
             ...n,
-            subSchemeData: { nodes: freshNodes, edges: freshEdges, entryLinks: (n.subSchemeData && n.subSchemeData.entryLinks) || [] },
-            label: `*📦 ${n.baseTitle || 'Subesquema'}*\n(${freshNodes.length} nodos)`,
+            subSchemeData: { nodes: freshNodes, edges: freshEdges },
+            label: `📦 ${n.baseTitle || 'Subesquema'}`,
             image: generateSubschemeThumbnail(freshNodes, freshEdges, freshPositions)
         };
     });
@@ -1657,8 +1657,10 @@ async function resolveTextOrYouTubeLink(raw, { fillReaderPanel } = {}) {
             if (docContextInput) docContextInput.value = data.title;
             updateDocContextChip();
         }
+        track('youtube_transcript_success');
         return data.text;
     } catch (err) {
+        track('youtube_transcript_error', { message: String(err?.message || '').slice(0, 160) });
         alert(err.message || "No se pudo extraer el texto de ese video.");
         return null;
     } finally {
@@ -1689,6 +1691,9 @@ if (isFirstTimeUser && welcomeScreen) {
     welcomeScreen.classList.remove('hidden');
     welcomeScreen.classList.add('flex');
     localStorage.setItem('gk_has_visited', 'true');
+    track('first_visit');
+} else {
+    track('return_visit');
 }
 
 function dismissWelcomeScreen() {
@@ -2183,38 +2188,59 @@ document.getElementById('closeStore')?.addEventListener('click', () => {
     document.getElementById('storeModal').classList.remove('flex');
 });
 
+// El pago se verifica siempre en el servidor (netlify/functions/paypal-create-order.js
+// y paypal-capture-order.js), que a su vez acredita en Supabase (_lib/store.js →
+// credit_nodes, idempotente por orderID). El navegador nunca decide el precio ni
+// suma nodos por su cuenta: solo muestra el botón y refleja el saldo que el
+// servidor confirme. Antes esto se calculaba enteramente en el cliente y se
+// guardaba en localStorage — cualquiera podía regalarse nodos desde la consola.
 if (window.paypal) {
     paypal.Buttons({
-        createOrder: function(data, actions) {
-            // Buscamos cuál paquete seleccionó el usuario y leemos su data-price
+        createOrder: async function () {
+            if (!requireAuth('comprar nodos')) {
+                // requireAuth ya mostró el muro de login; cancelamos esta orden.
+                throw new Error('auth_required');
+            }
             const selected = document.querySelector('input[name="nodePackage"]:checked');
-            return actions.order.create({
-                purchase_units: [{ amount: { value: selected.dataset.price } }]
+            const { ok, status, data } = await apiFetch('/.netlify/functions/paypal-create-order', {
+                method: 'POST',
+                body: JSON.stringify({ packageId: selected.value })
             });
+            if (!ok) {
+                if (status === 401) requireAuth('comprar nodos');
+                else alert(data?.error || 'No se pudo iniciar la compra. Intenta de nuevo.');
+                throw new Error('create_order_failed');
+            }
+            return data.orderID;
         },
-        onApprove: function(data, actions) {
-            return actions.order.capture().then(function(details) {
-                // Leemos cuántos nodos añadir según el 'value' del botón seleccionado
-                const selected = document.querySelector('input[name="nodePackage"]:checked');
-                const addedNodes = parseInt(selected.value, 10);
-                
-                // Sumar los nodos al saldo actual
-                availableNodes += addedNodes;
-                
-                // Guardar en la cuenta correspondiente
-                if (currentUser) {
-                    localStorage.setItem(`gk_balance_${currentUser.id}`, availableNodes);
-                } else {
-                    localStorage.setItem('gk_guest_balance', availableNodes);
-                }
-                
-                updateCounterDisplay();
-                alert(`¡Éxito, ${details.payer.name.given_name}! Se han añadido ${addedNodes} nodos a tu cuenta.`);
-                
-                // Cerrar modal
-                document.getElementById('storeModal').classList.add('hidden');
-                document.getElementById('storeModal').classList.remove('flex');
+        onApprove: async function (data) {
+            const selected = document.querySelector('input[name="nodePackage"]:checked');
+            const result = await apiFetch('/.netlify/functions/paypal-capture-order', {
+                method: 'POST',
+                body: JSON.stringify({ orderID: data.orderID, packageId: selected.value })
             });
+            if (!result.ok) {
+                alert(result.data?.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos para acreditarte los nodos.');
+                return;
+            }
+
+            // El saldo que importa es el que confirma el servidor, no una suma local.
+            if (typeof result.data.balance === 'number') { availableNodes = result.data.balance; updateCounterDisplay(); }
+            alert(`¡Éxito! Se han añadido ${result.data.nodesAdded} nodos a tu cuenta.`);
+
+            document.getElementById('storeModal').classList.add('hidden');
+            document.getElementById('storeModal').classList.remove('flex');
+        },
+        onCancel: function () {
+            // El usuario cerró la ventana de PayPal sin terminar: "intentó pagar
+            // pero no pudo/no quiso" en el sentido más literal.
+            track('payment_cancelled');
+        },
+        onError: function (err) {
+            console.error('[paypal]', err);
+            if (!/auth_required|create_order_failed/.test(String(err?.message))) {
+                alert('Ocurrió un problema con PayPal. Intenta de nuevo en un momento.');
+            }
         }
     }).render('#paypal-button-container');
 }

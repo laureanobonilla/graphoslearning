@@ -117,16 +117,31 @@ async function fetchCaptionTracks(videoId) {
     ];
     let lastResult = null;
     let lastError = null;
+    let allBlockedByLogin = true;
     for (const strategy of strategies) {
         try {
             const result = await strategy();
             lastResult = result;
+            allBlockedByLogin = false;
             if (result.tracks && result.tracks.length) return result;
         } catch (err) {
             lastError = err;
+            if (!/LOGIN_REQUIRED/.test(err.message)) allBlockedByLogin = false;
         }
     }
     if (lastResult) return lastResult; // sin pistas, pero al menos sabemos el título / que el video existe
+
+    // Las tres estrategias fallaron, y TODAS con "LOGIN_REQUIRED": no es que el
+    // video sea privado (un visitante normal sin iniciar sesión lo ve bien) —
+    // es que YouTube está tratando esta petición como la de un bot/servidor
+    // (algo que hace cada vez más con tráfico que no viene de un navegador real
+    // con su propia IP) y por eso exige "iniciar sesión" para cualquier video,
+    // sin importar cuál sea. No hay una forma confiable de evitar esto desde
+    // aquí sin iniciar sesión con una cuenta real (lo que no es seguro ni
+    // sostenible para una función de servidor pública).
+    if (allBlockedByLogin) {
+        throw new Error('YouTube está bloqueando estas peticiones automáticas por venir de un servidor (pide "iniciar sesión" aunque el video sea público) — no es un problema de ESTE video en particular. Por ahora, la alternativa es copiar la transcripción tú mismo: en YouTube, bajo el video → "⋯ Más" → "Mostrar transcripción" → cópiala y pégala directo en el Modo Lector.');
+    }
     throw lastError || new Error('No se pudo obtener información de ese video por ningún medio disponible.');
 }
 

@@ -1,5 +1,246 @@
 # Etapa 2 — Paneles flotantes + subesquemas + rediseño + YouTube/Wikipedia
 
+## 10. Registro de eventos de uso (embudo completo, sesión de hoy)
+
+Pediste poder ver qué hace cada usuario desde su primera visita: si se rinde,
+si intentó pagar y no pudo, etc. Quedó implementado como **solo datos,
+consultables con SQL** en Supabase (la opción que elegiste) — sin panel
+visual dentro de la app por ahora.
+
+### Cómo funciona (y por qué no afecta la velocidad de la app)
+
+- Nueva tabla `events` en Supabase (agregada a `supabase/schema.sql` —
+  acuérdate de volver a correr ese archivo para que se cree).
+- Una función nueva, `track(nombreDeEvento, metadata)` en `app.js`, que manda
+  el evento a una función de servidor nueva (`track-event.js`) **sin esperar
+  la respuesta ni poder fallar visiblemente**: es "dispara y olvida" a
+  propósito. Si Supabase estuviera caído, el usuario no lo notaría en nada —
+  la app sigue funcionando igual, el evento simplemente no quedaría guardado.
+- Esta función NO pasa por el sistema de facturación: no cuesta nodos, no
+  tiene límite de uso (si algún día se nota abuso/spam de eventos, se le
+  puede poner el mismo límite por hora que ya tienen las funciones de IA).
+- Cada evento queda asociado a quien lo generó: el usuario (si tiene cuenta)
+  o el invitado (misma identidad que ya usa el sistema de saldo), más un
+  `anon_id` por navegador que persiste aunque pase de invitado a cuenta
+  registrada a mitad de sesión — así puedes seguir "qué hizo antes de
+  registrarse" cruzando por ese id.
+- **Nunca se guarda el texto que el usuario escribe o pega** (ni el tema, ni
+  el documento, ni el enlace) — solo datos de forma: longitud, tipo, si fue
+  éxito o error. Es intencional, por privacidad.
+
+### Qué queda registrado hoy
+
+| Evento | Cuándo se dispara |
+|---|---|
+| `first_visit` | Primera vez que alguien abre la app en ese navegador |
+| `return_visit` | Cualquier visita después de la primera |
+| `login_wall_shown` | Se le muestra el muro de "inicia sesión" (incluye por qué, en `metadata.reason`) |
+| `login_success` | Inicia sesión correctamente |
+| `schema_generate_attempt` / `_success` / `_error` | Cada vez que pide generar un esquema (tema, texto largo o video), y cómo terminó |
+| `youtube_transcript_success` / `_error` | Intento de extraer subtítulos de un video |
+| `paywall_shown` | Se le muestra la tienda porque se quedó sin saldo |
+| `payment_order_created` / `_create_failed` | Se creó (o falló crear) una orden de PayPal — registrado en el servidor, no en el navegador |
+| `payment_cancelled` | Cerró la ventana de PayPal sin terminar de pagar |
+| `payment_failed` | El pago no se completó o el monto no coincidía (con el motivo en `metadata.reason`) |
+| `payment_success` | Pago confirmado y nodos acreditados |
+| `page_left` | Se fue de la página (cierra la pestaña, navega fuera) — incluye cuánto tiempo estuvo y si llegó a tener nodos en el lienzo |
+
+Es fácil agregar más eventos después (cualquier clic que quieras poder ver) —
+solo es una línea `track('nombre_del_evento', { lo que quieras guardar })`.
+
+### Cómo ver el embudo (ejemplos de consultas, en el SQL Editor de Supabase)
+
+**Conteo simple por evento, para tener una foto general:**
+```sql
+select event_name, count(*) 
+from events 
+where created_at > now() - interval '7 days'
+group by event_name 
+order by count(*) desc;
+```
+
+**Quién vio el muro de pago y nunca volvió a pagar (se "rindió" en el paywall):**
+```sql
+select e1.actor_id, e1.created_at as vio_paywall
+from events e1
+where e1.event_name = 'paywall_shown'
+  and not exists (
+    select 1 from events e2
+    where e2.actor_id = e1.actor_id
+      and e2.event_name = 'payment_success'
+      and e2.created_at > e1.created_at
+  )
+order by e1.created_at desc;
+```
+
+**Pagos que fallaron y por qué, últimos 30 días:**
+```sql
+select actor_id, created_at, metadata->>'reason' as motivo, metadata
+from events
+where event_name = 'payment_failed' and created_at > now() - interval '30 days'
+order by created_at desc;
+```
+
+**Embudo completo de un usuario o invitado específico (reemplaza el id):**
+```sql
+select event_name, created_at, metadata
+from events
+where actor_id = 'guest:xxxxxxxx-xxxx-...'  -- o el "sub" de su cuenta
+order by created_at asc;
+```
+
+**Tasa de conversión visita → primer esquema generado (aproximada):**
+```sql
+select
+  count(*) filter (where event_name = 'first_visit')            as visitas_nuevas,
+  count(*) filter (where event_name = 'schema_generate_success') as esquemas_generados
+from events
+where created_at > now() - interval '7 days';
+```
+
+### Limitación honesta
+
+"Se rindió" no es algo que el navegador pueda avisar con certeza — solo se
+puede *inferir* viendo cuál fue el último evento de alguien antes de que
+dejara de aparecer (ej. la consulta del paywall de arriba). El evento
+`page_left` ayuda (dice cuánto tiempo estuvo y si llegó a generar algo), pero
+no reemplaza esa inferencia. Si más adelante quieres algo más preciso —por
+ejemplo, un panel visual en vez de SQL, o alertas automáticas— se puede
+construir sobre esta misma tabla sin tener que cambiar nada de lo ya hecho.
+
+## 9. PayPal verificado en el servidor + lista antes de promocionar (sesión de hoy)
+
+### El problema que había
+
+El botón de PayPal cobraba de verdad (el dinero sí llegaba), pero **quién
+recibía los nodos lo decidía el navegador**: en cuanto el SDK de PayPal decía
+"aprobado", el propio JavaScript de la página sumaba los nodos a
+`localStorage`, sin que el servidor verificara nada. Cualquiera con las
+herramientas de desarrollador abiertas podía llamar esa misma función y
+regalarse nodos sin pagar un centavo — el saldo que de verdad gastaban las
+funciones de IA vive en Supabase, pero el que entregaba la compra vivía en el
+navegador. Dos sistemas de saldo distintos que no se hablaban entre sí.
+
+### Qué se hizo
+
+Ahora el pago se confirma **en el servidor**, con tres archivos nuevos:
+
+- `_lib/packages.js` — el catálogo real de paquetes (nodos y precio en USD).
+  Es la única fuente de verdad: aunque alguien edite el HTML de la tienda o
+  intercepte la llamada, el servidor nunca va a cobrar ni acreditar algo que
+  no esté en esta lista con ese precio exacto.
+- `_lib/paypal.js` — llama a la API REST real de PayPal (no al SDK del
+  navegador) para crear y capturar órdenes, usando credenciales
+  confidenciales que solo el servidor conoce.
+- `paypal-create-order.js` / `paypal-capture-order.js` — las dos funciones
+  que el botón de PayPal llama ahora: una crea la orden con el precio que fijó
+  el servidor, la otra confirma que PayPal de verdad cobró ese monto exacto y
+  **solo entonces** llama a `credit_nodes` en Supabase (la misma función que
+  ya existía preparada en `supabase/schema.sql`, pero que nunca se usaba).
+  Las dos exigen sesión iniciada (los invitados no pueden comprar).
+
+El flujo con tarjeta/PayPal real del usuario no cambia visualmente en nada —
+sigue siendo el mismo botón. Lo que cambió es invisible: antes el navegador se
+auto-otorgaba el crédito, ahora el crédito solo lo otorga Supabase después de
+que el servidor confirma con PayPal que el dinero entró.
+
+### Lo que TÚ tienes que hacer (yo no tengo acceso a tus cuentas)
+
+**1. Variables de entorno nuevas en Netlify** (Site settings → Environment
+variables), además de las que ya tenías de Etapa 1:
+
+| Variable | Valor |
+|---|---|
+| `PAYPAL_CLIENT_ID` | El **mismo** Client ID que ya está en `index.html` (línea del `<script src="https://www.paypal.com/sdk/js?client-id=...">`) |
+| `PAYPAL_CLIENT_SECRET` | El "Secret" de esa misma app, en el [Dashboard de PayPal Developer](https://developer.paypal.com/dashboard/applications) → Apps & Credentials |
+| `PAYPAL_ENV` | Déjala sin definir (o en cualquier valor que no sea `sandbox`) para cobros reales. Ponla en `sandbox` solo mientras pruebes con una cuenta de prueba. |
+
+  ⚠️ El Client ID y el Secret tienen que ser **de la misma app y el mismo
+  entorno** (los dos de "Live", o los dos de "Sandbox"). Si mezclas un Client
+  ID de Live con un Secret de Sandbox (o viceversa), la creación de la orden
+  fallará.
+
+**2. Confirmar que la tabla `payments` y la función `credit_nodes` existen en
+tu Supabase real.** Están en `supabase/schema.sql`, pero es posible que nunca
+se hayan ejecutado en tu base de datos porque antes no se usaban. El archivo
+es seguro de volver a correr completo en el SQL Editor de Supabase aunque ya
+tengas las otras tablas — usa `create table if not exists` y
+`create or replace function`, así que no borra ni duplica nada que ya tengas.
+
+**3. Probar con una compra real pequeña antes de promocionar.** Yo no tengo
+forma de probar esto en vivo desde este entorno (no tengo salida de red hacia
+PayPal ni acceso a tu cuenta de Netlify/Supabase), así que esto sí depende de
+que lo verifiques tú: compra el paquete más barato, confirma que el saldo que
+aparece en la app sube, y revisa en Supabase (tabla `payments`) que quedó un
+registro con el `order_id` de esa compra.
+  - Si quieres probar sin arriesgar dinero real primero: crea una app de
+    "Sandbox" en el dashboard de PayPal, cambia temporalmente el `client-id`
+    del `<script>` en `index.html` por el de esa app de prueba, pon
+    `PAYPAL_ENV=sandbox` y usa `PAYPAL_CLIENT_ID`/`PAYPAL_CLIENT_SECRET` de esa
+    misma app de prueba. Cuando confirmes que funciona, revierte el
+    `client-id` del HTML al real y quita (o cambia) `PAYPAL_ENV`.
+
+### Otras cosas que revisé antes de decir "ya puedes promocionar"
+
+- **Funciones huérfanas de versiones anteriores** (`track.js`, `license.js`,
+  `admin-auth.js`, que habían quedado señaladas como pendientes de borrar en
+  Etapa 1): ya no existen en esta carpeta — quedaron limpias.
+- **Límites de uso por hora** (`RATE_LIMIT_PER_HOUR`, `GUEST_RATE_LIMIT_PER_HOUR`)
+  y **cupos gratis** (`INITIAL_FREE_NODES`, `GUEST_FREE_NODES`, `GUEST_IP_CAP`)
+  ya estaban bien pensados desde Etapa 1 para aguantar un pico de tráfico de
+  lanzamiento; no hizo falta tocarlos.
+- **No agregué** límite de uso a `paypal-create-order`/`paypal-capture-order`
+  en sí mismas (solo exigen sesión iniciada) — con tráfico normal de
+  promoción no debería ser un problema, pero si llegas a ver abuso (alguien
+  creando órdenes en bucle) avísame y le pongo el mismo límite por hora que
+  tienen las funciones de IA.
+- **Pendiente, sin resolver (no bloquea el lanzamiento)**: la extracción de
+  subtítulos de YouTube sigue limitada por el bloqueo anti-bot de YouTube a
+  IPs de servidor (ver sección 8) — el resto de la app no depende de eso para
+  funcionar, así que no es necesario resolverlo antes de promocionar.
+
+## 8. YouTube "LOGIN_REQUIRED" y ajustes al nodo de subesquema (sesión de hoy)
+
+- **YouTube: por qué da "LOGIN_REQUIRED" en videos públicos.** Confirmaste que
+  el error exacto es `Ese video no está disponible (LOGIN_REQUIRED)` incluso
+  en videos que sí tienen subtítulos y son públicos. Investigándolo: esto NO
+  es que el video en particular tenga un problema — es que **YouTube está
+  tratando la petición del servidor (la IP de Netlify) como la de un bot** y
+  le exige "iniciar sesión" para cualquier video, sin importar cuál sea. Es un
+  bloqueo cada vez más agresivo de YouTube contra tráfico que no viene de un
+  navegador real con IP residencial, y afecta por igual a los tres mecanismos
+  que probamos (cliente Android, cliente Web, y leer el HTML de la página) —
+  los tres dependen de la misma IP del servidor.
+  - **Esto no tiene una solución confiable desde una función de servidor
+    gratuita.** Las únicas formas reales de evitarlo serían: (a) iniciar
+    sesión con una cuenta de YouTube real y mantener esa sesión viva en el
+    servidor (frágil, en contra de los términos de uso, y puede terminar en
+    que esa cuenta sea bloqueada), o (b) pagar por un servicio de proxies
+    residenciales (tiene costo recurrente y añade complejidad). Ninguna de las
+    dos es algo que recomiende implementar para esta app.
+  - **Lo que sí se hizo**: ahora, cuando las tres estrategias fallan
+    específicamente por este bloqueo, el mensaje de error ya no es confuso
+    ("no disponible") — explica la causa real y da la alternativa práctica:
+    **copiar la transcripción manualmente**. En YouTube, debajo del video →
+    "⋯ Más" → "Mostrar transcripción" → copiar ese texto y pegarlo directo en
+    el Modo Lector (o en el campo pequeño de la cabecera, si es corto). Eso
+    sigue funcionando siempre, sin depender de nada de esto.
+  - Si en el futuro un video específico sí logra extraerse (porque ese
+    bloqueo de YouTube no es parejo todo el tiempo para todas las IPs), el
+    código ya está listo para aprovecharlo — no hubo que revertir nada, solo
+    se aclaró el mensaje cuando falla por esta razón puntual.
+
+- **Nodo de subesquema: se quitó el "link rápido" dentro del lienzo.** El
+  nodo "⬅ Volver" que se agregó la vez pasada dentro del subesquema (con sus
+  flechas-puente) se sintió como una caja suelta que no aportaba — ya se quitó
+  por completo. Volver a salir del subesquema se hace solo con la pastilla
+  "← Volver" de arriba del lienzo (como al principio).
+- **Nodo de subesquema: más grande y con título corto.** El nodo colapsado en
+  el esquema principal ahora es notablemente más grande (para que la
+  miniatura pintada adentro se distinga de verdad) y su etiqueta es un título
+  corto y directo ("📦 Nombre del subesquema"), sin el conteo de nodos ni
+  relleno adicional.
+
 ## 7. Modo Lector flotante + un solo campo de "generar" (sesión de hoy)
 
 - **El Modo Lector ya no va fijo a un costado** ocupando siempre un tercio de

@@ -51,6 +51,12 @@ module.exports = {
     }),
     spendGuestNodes: (guestId, cost, action) => rpc('spend_guest_nodes', { p_guest: guestId, p_cost: cost, p_action: action }),
 
+    // Registro de eventos de uso (ver track-event.js). El llamador decide si
+    // espera esto o lo dispara sin esperar — nunca debe bloquear ni romper
+    // nada si Supabase está lento o falla.
+    logEvent: (actorId, actorKind, anonId, eventName, metadata) =>
+        rpc('log_event', { p_actor: actorId, p_kind: actorKind, p_anon: anonId || null, p_event: eventName, p_metadata: metadata || {} }),
+
     // --- Proyectos (siempre filtrados por owner=ownerId; nunca por el id que manda el cliente solo) ---
     async getProject(id, ownerId) {
         const rows = await table(`projects?id=eq.${id}&owner=eq.${encodeURIComponent(ownerId)}&select=*`);

@@ -137,9 +137,42 @@ returns integer language sql stable as $$
    where user_id = p_user and created_at > now() - interval '1 hour';
 $$;
 
+-- ==========================================
+-- REGISTRO DE EVENTOS (embudo de uso: primera visita, qué hace, dónde se
+-- atasca o abandona, intentos de pago fallidos/exitosos, etc.)
+-- ==========================================
+-- actor_id sigue la misma convención que usage_log.user_id: el "sub" de
+-- Netlify Identity si hay cuenta, o 'guest:<uuid>' si es un invitado (mismo
+-- id que ya se usa para su saldo), para poder cruzar ambas tablas si hace
+-- falta. anon_id es un identificador por NAVEGADOR (no por persona: cambia si
+-- borra cookies o usa otro dispositivo) que persiste aunque cambie de
+-- invitado a usuario logueado a mitad de sesión, para poder seguir el hilo
+-- de "qué hizo antes de crear cuenta".
+create table if not exists public.events (
+  id         bigserial primary key,
+  actor_id   text not null,
+  actor_kind text not null check (actor_kind in ('user', 'guest')),
+  anon_id    text,
+  event_name text not null,
+  metadata   jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists events_actor_time on public.events (actor_id, created_at desc);
+create index if not exists events_name_time  on public.events (event_name, created_at desc);
+create index if not exists events_anon_time  on public.events (anon_id, created_at desc);
+alter table public.events enable row level security;
+
+create or replace function public.log_event(p_actor text, p_kind text, p_anon text, p_event text, p_metadata jsonb)
+returns void language plpgsql as $$
+begin
+  insert into public.events(actor_id, actor_kind, anon_id, event_name, metadata)
+  values (p_actor, p_kind, p_anon, p_event, coalesce(p_metadata, '{}'::jsonb));
+end $$;
+
 revoke all on function public.ensure_profile(text,text,integer)             from public, anon, authenticated;
 revoke all on function public.spend_nodes(text,integer,text)                from public, anon, authenticated;
 revoke all on function public.credit_nodes(text,integer,text,numeric)       from public, anon, authenticated;
 revoke all on function public.ensure_guest(text,text,integer,integer,integer) from public, anon, authenticated;
 revoke all on function public.spend_guest_nodes(text,integer,text)          from public, anon, authenticated;
 revoke all on function public.usage_last_hour(text)                         from public, anon, authenticated;
+revoke all on function public.log_event(text,text,text,text,jsonb)          from public, anon, authenticated;
