@@ -1,12 +1,9 @@
 // ==========================================
-// 1. INICIALIZACIÓN DEL GRAFO (3D, vía graph3d.js sobre 3d-force-graph)
+// 1. INICIALIZACIÓN DEL GRAFO (VIS.JS)
 // ==========================================
-// nodes/edges y network conservan la misma API que tenían con vis-network
-// (ver graph3d.js para el porqué de este enfoque); todo lo demás en este archivo
-// sigue funcionando sin cambios.
 const container = document.getElementById('network-container');
-let nodes = new Graph3DDataSet([]);
-let edges = new Graph3DDataSet([]);
+let nodes = new vis.DataSet([]);
+let edges = new vis.DataSet([]);
 let currentDocumentText = "";
 let selectedDensity = 'auto';
 let sourceNodeForSynergy = null;
@@ -27,7 +24,40 @@ function getRandomColor() {
     return elegantPalette[Math.floor(Math.random() * elegantPalette.length)];
 }
 
-let network = new Graph3DNetworkShim(container, { nodes, edges }, {});
+let network = new vis.Network(container, { nodes, edges }, {
+    layout: { hierarchical: false },
+    physics: {
+        enabled: false,
+        solver: 'repulsion',
+        repulsion: { nodeDistance: 220, springLength: 200, springConstant: 0.05 }
+    },
+    nodes: {
+        shape: 'box',
+        margin: { top: 16, bottom: 16, left: 20, right: 20 },
+        font: {
+            multi: 'md',
+            size: 16,
+            face: 'Inter, sans-serif',
+            color: '#334155',
+            bold: { color: '#0f172a', size: 18, face: 'Inter, sans-serif' }
+        },
+        borderWidth: 1.5,
+        shadow: { enabled: true, color: 'rgba(0, 0, 0, 0.08)', size: 8, x: 2, y: 2 },
+        shapeProperties: { borderRadius: 12 }
+    },
+    edges: {
+        arrows: { to: { enabled: true, scaleFactor: 0.8 } },
+        color: { color: '#94a3b8', highlight: '#64748b', hover: '#cbd5e1' },
+        font: {
+            size: 14, face: 'Inter, sans-serif', color: '#475569', strokeWidth: 3,
+            strokeColor: '#fbfcfd', align: 'middle'
+        },
+        width: 1.5,
+        dashes: [4, 4],
+        smooth: { type: 'dynamic' } // Curvatura orgánica y adaptativa para que no se vean todas iguales
+    },
+    interaction: { hover: true, multiselect: true, selectConnectedEdges: true }
+});
 
 function stopPhysicsAndUnlock() {
     network.setOptions({ physics: { enabled: false } });
@@ -56,6 +86,10 @@ const mainHeader = document.getElementById('mainHeader');
 
 let selectedNodeId = null;
 let sourceNodeForConnection = null;
+// Pila de niveles cuando se navega dentro de un subesquema (ver sección
+// "SUBESQUEMAS" más abajo). Cada elemento es el nivel "padre" al que se vuelve
+// al salir: { nodes, edges, collapsedNodeId, label }.
+let schemeStack = [];
 
 let loaderInterval = null;
 
@@ -815,6 +849,11 @@ network.on('click', async function (params) {
 
         // --- 3. MOSTRAR MENÚ CONTEXTUAL ---
         selectedNodeId = clickedNodeId;
+        // "Expandir subesquema" solo aplica a un nodo colapsado (ver sección SUBESQUEMAS).
+        if (typeof btnMenuExpandSub !== 'undefined' && btnMenuExpandSub) {
+            const clickedNodeData = nodes.get(clickedNodeId);
+            btnMenuExpandSub.classList.toggle('hidden', !(clickedNodeData && clickedNodeData.isSubscheme));
+        }
         const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
         const DOMCoords = network.canvasToDOM(nodePosition);
         const containerRect = container.getBoundingClientRect();
@@ -849,6 +888,237 @@ network.on('zoom', () => { actionMenu.style.visibility = 'hidden'; actionMenu.cl
 network.on('dragStart', (params) => {
     actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (params.nodes.length > 0) nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
+});
+
+// ==========================================
+// SUBESQUEMAS: agrupar una selección de nodos en un solo nodo colapsado
+// (con una miniatura del subesquema dibujada dentro) y poder navegar dentro
+// de él como si fuera el esquema principal, con una forma de volver.
+// ==========================================
+const subschemeActionBar = document.getElementById('subschemeActionBar');
+const subschemeSelectionCount = document.getElementById('subschemeSelectionCount');
+const schemeBreadcrumb = document.getElementById('schemeBreadcrumb');
+const schemeBreadcrumbLabel = document.getElementById('schemeBreadcrumbLabel');
+const btnMenuExpandSub = document.getElementById('btnMenuExpandSub');
+
+// Dibuja una miniatura muy simple (puntos = nodos, líneas = conexiones) del
+// subesquema, para mostrarla dentro del nodo colapsado en el lienzo principal.
+function generateSubschemeThumbnail(subNodes, subEdges, positions) {
+    const W = 150, H = 94;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#eef2ff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#c7d2fe';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, W - 2, H - 2);
+
+    if (!subNodes.length) return canvas.toDataURL('image/png');
+
+    const xs = subNodes.map(n => (positions[n.id] && positions[n.id].x) || 0);
+    const ys = subNodes.map(n => (positions[n.id] && positions[n.id].y) || 0);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const rangeX = (maxX - minX) || 1;
+    const rangeY = (maxY - minY) || 1;
+    const pad = 16;
+    const toCanvas = (x, y) => ({
+        cx: pad + ((x - minX) / rangeX) * (W - pad * 2),
+        cy: pad + ((y - minY) / rangeY) * (H - pad * 2)
+    });
+
+    ctx.strokeStyle = '#a5b4fc';
+    ctx.lineWidth = 1;
+    subEdges.forEach(e => {
+        const a = positions[e.from], b = positions[e.to];
+        if (!a || !b) return;
+        const ca = toCanvas(a.x, a.y), cb = toCanvas(b.x, b.y);
+        ctx.beginPath();
+        ctx.moveTo(ca.cx, ca.cy);
+        ctx.lineTo(cb.cx, cb.cy);
+        ctx.stroke();
+    });
+
+    subNodes.forEach(n => {
+        const pos = positions[n.id];
+        if (!pos) return;
+        const c = toCanvas(pos.x, pos.y);
+        ctx.beginPath();
+        ctx.arc(c.cx, c.cy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = (n.color && n.color.background) || '#6366f1';
+        ctx.fill();
+        ctx.strokeStyle = (n.color && n.color.border) || '#4338ca';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+    });
+
+    return canvas.toDataURL('image/png');
+}
+
+function updateSubschemeActionBar() {
+    if (!subschemeActionBar) return;
+    const count = network.getSelectedNodes().length;
+    if (count >= 2) {
+        subschemeActionBar.classList.remove('hidden');
+        if (subschemeSelectionCount) subschemeSelectionCount.innerText = `${count} nodos seleccionados`;
+    } else {
+        subschemeActionBar.classList.add('hidden');
+    }
+}
+network.on('select', updateSubschemeActionBar);
+network.on('deselectNode', updateSubschemeActionBar);
+network.on('click', updateSubschemeActionBar); // cubre clic en fondo vacío (limpia selección)
+
+function updateSchemeBreadcrumb() {
+    if (!schemeBreadcrumb) return;
+    if (schemeStack.length === 0) {
+        schemeBreadcrumb.classList.add('hidden');
+    } else {
+        schemeBreadcrumb.classList.remove('hidden');
+        const top = schemeStack[schemeStack.length - 1];
+        if (schemeBreadcrumbLabel) schemeBreadcrumbLabel.innerText = `Dentro de: ${top.label}`;
+    }
+}
+
+// Toma la selección actual (2+ nodos) y la colapsa en un solo nodo "subesquema".
+// Las conexiones que iban hacia fuera de la selección ("puentes") se reconectan
+// al nuevo nodo colapsado, para no perder cómo se relacionaba con el resto.
+function convertSelectionToSubscheme() {
+    const selectedIds = network.getSelectedNodes();
+    if (selectedIds.length < 2) return;
+    const selectedSet = new Set(selectedIds);
+
+    // Si alguno de estos nodos tenía su definición abierta en un panel flotante,
+    // se cierra: ya no estará en el lienzo principal sino dentro del subesquema.
+    if (typeof closeFloatingPanel === 'function') {
+        selectedIds.forEach(id => closeFloatingPanel(id));
+    }
+
+    const allEdges = edges.get();
+    const internalEdges = allEdges.filter(e => selectedSet.has(e.from) && selectedSet.has(e.to));
+    const bridgeEdges = allEdges.filter(e => (selectedSet.has(e.from) || selectedSet.has(e.to)) && !(selectedSet.has(e.from) && selectedSet.has(e.to)));
+
+    const innerNodes = nodes.get(selectedIds);
+    const positions = network.getPositions(selectedIds);
+    let sumX = 0, sumY = 0;
+    selectedIds.forEach(id => { sumX += positions[id].x; sumY += positions[id].y; });
+    const centerX = sumX / selectedIds.length;
+    const centerY = sumY / selectedIds.length;
+
+    const subTitle = (innerNodes[0] && innerNodes[0].baseTitle) || 'Subesquema';
+    const subId = `subscheme_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const thumbnail = generateSubschemeThumbnail(innerNodes, internalEdges, positions);
+
+    // Quita del lienzo los nodos agrupados y SOLO sus conexiones internas
+    // (las que van hacia fuera del grupo se conservan, ver más abajo).
+    const internalIds = internalEdges.map(e => e.id);
+    nodes.remove(selectedIds);
+    if (internalIds.length) edges.remove(internalIds);
+
+    nodes.add({
+        id: subId,
+        label: `*📦 ${subTitle}*\n(${innerNodes.length} nodos)`,
+        baseTitle: subTitle,
+        isSubscheme: true,
+        subSchemeData: { nodes: innerNodes, edges: internalEdges },
+        x: centerX, y: centerY, fixed: { x: false, y: false },
+        shape: 'image', image: thumbnail,
+        widthConstraint: { minimum: 150, maximum: 150 },
+        color: { background: '#eef2ff', border: '#6366f1' },
+        font: { color: '#312e81', size: 13 }
+    });
+
+    // Las conexiones que iban hacia un nodo ahora agrupado se redirigen al
+    // nuevo nodo colapsado, para que la relación con el resto del esquema no se pierda.
+    bridgeEdges.forEach(e => {
+        const updated = { ...e };
+        delete updated.id; // que vis-network le asigne uno nuevo, limpio
+        if (selectedSet.has(e.from)) updated.from = subId;
+        if (selectedSet.has(e.to)) updated.to = subId;
+        edges.add(updated);
+    });
+    const bridgeIds = bridgeEdges.map(e => e.id).filter(id => id !== undefined);
+    if (bridgeIds.length) edges.remove(bridgeIds);
+
+    network.unselectAll();
+    updateSubschemeActionBar();
+}
+
+// Entra a ver un subesquema como si fuera el esquema principal: guarda el
+// nivel actual en la pila y carga en el lienzo los nodos/aristas guardados
+// dentro del nodo colapsado.
+function enterSubscheme(nodeId) {
+    const node = nodes.get(nodeId);
+    if (!node || !node.subSchemeData) return;
+
+    schemeStack.push({
+        nodes: nodes.get(),
+        edges: edges.get(),
+        collapsedNodeId: nodeId,
+        label: node.baseTitle || 'Subesquema'
+    });
+
+    isClearingCanvas = true;
+    nodes.clear();
+    edges.clear();
+    nodes.add((node.subSchemeData.nodes || []).map(n => ({ ...n })));
+    edges.add((node.subSchemeData.edges || []).map(e => ({ ...e })));
+    isClearingCanvas = false;
+
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    updateSchemeBreadcrumb();
+    setTimeout(() => network.fit({ animation: { duration: 500 } }), 50);
+}
+
+// Vuelve al nivel anterior, guardando dentro del nodo colapsado lo que haya
+// cambiado mientras se navegaba dentro del subesquema (incluida su miniatura).
+function exitSubscheme() {
+    if (schemeStack.length === 0) return;
+    const frame = schemeStack.pop();
+
+    const freshNodes = nodes.get();
+    const freshEdges = edges.get();
+    const freshPositions = network.getPositions(freshNodes.map(n => n.id));
+
+    const restoredNodes = frame.nodes.map(n => {
+        if (n.id !== frame.collapsedNodeId) return n;
+        return {
+            ...n,
+            subSchemeData: { nodes: freshNodes, edges: freshEdges },
+            label: `*📦 ${n.baseTitle || 'Subesquema'}*\n(${freshNodes.length} nodos)`,
+            image: generateSubschemeThumbnail(freshNodes, freshEdges, freshPositions)
+        };
+    });
+
+    isClearingCanvas = true;
+    nodes.clear();
+    edges.clear();
+    nodes.add(restoredNodes);
+    edges.add(frame.edges);
+    isClearingCanvas = false;
+
+    updateSchemeBreadcrumb();
+    setTimeout(() => network.fit({ animation: { duration: 500 } }), 50);
+
+    // Solo se guarda en la nube/local cuando se está de vuelta en el nivel raíz
+    // (ver guardas en triggerAutoSave/saveCurrentProjectToBin más abajo).
+    if (schemeStack.length === 0) triggerAutoSave();
+}
+
+document.getElementById('btnMakeSubscheme')?.addEventListener('click', convertSelectionToSubscheme);
+document.getElementById('btnExitSubscheme')?.addEventListener('click', exitSubscheme);
+btnMenuExpandSub?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (selectedNodeId) enterSubscheme(selectedNodeId);
+});
+network.on('doubleClick', (params) => {
+    if (params.nodes.length > 0) {
+        const n = nodes.get(params.nodes[0]);
+        if (n && n.isSubscheme) enterSubscheme(n.id);
+    }
 });
 
 // ==========================================
@@ -1357,6 +1627,8 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
     }
     sourceNodeForConnection = null;
     selectedNodeId = null;
+    schemeStack = [];
+    updateSchemeBreadcrumb();
     isClearingCanvas = false;
 });
 
@@ -1481,7 +1753,11 @@ function showSaveFeedback(state) {
 }
 
 async function saveCurrentProjectToBin() {
-    if (isClearingCanvas || nodes.length === 0) return;
+    // Mientras se navega dentro de un subesquema (schemeStack no vacío), lo que
+    // se ve en el lienzo es solo ESE fragmento, no el proyecto completo: guardarlo
+    // tal cual sobrescribiría el esquema principal con el subesquema. Se guarda
+    // de nuevo automáticamente en cuanto se vuelve al nivel raíz (ver exitSubscheme).
+    if (isClearingCanvas || schemeStack.length > 0 || nodes.length === 0) return;
 
     showSaveFeedback('saving');
     const userKey = getActiveUserKey();
@@ -1569,7 +1845,7 @@ async function saveCurrentProjectToBin() {
 }
 
 function triggerAutoSave() {
-    if (isClearingCanvas || nodes.length === 0) return;
+    if (isClearingCanvas || schemeStack.length > 0 || nodes.length === 0) return;
     clearTimeout(window._binSaveTimer);
     window._binSaveTimer = setTimeout(() => saveCurrentProjectToBin(), 1200);
 }
@@ -1678,6 +1954,8 @@ async function loadProjectById(projectId) {
 
 function applyLoadedProject(projectId, record) {
     isClearingCanvas = true;
+    schemeStack = [];
+    updateSchemeBreadcrumb();
     nodes.clear();
     edges.clear();
     if (record.nodes) nodes.add(record.nodes);
@@ -1693,6 +1971,8 @@ document.getElementById('btnNewProject')?.addEventListener('click', () => {
         if (!confirm("¿Deseas iniciar un esquema completamente en blanco en un proyecto aparte?")) return;
     }
     isClearingCanvas = true;
+    schemeStack = [];
+    updateSchemeBreadcrumb();
     clearTimeout(window._binSaveTimer);
     currentProjectId = null;
     localStorage.removeItem('gk_current_project_id');

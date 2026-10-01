@@ -1,4 +1,17 @@
-# Etapa 2 — Paneles flotantes + lienzo 3D
+# Etapa 2 — Paneles flotantes + subesquemas (sin 3D, app unificada)
+
+## 0. Qué cambió de rumbo en esta etapa (importante)
+
+- Se probó migrar el lienzo a 3D (`3d-force-graph`), pero no funcionó bien en la
+  práctica (ver conversación) y **se revirtió por completo**: el lienzo vuelve a
+  ser `vis-network` 2D, exactamente como estaba antes de esa prueba.
+- Se eliminó la carpeta `/lab` (`lab/index.html`, `lab/lab.js`). Ya no existen dos
+  versiones de la app: **solo hay una, en la raíz** (`index.html` + `app.js`). Todo
+  lo que hacía `lab.js` (los botones "Antítesis"/"Ponme a prueba", la barra "Tu
+  Cosmos" en Mis Proyectos, el manejo de incógnitas al expandir) ya estaba
+  duplicado o mejorado dentro de `app.js`/`index.html`, así que no se perdió nada
+  al borrarlo — al contrario, eliminaba un bug real de doble-clic que ya existía
+  (`lab.js` y `app.js` escuchaban los mismos botones por separado).
 
 ## 1. Paneles flotantes (ya no hay "expandir definición")
 
@@ -11,87 +24,67 @@
   flotante apenas se genera.
 - Se eliminó todo el sistema de "expandir/contraer en el nodo" (`isExpandedDef`,
   los botones de escala +/-, "Ver aquí"/"Contraer").
-- **Bug corregido de paso:** "Antítesis" y "Ponme a prueba" se disparaban DOS veces
-  por clic (`app.js` y `lab.js` escuchaban cada uno el mismo botón por separado),
-  generando nodos duplicados y gastando el doble de nodos en cada uso. Ahora solo
-  hay un listener por botón.
 
-## 2. Lienzo 3D
+## 2. Subesquemas (nuevo)
 
-### Qué se usó y por qué
+Se puede tomar una selección de nodos y convertirla en un **subesquema**: un solo
+nodo colapsado, con una miniatura dibujada dentro de él (puntos = nodos, líneas =
+conexiones), que se puede volver a abrir y navegar como si fuera el esquema
+principal.
 
-Se cambió `vis-network` (2D) por **3d-force-graph** (sobre three.js), con
-**three-spritetext** para el texto de los nodos. Se eligió esta combinación en vez
-de three.js puro porque ya trae resuelto exactamente lo que pediste:
+### Cómo se usa
 
-- **Navegación circular en todas direcciones**: la cámara orbital (OrbitControls)
-  viene integrada — arrastrar con el mouse rota la vista alrededor del esquema en
-  cualquier dirección, la rueda hace zoom.
-- **Profundidad real**: a diferencia de vis-network (que solo reparte nodos en X/Y),
-  3d-force-graph es un layout de fuerzas verdaderamente 3D. Cuando el esquema crece,
-  el exceso de nodos se reparte también en el eje Z — quedan "atrás" en vez de
-  amontonarse solo a los lados — sin necesitar lógica adicional para forzarlo.
+1. **Selecciona 2 o más nodos** con Ctrl/Cmd + clic (el multiselección ya estaba
+   habilitado en `vis-network`). Al llegar a 2, aparece arriba una barra: *"N
+   nodos seleccionados — 📦 Convertir en subesquema"*.
+2. Al convertir: esos nodos y sus conexiones **entre sí** desaparecen del lienzo
+   principal y se reemplazan por **un solo nodo** con la miniatura del grupo
+   dentro. Las conexiones que iban desde/hacia afuera del grupo (hacia nodos que
+   no estaban seleccionados) se conservan, pero ahora apuntan al nodo colapsado
+   en vez de al nodo específico que tenían adentro.
+3. **Para entrar al subesquema**: doble clic sobre el nodo colapsado, o clic
+   derecho/menú → "🔍 Expandir subesquema". El lienzo cambia para mostrar *solo*
+   ese subesquema, como si fuera el mapa principal (puedes expandir nodos,
+   generar sinergia, etc. con total normalidad ahí dentro).
+4. **Para volver**: aparece una pastilla arriba a la izquierda, *"← Volver —
+   Dentro de: <nombre>"*. Al volver, lo que hayas cambiado dentro del subesquema
+   (nodos agregados, editados, etc.) se guarda de nuevo dentro del nodo colapsado
+   y su miniatura se redibuja para reflejarlo.
+5. Los subesquemas se pueden anidar (un subesquema puede contener otro
+   subesquema adentro), y navegar entre varios niveles con la misma pastilla de
+   "Volver" repetida.
 
-### Cómo se integró sin reescribir toda la app
+### Cómo se guardó esto sin arriesgar tus proyectos
 
-`app.js` y `lab.js` tienen cerca de 80 puntos que llaman a la API de vis-network
-(`nodes.add/update/get`, `edges.add/get`, `network.getPositions/focus/fit/...`).
-En vez de tocar cada uno, se creó **`graph3d.js`**: una capa de compatibilidad que
-implementa esa misma API (mismos nombres de método, mismas firmas) pero por debajo
-usa 3d-force-graph. Así, **el único cambio real en `app.js` fue su bloque de
-inicialización** (sección 1): donde antes decía `new vis.DataSet([])` y
-`new vis.Network(...)`, ahora dice `new Graph3DDataSet([])` y
-`new Graph3DNetworkShim(...)`. Todo lo demás —generar esquemas, sinergia, vincular
-nodos, el menú contextual, arrastrar, fijar nodos— sigue funcionando porque llama a
-los mismos métodos de siempre.
+- Mientras estás *dentro* de un subesquema, el autoguardado se desactiva (no se
+  sobrescribe el proyecto completo con solo el fragmento que estás viendo). En
+  cuanto vuelves al nivel principal, se guarda automáticamente de nuevo.
+- Un subesquema es solo datos dentro del nodo colapsado (`subSchemeData: {nodes,
+  edges}`), así que viaja con el proyecto normal al guardarlo/cargarlo — no
+  necesitó cambios en el backend ni en Supabase.
+- Abrir "Mis Proyectos", cargar otro proyecto, o usar "Limpiar"/"Nuevo proyecto"
+  reinicia la navegación de subesquemas al nivel principal, para no dejar un
+  estado "a medias" de un proyecto anterior mezclado con el nuevo.
 
-### Limitaciones conocidas de este cambio (para que las tengas presentes)
+### Limitaciones conocidas
 
-- **El texto en negritas (`*texto*`) ya no se renderiza en negrita**: en 3D el
-  texto de cada nodo es un sprite (three-spritetext), no HTML con rich-text, así
-  que por ahora se muestra como texto plano (se quitan los asteriscos). Si esto
-  importa visualmente, se puede mejorar generando un sprite con dos tamaños de
-  fuente para título/cuerpo.
-- **Se perdió la selección múltiple por recuadro (Shift + arrastrar)** que existía
-  en vis-network. Se verificó que el código nunca la usaba funcionalmente (solo
-  estaba documentada en el modal de ayuda, que ya se actualizó); no afecta ninguna
-  función real de la app, pero si la quieres de vuelta en 3D habría que
-  construirla a mano (no viene con la librería).
-- `canvasToDOM`, `getViewPosition()` y `focus()` son **aproximaciones** razonables
-  a sus equivalentes 2D (ver comentarios en `graph3d.js`), no una traducción exacta
-  — cubren los mismos usos que tenía la app (posicionar el menú contextual sobre un
-  nodo, enfocar la cámara en un nodo, ubicar nodos nuevos sin padre), pero si en el
-  futuro se usan para algo más fino puede que haya que ajustarlos.
-- Las propiedades de estilo 2D que ya no aplican (`shapeProperties`,
-  `widthConstraint`, `heightConstraint`, `shadow`) quedaron en el código pero el
-  renderer 3D las ignora — no rompen nada, son datos muertos en los nodos.
+- La miniatura es deliberadamente simple (un canvas 2D con puntos y líneas, sin
+  colores de texto ni etiquetas) — es una referencia visual rápida, no un mapa
+  en miniatura navegable.
+- Si arrastras nodos para reordenarlos dentro de un subesquema, esa disposición
+  se conserva la próxima vez que lo abras (se guarda tal cual la dejaste).
+- No hay (todavía) una forma de "deshacer" convertir en subesquema desde la UI;
+  si te equivocas, entra al subesquema (doble clic), copia mentalmente lo que
+  haya, y vuelve a crear esos nodos sueltos a mano, o pídeme que agregue un
+  botón de "deshacer agrupación" si lo necesitas seguido.
 
-### Qué falta probar (no pude correr un navegador real desde aquí)
+## Archivos modificados en esta etapa
 
-Esta es una migración de librería grande y el entorno donde trabajé no tiene
-navegador para verlo correr de verdad. Antes de reemplazar producción, prueba
-específicamente:
-
-1. Que el mapa cargue y los nodos aparezcan (no una pantalla negra vacía).
-2. Generar un esquema inicial, expandir un nodo, usar sinergia y "vincular con...".
-3. Que el menú contextual aparezca pegado al nodo clickeado (no desplazado).
-4. Arrastrar un nodo y soltarlo — debe quedar fijo ahí.
-5. Orbitar con el mouse y hacer zoom con la rueda.
-6. Que "Ver definición" abra el panel flotante correcto para el nodo clickeado.
-
-Si algo de esto falla, dime exactamente qué ves (o un screenshot) y lo ajusto —
-los puntos más delicados de esta migración son el posicionamiento del menú
-contextual (`canvasToDOM`) y el comportamiento de fijar/soltar nodos (`fixed` →
-`fx/fy/fz`), así que son los primeros lugares donde miraría si algo no calza.
-
-## Archivos nuevos / modificados en esta etapa
-
-- **Nuevo:** `graph3d.js` — la capa de compatibilidad vis-network → 3d-force-graph.
-- `app.js` — paneles flotantes (reemplaza el panel único), bloque de
-  inicialización del grafo actualizado para usar `graph3d.js`.
-- `lab/lab.js` — mismos ajustes de paneles flotantes; se eliminó el listener
-  duplicado de "Antítesis"/"Ponme a prueba".
-- `index.html` y `lab/index.html` — se reemplazó el panel único por la capa de
-  paneles flotantes, se quitaron los botones de escala +/- (ya sin uso), se
-  actualizó el texto de ayuda sobre controles del lienzo, y se cambiaron los
-  `<script>` de `vis-network` por `three` + `three-spritetext` + `3d-force-graph`.
+- `app.js` — paneles flotantes; sección nueva "SUBESQUEMAS" (agrupar selección,
+  entrar/salir, miniatura); guardas de autoguardado actualizadas para no guardar
+  mientras se navega dentro de un subesquema.
+- `index.html` — capa de paneles flotantes (reemplaza el panel único); barra para
+  convertir selección en subesquema; pastilla de navegación "Volver"; botón
+  "Expandir subesquema" en el menú contextual; se quitaron los botones de escala
+  +/- (ya sin uso); texto de ayuda actualizado.
+- Se eliminó `/lab` por completo (ver sección 0).
