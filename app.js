@@ -940,22 +940,19 @@ network.on('click', async function (params) {
                     trackNodeUsage(synNode.label);
                 }
 
+                // La generación sigue siendo exactamente la misma (mismo llamado a
+                // Gemini, mismo costo en nodos vía totalNodes/consumeNodes): el servidor
+                // sigue pensando en "puentes" intermedios entre A/B y el nodo de sinergia.
+                // Lo único que cambia es que ya NO se dibujan esos puentes como nodos
+                // aparte en el lienzo — se conecta directo A → Sinergia y B → Sinergia,
+                // usando el nombre del puente como la etiqueta de ese enlace, para no
+                // perder la idea que representaba sin ensuciar el esquema con nodos de más.
                 (data.pathsFromA || []).forEach(bridge => {
-                    if (!nodes.get(bridge.id)) {
-                        nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: posA.x + (midX - posA.x)/2 + (Math.random()*40-20), y: posA.y + (midY - posA.y)/2 + (Math.random()*40-20), fixed: { x: false, y: false }, color: getRandomColor() });
-                        trackNodeUsage(bridge.label);
-                    }
-                    edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
-                    edges.add({ from: bridge.id, to: synNode.id, label: bridge.relToSynergy });
+                    edges.add({ from: nodeA.id, to: synNode.id, label: bridge.label, dashes: [4, 3], color: { color: '#d946ef' } });
                 });
 
                 (data.pathsFromB || []).forEach(bridge => {
-                    if (!nodes.get(bridge.id)) {
-                        nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: posB.x + (midX - posB.x)/2 + (Math.random()*40-20), y: posB.y + (midY - posB.y)/2 + (Math.random()*40-20), fixed: { x: false, y: false }, color: getRandomColor() });
-                        trackNodeUsage(bridge.label);
-                    }
-                    edges.add({ from: nodeB.id, to: bridge.id, label: bridge.relFromB });
-                    edges.add({ from: bridge.id, to: synNode.id, label: bridge.relToSynergy });
+                    edges.add({ from: nodeB.id, to: synNode.id, label: bridge.label, dashes: [4, 3], color: { color: '#d946ef' } });
                 });
 
                 applyServerBalance(data); consumeNodes(totalNodes);
@@ -1309,7 +1306,11 @@ const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
 // Cada "Ver definición" abre su propia ventana flotante, apilada en cascada, que el
 // usuario puede arrastrar, minimizar o cerrar sin afectar a las demás ni al lienzo.
 // ==========================================
-let floatingPanelCount = 0;
+// Arranca en 1 (no 0) porque el Modo Lector ya nace visible con z-index 501
+// (= 500 + 1) directamente en el HTML. Si este contador arrancara en 0, el
+// primer panel de definición que se abra también calcularía 500 + 1 = 501 y
+// quedaría empatado con el Modo Lector en vez de competir correctamente.
+let floatingPanelCount = 1;
 const openFloatingPanels = new Map(); // nodeId -> { el, contentEl, titleEl }
 
 function closeFloatingPanel(nodeId) {
@@ -1432,7 +1433,7 @@ function openReaderPanel() {
 }
 function closeReaderPanel() {
     readerPanel.classList.add('hidden');
-    btnToggleReader.innerHTML = '<span>📖</span> Pegar documento / video (Modo Lector)';
+    btnToggleReader.innerHTML = '<span>📖</span> Pegar documento / enlace (Modo Lector)';
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
 }
 
@@ -1466,6 +1467,12 @@ document.addEventListener('mouseup', () => {
     }
 });
 
+const readerEmptyHint = document.getElementById('readerEmptyHint');
+function updateReaderEmptyHint() {
+    if (!readerEmptyHint || !readerTextMode) return;
+    readerEmptyHint.classList.toggle('hidden', readerTextMode.innerText.trim() !== "");
+}
+
 readerTextMode?.addEventListener('input', () => {
     const content = readerTextMode.innerText.trim();
     currentDocumentText = content;
@@ -1474,6 +1481,7 @@ readerTextMode?.addEventListener('input', () => {
         if (docContextInput) docContextInput.value = globalDocumentContext;
         updateDocContextChip();
     }
+    updateReaderEmptyHint();
 });
 
 readerTextMode?.addEventListener('mouseup', (e) => {
@@ -1492,7 +1500,9 @@ readerTextMode?.addEventListener('mouseup', (e) => {
 });
 
 document.addEventListener('mousedown', (e) => {
-    if (!selectionTooltip.contains(e.target) && !readerPanel.contains(e.target)) selectionTooltip.classList.add('hidden');
+    // ".reader-panel-instance" cubre tanto el panel principal como cualquier
+    // panel adicional (clon) que el usuario haya abierto con el botón ➕.
+    if (!selectionTooltip.contains(e.target) && !e.target.closest('.reader-panel-instance')) selectionTooltip.classList.add('hidden');
 });
 
 function highlightSelectedTextAndLink(nodeId) {
@@ -1535,6 +1545,154 @@ document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
     highlightSelectedTextAndLink(nodeId);
     selectedNodeId = nodeId;
 });
+
+// ==========================================
+// PANELES DE LECTOR ADICIONALES (clones independientes del Modo Lector)
+// ==========================================
+// El usuario puede abrir más de un "Modo Lector" a la vez con el botón ➕ de
+// la cabecera (en el panel principal o en cualquiera de los adicionales) para
+// pegar dos o más textos/enlaces distintos y generar varios esquemas por
+// separado. Cada panel adicional es una COPIA del panel principal con su
+// propio texto (vive directo en su propio textEl, el <div contenteditable>
+// clonado) y su propio contexto de documento (localContext, variable local a
+// esta función) — nada se comparte entre paneles ni con el principal
+// (globalDocumentContext/currentDocumentText), así que el texto o el contexto
+// de uno nunca puede terminar mezclado con el de otro.
+let extraReaderPanelCount = 0;
+
+function wireReaderPanelClone(root) {
+    const q = (role) => root.querySelector(`[data-role="${role}"]`);
+    const header = q('header');
+    const btnAdd = q('btnAdd');
+    const btnClear = q('btnClearReader');
+    const btnClose = q('btnClose');
+    const btnGenerate = q('btnGenerate');
+    const textEl = q('textMode');
+    const emptyHint = q('emptyHint');
+    const chip = q('docContextChip');
+    const chipText = q('docContextChipText');
+    const btnEditContext = q('btnEditContext');
+    const editRow = q('docContextEditRow');
+    const contextInput = q('docContextInput');
+
+    let localContext = "";
+
+    function updateChip() {
+        if (!chip) return;
+        if (localContext) {
+            chip.classList.remove('hidden'); chip.classList.add('flex');
+            if (chipText) chipText.innerText = localContext.length > 60 ? localContext.slice(0, 60) + '…' : localContext;
+        } else {
+            chip.classList.add('hidden'); chip.classList.remove('flex');
+        }
+    }
+    function updateEmptyHintLocal() {
+        if (!emptyHint || !textEl) return;
+        emptyHint.classList.toggle('hidden', textEl.innerText.trim() !== "");
+    }
+
+    contextInput?.addEventListener('input', (e) => { localContext = e.target.value.trim(); updateChip(); });
+    btnEditContext?.addEventListener('click', () => {
+        editRow?.classList.remove('hidden'); editRow?.classList.add('flex');
+        if (contextInput) { contextInput.value = localContext; contextInput.focus(); }
+    });
+
+    textEl?.addEventListener('input', () => {
+        const content = textEl.innerText.trim();
+        if (!localContext && content.length > 20) {
+            localContext = content.split(/\s+/).slice(0, 6).join(' ') + '...';
+            if (contextInput) contextInput.value = localContext;
+            updateChip();
+        }
+        updateEmptyHintLocal();
+    });
+
+    // Igual que en el panel principal: subrayar texto aquí también permite
+    // crear un nodo vinculado a esa selección (mismo tooltip compartido y
+    // mismo botón "⚡ Crear elemento en esquema", ver más abajo en el archivo
+    // — solo puede haber una selección activa a la vez, así que reusarlo es
+    // seguro y no mezcla nada entre paneles).
+    textEl?.addEventListener('mouseup', (e) => {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
+        if (text.length > 2) {
+            activeSelectedText = text;
+            activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+            const preview = document.getElementById('tooltipSelectedTextPreview');
+            if (preview) preview.innerText = `"${text.substring(0, 25)}..."`;
+            selectionTooltip.style.left = `${e.pageX - 60}px`;
+            selectionTooltip.style.top = `${e.pageY - 70}px`;
+            selectionTooltip.classList.remove('hidden');
+        } else {
+            selectionTooltip.classList.add('hidden');
+        }
+    });
+
+    // Arrastre desde la cabecera, igual que el panel principal.
+    let dragState = null;
+    header?.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button') || e.target.closest('input')) return;
+        dragState = { startX: e.clientX, startY: e.clientY, left: root.offsetLeft, top: root.offsetTop };
+        e.preventDefault();
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!dragState) return;
+        root.style.left = `${Math.max(0, dragState.left + (e.clientX - dragState.startX))}px`;
+        root.style.top = `${Math.max(0, dragState.top + (e.clientY - dragState.startY))}px`;
+    });
+    document.addEventListener('mouseup', () => { dragState = null; });
+    root.addEventListener('mousedown', () => { root.style.zIndex = String(500 + (++floatingPanelCount)); });
+
+    btnClose?.addEventListener('click', () => root.remove());
+    btnClear?.addEventListener('click', () => {
+        const hasText = textEl && textEl.innerText.trim() !== "";
+        if (!hasText && !localContext) return;
+        if (confirm("¿Deseas limpiar el texto y el contexto de este lector?")) {
+            localContext = "";
+            if (textEl) textEl.innerText = "";
+            if (contextInput) contextInput.value = "";
+            editRow?.classList.add('hidden');
+            updateChip(); updateEmptyHintLocal();
+        }
+    });
+
+    btnAdd?.addEventListener('click', () => createExtraReaderPanel());
+
+    btnGenerate?.addEventListener('click', async () => {
+        let textContent = textEl ? textEl.innerText.trim() : "";
+        if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
+
+        textContent = await resolveTextOrWebLink(textContent, {
+            targetTextEl: textEl,
+            onTitle: (t) => { if (!localContext) { localContext = t; if (contextInput) contextInput.value = t; updateChip(); } }
+        });
+        if (textContent === null) return;
+        updateEmptyHintLocal();
+
+        await generateFullSchemaFromTopic(textContent);
+    });
+
+    updateEmptyHintLocal();
+}
+
+function createExtraReaderPanel() {
+    extraReaderPanelCount++;
+    const clone = readerPanel.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+    const n = extraReaderPanelCount;
+    const titleEl = clone.querySelector('[data-role="title"]');
+    if (titleEl) titleEl.innerText = `📖 Modo Lector ${n + 1}`;
+    const cascade = n % 8;
+    clone.style.left = `${56 + cascade * 44}px`;
+    clone.style.top = `${136 + cascade * 44}px`;
+    clone.style.zIndex = String(500 + (++floatingPanelCount));
+    floatingPanelsLayer.appendChild(clone);
+    wireReaderPanelClone(clone);
+    return clone;
+}
+
+document.querySelector('#readerPanel [data-role="btnAdd"]')?.addEventListener('click', () => createExtraReaderPanel());
 
 function formatInteractiveDefinition(rawText, parentNodeId) {
     const safeHtml = rawText.replace(/\n/g, '<br>');
@@ -1654,6 +1812,36 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
     showDefinitionInFloatingPanel(selectedNodeId);
+});
+
+// Editar el texto de un nodo existente. El usuario ve/edita el texto "limpio"
+// (sin los * de negrita ni el ícono/prefijo que algunos nodos especiales traen,
+// como 🌟 en Sinergia o ⚡ en Antítesis), y al guardar reconstruimos el label
+// conservando ese mismo prefijo si lo había, para no perder la pista visual de
+// qué tipo de nodo es.
+document.getElementById('btnMenuEditText')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    const node = nodes.get(selectedNodeId);
+    if (!node) return;
+
+    const currentLabel = String(node.label || '');
+    // Detecta un prefijo tipo "*🌟 " o "*" al inicio del label para conservarlo.
+    const prefixMatch = currentLabel.match(/^\*((?:\p{Emoji_Presentation}|\p{Extended_Pictographic})\s)?/u);
+    const prefixEmoji = (prefixMatch && prefixMatch[1]) ? prefixMatch[1] : '';
+    const currentPlainText = node.baseTitle || currentLabel.replace(/^\*/, '').replace(/\*$/, '').replace(/^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic})\s/u, '');
+
+    const newText = prompt('Editar texto del nodo:', currentPlainText);
+    if (newText === null) return; // canceló
+    const trimmed = newText.trim();
+    if (!trimmed) return;
+
+    nodes.update({
+        id: selectedNodeId,
+        label: `*${prefixEmoji}${trimmed}*`,
+        baseTitle: trimmed
+    });
 });
 
 // ==========================================
@@ -1809,7 +1997,12 @@ function looksLikeWebLink(str) {
 // mecanismo para el Modo Lector y para el campo pequeño de arriba, así ambos
 // pueden recibir un enlace indistintamente). Devuelve null si falló (y ya
 // mostró la alerta correspondiente).
-async function resolveTextOrWebLink(raw, { fillReaderPanel } = {}) {
+// Generalizada para servir tanto al panel principal como a cualquier panel de
+// lector adicional: en vez de escribir directo sobre el textarea/contexto del
+// panel principal (lo que mezclaría resultados si se llamaba desde un clon),
+// recibe a qué elemento de texto escribir el resultado (targetTextEl) y un
+// callback para el título detectado (onTitle), cada panel pasa los suyos.
+async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null } = {}) {
     if (!looksLikeWebLink(raw)) return raw;
 
     showLoader('Leyendo la página...');
@@ -1821,12 +2014,8 @@ async function resolveTextOrWebLink(raw, { fillReaderPanel } = {}) {
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || 'No se pudo leer esa página.');
-        if (fillReaderPanel && readerTextMode) readerTextMode.innerText = data.text;
-        if (data.title && !globalDocumentContext) {
-            globalDocumentContext = data.title;
-            if (docContextInput) docContextInput.value = data.title;
-            updateDocContextChip();
-        }
+        if (targetTextEl) targetTextEl.innerText = data.text;
+        if (data.title && onTitle) onTitle(data.title);
         track('webpage_read_success');
         return data.text;
     } catch (err) {
@@ -1842,8 +2031,18 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
     let textContent = readerTextMode.innerText.trim();
     if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
 
-    textContent = await resolveTextOrWebLink(textContent, { fillReaderPanel: true });
+    textContent = await resolveTextOrWebLink(textContent, {
+        targetTextEl: readerTextMode,
+        onTitle: (title) => {
+            if (!globalDocumentContext) {
+                globalDocumentContext = title;
+                if (docContextInput) docContextInput.value = title;
+                updateDocContextChip();
+            }
+        }
+    });
     if (textContent === null) return;
+    updateReaderEmptyHint();
 
     currentDocumentText = textContent;
     await generateFullSchemaFromTopic(textContent);
@@ -1984,7 +2183,14 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
 
     nodes.clear();
     edges.clear();
-    currentDocumentText = "";
+    // El Modo Lector NO se toca: si el usuario ya tenía un texto/enlace pegado
+    // ahí, sigue intacto después de limpiar. Por eso currentDocumentText se
+    // vuelve a sincronizar con lo que haya en el lector en vez de vaciarse.
+    currentDocumentText = readerTextMode ? readerTextMode.innerText.trim() : "";
+    // Limpiar el lienzo también debe cerrar los paneles flotantes de
+    // definición/explicación/reto (quedaban "huérfanos", apuntando a nodos que
+    // ya no existen) — pero sin tocar el panel del Modo Lector, que es aparte.
+    Array.from(openFloatingPanels.keys()).forEach(closeFloatingPanel);
     actionMenu.classList.add('hidden');
     if (typeof connectionBanner !== 'undefined' && connectionBanner) {
         connectionBanner.classList.add('hidden');
@@ -2008,6 +2214,7 @@ document.getElementById('btnClearReader')?.addEventListener('click', () => {
         currentDocumentText = "";
         globalDocumentContext = "";
         if (readerTextMode) readerTextMode.innerText = "";
+        updateReaderEmptyHint();
         if (docContextInput) docContextInput.value = "";
         docContextEditRow?.classList.add('hidden');
         updateDocContextChip();

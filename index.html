@@ -240,7 +240,7 @@
         <!-- Fila 2: Controles secundarios, discretos -->
         <div class="flex items-center gap-2 w-full">
             <button id="btnToggleReader" class="text-[#c9b37a] hover:text-[#e4cf96] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>📖</span> Pegar documento / enlace (Modo Lector)
+                <span>📖</span> Ocultar Modo Lector
             </button>
             <span class="text-[10px] text-[#5b6388] hidden lg:inline truncate">💡 "Generar" crea un nodo suelto · Para un esquema completo (tema, texto largo o enlace), usa el Modo Lector</span>
             <div class="flex-1"></div>
@@ -268,33 +268,54 @@
              igual en espíritu a los paneles de definición (vive en la misma capa que
              ellos, ver comentario arriba), que se abre solo cuando se necesita pegar
              un documento largo o un enlace a una página web. -->
-        <div id="readerPanel" class="hidden absolute w-[420px] max-w-[92vw] h-[70vh] max-h-[80vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px;">
-            <div id="readerPanelHeader" class="px-3 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 select-none cursor-move">
+        <!-- Visible por defecto al cargar la app (no "hidden"): es el punto de
+             partida recomendado para el usuario, así que debe verse de una vez,
+             con una forma más cuadrada que antes (antes era un rectángulo muy
+             alto y angosto). -->
+        <div id="readerPanel" data-role="panel" class="reader-panel-instance absolute w-[480px] max-w-[92vw] h-[560px] max-h-[82vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px; z-index: 501;">
+            <div id="readerPanelHeader" data-role="header" class="px-3 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 select-none cursor-move">
                 <div class="flex items-center justify-between gap-2">
-                    <h3 class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
+                    <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
                     <div class="flex items-center gap-1.5">
-                        <button id="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">🧹</button>
-                        <button id="btnCloseReader" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all">✕</button>
+                        <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">➕</button>
+                        <button id="btnClearReader" data-role="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">🧹</button>
+                        <button id="btnCloseReader" data-role="btnClose" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all">✕</button>
                     </div>
                 </div>
-                <button id="btnParseReaderText" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-                    <span>🌐 Generar Esquema del texto o tema</span>
+                <button id="btnParseReaderText" data-role="btnGenerate" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+                    <span>🌐 Generar Esquema</span>
                 </button>
                 <!-- El contexto (para desambiguar definiciones después) ya no es un campo
                      que el usuario tenga que llenar: se detecta solo del texto o del título
                      de la página leída. Solo aparece, muy discreto, cuando hay algo que mostrar. -->
-                <div id="docContextChip" class="hidden items-center gap-1.5 text-[10px] text-slate-500">
-                    <span class="truncate">📎 Contexto: <span id="docContextChipText" class="text-slate-400"></span></span>
-                    <button id="btnEditContext" class="underline hover:text-indigo-300 shrink-0">editar</button>
+                <div id="docContextChip" data-role="docContextChip" class="hidden items-center gap-1.5 text-[10px] text-slate-500">
+                    <span class="truncate">📎 Contexto: <span id="docContextChipText" data-role="docContextChipText" class="text-slate-400"></span></span>
+                    <button id="btnEditContext" data-role="btnEditContext" class="underline hover:text-indigo-300 shrink-0">editar</button>
                 </div>
-                <div id="docContextEditRow" class="hidden items-center gap-2">
-                    <input type="text" id="docContextInput" placeholder="Detectado automático, o escríbelo tú..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
+                <div id="docContextEditRow" data-role="docContextEditRow" class="hidden items-center gap-2">
+                    <input type="text" id="docContextInput" data-role="docContextInput" placeholder="Detectado automático, o escríbelo tú..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
                 </div>
             </div>
 
             <!-- Área de Lectura (Fondo Blanco Limpio) -->
-            <div id="readerContentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
-                <div id="readerTextMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:pointer-events-none" contenteditable="true" data-placeholder="Pega aquí un texto largo, o el enlace de un artículo o página web..."></div>
+            <div id="readerContentContainer" data-role="contentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
+                <div id="readerTextMode" data-role="textMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text" contenteditable="true" data-placeholder="Pega aquí un texto o un enlace"></div>
+                <!-- Pista de inicio, sobrepuesta mientras el lector está vacío: el texto
+                     base funciona como un placeholder normal ("Pega aquí un texto o un
+                     enlace"), pero "un enlace" se resalta con color/insignia aparte para
+                     dejar claro, de un vistazo, que es una opción fuerte y recomendada
+                     (no solo texto largo a mano) y que este panel es el mejor punto de
+                     partida. Se oculta sola en cuanto el usuario escribe o pega algo (ver
+                     listener 'input' en app.js). -->
+                <div id="readerEmptyHint" data-role="emptyHint" class="absolute inset-6 top-6 pointer-events-none select-none">
+                    <p class="text-slate-400 text-base leading-relaxed">
+                        Pega aquí un texto o
+                        <span class="inline-flex items-center gap-1 text-indigo-600 font-bold bg-indigo-50 border border-indigo-300 rounded-md px-1.5 py-1 align-middle whitespace-nowrap">
+                            🔗 un enlace
+                            <span class="text-[8px] font-bold uppercase tracking-wide bg-indigo-600 text-white rounded px-1 py-0.5">Recomendado</span>
+                        </span>
+                    </p>
+                </div>
             </div>
         </div>
     </div>
@@ -362,6 +383,10 @@
             <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
                 <span>Ver definición</span>
                 <span class="text-[#5b6388] text-[10px]">Panel flotante</span>
+            </button>
+            <button id="btnMenuEditText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>✏️ Editar texto</span>
+                <span class="text-[#5b6388] text-[10px]">Renombrar</span>
             </button>
             <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2 hover:bg-[#1c2a1a] text-lime-300 font-medium text-xs text-left flex items-center justify-between transition-colors">
                 <span>💡 Explicación sencilla</span>

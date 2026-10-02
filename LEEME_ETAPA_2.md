@@ -858,3 +858,75 @@ mismo lugar que otro:
   `onApprove` en `app.js`) espera un `input[name="nodePackage"]` marcado, que
   ya no existe en este HTML — habrá que devolverle al modal algún selector de
   paquete/precio en ese momento.
+
+## 16. Siete ajustes sobre "Limpiar", el Modo Lector, Sinergia y edición de nodos
+
+### a) "Limpiar" ahora también cierra los paneles flotantes (y no toca el Modo Lector)
+
+Antes, "Limpiar" (botón de la barra superior) borraba todos los nodos/enlaces
+del lienzo pero dejaba abiertos los paneles flotantes de "Ver definición",
+"Explicación sencilla", etc. — quedaban "huérfanos", apuntando a nodos que ya
+no existían. Ahora Limpiar también los cierra a todos. El Modo Lector (el
+panel principal y cualquier panel adicional, ver punto g) **no se toca**: si
+ya tenías un texto o enlace pegado ahí, sigue intacto después de limpiar el
+lienzo.
+
+### b) El Modo Lector ahora se ve abierto desde que entras a la app
+
+Antes había que hacer clic en "Pegar documento / enlace (Modo Lector)" para
+verlo. Ahora nace visible, en la posición y con una forma más cuadrada
+(480×560px) — es el punto de partida recomendado para generar tu primer
+esquema, así que no tenía sentido que estuviera escondido.
+
+### c) El botón azul ahora dice solo "Generar Esquema"
+
+Antes decía "Generar Esquema del texto o tema" — se acortó a "Generar
+Esquema", sin perder funcionalidad.
+
+### d) Pista de inicio dentro del lector, con el enlace resaltado
+
+El cuadro de texto del lector ahora muestra, mientras está vacío: "Pega aquí
+un texto o **🔗 un enlace**", con la parte del enlace resaltada en un color
+aparte (morado/índigo) y una insignia "Recomendado" — para que, de un
+vistazo, quede claro que pegar un enlace es una vía fuerte y es el mejor
+punto de partida, sin dejar de mencionar que un texto pegado a mano también
+funciona. Desaparece sola en cuanto escribes o pegas algo.
+
+### e) Ahora se puede editar el texto de un nodo
+
+Nuevo ítem **✏️ Editar texto** en el menú de cualquier nodo (junto a "Ver
+definición"). Abre un cuadro simple para escribir el nuevo texto (ya viene
+con el texto actual, sin los `*` de negrita), y al guardar actualiza tanto lo
+que se ve en el lienzo como el título interno del nodo (usado en menús,
+definiciones futuras, etc.). Si el nodo tenía un ícono especial al inicio
+(🌟 de Sinergia, ⚡ de Antítesis), se conserva.
+
+### f) Sinergia ya no agrega nodos "puente" intermedios
+
+La generación es exactamente la misma de antes (mismo llamado a Gemini,
+mismo costo en nodos) — el servidor sigue pensando en "puentes" conceptuales
+entre los dos temas que fusionas y el nodo de Sinergia resultante. Lo único
+que cambió es que esos puentes ya no se dibujan como nodos aparte en el
+lienzo: ahora se conecta directo cada tema original → el nodo de Sinergia,
+usando el nombre de cada puente como la etiqueta de esa línea (en vez de
+como un nodo), para no perder la idea sin ensuciar el esquema con nodos de
+más.
+
+### g) Se pueden abrir varios lectores a la vez, sin que se mezclen
+
+Nuevo botón **➕** en la cabecera del Modo Lector (en el panel principal y en
+cualquier panel adicional). Cada clic abre una copia independiente del
+panel: su propio cuadro de texto, su propio contexto de documento detectado,
+y su propio botón "Generar Esquema" — nada se comparte entre paneles. Puedes
+pegar un texto/enlace en uno, otro texto/enlace distinto en otro, y generar
+dos (o más) esquemas por separado sin que el contenido de uno se filtre al
+otro. Cada panel adicional se cierra con su propia ✕ sin afectar a los demás.
+
+**Limitación conocida, menor:** el "contexto de documento" que usan después
+las definiciones/ejemplos de un nodo (para desambiguar, ej. "Mercurio" el
+planeta vs. el elemento) sigue siendo uno solo para toda la app — viene del
+panel principal. Si generas dos esquemas distintos desde dos lectores, las
+definiciones de ambos usarán ese mismo contexto general. No es un problema
+nuevo (la app nunca distinguió contexto por esquema), pero vale mencionarlo
+por si en algún momento quieres que cada esquema "recuerde" su propio
+contexto por separado — sería un cambio más grande, avísame si te interesa.
