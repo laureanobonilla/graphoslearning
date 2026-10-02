@@ -326,6 +326,45 @@ async function rawHandler(event, context) {
         }
 
 // ==========================================
+        // 4b. EXPLICACIÓN SENCILLA (lenguaje simple + analogía + ejemplo)
+        // ==========================================
+        // Distinto de "define": esto NO es una versión más corta de la definición
+        // técnica, es una explicación pensada para alguien que nunca ha oído el
+        // concepto — sin jerga, con una comparación cotidiana y un ejemplo concreto.
+        if (action === 'simple_explanation') {
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    definition: { type: 'STRING', description: 'Explicación en 1-2 oraciones MUY simples, sin jerga técnica ni palabras especializadas. Como si se la explicaras a alguien inteligente pero que nunca ha oído el tema.' },
+                    analogy: { type: 'STRING', description: 'Una analogía o comparación concreta y cotidiana (de la vida diaria, no de otro campo técnico) que ayude a entender la idea de un vistazo.' },
+                    example: { type: 'STRING', description: 'Un ejemplo breve y concreto de esto en la vida real o en un caso reconocible — nunca un ejemplo abstracto o genérico.' }
+                },
+                required: ["definition", "analogy", "example"]
+            };
+
+            const docPrompt = documentContext
+                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nBasa la explicación en lo que dice el documento sobre este concepto, pero igual simplifícalo al máximo.`
+                : '';
+
+            const response = await generateWithFallback({
+                contents: `Explica el concepto "${topic}" (contexto: "${contextPath}") de la forma MÁS SENCILLA posible, para alguien que no domina el tema en absoluto.
+                ${docPrompt}
+
+                REGLAS:
+                1. Cero jerga técnica, cero palabras que a su vez necesiten explicación. Si usas un término especializado, no lo puedes evitar explicándolo en palabras de todos los días.
+                2. La analogía debe ser de algo cotidiano y reconocible (cocinar, el tráfico, una fiesta, el cuerpo humano, deportes, etc.), NUNCA de otro concepto técnico.
+                3. El ejemplo debe ser concreto y específico, nunca "por ejemplo, en muchos casos...".
+                4. Tono cercano y claro, como explicándole a un amigo curioso, no como un libro de texto.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.3
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
+// ==========================================
         // 5. SINTETIZAR ESQUEMA INICIAL (3 NIVELES, SIN EJEMPLOS)
         // ==========================================
         if (action === 'parse_text') {

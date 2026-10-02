@@ -654,6 +654,69 @@ en la próxima ronda puedo dejar lista la integración con cualquiera de las dos
 (siguiendo el mismo patrón server-verificado que ya tiene PayPal: crear sesión
 de pago en el servidor, verificar el webhook/captura, acreditar nodos solo ahí).
 
+## 12. Explicación Sencilla (nueva, tipo "explícamelo como si no supiera nada")
+
+Nuevo ítem en el menú de un nodo: **💡 Explicación sencilla**, junto a "Ver
+definición" pero deliberadamente distinto:
+
+- **"Ver definición"** sigue siendo la explicación rigurosa/técnica (o el
+  extracto de Wikipedia).
+- **"Explicación sencilla"** es otra cosa: sin jerga, con una analogía de la
+  vida cotidiana y un ejemplo concreto — pensada para alguien que nunca ha
+  oído el tema. El backend (`gemini.js`, acción `simple_explanation`) le pide
+  explícitamente a la IA que evite tecnicismos y use comparaciones de todos
+  los días (cocinar, el tráfico, deportes, etc.), nunca otra jerga técnica
+  para "explicar" la primera.
+
+**Es un panel flotante, como pediste, pero visualmente distinto** al de "Ver
+definición": acento verde-lima en vez de turquesa, con tres bloques
+separados y etiquetados (*"En palabras simples"*, *"🔗 Es como..."* para la
+analogía, y *"Por ejemplo"*) en vez de un párrafo corrido. Así, aunque
+tengas los dos paneles abiertos a la vez para el mismo nodo (sí se puede:
+cada uno vive en su propia ventana), se distinguen de un vistazo.
+
+Como "Ver definición", esta función es **gratis** (no gasta nodos) — se
+agregó a la lista `FREE` en `_lib/billing.js`, igual que las definiciones.
+La respuesta se guarda en el nodo (`simpleExplanation`) para no volver a
+gastar una llamada a Gemini si se abre otra vez.
+
+## 13. Bug importante: varias funciones no mandaban el login, y por eso fallaban mal al quedarse sin saldo
+
+Esto explica los dos problemas que reportaste seguidos (el JSON crudo de
+`insufficient_balance`, y que viendo sesión como admin te salía
+`guest_limit_reached`).
+
+**La causa real:** en el código original, bastantes acciones — generar el
+esquema inicial, "Conceptos Relacionados", "Ejemplos Prácticos", "Generar
+Sinergia", "Vincular con...", "Prompt personalizado", "Cuestionar/Antítesis"
+y el "Reto Socrático" — llamaban a la función de Gemini con un `fetch()` a
+secas, en vez de con `apiFetch` (el ayudante que ya existía en el código y
+que sí le agrega el token de sesión). Como nunca mandaban ese token, el
+servidor **nunca te reconocía como usuario logueado ni como admin en esas
+acciones concretas** — siempre te trataba como invitado anónimo, sin
+importar que hubieras iniciado sesión. Por eso, estando logueado como admin,
+te salió `guest_limit_reached` en vez de que tu cuenta se saltara el límite.
+
+Además, esas mismas funciones tampoco revisaban si la respuesta del servidor
+era un error (402/429/401): agarraban el JSON tal cual y seguían de largo,
+así que cuando sí fallaban por falta de saldo, el usuario no veía la tienda
+ni el muro de login — veía el mensaje genérico "Intenta de nuevo en unos
+segundos" (o, en algunos casos, ni siquiera eso: la acción simplemente no
+hacía nada, en silencio).
+
+**El arreglo:** las 10 llamadas afectadas en `app.js` ahora usan `apiFetch`
+(con lo que el token de sesión sí viaja) y revisan la respuesta con
+`handleBillingError(status, data)` antes de seguir — la misma función que ya
+usaban "Ver definición" y otras acciones que sí funcionaban bien. Con esto:
+
+- Un usuario logueado (o admin) se reconoce correctamente en **todas** las
+  acciones, no solo en algunas.
+- Sin saldo (`insufficient_balance`): se abre la tienda — el bloque de
+  WhatsApp/correo que armamos — en vez de un mensaje genérico.
+- Invitado que agotó su límite (`guest_limit_reached`): se abre el muro de
+  inicio de sesión, no la tienda (un invitado no puede comprar sin cuenta).
+- Demasiadas peticiones seguidas (429): su propio aviso, como antes.
+
 ## Archivos modificados en esta ronda
 
 - `app.js` — `findFreeSpot`/`flashNewNode` (nodo suelto visible);
@@ -663,7 +726,14 @@ de pago en el servidor, verificar el webhook/captura, acreditar nodos solo ahí)
   `definitionSource: 'pregenerated'`.
 - `netlify/functions/gemini.js` — esquemas de `antithesis` y `synergy` ahora
   piden `label` (corto) y `explanation` (completo) por separado, con las
-  instrucciones del prompt actualizadas.
+  instrucciones del prompt actualizadas; nueva acción `simple_explanation`
+  (sección 12 de este documento).
+- `netlify/functions/_lib/billing.js` — `simple_explanation` agregada a
+  `KNOWN` y a `FREE` (no gasta nodos, igual que `define`).
+- `app.js` — las 10 llamadas a `gemini.js` que usaban `fetch()` directo
+  (parse_text, expand, examples, synergy, connect, custom_prompt ×2,
+  antithesis, socratic_question, socratic_evaluate) ahora usan `apiFetch` y
+  `handleBillingError` (sección 13 de este documento).
 - `app.js` — bloque "0. COBRO MANUAL" (constantes `SUPPORT_WHATSAPP_NUMBER`,
   `SUPPORT_EMAIL`, `AUTOMATIC_PAYMENTS_ENABLED`); `updateManualPurchaseBox()` y
   `openStoreModal()` nuevas; `initPaypalButtons` ahora respeta

@@ -5,11 +5,11 @@
 
 const KNOWN = new Set([
     'parse_text', 'expand', 'examples', 'synergy', 'connect', 'define',
-    'custom_prompt', 'antithesis', 'socratic_question', 'socratic_evaluate'
+    'simple_explanation', 'custom_prompt', 'antithesis', 'socratic_question', 'socratic_evaluate'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'socratic_question']);
+const FREE = new Set(['define', 'simple_explanation', 'socratic_question']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2 };
 

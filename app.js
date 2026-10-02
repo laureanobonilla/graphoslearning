@@ -624,14 +624,16 @@ async function generateFullSchemaFromTopic(topicText) {
     if (topicInput) topicInput.value = '';
 
     try {
-        const response = await fetch('/.netlify/functions/gemini', {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'parse_text', text: topicText })
         });
-        if (!response.ok) throw new Error("Error en el servidor");
+        if (!ok) {
+            if (!handleBillingError(status, data)) alert(data?.error || 'Intenta de nuevo en unos segundos.');
+            track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(data?.error || status).slice(0, 120) });
+            return;
+        }
 
-        const data = await response.json();
         const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
         renderThreeLevelTree(data);
@@ -640,7 +642,7 @@ async function generateFullSchemaFromTopic(topicText) {
     } catch (err) {
         console.error(err);
         track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120) });
-        alert('Intenta de nuevo en unos segundos');
+        alert('Intenta de nuevo en unos segundos.');
     } finally {
         hideLoader();
     }
@@ -758,9 +760,8 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
         if (!checkBalance(1)) return;
         showLoader('Revelando incógnita...');
         try {
-            const response = await fetch('/.netlify/functions/gemini', {
+            const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'custom_prompt',
                     topic: topicName,
@@ -769,7 +770,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                     documentContext: globalDocumentContext || currentDocumentText
                 })
             });
-            const data = await response.json();
+            if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo resolver la incógnita.'); return; }
             const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
             let createdCount = 0;
             let firstAnswer = null;
@@ -806,9 +807,8 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
     showLoader('Generando conceptos e incógnitas...');
 
     try {
-        const response = await fetch('/.netlify/functions/gemini', {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'expand',
                 topic: topicName,
@@ -818,7 +818,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 documentContext: globalDocumentContext || currentDocumentText
             })
         });
-        const data = await response.json();
+        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudieron generar conceptos relacionados.'); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
@@ -877,11 +877,11 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
     showLoader('Buscando casos prácticos...');
 
     try {
-        const response = await fetch('/.netlify/functions/gemini', {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
             body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: globalDocumentContext || currentDocumentText })
         });
-        const data = await response.json();
+        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudieron generar ejemplos.'); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
@@ -922,12 +922,11 @@ network.on('click', async function (params) {
 
             showLoader('Calculando convergencia...');
             try {
-                const response = await fetch('/.netlify/functions/gemini', {
+                const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
                     method: 'POST',
                     body: JSON.stringify({ action: 'synergy', topic: topicA, topicB: topicB, density: document.getElementById('nodeCount')?.value || 'auto' })
                 });
-                if(!response.ok) throw new Error("Error de red");
-                const data = await response.json();
+                if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo generar la sinergia.'); return; }
 
                 const totalNodes = 1 + (data.pathsFromA?.length || 0) + (data.pathsFromB?.length || 0);
                 if (!checkBalance(totalNodes)) return;
@@ -996,12 +995,11 @@ network.on('click', async function (params) {
 
             showLoader('Generando puente conceptual...');
             try {
-                const response = await fetch('/.netlify/functions/gemini', {
+                const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
                     method: 'POST',
                     body: JSON.stringify({ action: 'connect', topic: topicA, topicB: topicB })
                 });
-                if(!response.ok) throw new Error("Error de red");
-                const data = await response.json();
+                if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo generar el vínculo.'); return; }
 
                 const posA = network.getPositions([nodeA.id])[nodeA.id];
                 const posB = network.getPositions([nodeB.id])[nodeB.id];
@@ -1664,6 +1662,85 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
     showDefinitionInFloatingPanel(selectedNodeId);
+});
+
+// ==========================================
+// EXPLICACIÓN SENCILLA (ELI5): definición en palabras simples + analogía +
+// ejemplo, para quien no domina el tema. Es un panel flotante aparte del de
+// "Ver definición" (puede haber uno de cada uno abierto a la vez para el mismo
+// nodo), con su propio estilo para que no se confundan de un vistazo.
+// ==========================================
+async function showSimpleExplanationInFloatingPanel(nodeId) {
+    const currentNode = nodes.get(nodeId);
+    if (!currentNode) return;
+    const title = currentNode.baseTitle || nodeId;
+    // Clave distinta a la del nodo "crudo" para que este panel y el de "Ver
+    // definición" puedan convivir abiertos al mismo tiempo sin pisarse.
+    const panelKey = `simple_${nodeId}`;
+
+    const panel = openFloatingPanel(panelKey, `💡 ${title}`);
+    panel.el.dataset.nodeId = nodeId;
+    // Acento visual distinto (verde-lima) para diferenciarlo del panel de
+    // definición normal (teal) con solo mirar el borde/título.
+    panel.el.classList.add('border-lime-600/40');
+    panel.titleEl.classList.remove('text-[#4fd1c5]');
+    panel.titleEl.classList.add('text-lime-400');
+
+    let simple = currentNode.simpleExplanation;
+    if (!simple) {
+        panel.contentEl.innerHTML = `
+            <div class="flex flex-col items-center justify-center gap-3 py-6">
+                <div class="relative w-8 h-8">
+                    <div class="absolute inset-0 border-[3px] border-slate-700 rounded-full"></div>
+                    <div class="absolute inset-0 border-[3px] border-lime-400 rounded-full border-t-transparent animate-spin"></div>
+                </div>
+                <p class="text-slate-400 text-xs italic">Preparando una explicación sencilla…</p>
+            </div>
+        `;
+        try {
+            const { ok, data } = await apiFetch('/.netlify/functions/gemini', {
+                method: 'POST',
+                body: JSON.stringify({
+                    action: 'simple_explanation',
+                    topic: title,
+                    contextPath: getContextPath(nodeId),
+                    documentContext: globalDocumentContext || currentDocumentText
+                })
+            });
+            if (!ok) { panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">No se pudo generar la explicación.</p>`; return; }
+            applyServerBalance(data);
+            simple = { definition: data.definition, analogy: data.analogy, example: data.example };
+            nodes.update({ id: nodeId, simpleExplanation: simple });
+        } catch (err) {
+            panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">Error al generar la explicación.</p>`;
+            return;
+        }
+    }
+
+    const esc = (s) => String(s || '').replace(/\n/g, '<br>');
+    panel.contentEl.innerHTML = `
+        <div class="flex flex-col gap-4">
+            <div>
+                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">En palabras simples</p>
+                <p class="leading-relaxed text-slate-200">${esc(simple.definition)}</p>
+            </div>
+            <div class="bg-lime-500/10 border border-lime-500/20 rounded-lg p-3">
+                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">🔗 Es como...</p>
+                <p class="leading-relaxed text-slate-200 text-[13px]">${esc(simple.analogy)}</p>
+            </div>
+            <div>
+                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">Por ejemplo</p>
+                <p class="leading-relaxed text-slate-200 text-[13px]">${esc(simple.example)}</p>
+            </div>
+        </div>
+    `;
+}
+
+document.getElementById('btnMenuSimpleExplain')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    showSimpleExplanationInFloatingPanel(selectedNodeId);
 });
 
 // EXTRACCIÓN DE NODOS DESDE CUALQUIER PANEL FLOTANTE ABIERTO.
@@ -2423,9 +2500,8 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
     showLoader('Desarrollando tu petición...');
 
     try {
-        const response = await fetch('/.netlify/functions/gemini', {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'custom_prompt',
                 topic: topicName,
@@ -2435,8 +2511,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
             })
         });
 
-        if (!response.ok) throw new Error("Error en la respuesta");
-        const data = await response.json();
+        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo procesar tu petición.'); return; }
         const generatedItems = data.nodes || [];
 
         if (!checkBalance(generatedItems.length)) return;
@@ -2560,12 +2635,11 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
 
     showLoader('Buscando contradicciones y límites teóricos...');
     try {
-        const response = await fetch('/.netlify/functions/gemini', {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'antithesis', topic: topicName, contextPath: getContextPath(originId) })
         });
-        const data = await response.json();
+        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo generar la antítesis.'); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([originId])[originId];
         network.setOptions({ physics: { enabled: true } });
@@ -2609,12 +2683,11 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
 
     showLoader('Formulando desafío socrático...');
     try {
-        const response = await fetch('/.netlify/functions/gemini', {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'socratic_question', topic: topicName, contextPath: getContextPath(originId) })
         });
-        const data = await response.json();
+        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo iniciar el reto.'); return; }
 
         // Panel propio para el reto (no es la definición de ningún nodo existente,
         // así que usa un id sintético para no chocar con el panel de otro nodo).
@@ -2640,12 +2713,11 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
 
             showLoader('Evaluando tu argumento...');
             try {
-                const evalRes = await fetch('/.netlify/functions/gemini', {
+                const { ok: evalOk, status: evalStatus, data: evalData } = await apiFetch('/.netlify/functions/gemini', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'socratic_evaluate', topic: topicName, question: data.question, userAnswer })
                 });
-                const evalData = await evalRes.json();
+                if (!evalOk) { if (!handleBillingError(evalStatus, evalData)) alert(evalData?.error || 'No se pudo evaluar tu respuesta.'); return; }
 
                 const fbBox = panel.contentEl.querySelector('#socraticFeedbackBox');
                 fbBox.innerHTML = `<p class="font-bold text-amber-400 mb-1">🌟 Veredicto:</p><p>${evalData.feedback}</p>`;
