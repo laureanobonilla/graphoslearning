@@ -588,11 +588,13 @@ limitarse específicamente al módulo de tarjeta de invitado.
 
 ### f) Pago manual activado (automático queda listo pero apagado)
 
-Siguiendo tu decisión, la tienda ya **no** muestra el botón de pago de
-PayPal: en su lugar muestra un bloque con el paquete elegido y dos botones
-("Escribir por WhatsApp" / "Escribir por correo") que abren un mensaje ya
-redactado con el paquete y el correo de la cuenta del cliente, listo para
-enviar.
+Siguiendo tu decisión, la tienda ya **no** muestra precios ni paquetes: es
+deliberadamente solo un botón "Escribir por WhatsApp" (con mensaje ya
+redactado, mencionando el correo de la cuenta del cliente) y, debajo, el
+correo como texto plano ("o envía un correo a bonillapretiz@gmail.com") para
+quien prefiera esa vía o no tenga WhatsApp a mano. El precio se conversa por
+chat, no se muestra en la app — así evitas que la pantalla parezca un cobro
+automático cuando en realidad es una conversación.
 
 Antes de publicar, edita estas 2 líneas al inicio de `app.js` (sección "0.
 COBRO MANUAL") con tus datos reales:
@@ -666,6 +668,11 @@ de pago en el servidor, verificar el webhook/captura, acreditar nodos solo ahí)
   `SUPPORT_EMAIL`, `AUTOMATIC_PAYMENTS_ENABLED`); `updateManualPurchaseBox()` y
   `openStoreModal()` nuevas; `initPaypalButtons` ahora respeta
   `AUTOMATIC_PAYMENTS_ENABLED`.
-- `index.html` — el botón de PayPal en la tienda se reemplazó por el bloque
-  de contacto manual (WhatsApp/correo); el contenedor de PayPal queda oculto
-  pero intacto en el HTML.
+- `index.html` — la tienda ya no lista paquetes con precio: el botón de
+  PayPal y las 3 tarjetas de paquete se reemplazaron por un botón de
+  WhatsApp (con el logo oficial) y el correo como texto plano debajo. El
+  contenedor de PayPal queda oculto pero intacto en el HTML. **Nota para
+  cuando se reactive el pago automático**: ese flujo (`createOrder`/
+  `onApprove` en `app.js`) espera un `input[name="nodePackage"]` marcado, que
+  ya no existe en este HTML — habrá que devolverle al modal algún selector de
+  paquete/precio en ese momento.

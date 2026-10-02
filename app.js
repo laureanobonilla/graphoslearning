@@ -100,34 +100,20 @@ const loaderText = document.getElementById('loaderText');
 const connectionBanner = document.getElementById('connectionBanner');
 const storeModal = document.getElementById('storeModal');
 
-// Rellena el bloque de "compra manual" (paquete elegido, correo del usuario,
-// enlaces de WhatsApp/correo ya con el mensaje armado) cada vez que se abre
-// la tienda o se cambia de paquete.
+// Rellena el bloque de contacto (enlace de WhatsApp con mensaje ya armado, y
+// el correo visible como texto) cada vez que se abre la tienda. Deliberadamente
+// no menciona paquete ni precio: eso se conversa por chat, no se expone en la UI
+// como si fuera un cobro automático (ver nota en index.html, modal storeModal).
 function updateManualPurchaseBox() {
-    const selected = document.querySelector('input[name="nodePackage"]:checked');
-    const labelEl = selected?.closest('label');
-    const title = labelEl?.querySelector('p.font-bold')?.innerText?.trim() || 'Paquete';
-    const nodesText = labelEl?.querySelector('p.text-indigo-600')?.innerText?.trim() || '';
-    const price = selected?.dataset?.price || '';
-    const packageLabel = `${title} (${nodesText}) — $${price}`;
-    const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : '(tu correo de la cuenta)';
-
-    // El nombre corto (sin precio) es lo que se usa en la frase "Para activar
-    // el Pase de Estudio...". El precio/nodos solo hace falta en el mensaje
-    // que se manda, no repetido en esa frase.
-    const labelSpan = document.getElementById('manualPurchasePackageLabel');
-    if (labelSpan) labelSpan.innerText = title;
+    const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : '(sin iniciar sesión)';
 
     const emailAddressEl = document.getElementById('manualPurchaseEmailAddress');
     if (emailAddressEl) emailAddressEl.innerText = SUPPORT_EMAIL;
 
-    const message = `Hola, quiero activar el paquete "${packageLabel}" en mi cuenta de Graphikosmos. Mi correo de la cuenta es: ${userEmail}`;
+    const message = `Hola, ya usé mis nodos disponibles en Graphikosmos y quiero seguir usando la app. Mi correo de la cuenta es: ${userEmail}`;
     const waLink = document.getElementById('manualPurchaseWhatsapp');
-    const mailLink = document.getElementById('manualPurchaseEmail');
     if (waLink) waLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-    if (mailLink) mailLink.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Activar paquete — ' + packageLabel)}&body=${encodeURIComponent(message)}`;
 }
-document.querySelectorAll('input[name="nodePackage"]').forEach(r => r.addEventListener('change', updateManualPurchaseBox));
 
 function openStoreModal() {
     storeModal?.classList.remove('hidden');
