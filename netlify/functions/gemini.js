@@ -138,9 +138,10 @@ async function rawHandler(event, context) {
                         type: 'OBJECT',
                         properties: {
                             id: { type: 'STRING' },
-                            label: { type: 'STRING', description: 'El concepto cumbre o innovación que nace de cruzar A y B.' }
+                            label: { type: 'STRING', description: 'Título CORTO (2-5 palabras) del concepto cumbre o innovación que nace de cruzar A y B. Esto es lo único que se ve en el nodo del mapa, así que debe ser breve como un título.' },
+                            explanation: { type: 'STRING', description: 'Explicación completa (2-4 oraciones) de esa sinergia: qué es y por qué surge de unir A y B. Esto se muestra aparte, en un panel, nunca en el nodo.' }
                         },
-                        required: ["id", "label"]
+                        required: ["id", "label", "explanation"]
                     },
                     pathsFromA: {
                         type: 'ARRAY',
@@ -179,7 +180,8 @@ async function rawHandler(event, context) {
                 1. "synergy": Define el concepto definitivo, la intersección más importante o el resultado innovador de unir ambos campos.
                 2. "pathsFromA" y "pathsFromB": Crea los nodos intermedios que explican cómo se llega desde cada extremo hasta esa sinergia central.
                 3. ${densityGuideline}
-                4. Conectores estrictamente de 1 a 3 palabras. Cero descripciones largas.`,
+                4. Conectores estrictamente de 1 a 3 palabras. Cero descripciones largas.
+                5. "synergy.label" debe ser un TÍTULO corto (2-5 palabras): va solo en el nodo del mapa. "synergy.explanation" lleva la explicación completa aparte.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
@@ -457,10 +459,11 @@ async function rawHandler(event, context) {
                             type: 'OBJECT',
                             properties: {
                                 id: { type: 'STRING' },
-                                label: { type: 'STRING', description: 'Crítica, escuela opuesta, anomalía o límite teórico concreto.' },
+                                label: { type: 'STRING', description: 'Título CORTO (2-6 palabras): el nombre de la teoría, autor o fenómeno opuesto (ej: "Falsacionismo de Popper"). Esto es lo único que se ve en el nodo del mapa.' },
+                                explanation: { type: 'STRING', description: 'La crítica completa (2-4 oraciones): en qué consiste y por qué contradice o limita el concepto original. Se muestra aparte, en un panel, nunca en el nodo.' },
                                 relationship: { type: 'STRING', description: 'Conector de tensión (1-3 palabras, ej: "refutado por", "entra en tensión con", "limitado por").' }
                             },
-                            required: ["id", "label", "relationship"]
+                            required: ["id", "label", "explanation", "relationship"]
                         }
                     }
                 },
@@ -470,7 +473,8 @@ async function rawHandler(event, context) {
             const response = await generateWithFallback({
                 contents: `Analiza críticamente el concepto: "${topic}" (Contexto: "${contextPath}").
                 Genera entre 2 y 3 antítesis reales: posturas filosóficas o científicas opuestas, críticas históricas, paradojas o límites donde este concepto falla.
-                PROHIBIDO usar nombres genéricos como "Crítica 1". Nombra la teoría, autor o fenómeno real.`,
+                PROHIBIDO usar nombres genéricos como "Crítica 1". Nombra la teoría, autor o fenómeno real.
+                "label" es solo el título corto de esa teoría/autor/fenómeno; "explanation" lleva el desarrollo completo de la crítica, aparte.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,

@@ -1,4 +1,19 @@
 // ==========================================
+// 0. COBRO MANUAL (temporal, mientras PayPal no habilite tarjeta de invitado)
+// ==========================================
+// La tienda ya NO muestra el botón de pago automático: muestra estos datos de
+// contacto para que el cliente escriba, pague por otro medio, y tú le
+// acredites los nodos a mano (ver LEEME_ETAPA_2.md, sección 11). Reemplaza
+// estos 2 valores por los tuyos reales antes de publicar.
+const SUPPORT_WHATSAPP_NUMBER = '50600000000'; // Código de país + número, solo dígitos, sin "+" ni espacios (ej. Costa Rica: 506XXXXXXXX)
+const SUPPORT_EMAIL = 'tu-correo@dominio.com';
+// Déjalo en false: la integración de PayPal (createOrder/captureOrder, ya
+// verificada en el servidor) queda intacta y sin usar. Cuando PayPal habilite
+// el pago con tarjeta de invitado para tu cuenta (o integres Paddle/Lemon
+// Squeezy), basta con poner esto en true para que el botón vuelva a aparecer.
+const AUTOMATIC_PAYMENTS_ENABLED = false;
+
+// ==========================================
 // 1. INICIALIZACIÓN DEL GRAFO (VIS.JS)
 // ==========================================
 const container = document.getElementById('network-container');
@@ -84,6 +99,36 @@ const loaderOverlay = document.getElementById('loaderOverlay');
 const loaderText = document.getElementById('loaderText');
 const connectionBanner = document.getElementById('connectionBanner');
 const storeModal = document.getElementById('storeModal');
+
+// Rellena el bloque de "compra manual" (paquete elegido, correo del usuario,
+// enlaces de WhatsApp/correo ya con el mensaje armado) cada vez que se abre
+// la tienda o se cambia de paquete.
+function updateManualPurchaseBox() {
+    const selected = document.querySelector('input[name="nodePackage"]:checked');
+    const labelEl = selected?.closest('label');
+    const title = labelEl?.querySelector('p.font-bold')?.innerText?.trim() || 'Paquete';
+    const nodesText = labelEl?.querySelector('p.text-indigo-600')?.innerText?.trim() || '';
+    const price = selected?.dataset?.price || '';
+    const packageLabel = `${title} (${nodesText}) — $${price}`;
+    const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : '(tu correo de la cuenta)';
+
+    const labelSpan = document.getElementById('manualPurchasePackageLabel');
+    if (labelSpan) labelSpan.innerText = packageLabel;
+
+    const message = `Hola, quiero comprar el paquete "${packageLabel}" para mi cuenta de Graphikosmos. Mi correo de la cuenta es: ${userEmail}`;
+    const waLink = document.getElementById('manualPurchaseWhatsapp');
+    const mailLink = document.getElementById('manualPurchaseEmail');
+    if (waLink) waLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+    if (mailLink) mailLink.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Compra de nodos — ' + packageLabel)}&body=${encodeURIComponent(message)}`;
+}
+document.querySelectorAll('input[name="nodePackage"]').forEach(r => r.addEventListener('change', updateManualPurchaseBox));
+
+function openStoreModal() {
+    storeModal?.classList.remove('hidden');
+    storeModal?.classList.add('flex');
+    updateManualPurchaseBox();
+}
+
 const authWallModal = document.getElementById('authWallModal');
 const landscapeToggle = document.getElementById('landscapeToggle');
 const mainHeader = document.getElementById('mainHeader');
@@ -330,7 +375,7 @@ function handleBillingError(status, data) {
         if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
         if (actionMenu) actionMenu.classList.add('hidden');
         track('paywall_shown', { reason: 'insufficient_balance' });
-        storeModal?.classList.remove('hidden'); storeModal?.classList.add('flex');
+        openStoreModal();
         return true;
     }
     if (status === 429) {
@@ -436,7 +481,7 @@ function checkBalance(cost) {
         else {
             if (actionMenu) actionMenu.classList.add('hidden');
             track('paywall_shown', { reason: 'checkBalance_client_side' });
-            storeModal?.classList.remove('hidden'); storeModal?.classList.add('flex');
+            openStoreModal();
         }
         return false;
     }
@@ -609,14 +654,57 @@ async function generateFullSchemaFromTopic(topicText) {
     }
 }
 
+// Busca un punto cerca de (centerX, centerY) que no quede encima de ningún
+// nodo existente, probando en espiral hacia afuera. Sin esto, un nodo nuevo
+// podía caer justo sobre otro ya puesto ahí y el usuario no veía que se había
+// agregado nada.
+function findFreeSpot(centerX, centerY, minDist = 170) {
+    const positions = Object.values(network.getPositions());
+    const farEnough = (x, y) => positions.every(p => Math.hypot(p.x - x, p.y - y) >= minDist);
+    if (farEnough(centerX, centerY)) return { x: centerX, y: centerY };
+    for (let i = 1; i <= 16; i++) {
+        const angle = i * 0.9;
+        const radius = minDist * (0.9 + i * 0.35);
+        const x = centerX + Math.cos(angle) * radius;
+        const y = centerY + Math.sin(angle) * radius;
+        if (farEnough(x, y)) return { x, y };
+    }
+    // Si el lienzo está realmente saturado, al menos lo alejamos bastante del centro.
+    return { x: centerX + 260, y: centerY + (Math.random() * 120 - 60) };
+}
+
+// Pulso visual breve (agranda y resalta el borde un par de veces) para que sea
+// obvio que un nodo nuevo acaba de aparecer, incluso si ya hay muchos en pantalla.
+function flashNewNode(nodeId, baseSize = 25) {
+    let tick = 0;
+    const totalTicks = 6;
+    const pulse = setInterval(() => {
+        if (!nodes.get(nodeId)) { clearInterval(pulse); return; }
+        const highlighted = tick % 2 === 0;
+        nodes.update({
+            id: nodeId,
+            size: highlighted ? baseSize * 1.7 : baseSize,
+            borderWidth: highlighted ? 6 : 2,
+            shadow: highlighted ? { enabled: true, color: 'rgba(79, 209, 197, 0.55)', size: 25 } : { enabled: false }
+        });
+        tick++;
+        if (tick >= totalTicks) {
+            clearInterval(pulse);
+            if (nodes.get(nodeId)) nodes.update({ id: nodeId, size: baseSize, borderWidth: 2, shadow: { enabled: false } });
+        }
+    }, 220);
+}
+
 function insertSingleNode(topic) {
     if (!checkBalance(1)) return;
     const viewCenter = network.getViewPosition();
-    const spawnX = viewCenter.x + 200 + (Math.random() * 50); 
-    const spawnY = viewCenter.y + (Math.random() * 100 - 50);
-    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(), x: spawnX, y: spawnY, fixed: { x: false, y: false } });
+    const spot = findFreeSpot(viewCenter.x, viewCenter.y);
+    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(), x: spot.x, y: spot.y, fixed: { x: false, y: false } });
     trackNodeUsage(topic); consumeNodes(1); topicInput.value = '';
-    setTimeout(() => { network.focus(topic, { scale: 1.0, animation: { duration: 600 }}); }, 50);
+    setTimeout(() => {
+        network.focus(topic, { scale: 1.1, animation: { duration: 600 } });
+        flashNewNode(topic);
+    }, 50);
 }
 
 // Campo pequeño de la cabecera: es el único punto de entrada para "generar",
@@ -862,8 +950,13 @@ network.on('click', async function (params) {
 
                 const synNode = data.synergy;
                 if (!nodes.get(synNode.id)) {
+                    // Igual que con las antítesis: el nodo muestra solo el título corto
+                    // y la explicación completa queda como "definition" pregenerada,
+                    // visible en el panel flotante vía "Ver definición".
                     nodes.add({
-                        id: synNode.id, label: `*🌟 Sinergia:*\n${synNode.label}`, baseTitle: synNode.label,
+                        id: synNode.id, label: `*🌟 ${synNode.label}*`, baseTitle: synNode.label,
+                        definition: synNode.explanation || synNode.label,
+                        definitionSource: 'pregenerated',
                         x: midX, y: midY, fixed: { x: false, y: false },
                         color: { background: '#faf5ff', border: '#d946ef', highlight: { background: '#fdf4ff', border: '#c026d3' } },
                         font: { color: '#4a044e', bold: { color: '#701a75', size: 16 } },
@@ -1496,9 +1589,17 @@ async function showDefinitionInFloatingPanel(nodeId) {
     const panel = openFloatingPanel(nodeId, title);
     panel.el.dataset.nodeId = nodeId;
 
-    const cacheIsUsable = definitionText && (defSource === 'wikipedia' || definitionText.includes('[['));
+    const cacheIsUsable = definitionText && (defSource === 'wikipedia' || defSource === 'pregenerated' || definitionText.includes('[['));
     if (!cacheIsUsable) {
-        panel.contentEl.innerHTML = `<p class="text-slate-400 text-xs italic">Redactando definición…</p>`;
+        panel.contentEl.innerHTML = `
+            <div class="flex flex-col items-center justify-center gap-3 py-6">
+                <div class="relative w-8 h-8">
+                    <div class="absolute inset-0 border-[3px] border-slate-700 rounded-full"></div>
+                    <div class="absolute inset-0 border-[3px] border-[#4fd1c5] rounded-full border-t-transparent animate-spin"></div>
+                </div>
+                <p class="text-slate-400 text-xs italic">Redactando definición…</p>
+            </div>
+        `;
         try {
             const { ok, data } = await apiFetch('/.netlify/functions/gemini', {
                 method: 'POST',
@@ -1535,8 +1636,9 @@ async function showDefinitionInFloatingPanel(nodeId) {
         return;
     }
 
+    const hasInteractiveHints = definitionText.includes('[[');
     panel.contentEl.innerHTML = `
-        <p class="text-[11px] text-slate-400 mb-3">💡 Haz clic en los conceptos resaltados con ⚡ para agregarlos al mapa.</p>
+        ${hasInteractiveHints ? `<p class="text-[11px] text-slate-400 mb-3">💡 Haz clic en los conceptos resaltados con ⚡ para agregarlos al mapa.</p>` : ''}
         <div class="leading-relaxed text-slate-200">${formatInteractiveDefinition(definitionText, nodeId)}</div>
     `;
 
@@ -2224,6 +2326,10 @@ async function loadPaypalSdk() {
 }
 
 (async function initPaypalButtons() {
+    // Pago automático apagado por ahora (ver sección 11 del LEEME): el
+    // contenedor '#paypal-button-container' queda oculto en el HTML y esta
+    // función no hace nada hasta que AUTOMATIC_PAYMENTS_ENABLED vuelva a true.
+    if (!AUTOMATIC_PAYMENTS_ENABLED) return;
     const loaded = await loadPaypalSdk();
     // Sin SDK (ej. PAYPAL_CLIENT_ID no configurado todavía), el contenedor de
     // botones simplemente queda vacío en vez de romper el resto de la tienda.
@@ -2475,10 +2581,17 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
         let count = 0;
         (data.critiques || []).forEach((crit, idx) => {
             const cId = crit.id && !nodes.get(crit.id) ? crit.id : `anti_${Date.now()}_${idx}`;
+            // El nodo solo lleva el título corto (⚡ + nombre de la teoría/autor/
+            // fenómeno). La crítica completa (crit.explanation) se guarda como
+            // "definition" pregenerada, para que "Ver definición" la muestre en
+            // el panel flotante sin volver a llamar a Gemini (ver más abajo el
+            // ajuste de cacheIsUsable/defSource === 'pregenerated').
             nodes.update({
                 id: cId,
-                label: `*⚡ Antítesis:*\n${crit.label}`,
+                label: `*⚡ ${crit.label}*`,
                 baseTitle: crit.label,
+                definition: crit.explanation || crit.label,
+                definitionSource: 'pregenerated',
                 color: { background: '#fff1f2', border: '#f43f5e' },
                 x: parentPos.x + ((idx - 1) * 180),
                 y: parentPos.y + 150,

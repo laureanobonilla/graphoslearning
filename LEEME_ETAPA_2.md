@@ -503,3 +503,169 @@ principal.
   "Expandir subesquema" en el menú contextual; se quitaron los botones de escala
   +/- (ya sin uso); texto de ayuda actualizado.
 - Se eliminó `/lab` por completo (ver sección 0).
+
+## 11. Ronda de ajustes: nodos visibles, Antítesis/Sinergia cortas, animación de carga, y pagos
+
+### a) Nodo suelto ("Generar") ahora siempre visible
+
+Antes, `insertSingleNode` ponía el nodo nuevo a un desplazamiento fijo del
+centro de la vista, así que si ya había otro nodo justo ahí, el nuevo quedaba
+tapado y parecía que no había pasado nada.
+
+Ahora:
+- `findFreeSpot(...)` revisa las posiciones de todos los nodos existentes y,
+  si el punto candidato está muy cerca de alguno, prueba puntos en espiral
+  hacia afuera hasta encontrar uno libre (o, en el peor caso, se aleja bastante
+  del centro).
+- `flashNewNode(...)` hace que el nodo nuevo "pulse" (agranda/achica su borde
+  un par de veces) justo después de aparecer, además del zoom/encuadre que ya
+  existía. Esto es la misma idea que el punto (d) de abajo: que sea imposible
+  no notar que algo acaba de pasar.
+
+### b) y c) Antítesis y Sinergia: título corto en el nodo, texto completo en el panel
+
+Antes, el nodo de una antítesis o de una sinergia mostraba el párrafo
+completo generado por la IA como etiqueta — ocupaba mucho espacio y
+desbalanceaba el mapa.
+
+Ahora el backend (`gemini.js`) devuelve dos campos separados:
+- `label`: un título corto (2-6 palabras) — el nombre de la teoría/autor/
+  fenómeno (antítesis) o del concepto cumbre (sinergia). Esto es lo único que
+  se ve en el nodo.
+- `explanation`: el desarrollo completo (2-4 oraciones). Se guarda en el nodo
+  como `definition` con `definitionSource: 'pregenerated'`, y aparece en el
+  panel flotante al usar "Ver definición" — sin volver a llamarle a Gemini,
+  porque el texto ya existe.
+
+(`definitionSource: 'pregenerated'` es un valor nuevo que ya reconoce
+`showDefinitionInFloatingPanel`: lo trata igual que una definición en caché,
+así que no se re-genera ni se le pide "contexto" de más.)
+
+Nota: las sinergias tienen, además del nodo central, "nodos puente"
+(`pathsFromA`/`pathsFromB`) que ya eran cortos por diseño (conectores de 1 a 3
+palabras) — esos no se tocaron porque no presentaban el problema.
+
+### d) Animación visible mientras se redacta una definición
+
+El panel flotante de "Ver definición" mostraba solo un texto en cursiva
+("Redactando definición…") sin ningún movimiento — fácil de interpretar como
+que la app se quedó colgada. Se le agregó un spinner (anillo girando) igual en
+espíritu al que ya existía en el loader de pantalla completa, pero a tamaño de
+panel.
+
+### e) Error de tarjeta rechazada en PayPal (`scf_recoverable_page_error_on_submit`)
+
+Este error ("no hemos podido asociar esta tarjeta") ocurre **dentro del propio
+componente de PayPal** (`xo-card-fields` / `standardcardfields`) — es decir,
+antes de que la tarjeta llegue siquiera a `paypal-capture-order.js`. El código
+de esta app no participa en esa decisión; PayPal la toma internamente.
+
+La causa más probable (no se puede confirmar sin acceso a tu panel de PayPal)
+es que la cuenta de PayPal del negocio todavía no tenga habilitado el pago con
+tarjeta de invitado ("Advanced/Standard Card Fields" o "Checkout avanzado")
+para tu país/categoría de cuenta — que una cuenta personal reciba pagos por
+link es un producto distinto ("PayPal.Me" o enlaces de pago) al de aceptar
+tarjetas de invitado dentro de un sitio propio vía la API de Orders.
+
+Qué revisar en tu panel de PayPal (Account Settings → Website Payments /
+Checkout Settings, o contactando soporte de PayPal directamente):
+1. Que la cuenta sea de tipo **Business** (no Personal) — el checkout de
+   tarjetas de invitado dentro de un sitio propio solo está disponible para
+   cuentas de negocio.
+2. Si el panel menciona "Advanced Checkout" o "Card payments" como una
+   capacidad separada que haya que solicitar/activar — en varios países
+   Latinoamericanos esto requiere aprobación adicional de PayPal, a veces
+   indefinidamente limitada (ej. solo PayPal Checkout estándar, sin tarjetas de
+   invitado).
+3. Confirmar con soporte de PayPal (chat/soporte de la cuenta business) si tu
+   país está habilitado para "Guest Checkout con tarjeta" — esto es
+   independiente de que ya puedas *cobrar* con otros métodos de PayPal.
+
+Mientras se resuelve o se confirma esto con soporte de PayPal, el botón de
+PayPal normal (sin tarjeta de invitado, pagando con cuenta de PayPal) debería
+seguir funcionando para quien sí tenga cuenta de PayPal — el problema parece
+limitarse específicamente al módulo de tarjeta de invitado.
+
+### f) Pago manual activado (automático queda listo pero apagado)
+
+Siguiendo tu decisión, la tienda ya **no** muestra el botón de pago de
+PayPal: en su lugar muestra un bloque con el paquete elegido y dos botones
+("Escribir por WhatsApp" / "Escribir por correo") que abren un mensaje ya
+redactado con el paquete y el correo de la cuenta del cliente, listo para
+enviar.
+
+Antes de publicar, edita estas 2 líneas al inicio de `app.js` (sección "0.
+COBRO MANUAL") con tus datos reales:
+
+```js
+const SUPPORT_WHATSAPP_NUMBER = '50600000000'; // código de país + número, solo dígitos
+const SUPPORT_EMAIL = 'tu-correo@dominio.com';
+```
+
+Toda la integración automática con PayPal (crear orden, capturar, verificar
+en el servidor) **sigue intacta y sin borrar** — solo está apagada con una
+bandera:
+
+```js
+const AUTOMATIC_PAYMENTS_ENABLED = false;
+```
+
+El día que PayPal habilite tarjeta de invitado para tu cuenta (o integres
+Paddle/Lemon Squeezy reusando el mismo patrón), basta con poner esa bandera
+en `true` para que el botón de pago vuelva a aparecer — no hay que reconstruir
+nada.
+
+### g) Mientras tanto: cobro manual + acreditar nodos a mano
+
+Para manejar unos pocos compradores por hora mientras se resuelve lo de
+tarjetas, la idea de "pido el correo, cobro por otro medio, y acredito nodos
+después" es viable, pero `credit_nodes` (la función de Supabase que usa
+`paypal-capture-order.js`) necesita el `user_id` de Netlify Identity del
+comprador, no su correo.
+
+No existe todavía una herramienta para esto — habría que construir una (una
+función protegida solo para el admin, que busque el usuario por correo en la
+tabla de perfiles y llame a `credit_nodes` con su `user_id`). Si quieres que la
+construya, dime y la agrego en la próxima ronda; mientras tanto puedes hacerlo
+a mano desde el panel de Supabase (tabla `profiles` para encontrar el
+`user_id` por correo, y la función `credit_nodes` desde el SQL Editor).
+
+### h) Alternativas a PayPal para una cuenta en Costa Rica
+
+Investigado y verificado (no de memoria):
+- **Stripe**: confirmado que **no** acepta cuentas de negocio en Costa Rica
+  (no aparece en `stripe.com/global`, que sí lista países vecinos como Brasil
+  y México). Tenías razón en tu duda.
+- **Paddle**: sí acepta vendedores de Costa Rica — su lista de países NO
+  soportados (ayuda oficial de Paddle) no incluye Costa Rica. Paddle actúa
+  como "Merchant of Record" (factura y cobra en su nombre, se encarga de
+  impuestos), lo cual simplifica bastante el papeleo. Pasos generales: crear
+  cuenta en paddle.com → verificación de identidad/negocio → integrar su
+  Checkout (similar a como está PayPal ahora: crear producto/precio, botón de
+  checkout, webhook de confirmación de pago en una función de Netlify).
+- **Lemon Squeezy**: confirmado que soporta pagos/retiros para vendedores en
+  Costa Rica (también actúa como Merchant of Record, similar a Paddle).
+
+De estas dos últimas, Paddle y Lemon Squeezy son alternativas razonables a
+PayPal si el problema de tarjetas de invitado no se resuelve pronto. Si quieres,
+en la próxima ronda puedo dejar lista la integración con cualquiera de las dos
+(siguiendo el mismo patrón server-verificado que ya tiene PayPal: crear sesión
+de pago en el servidor, verificar el webhook/captura, acreditar nodos solo ahí).
+
+## Archivos modificados en esta ronda
+
+- `app.js` — `findFreeSpot`/`flashNewNode` (nodo suelto visible);
+  `insertSingleNode` actualizado; spinner en el panel de "Ver definición";
+  handlers de Antítesis y Sinergia actualizados para título corto +
+  `definition` pregenerada; `cacheIsUsable` y el render del panel reconocen
+  `definitionSource: 'pregenerated'`.
+- `netlify/functions/gemini.js` — esquemas de `antithesis` y `synergy` ahora
+  piden `label` (corto) y `explanation` (completo) por separado, con las
+  instrucciones del prompt actualizadas.
+- `app.js` — bloque "0. COBRO MANUAL" (constantes `SUPPORT_WHATSAPP_NUMBER`,
+  `SUPPORT_EMAIL`, `AUTOMATIC_PAYMENTS_ENABLED`); `updateManualPurchaseBox()` y
+  `openStoreModal()` nuevas; `initPaypalButtons` ahora respeta
+  `AUTOMATIC_PAYMENTS_ENABLED`.
+- `index.html` — el botón de PayPal en la tienda se reemplazó por el bloque
+  de contacto manual (WhatsApp/correo); el contenedor de PayPal queda oculto
+  pero intacto en el HTML.
