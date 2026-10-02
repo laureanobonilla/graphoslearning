@@ -134,6 +134,105 @@ let schemeStack = [];
 
 let loaderInterval = null;
 
+// ==========================================
+// DIÁLOGOS PROPIOS DE LA APP (reemplazan alert/confirm/prompt nativos)
+// ==========================================
+// Los diálogos nativos del navegador (alert/confirm/prompt) se ven fuera de
+// estilo, bloquean TODA la pestaña mientras están abiertos (incluida la
+// animación del loader) y no se pueden personalizar. appAlert/appConfirm/
+// appPrompt hacen exactamente lo mismo (avisar, pedir sí/no, pedir un texto)
+// pero con el modal propio #appDialogModal — mismo estilo que el resto de
+// modales de la app — y devuelven una Promise en vez de bloquear el hilo:
+//   await appAlert("mensaje")              // antes: appAlert("mensaje")
+//   if (await appConfirm("¿Seguro?")) {...} // antes: if (confirm("¿Seguro?")) {...}
+//   const t = await appPrompt("Nombre:", "valor actual") // antes: prompt(...)
+// Solo puede haber un diálogo visible a la vez: si se pide uno mientras otro
+// sigue abierto (o pendiente), se encola y espera su turno en vez de pisarlo.
+const appDialogModal = document.getElementById('appDialogModal');
+const appDialogTitle = document.getElementById('appDialogTitle');
+const appDialogMessage = document.getElementById('appDialogMessage');
+const appDialogInput = document.getElementById('appDialogInput');
+const appDialogCancel = document.getElementById('appDialogCancel');
+const appDialogOk = document.getElementById('appDialogOk');
+
+let dialogQueue = Promise.resolve();
+
+function showAppDialog({ title = '', message = '', mode = 'alert', defaultValue = '', okText, cancelText = 'Cancelar' }) {
+    const run = () => new Promise((resolve) => {
+        if (!appDialogModal) {
+            // Red de seguridad por si el HTML no cargó este modal por algún motivo:
+            // en vez de dejar al usuario sin ningún aviso, caemos al nativo del navegador.
+            if (mode === 'confirm') resolve(confirm(message));
+            else if (mode === 'prompt') resolve(prompt(message, defaultValue));
+            else { alert(message); resolve(undefined); }
+            return;
+        }
+
+        const isPrompt = mode === 'prompt';
+        const isConfirm = mode === 'confirm' || isPrompt;
+
+        if (appDialogTitle) {
+            appDialogTitle.textContent = title;
+            appDialogTitle.classList.toggle('hidden', !title);
+        }
+        if (appDialogMessage) appDialogMessage.textContent = message;
+        if (appDialogOk) appDialogOk.textContent = okText || (isPrompt ? 'Guardar' : 'Entendido');
+        if (appDialogInput) {
+            appDialogInput.classList.toggle('hidden', !isPrompt);
+            if (isPrompt) appDialogInput.value = defaultValue || '';
+        }
+        if (appDialogCancel) {
+            appDialogCancel.classList.toggle('hidden', !isConfirm);
+            appDialogCancel.textContent = cancelText;
+        }
+
+        appDialogModal.classList.remove('hidden');
+        appDialogModal.classList.add('flex');
+
+        const cleanup = () => {
+            appDialogModal.classList.add('hidden');
+            appDialogModal.classList.remove('flex');
+            appDialogOk.removeEventListener('click', onOk);
+            appDialogCancel.removeEventListener('click', onCancel);
+            appDialogInput.removeEventListener('keydown', onKeydown);
+        };
+        const onOk = () => {
+            cleanup();
+            if (mode === 'prompt') resolve(appDialogInput.value);
+            else resolve(mode === 'confirm' ? true : undefined);
+        };
+        const onCancel = () => {
+            cleanup();
+            if (mode === 'prompt') resolve(null);
+            else resolve(mode === 'confirm' ? false : undefined);
+        };
+        const onKeydown = (e) => {
+            if (e.key === 'Enter' && (!isPrompt || document.activeElement === appDialogInput)) { e.preventDefault(); onOk(); }
+            else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+        };
+
+        appDialogOk.addEventListener('click', onOk);
+        appDialogCancel.addEventListener('click', onCancel);
+        appDialogInput.addEventListener('keydown', onKeydown);
+
+        setTimeout(() => { (isPrompt ? appDialogInput : appDialogOk)?.focus(); }, 30);
+    });
+
+    const result = dialogQueue.then(run);
+    dialogQueue = result.catch(() => {});
+    return result;
+}
+
+function appAlert(message, opts = {}) {
+    return showAppDialog({ ...opts, message, mode: 'alert' });
+}
+function appConfirm(message, opts = {}) {
+    return showAppDialog({ ...opts, message, mode: 'confirm' });
+}
+function appPrompt(message, defaultValue = '', opts = {}) {
+    return showAppDialog({ ...opts, message, defaultValue, mode: 'prompt' });
+}
+
 function showLoader(msg) {
     if (loaderText && loaderOverlay) {
         loaderText.innerText = msg;
@@ -356,7 +455,7 @@ function applyServerBalance(data) {
 }
 
 // Interpreta un error 402/429 devuelto por gemini.js y muestra el panel correcto.
-// Devuelve true si ya se manejó (el llamador no debe seguir con su propio alert()).
+// Devuelve true si ya se manejó (el llamador no debe seguir con su propio appAlert()).
 function handleBillingError(status, data) {
     if (status === 402 && data?.error === 'guest_limit_reached') {
         if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
@@ -371,7 +470,7 @@ function handleBillingError(status, data) {
         return true;
     }
     if (status === 429) {
-        alert('Estás generando muy rápido. Espera un minuto y vuelve a intentar.');
+        appAlert('Estás generando muy rápido. Espera un minuto y vuelve a intentar.');
         return true;
     }
     if (status === 401) {
@@ -483,11 +582,15 @@ function checkBalance(cost) {
 // ==========================================
 // 6. GENERACIÓN DE ESQUEMA EN 3 NIVELES Y NODOS
 // ==========================================
-function renderThreeLevelTree(data) {
+async function renderThreeLevelTree(data) {
     let offsetX = 0;
 
     if (nodes.length > 1) {
-        const shouldClear = confirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?\n\n• Aceptar: Crea un proyecto nuevo aparte.\n• Cancelar: Conserva tus nodos actuales y agrega el nuevo esquema a un lado.");
+        const shouldClear = await appConfirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?", {
+            title: '¿Limpiar el lienzo?',
+            okText: 'Sí, crear proyecto nuevo',
+            cancelText: 'No, agregar al actual'
+        });
         if (shouldClear) {
             isClearingCanvas = true;
             clearTimeout(window._binSaveTimer);
@@ -629,20 +732,20 @@ async function generateFullSchemaFromTopic(topicText) {
             body: JSON.stringify({ action: 'parse_text', text: topicText })
         });
         if (!ok) {
-            if (!handleBillingError(status, data)) alert(data?.error || 'Intenta de nuevo en unos segundos.');
+            if (!handleBillingError(status, data)) appAlert(data?.error || 'Intenta de nuevo en unos segundos.');
             track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(data?.error || status).slice(0, 120) });
             return;
         }
 
         const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
-        renderThreeLevelTree(data);
+        await renderThreeLevelTree(data);
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes });
     } catch (err) {
         console.error(err);
         track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120) });
-        alert('Intenta de nuevo en unos segundos.');
+        appAlert('Intenta de nuevo en unos segundos.');
     } finally {
         hideLoader();
     }
@@ -754,7 +857,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                     documentContext: globalDocumentContext || currentDocumentText
                 })
             });
-            if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo resolver la incógnita.'); return; }
+            if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo resolver la incógnita.'); return; }
             const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
             let createdCount = 0;
             let firstAnswer = null;
@@ -778,7 +881,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
             nodes.update({ id: selectedNodeId, isMystery: false });
             applyServerBalance(data); consumeNodes(createdCount);
             if (firstAnswer) showContentInFloatingPanel(firstAnswer.id, firstAnswer.title, firstAnswer.content);
-        } catch { alert("Error al resolver la incógnita."); } finally { hideLoader(); }
+        } catch { appAlert("Error al resolver la incógnita."); } finally { hideLoader(); }
         return;
     }
 
@@ -802,7 +905,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 documentContext: globalDocumentContext || currentDocumentText
             })
         });
-        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudieron generar conceptos relacionados.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudieron generar conceptos relacionados.'); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
@@ -839,7 +942,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
         nodes.update({ id: selectedNodeId, expanded: true });
         applyServerBalance(data); consumeNodes(createdCount);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
-    } catch { alert("Error al conectar con el servicio."); } finally { hideLoader(); }
+    } catch { appAlert("Error al conectar con el servicio."); } finally { hideLoader(); }
 });
 
 // ==========================================
@@ -865,7 +968,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
             method: 'POST',
             body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: globalDocumentContext || currentDocumentText })
         });
-        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudieron generar ejemplos.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudieron generar ejemplos.'); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
@@ -883,7 +986,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
         });
         applyServerBalance(data); consumeNodes(createdCount);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
-    } catch { alert("Error al conectar con el servicio."); } finally { hideLoader(); }
+    } catch { appAlert("Error al conectar con el servicio."); } finally { hideLoader(); }
 });
 
 // ==========================================
@@ -910,7 +1013,7 @@ network.on('click', async function (params) {
                     method: 'POST',
                     body: JSON.stringify({ action: 'synergy', topic: topicA, topicB: topicB, density: document.getElementById('nodeCount')?.value || 'auto' })
                 });
-                if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo generar la sinergia.'); return; }
+                if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo generar la sinergia.'); return; }
 
                 const totalNodes = 1 + (data.pathsFromA?.length || 0) + (data.pathsFromB?.length || 0);
                 if (!checkBalance(totalNodes)) return;
@@ -957,7 +1060,7 @@ network.on('click', async function (params) {
 
                 applyServerBalance(data); consumeNodes(totalNodes);
                 setTimeout(() => { stopPhysicsAndUnlock(); }, 1800);
-            } catch (err) { alert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
+            } catch (err) { appAlert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
             return; // ¡Este return detiene el código para que NO abra el menú!
         }
 
@@ -980,7 +1083,7 @@ network.on('click', async function (params) {
                     method: 'POST',
                     body: JSON.stringify({ action: 'connect', topic: topicA, topicB: topicB })
                 });
-                if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo generar el vínculo.'); return; }
+                if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo generar el vínculo.'); return; }
 
                 const posA = network.getPositions([nodeA.id])[nodeA.id];
                 const posB = network.getPositions([nodeB.id])[nodeB.id];
@@ -995,7 +1098,7 @@ network.on('click', async function (params) {
                 }
                 edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
                 edges.add({ from: bridge.id, to: nodeB.id, label: bridge.relToB });
-            } catch (err) { alert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
+            } catch (err) { appAlert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
             return; // ¡Este return detiene el código para que NO abra el menú!
         }
 
@@ -1644,10 +1747,10 @@ function wireReaderPanelClone(root) {
     root.addEventListener('mousedown', () => { root.style.zIndex = String(500 + (++floatingPanelCount)); });
 
     btnClose?.addEventListener('click', () => root.remove());
-    btnClear?.addEventListener('click', () => {
+    btnClear?.addEventListener('click', async () => {
         const hasText = textEl && textEl.innerText.trim() !== "";
         if (!hasText && !localContext) return;
-        if (confirm("¿Deseas limpiar el texto y el contexto de este lector?")) {
+        if (await appConfirm("¿Deseas limpiar el texto y el contexto de este lector?")) {
             localContext = "";
             if (textEl) textEl.innerText = "";
             if (contextInput) contextInput.value = "";
@@ -1660,7 +1763,7 @@ function wireReaderPanelClone(root) {
 
     btnGenerate?.addEventListener('click', async () => {
         let textContent = textEl ? textEl.innerText.trim() : "";
-        if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
+        if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
 
         textContent = await resolveTextOrWebLink(textContent, {
             targetTextEl: textEl,
@@ -1819,7 +1922,7 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
 // como 🌟 en Sinergia o ⚡ en Antítesis), y al guardar reconstruimos el label
 // conservando ese mismo prefijo si lo había, para no perder la pista visual de
 // qué tipo de nodo es.
-document.getElementById('btnMenuEditText')?.addEventListener('click', () => {
+document.getElementById('btnMenuEditText')?.addEventListener('click', async () => {
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
@@ -1832,7 +1935,7 @@ document.getElementById('btnMenuEditText')?.addEventListener('click', () => {
     const prefixEmoji = (prefixMatch && prefixMatch[1]) ? prefixMatch[1] : '';
     const currentPlainText = node.baseTitle || currentLabel.replace(/^\*/, '').replace(/\*$/, '').replace(/^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic})\s/u, '');
 
-    const newText = prompt('Editar texto del nodo:', currentPlainText);
+    const newText = await appPrompt('Editar texto del nodo:', currentPlainText, { title: '✏️ Editar texto' });
     if (newText === null) return; // canceló
     const trimmed = newText.trim();
     if (!trimmed) return;
@@ -2020,7 +2123,7 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
         return data.text;
     } catch (err) {
         track('webpage_read_error', { message: String(err?.message || '').slice(0, 160) });
-        alert(err.message || "No se pudo leer esa página.");
+        appAlert(err.message || "No se pudo leer esa página.");
         return null;
     } finally {
         hideLoader();
@@ -2029,7 +2132,7 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
 
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     let textContent = readerTextMode.innerText.trim();
-    if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
+    if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
 
     textContent = await resolveTextOrWebLink(textContent, {
         targetTextEl: readerTextMode,
@@ -2130,16 +2233,15 @@ function getAllDescendants(parentNodeId) {
     return Array.from(descendants);
 }
 
-document.getElementById('btnMenuDelete')?.addEventListener('click', () => {
+document.getElementById('btnMenuDelete')?.addEventListener('click', async () => {
     if (!selectedNodeId) return;
 
     const descendants = getAllDescendants(selectedNodeId);
 
     if (descendants.length > 0) {
-        const deleteAll = confirm(
-            `Este nodo tiene ${descendants.length} sub-nodo(s) conectado(s).\n\n` +
-            `• Presiona "Aceptar" para eliminar el nodo y TODOS sus hijos.\n` +
-            `• Presiona "Cancelar" para eliminar ÚNICAMENTE este nodo y conservar sus hijos.`
+        const deleteAll = await appConfirm(
+            `Este nodo tiene ${descendants.length} sub-nodo(s) conectado(s).`,
+            { title: '¿Eliminar nodo y sus hijos?', okText: 'Eliminar todo', cancelText: 'Solo este nodo' }
         );
 
         if (deleteAll) {
@@ -2166,11 +2268,10 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
     // Asegurar que el estado actual quede guardado antes de limpiar
     await saveCurrentProjectToBin();
 
-    const createNewProject = confirm(
-        "Vas a limpiar el lienzo actual.\n\n" +
-        "¿Deseas generar un NUEVO proyecto para lo próximo que hagas?\n\n" +
-        "• Aceptar: Conserva este esquema en 'Mis Proyectos' y empieza a guardar en un proyecto aparte.\n" +
-        "• Cancelar: Limpia el lienzo pero sigue guardando sobre este mismo proyecto."
+    const createNewProject = await appConfirm(
+        "Vas a limpiar el lienzo actual. Este esquema ya quedó guardado en 'Mis Proyectos'.\n\n" +
+        "¿Deseas que lo próximo que hagas se guarde en un proyecto NUEVO, aparte de este?",
+        { title: '¿Limpiar el lienzo?', okText: 'Sí, proyecto nuevo', cancelText: 'No, seguir en este' }
     );
 
     isClearingCanvas = true;
@@ -2204,13 +2305,13 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
 
 
 // 2. Limpiar SOLO el panel del Lector (Botón nuevo a la par de Generar Esquema)
-document.getElementById('btnClearReader')?.addEventListener('click', () => {
+document.getElementById('btnClearReader')?.addEventListener('click', async () => {
     const hasText = readerTextMode && readerTextMode.innerText.trim() !== "";
     const hasContext = !!globalDocumentContext;
 
     if (!hasText && !hasContext) return;
 
-    if (confirm("¿Deseas limpiar el texto y el contexto del panel de lectura?")) {
+    if (await appConfirm("¿Deseas limpiar el texto y el contexto del panel de lectura?")) {
         currentDocumentText = "";
         globalDocumentContext = "";
         if (readerTextMode) readerTextMode.innerText = "";
@@ -2223,7 +2324,7 @@ document.getElementById('btnClearReader')?.addEventListener('click', () => {
 
 document.getElementById('btnCapture')?.addEventListener('click', () => {
     if (nodes.length === 0) {
-        alert("El lienzo está vacío.");
+        appAlert("El lienzo está vacío.");
         return;
     }
     actionMenu.classList.add('hidden');
@@ -2249,7 +2350,7 @@ document.getElementById('btnCapture')?.addEventListener('click', () => {
             downloadLink.click();
             document.body.removeChild(downloadLink);
         } catch {
-            alert("Error al exportar la imagen.");
+            appAlert("Error al exportar la imagen.");
         } finally {
             hideLoader();
         }
@@ -2519,7 +2620,7 @@ async function loadProjectById(projectId) {
             applyLoadedProject(projectId, resData.data);
         }
     } catch (err) {
-        alert("Error al abrir el proyecto.");
+        appAlert("Error al abrir el proyecto.");
     } finally {
         hideLoader();
     }
@@ -2539,9 +2640,9 @@ function applyLoadedProject(projectId, record) {
     network.fit({ animation: { duration: 600 } });
 }
 
-document.getElementById('btnNewProject')?.addEventListener('click', () => {
+document.getElementById('btnNewProject')?.addEventListener('click', async () => {
     if (nodes.length > 0) {
-        if (!confirm("¿Deseas iniciar un esquema completamente en blanco en un proyecto aparte?")) return;
+        if (!await appConfirm("¿Deseas iniciar un esquema completamente en blanco en un proyecto aparte?")) return;
     }
     isClearingCanvas = true;
     schemeStack = [];
@@ -2623,7 +2724,7 @@ async function loadPaypalSdk() {
             });
             if (!ok) {
                 if (status === 401) requireAuth('comprar nodos');
-                else alert(data?.error || 'No se pudo iniciar la compra. Intenta de nuevo.');
+                else appAlert(data?.error || 'No se pudo iniciar la compra. Intenta de nuevo.');
                 throw new Error('create_order_failed');
             }
             return data.orderID;
@@ -2635,13 +2736,13 @@ async function loadPaypalSdk() {
                 body: JSON.stringify({ orderID: data.orderID, packageId: selected.value })
             });
             if (!result.ok) {
-                alert(result.data?.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos para acreditarte los nodos.');
+                appAlert(result.data?.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos para acreditarte los nodos.');
                 return;
             }
 
             // El saldo que importa es el que confirma el servidor, no una suma local.
             if (typeof result.data.balance === 'number') { availableNodes = result.data.balance; updateCounterDisplay(); }
-            alert(`¡Éxito! Se han añadido ${result.data.nodesAdded} nodos a tu cuenta.`);
+            appAlert(`¡Éxito! Se han añadido ${result.data.nodesAdded} nodos a tu cuenta.`);
 
             document.getElementById('storeModal').classList.add('hidden');
             document.getElementById('storeModal').classList.remove('flex');
@@ -2654,7 +2755,7 @@ async function loadPaypalSdk() {
         onError: function (err) {
             console.error('[paypal]', err);
             if (!/auth_required|create_order_failed/.test(String(err?.message))) {
-                alert('Ocurrió un problema con PayPal. Intenta de nuevo en un momento.');
+                appAlert('Ocurrió un problema con PayPal. Intenta de nuevo en un momento.');
             }
         }
     }).render('#paypal-button-container');
@@ -2717,7 +2818,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
             })
         });
 
-        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo procesar tu petición.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo procesar tu petición.'); return; }
         const generatedItems = data.nodes || [];
 
         if (!checkBalance(generatedItems.length)) return;
@@ -2795,7 +2896,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1400);
     } catch (err) {
         console.error(err);
-        alert("Intenta de nuevo en unos segundos");
+        appAlert("Intenta de nuevo en unos segundos");
     } finally {
         hideLoader();
     }
@@ -2845,7 +2946,7 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
             method: 'POST',
             body: JSON.stringify({ action: 'antithesis', topic: topicName, contextPath: getContextPath(originId) })
         });
-        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo generar la antítesis.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo generar la antítesis.'); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([originId])[originId];
         network.setOptions({ physics: { enabled: true } });
@@ -2875,7 +2976,7 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
         });
         applyServerBalance(data); consumeNodes(count);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
-    } catch { alert("Error al generar antítesis."); } finally { hideLoader(); }
+    } catch { appAlert("Error al generar antítesis."); } finally { hideLoader(); }
 });
 
 document.getElementById('btnMenuChallenge')?.addEventListener('click', async () => {
@@ -2893,7 +2994,7 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
             method: 'POST',
             body: JSON.stringify({ action: 'socratic_question', topic: topicName, contextPath: getContextPath(originId) })
         });
-        if (!ok) { if (!handleBillingError(status, data)) alert(data?.error || 'No se pudo iniciar el reto.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo iniciar el reto.'); return; }
 
         // Panel propio para el reto (no es la definición de ningún nodo existente,
         // así que usa un id sintético para no chocar con el panel de otro nodo).
@@ -2914,7 +3015,7 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
 
         panel.contentEl.querySelector('#btnSubmitSocratic')?.addEventListener('click', async () => {
             const userAnswer = panel.contentEl.querySelector('#socraticInput').value.trim();
-            if (userAnswer.length < 5) return alert("Escribe una respuesta breve para evaluar.");
+            if (userAnswer.length < 5) return appAlert("Escribe una respuesta breve para evaluar.");
             if (!checkBalance(1)) return;
 
             showLoader('Evaluando tu argumento...');
@@ -2923,7 +3024,7 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
                     method: 'POST',
                     body: JSON.stringify({ action: 'socratic_evaluate', topic: topicName, question: data.question, userAnswer })
                 });
-                if (!evalOk) { if (!handleBillingError(evalStatus, evalData)) alert(evalData?.error || 'No se pudo evaluar tu respuesta.'); return; }
+                if (!evalOk) { if (!handleBillingError(evalStatus, evalData)) appAlert(evalData?.error || 'No se pudo evaluar tu respuesta.'); return; }
 
                 const fbBox = panel.contentEl.querySelector('#socraticFeedbackBox');
                 fbBox.innerHTML = `<p class="font-bold text-amber-400 mb-1">🌟 Veredicto:</p><p>${evalData.feedback}</p>`;
@@ -2946,7 +3047,7 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
                 edges.add({ from: originId, to: masteryId, label: 'síntesis propia', color: { color: '#eab308' } });
                 applyServerBalance(evalData); consumeNodes(1);
                 showContentInFloatingPanel(masteryId, `🏆 ${evalData.masteryNodeTitle}`, masterySynthesis);
-            } catch { alert("Error al evaluar."); } finally { hideLoader(); }
+            } catch { appAlert("Error al evaluar."); } finally { hideLoader(); }
         });
-    } catch { alert("Error al iniciar el reto."); } finally { hideLoader(); }
+    } catch { appAlert("Error al iniciar el reto."); } finally { hideLoader(); }
 });

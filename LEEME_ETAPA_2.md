@@ -930,3 +930,67 @@ definiciones de ambos usarán ese mismo contexto general. No es un problema
 nuevo (la app nunca distinguió contexto por esquema), pero vale mencionarlo
 por si en algún momento quieres que cada esquema "recuerde" su propio
 contexto por separado — sería un cambio más grande, avísame si te interesa.
+
+## 17. Los alert()/confirm()/prompt() del navegador ahora son modales propios de la app
+
+Quedó pendiente de una recomendación anterior: todos los avisos, preguntas de
+sí/no y cuadros para escribir texto que usaba la app venían de las funciones
+nativas del navegador (`alert()`, `confirm()`, `prompt()`) — esos cuadros
+grises, feos, que bloquean TODA la pestaña (hasta la animación del loader se
+congelaba) y que no se pueden vestir con el estilo de la app. Ya se
+reemplazaron **todos** (34 `alert()`, 6 `confirm()`, 1 `prompt()` — cada uno
+revisado uno por uno) por un modal propio, `#appDialogModal` en `index.html`,
+con el mismo estilo que los demás modales de la app (la tienda, el muro de
+login, la ayuda).
+
+### Cómo funciona
+
+Tres funciones nuevas en `app.js` (sección "DIÁLOGOS PROPIOS DE LA APP",
+cerca del principio del archivo), que se usan igual que las nativas pero con
+`await` porque el modal no bloquea el código — espera a que el usuario haga
+clic:
+
+```js
+await appAlert("mensaje");                       // antes: alert("mensaje")
+if (await appConfirm("¿Seguro?")) { ... }         // antes: if (confirm("¿Seguro?")) { ... }
+const texto = await appPrompt("Nombre:", "valor") // antes: prompt("Nombre:", "valor")
+```
+
+Cada `confirm()`/`prompt()` que se reemplazó vivía dentro de una función que
+no era `async` (los `alert()` no necesitaban esto porque no se usa su
+resultado) — esas funciones/manejadores de clic se marcaron `async` para
+poder usar `await` ahí. Verifiqué con el intérprete de Node que no quedó
+ningún `await` fuera de una función `async` (eso sí sería un error real, sin
+excepción) antes de entregar esta versión.
+
+### Detalle de diseño
+
+- Solo puede haber un diálogo visible a la vez: si se pide uno mientras otro
+  ya está abierto (p. ej. dos errores seguidos de la red), se encola y
+  espera su turno en vez de superponerse o perderse.
+- Funciona con teclado: Enter confirma (el botón principal), Escape cancela.
+- Si por algún motivo el HTML del modal no cargara, hay una red de
+  seguridad que cae de vuelta a los diálogos nativos del navegador en vez de
+  dejar al usuario sin ningún aviso — no debería pasar nunca en condiciones
+  normales, pero es más seguro que fallar en silencio.
+- Los textos de los botones ahora pueden ser específicos en vez del genérico
+  "Aceptar/Cancelar" (ej. "Sí, nuevo proyecto" / "No, seguir en este"), lo
+  que hace más claro qué hace cada opción sin tener que leer un párrafo de
+  explicación dentro del mensaje.
+
+### Otras recomendaciones de antes que sigan sin implementarse
+
+Hice memoria repasando este mismo documento (LEEME) en busca de cualquier
+otra recomendación mía que hubiera quedado "pendiente, sin resolver" — y lo
+único que encontré con esas palabras es la extracción de subtítulos de
+YouTube (sección 7/8), que ya no aplica: ese flujo se **quitó por completo**
+de la app (sección 14) y se reemplazó por la lectura de páginas web. No hay
+ninguna otra recomendación mía registrada aquí como pendiente.
+
+Debo ser honesto en un punto: el historial de conversación de antes de hoy
+se resume automáticamente cuando crece demasiado (así sigo funcionando sin
+perder el hilo del proyecto), y ese resumen no necesariamente capturó cada
+comentario suelto que haya hecho en su momento — como evidentemente pasó con
+esta recomendación de los modales, que no quedé con un registro escrito de
+ella hasta que la mencionaste ahora. Si recuerdas alguna otra sugerencia
+mía de sesiones anteriores que no se haya hecho, dímela y la reviso.

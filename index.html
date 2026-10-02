@@ -300,20 +300,14 @@
             <!-- Área de Lectura (Fondo Blanco Limpio) -->
             <div id="readerContentContainer" data-role="contentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
                 <div id="readerTextMode" data-role="textMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text" contenteditable="true" data-placeholder="Pega aquí un texto o un enlace"></div>
-                <!-- Pista de inicio, sobrepuesta mientras el lector está vacío: el texto
-                     base funciona como un placeholder normal ("Pega aquí un texto o un
-                     enlace"), pero "un enlace" se resalta con color/insignia aparte para
-                     dejar claro, de un vistazo, que es una opción fuerte y recomendada
-                     (no solo texto largo a mano) y que este panel es el mejor punto de
-                     partida. Se oculta sola en cuanto el usuario escribe o pega algo (ver
-                     listener 'input' en app.js). -->
+                <!-- Pista de inicio, sobrepuesta mientras el lector está vacío: funciona
+                     como un placeholder normal ("Pega aquí un texto o un enlace"), solo
+                     que "un enlace" va en un color distinto para que se note, de un
+                     vistazo, que es una opción válida y fuerte. Se oculta sola en cuanto
+                     el usuario escribe o pega algo (ver listener 'input' en app.js). -->
                 <div id="readerEmptyHint" data-role="emptyHint" class="absolute inset-6 top-6 pointer-events-none select-none">
                     <p class="text-slate-400 text-base leading-relaxed">
-                        Pega aquí un texto o
-                        <span class="inline-flex items-center gap-1 text-indigo-600 font-bold bg-indigo-50 border border-indigo-300 rounded-md px-1.5 py-1 align-middle whitespace-nowrap">
-                            🔗 un enlace
-                            <span class="text-[8px] font-bold uppercase tracking-wide bg-indigo-600 text-white rounded px-1 py-0.5">Recomendado</span>
-                        </span>
+                        Pega aquí un texto o <span class="text-indigo-600 font-semibold">un enlace</span>
                     </p>
                 </div>
             </div>
@@ -551,6 +545,28 @@
         </div>
     </div>
 <!-- Modal: Guía de Uso / Ayuda -->
+    <!-- Diálogo genérico de la app: reemplaza los alert()/confirm()/prompt()
+         nativos del navegador (feos, bloquean todo, no combinan con el resto de
+         la interfaz) por un modal propio, con el mismo estilo que los demás
+         modales de arriba. Un solo markup para los 3 casos — ver
+         appAlert/appConfirm/appPrompt en app.js, que muestran/ocultan el campo
+         de texto y el botón "Cancelar" según haga falta. z-[200] para quedar
+         SIEMPRE por encima de cualquier otro modal o panel (p. ej. un error de
+         pago mientras la tienda ya está abierta). -->
+    <div id="appDialogModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[200] hidden items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-200 p-6 flex flex-col gap-4">
+            <div class="flex flex-col gap-1.5">
+                <h3 id="appDialogTitle" class="hidden text-base font-bold font-heading text-slate-900"></h3>
+                <p id="appDialogMessage" class="text-sm text-slate-600 leading-relaxed whitespace-pre-line"></p>
+            </div>
+            <input id="appDialogInput" type="text" class="hidden w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 font-sans">
+            <div class="flex gap-2 justify-end pt-1">
+                <button id="appDialogCancel" class="hidden px-4 py-2 rounded-full text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancelar</button>
+                <button id="appDialogOk" class="px-5 py-2 rounded-full text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors shadow-sm">Entendido</button>
+            </div>
+        </div>
+    </div>
+
     <div id="helpModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
         <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl flex flex-col border border-slate-200 max-h-[88vh]">
             
