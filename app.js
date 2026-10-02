@@ -582,7 +582,21 @@ function checkBalance(cost) {
 // ==========================================
 // 6. GENERACIÓN DE ESQUEMA EN 3 NIVELES Y NODOS
 // ==========================================
-async function renderThreeLevelTree(data) {
+async function renderThreeLevelTree(data, opts = {}) {
+    const { originPanelId = null } = opts;
+    // Si hay más de un panel de lectura registrado, coloreamos el borde de
+    // cada nodo según de qué panel vino (Idea 3), para que se note a simple
+    // vista qué parte del esquema salió de cuál texto. Con un solo panel en
+    // juego no cambiamos nada del aspecto visual de siempre.
+    const multiPanelMode = readerPanelRegistry.size > 1 && !!originPanelId;
+    const originAccent = originPanelId ? readerPanelRegistry.get(originPanelId)?.accent : null;
+    const nodeColorFor = () => {
+        const base = getRandomColor();
+        return (multiPanelMode && originAccent) ? { background: base.background, border: originAccent } : base;
+    };
+    // Orden en que se van a "revelar" los nodos al final (Idea 7, adaptada).
+    const revealOrder = [];
+
     const root = data.root;
     const branches = data.branches || [];
     const subBranches = data.subBranches || [];
@@ -677,11 +691,13 @@ async function renderThreeLevelTree(data) {
     // 2. Crear Raíz (Nivel 1) con ancho controlado para mantener compacidad
     nodes.add({
         id: root.id, label: `*${root.label}*`, baseTitle: root.label,
-        color: getRandomColor(), definition: root.definition || null,
+        color: nodeColorFor(), definition: root.definition || null,
         x: rootX, y: rootY, fixed: { x: false, y: false },
-        widthConstraint: { minimum: 140, maximum: 220 }
+        widthConstraint: { minimum: 140, maximum: 220 },
+        sourceQuote: root.sourceQuote || '', originPanelId: originPanelId
     });
     trackNodeUsage(root.label);
+    revealOrder.push(root.id);
 
     let currentLeftX = rootX - (totalTreeWidth / 2);
 
@@ -695,12 +711,14 @@ async function renderThreeLevelTree(data) {
 
         nodes.add({
             id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label,
-            color: getRandomColor(), definition: branch.definition || null,
+            color: nodeColorFor(), definition: branch.definition || null,
             x: branchX, y: branchY, fixed: { x: false, y: false },
-            widthConstraint: { minimum: 130, maximum: 200 }
+            widthConstraint: { minimum: 130, maximum: 200 },
+            sourceQuote: branch.sourceQuote || '', originPanelId: originPanelId
         });
         edges.add({ from: root.id, to: branch.id, label: branch.relationship });
         trackNodeUsage(branch.label);
+        revealOrder.push(branch.id);
 
         const subs = childrenByBranch[branch.id];
         const cols = subs.length <= 1 ? 1 : 2;
@@ -718,30 +736,70 @@ async function renderThreeLevelTree(data) {
 
             nodes.add({
                 id: sub.id, label: `*${sub.label}*`, baseTitle: sub.label,
-                color: getRandomColor(), definition: sub.definition || null,
+                color: nodeColorFor(), definition: sub.definition || null,
                 x: subX, y: subY, fixed: { x: false, y: false },
-                widthConstraint: { minimum: 120, maximum: 185 }
+                widthConstraint: { minimum: 120, maximum: 185 },
+                sourceQuote: sub.sourceQuote || '', originPanelId: originPanelId
             });
             edges.add({ from: branch.id, to: sub.id, label: sub.relationship });
             trackNodeUsage(sub.label);
+            revealOrder.push(sub.id);
         });
 
         currentLeftX += sectionWidth;
     });
 
     network.setOptions({ physics: { enabled: false } });
-    
+
+    // Idea 2: resaltar de forma permanente, en el panel de lectura de origen,
+    // los fragmentos que ya quedaron convertidos en nodos de este esquema.
+    if (originPanelId) highlightCoverageForPanel(originPanelId);
+
     // Esperamos un instante a que el DOM reajuste los 300px del lector para encuadrar de cerca
     setTimeout(() => {
         network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
     }, 60);
+
+    // Idea 7 (adaptada): no hay forma segura de probar streaming real contra
+    // Gemini sin un entorno Netlify+Gemini en vivo, así que en su lugar
+    // simulamos la sensación de "esquema armándose en vivo": el árbol ya
+    // quedó calculado y puesto en su posición final (para no romper la
+    // lógica de evitar traslapes), pero cada nodo aparece en orden con un
+    // pequeño destello, y si tiene una cita asociada, el fragmento
+    // correspondiente también destella en el texto al mismo tiempo.
+    if (revealOrder.length > 0) {
+        nodes.update(revealOrder.map(id => ({ id, opacity: 0.05 })));
+        revealOrder.forEach((id, i) => {
+            setTimeout(() => {
+                if (!nodes.get(id)) return;
+                nodes.update({ id, opacity: 1 });
+                flashNewNode(id, 22);
+                const n = nodes.get(id);
+                if (n && n.originPanelId && n.sourceQuote) {
+                    const entry = readerPanelRegistry.get(n.originPanelId);
+                    const mark = entry?.textEl?.querySelector(`mark[data-node-id="${id}"]`);
+                    if (mark) {
+                        mark.classList.add('gk-coverage-flash');
+                        setTimeout(() => mark.classList.remove('gk-coverage-flash'), 900);
+                    }
+                }
+            }, 150 * (i + 1));
+        });
+    }
+
+    // Idea 8: una sola sugerencia descartable de vínculo, una vez que el
+    // esquema terminó de "revelarse" visualmente.
+    if (originPanelId) {
+        setTimeout(() => suggestProximityLinks(originPanelId), 150 * (revealOrder.length + 2));
+    }
 }
 
-async function generateFullSchemaFromTopic(topicText) {
+async function generateFullSchemaFromTopic(topicText, opts = {}) {
     if (!topicText) return;
     // Verificamos que tenga al menos saldo disponible para iniciar
     if (!checkBalance(1)) return;
 
+    const { originPanelId = null, focusTerms = [] } = opts;
     const isLong = topicText.trim().split(/\s+/).length >= 25;
     track('schema_generate_attempt', { mode: isLong ? 'text' : 'topic', length: topicText.length });
 
@@ -751,7 +809,7 @@ async function generateFullSchemaFromTopic(topicText) {
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'parse_text', text: topicText })
+            body: JSON.stringify({ action: 'parse_text', text: topicText, focusTerms })
         });
         if (!ok) {
             if (!handleBillingError(status, data)) appAlert(data?.error || 'Intenta de nuevo en unos segundos.');
@@ -761,7 +819,7 @@ async function generateFullSchemaFromTopic(topicText) {
 
         const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
-        await renderThreeLevelTree(data);
+        await renderThreeLevelTree(data, { originPanelId });
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes });
     } catch (err) {
@@ -1018,6 +1076,37 @@ network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNodeId = params.nodes[0];
 
+        // --- 0. VINCULAR FRAGMENTO SUBRAYADO COMO HIJO DE UN NODO EXISTENTE ---
+        // Si el usuario pulsó "🔗 Vincular a nodo..." en el tooltip de selección,
+        // el próximo clic en un nodo (sea cual sea) se interpreta como el nodo
+        // padre elegido, en vez de disparar sinergia/otras acciones de clic.
+        if (awaitingLinkTargetClick && pendingLinkSelection) {
+            awaitingLinkTargetClick = false;
+            document.body.classList.remove('gk-picking-link-target');
+            const { text: topic, range: rangeToHighlight } = pendingLinkSelection;
+            pendingLinkSelection = null;
+            if (!checkBalance(1)) return;
+
+            const parentNode = nodes.get(clickedNodeId);
+            const parentPos = network.getPositions([clickedNodeId])[clickedNodeId];
+            const spot = findFreeSpot(parentPos.x, parentPos.y + 130, 150);
+            const nodeId = topic;
+
+            if (!nodes.get(nodeId)) {
+                nodes.add({
+                    id: nodeId, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(),
+                    x: spot.x, y: spot.y, fixed: { x: false, y: false }
+                });
+                trackNodeUsage(topic); consumeNodes(1);
+            }
+            edges.add({ from: clickedNodeId, to: nodeId, label: 'del texto' });
+            activeSelectionRange = rangeToHighlight;
+            highlightSelectedTextAndLink(nodeId);
+            selectedNodeId = nodeId;
+            setTimeout(() => flashNewNode(nodeId), 50);
+            return;
+        }
+
         // --- 1. LÓGICA DE SINERGIA (FUSIÓN) ---
         if (sourceNodeForSynergy && sourceNodeForSynergy !== clickedNodeId) {
             const nodeA = nodes.get(sourceNodeForSynergy);
@@ -1158,6 +1247,14 @@ network.on('click', async function (params) {
     } else {
         actionMenu.classList.add('hidden');
         selectedNodeId = null;
+        // Si el usuario había pedido "Vincular a nodo..." y en vez de clickear
+        // un nodo le dio clic al lienzo vacío, cancelamos ese modo en vez de
+        // dejarlo esperando para siempre.
+        if (awaitingLinkTargetClick) {
+            awaitingLinkTargetClick = false;
+            pendingLinkSelection = null;
+            document.body.classList.remove('gk-picking-link-target');
+        }
     }
 });
 
@@ -1419,10 +1516,205 @@ const docContextChip = document.getElementById('docContextChip');
 const docContextChipText = document.getElementById('docContextChipText');
 const docContextEditRow = document.getElementById('docContextEditRow');
 
+// ==========================================
+// REGISTRO DE PANELES DE LECTOR + INTERACTIVIDAD TEXTO↔ESQUEMA
+// ==========================================
+// Cada panel de lectura (el principal "main" y cada clon ➕) queda registrado
+// aquí con una referencia a su propio <div> de texto y un color de acento
+// propio. Esto es lo que permite, una vez generado un esquema: (a) saber en
+// cuál panel buscar la cita de un nodo ("📍 Ver en el texto"), (b) resaltar
+// de forma permanente en el texto los fragmentos que ya se convirtieron en
+// nodos, y (c) colorear el borde de cada nodo según de qué panel vino, con
+// resaltado al pasar el mouse por la cabecera de ese panel.
+const panelAccentPalette = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#8b5cf6'];
+const readerPanelRegistry = new Map(); // panelId -> { root, textEl, accent }
+
+function applyPanelAccent(root, accent) {
+    if (!root) return;
+    const headerEl = root.querySelector('[data-role="header"]');
+    if (headerEl) headerEl.style.borderLeft = `4px solid ${accent}`;
+}
+
+function registerReaderPanel(panelId, root, textEl, accent) {
+    readerPanelRegistry.set(panelId, { root, textEl, accent });
+    if (root) root.dataset.panelId = panelId;
+    applyPanelAccent(root, accent);
+}
+
+// Resalta (atenuando el resto) los nodos que vinieron de un panel concreto,
+// al pasar el mouse por su cabecera. clearPanelHighlight() quita el efecto.
+function highlightPanelNodes(panelId) {
+    const ids = nodes.getIds();
+    nodes.update(ids.map(id => {
+        const n = nodes.get(id);
+        return { id, opacity: (n && n.originPanelId === panelId) ? 1 : 0.2 };
+    }));
+}
+function clearPanelHighlight() {
+    const ids = nodes.getIds();
+    nodes.update(ids.map(id => ({ id, opacity: 1 })));
+}
+
+function wirePanelHoverHighlight(root, panelId) {
+    const headerEl = root?.querySelector('[data-role="header"]');
+    headerEl?.addEventListener('mouseenter', () => highlightPanelNodes(panelId));
+    headerEl?.addEventListener('mouseleave', () => clearPanelHighlight());
+}
+
+// --- Resaltado permanente de cobertura (Idea 2) ---------------------------
+function escapeHtmlForMark(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Reconstruye el HTML del panel de texto envolviendo en <mark> cada cita que
+// ya quedó convertida en un nodo del esquema. No reescribe nada si ninguna
+// cita calza (p. ej. esquemas generados solo a partir de un tema, sin texto).
+function buildHighlightedMarkup(rawText, quotes) {
+    let html = escapeHtmlForMark(rawText);
+    const seen = new Set();
+    const uniqueQuotes = [];
+    quotes.forEach(q => {
+        const key = (q.quote || '').trim();
+        if (key && key.length > 2 && !seen.has(key)) { seen.add(key); uniqueQuotes.push({ ...q, quote: key }); }
+    });
+    // Las citas más largas primero, para no dejar fragmentos de una cita larga
+    // sueltos cuando otra cita más corta está contenida dentro de ella.
+    uniqueQuotes.sort((a, b) => b.quote.length - a.quote.length);
+    uniqueQuotes.forEach(({ quote, nodeId }) => {
+        const escaped = escapeHtmlForMark(quote);
+        const idx = html.indexOf(escaped);
+        if (idx === -1) return;
+        const before = html.slice(0, idx);
+        const openMarks = (before.match(/<mark/g) || []).length;
+        const closeMarks = (before.match(/<\/mark>/g) || []).length;
+        if (openMarks > closeMarks) return; // ya quedó dentro de otra cita marcada, no anidar
+        html = html.slice(0, idx)
+            + `<mark class="gk-coverage-mark" data-node-id="${nodeId}">`
+            + escaped + `</mark>`
+            + html.slice(idx + escaped.length);
+    });
+    return html;
+}
+
+function highlightCoverageForPanel(panelId) {
+    const entry = readerPanelRegistry.get(panelId);
+    if (!entry || !entry.textEl) return;
+    const rawText = entry.textEl.innerText;
+    if (!rawText || !rawText.trim()) return;
+    const quotes = [];
+    nodes.getIds().forEach(id => {
+        const n = nodes.get(id);
+        if (n && n.originPanelId === panelId && n.sourceQuote) quotes.push({ quote: n.sourceQuote, nodeId: id });
+    });
+    if (quotes.length === 0) return;
+    entry.textEl.innerHTML = buildHighlightedMarkup(rawText, quotes);
+}
+
+// --- Sugerir vínculo entre nodos cercanos en el texto (Idea 8) ------------
+// Si dos nodos del mismo esquema (y del mismo panel de origen) tienen sus
+// citas muy cerca una de la otra dentro del texto original, probablemente
+// están relacionados aunque hayan caído en ramas distintas del árbol. Se
+// ofrece UNA sugerencia descartable (nunca se fuerza el vínculo) por cada
+// esquema generado desde un documento.
+function suggestProximityLinks(originPanelId) {
+    const entry = readerPanelRegistry.get(originPanelId);
+    if (!entry || !entry.textEl) return;
+    const rawText = entry.textEl.innerText;
+    if (!rawText) return;
+
+    const candidates = [];
+    nodes.getIds().forEach(id => {
+        const n = nodes.get(id);
+        if (n && n.originPanelId === originPanelId && n.sourceQuote) {
+            const idx = rawText.indexOf(n.sourceQuote);
+            if (idx !== -1) candidates.push({ id, idx, len: n.sourceQuote.length });
+        }
+    });
+    candidates.sort((a, b) => a.idx - b.idx);
+
+    let best = null;
+    for (let i = 0; i < candidates.length - 1; i++) {
+        const a = candidates[i], b = candidates[i + 1];
+        const gap = b.idx - (a.idx + a.len);
+        if (gap < 0 || gap > 160) continue;
+        const alreadyLinked = edges.get({ filter: e => (e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id) }).length > 0;
+        if (alreadyLinked) continue;
+        if (!best || gap < best.gap) best = { a: a.id, b: b.id, gap };
+    }
+    if (best) showLinkSuggestionToast(best.a, best.b);
+}
+
+function showLinkSuggestionToast(idA, idB) {
+    const nodeA = nodes.get(idA), nodeB = nodes.get(idB);
+    if (!nodeA || !nodeB) return;
+    document.getElementById('gkLinkSuggestionToast')?.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'gkLinkSuggestionToast';
+    toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] bg-slate-950 border border-indigo-500/40 text-white text-xs rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3 max-w-[90vw]';
+    const labelA = (nodeA.baseTitle || idA);
+    const labelB = (nodeB.baseTitle || idB);
+    toast.innerHTML = `
+        <span>💡 "${labelA}" y "${labelB}" aparecen muy cerca en el texto. ¿Vincularlos?</span>
+        <button id="gkLinkSuggestAccept" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded font-semibold shrink-0">Vincular</button>
+        <button id="gkLinkSuggestDismiss" class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded shrink-0">Descartar</button>
+    `;
+    document.body.appendChild(toast);
+    document.getElementById('gkLinkSuggestAccept')?.addEventListener('click', () => {
+        const alreadyLinked = edges.get({ filter: e => (e.from === idA && e.to === idB) || (e.from === idB && e.to === idA) }).length > 0;
+        if (!alreadyLinked) edges.add({ from: idA, to: idB, label: 'relacionado', dashes: [2, 3], color: { color: '#94a3b8' } });
+        toast.remove();
+    });
+    document.getElementById('gkLinkSuggestDismiss')?.addEventListener('click', () => toast.remove());
+    setTimeout(() => { if (document.body.contains(toast)) toast.remove(); }, 14000);
+}
+
+// --- "📍 Ver en el texto" (Idea 1) ------------------------------------------
+function locateNodeInText(nodeId) {
+    const node = nodes.get(nodeId);
+    if (!node) return;
+    if (!node.originPanelId || !node.sourceQuote) {
+        appAlert('Este nodo no quedó vinculado a ninguna cita del texto (puede venir de un tema escrito a mano, no de un documento).');
+        return;
+    }
+    const entry = readerPanelRegistry.get(node.originPanelId);
+    if (!entry || !entry.root || !document.body.contains(entry.root)) {
+        appAlert('No se encontró el panel de lectura de origen de este nodo (puede que lo hayas cerrado).');
+        return;
+    }
+    if (entry.root.classList.contains('hidden')) openReaderPanel();
+    entry.root.style.zIndex = String(500 + (++floatingPanelCount));
+    entry.root.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+
+    let mark = entry.textEl?.querySelector(`mark[data-node-id="${nodeId}"]`);
+    if (!mark) {
+        // El resaltado permanente puede no existir todavía (p. ej. nodo creado
+        // antes de esta función) — lo generamos al vuelo para este nodo.
+        highlightCoverageForPanel(node.originPanelId);
+        mark = entry.textEl?.querySelector(`mark[data-node-id="${nodeId}"]`);
+    }
+    if (!mark) {
+        appAlert('No se pudo ubicar la cita exacta dentro del texto actual (puede que lo hayas editado).');
+        return;
+    }
+    mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    mark.classList.add('gk-coverage-flash');
+    setTimeout(() => mark.classList.remove('gk-coverage-flash'), 2200);
+}
+
+// --- "🔗 Vincular a nodo..." desde el tooltip de selección (Idea 5) --------
+let awaitingLinkTargetClick = false;
+let pendingLinkSelection = null; // { text, range }
+
 const floatingPanelsLayer = document.getElementById('floatingPanelsLayer');
 const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
 const nodeTooltipPreview = document.getElementById('nodeTooltipPreview');
 const nodeBtnExtractChild = document.getElementById('nodeBtnExtractChild');
+
+// Registramos el panel principal con el primer color de acento. Los paneles
+// adicionales (➕) se registran al crearse, en createExtraReaderPanel().
+registerReaderPanel('main', readerPanel, readerTextMode, panelAccentPalette[0]);
+wirePanelHoverHighlight(readerPanel, 'main');
 
 // ==========================================
 // PANELES FLOTANTES DE DEFINICIÓN
@@ -1630,6 +1922,46 @@ document.addEventListener('mousedown', (e) => {
     if (!selectionTooltip.contains(e.target) && !e.target.closest('.reader-panel-instance')) selectionTooltip.classList.add('hidden');
 });
 
+// --- Arrastrar un fragmento subrayado directo al lienzo (Idea 4) ----------
+// Los navegadores ya permiten arrastrar una selección de texto dentro de un
+// <div contenteditable> de forma nativa (arranca un 'dragstart' con
+// "text/plain" = el texto seleccionado), así que no se necesita ningún
+// atributo especial: basta con escuchar 'dragstart' en el texto (para poder
+// ocultar el tooltip mientras se arrastra) y 'drop' en el lienzo, donde se
+// convierte la posición del mouse a coordenadas del canvas con
+// network.DOMtoCanvas() y se crea el nodo justo ahí.
+function wireDragToCanvas(textEl) {
+    textEl?.addEventListener('dragstart', (e) => {
+        const text = window.getSelection().toString().trim();
+        if (!text) { e.preventDefault(); return; }
+        e.dataTransfer.setData('text/plain', text);
+        selectionTooltip.classList.add('hidden');
+    });
+}
+wireDragToCanvas(readerTextMode);
+
+container.addEventListener('dragover', (e) => { e.preventDefault(); });
+container.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const text = (e.dataTransfer.getData('text/plain') || '').trim();
+    if (!text || text.length < 2) return;
+    if (!checkBalance(1)) return;
+
+    const rect = container.getBoundingClientRect();
+    const canvasPos = network.DOMtoCanvas({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    const nodeId = text;
+    if (!nodes.get(nodeId)) {
+        nodes.add({
+            id: nodeId, label: `*${text}*`, baseTitle: text, color: getRandomColor(),
+            x: canvasPos.x, y: canvasPos.y, fixed: { x: false, y: false }
+        });
+        trackNodeUsage(text); consumeNodes(1);
+    }
+    selectedNodeId = nodeId;
+    setTimeout(() => flashNewNode(nodeId), 50);
+    track('node_created_via_drag');
+});
+
 function highlightSelectedTextAndLink(nodeId) {
     if (!activeSelectionRange) return;
     try {
@@ -1671,6 +2003,20 @@ document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
     selectedNodeId = nodeId;
 });
 
+// "🔗 Vincular a nodo...": en vez de crear el nodo suelto de una vez, guarda la
+// selección y entra en modo "esperando clic en el nodo destino" — el próximo
+// clic sobre un nodo (interceptado al inicio de network.on('click', ...))
+// crea el nodo nuevo YA conectado como hijo de ese nodo elegido.
+document.getElementById('tipBtnLinkToNode')?.addEventListener('click', () => {
+    if (!activeSelectedText) return;
+    selectionTooltip.classList.add('hidden');
+    pendingLinkSelection = { text: activeSelectedText, range: activeSelectionRange };
+    activeSelectedText = ""; activeSelectionRange = null;
+    awaitingLinkTargetClick = true;
+    document.body.classList.add('gk-picking-link-target');
+    appAlert('Ahora haz clic en el nodo del esquema al que quieres vincular este fragmento como hijo.');
+});
+
 // ==========================================
 // PANELES DE LECTOR ADICIONALES (clones independientes del Modo Lector)
 // ==========================================
@@ -1685,7 +2031,64 @@ document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
 // de uno nunca puede terminar mezclado con el de otro.
 let extraReaderPanelCount = 0;
 
-function wireReaderPanelClone(root) {
+// "🔑 Sugerir términos clave" (Idea 6): pide a la IA los términos más
+// importantes del texto pegado y los muestra como chips que el usuario puede
+// marcar/desmarcar. Los que queden marcados se mandan como "focusTerms" al
+// generar el esquema, para que la IA se asegure de representarlos. Devuelve
+// el arreglo "selected" — se mantiene SIEMPRE el mismo arreglo (se vacía y
+// se vuelve a llenar con splice/push, nunca se reasigna), así que quien lo
+// guardó en una variable sigue viendo los cambios.
+function wireKeyTermsSuggestion(btn, chipsContainer, textEl) {
+    const selected = [];
+    btn?.addEventListener('click', async () => {
+        const text = textEl ? textEl.innerText.trim() : '';
+        if (!text || text.length < 20) {
+            appAlert('Pega primero un texto con suficiente contenido para poder sugerir términos.');
+            return;
+        }
+        showLoader('Buscando términos clave...');
+        try {
+            const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'extract_key_terms', text })
+            });
+            if (!ok) {
+                if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudieron sugerir términos.');
+                return;
+            }
+            const terms = Array.isArray(data.terms) ? data.terms : [];
+            if (terms.length === 0) {
+                appAlert('No se encontraron términos claros en este texto.');
+                return;
+            }
+            selected.length = 0;
+            if (chipsContainer) {
+                chipsContainer.innerHTML = '';
+                chipsContainer.classList.remove('hidden');
+                chipsContainer.classList.add('flex');
+                terms.forEach(term => {
+                    const chipEl = document.createElement('span');
+                    chipEl.className = 'gk-term-chip';
+                    chipEl.textContent = term;
+                    chipEl.addEventListener('click', () => {
+                        const idx = selected.indexOf(term);
+                        if (idx === -1) { selected.push(term); chipEl.classList.add('gk-term-selected'); }
+                        else { selected.splice(idx, 1); chipEl.classList.remove('gk-term-selected'); }
+                    });
+                    chipsContainer.appendChild(chipEl);
+                });
+            }
+        } catch (err) {
+            console.error(err);
+            appAlert('No se pudieron sugerir términos, intenta de nuevo.');
+        } finally {
+            hideLoader();
+        }
+    });
+    return selected;
+}
+
+function wireReaderPanelClone(root, panelId) {
     const q = (role) => root.querySelector(`[data-role="${role}"]`);
     const header = q('header');
     const btnAdd = q('btnAdd');
@@ -1699,8 +2102,11 @@ function wireReaderPanelClone(root) {
     const btnEditContext = q('btnEditContext');
     const editRow = q('docContextEditRow');
     const contextInput = q('docContextInput');
+    const btnSuggestTerms = q('btnSuggestTerms');
+    const keyTermsChips = q('keyTermsChips');
 
     let localContext = "";
+    let selectedFocusTerms = wireKeyTermsSuggestion(btnSuggestTerms, keyTermsChips, textEl);
 
     function updateChip() {
         if (!chip) return;
@@ -1768,7 +2174,10 @@ function wireReaderPanelClone(root) {
     document.addEventListener('mouseup', () => { dragState = null; });
     root.addEventListener('mousedown', () => { root.style.zIndex = String(500 + (++floatingPanelCount)); });
 
-    btnClose?.addEventListener('click', () => root.remove());
+    btnClose?.addEventListener('click', () => {
+        if (panelId) readerPanelRegistry.delete(panelId);
+        root.remove();
+    });
     btnClear?.addEventListener('click', async () => {
         const hasText = textEl && textEl.innerText.trim() !== "";
         if (!hasText && !localContext) return;
@@ -1777,6 +2186,8 @@ function wireReaderPanelClone(root) {
             if (textEl) textEl.innerText = "";
             if (contextInput) contextInput.value = "";
             editRow?.classList.add('hidden');
+            selectedFocusTerms.length = 0;
+            if (keyTermsChips) { keyTermsChips.innerHTML = ''; keyTermsChips.classList.add('hidden'); keyTermsChips.classList.remove('flex'); }
             updateChip(); updateEmptyHintLocal();
         }
     });
@@ -1794,10 +2205,13 @@ function wireReaderPanelClone(root) {
         if (textContent === null) return;
         updateEmptyHintLocal();
 
-        await generateFullSchemaFromTopic(textContent);
+        await generateFullSchemaFromTopic(textContent, { originPanelId: panelId, focusTerms: selectedFocusTerms.slice() });
     });
 
+    wireDragToCanvas(textEl);
+
     updateEmptyHintLocal();
+    wirePanelHoverHighlight(root, panelId);
 }
 
 function createExtraReaderPanel() {
@@ -1822,6 +2236,8 @@ function createExtraReaderPanel() {
     if (cloneContextInput) cloneContextInput.value = '';
     const cloneEmptyHint = clone.querySelector('[data-role="emptyHint"]');
     if (cloneEmptyHint) cloneEmptyHint.classList.remove('hidden');
+    const cloneChips = clone.querySelector('[data-role="keyTermsChips"]');
+    if (cloneChips) { cloneChips.innerHTML = ''; cloneChips.classList.add('hidden'); cloneChips.classList.remove('flex'); }
 
     const n = extraReaderPanelCount;
     const titleEl = clone.querySelector('[data-role="title"]');
@@ -1831,7 +2247,11 @@ function createExtraReaderPanel() {
     clone.style.top = `${136 + cascade * 44}px`;
     clone.style.zIndex = String(500 + (++floatingPanelCount));
     floatingPanelsLayer.appendChild(clone);
-    wireReaderPanelClone(clone);
+
+    const panelId = `panel-${n}`;
+    const accent = panelAccentPalette[n % panelAccentPalette.length];
+    registerReaderPanel(panelId, clone, cloneText, accent);
+    wireReaderPanelClone(clone, panelId);
     return clone;
 }
 
@@ -1971,7 +2391,17 @@ document.getElementById('btnMenuFullSchema')?.addEventListener('click', async ()
     const node = nodes.get(selectedNodeId);
     if (!node) return;
     const topic = node.baseTitle || selectedNodeId;
-    await generateFullSchemaFromTopic(topic);
+    // Si el nodo ya venía de un panel de lectura (tiene origen registrado),
+    // conservamos esa herencia para que el nuevo esquema también quede
+    // tageado/resaltable con ese mismo panel.
+    await generateFullSchemaFromTopic(topic, { originPanelId: node.originPanelId || null });
+});
+
+document.getElementById('btnMenuLocateText')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    locateNodeInText(selectedNodeId);
 });
 
 // Editar el texto de un nodo existente. El usuario ve/edita el texto "limpio"
@@ -2187,6 +2617,12 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
     }
 }
 
+const mainSelectedFocusTerms = wireKeyTermsSuggestion(
+    document.getElementById('btnSuggestTerms'),
+    document.getElementById('keyTermsChips'),
+    readerTextMode
+);
+
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     let textContent = readerTextMode.innerText.trim();
     if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
@@ -2205,7 +2641,7 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
     updateReaderEmptyHint();
 
     currentDocumentText = textContent;
-    await generateFullSchemaFromTopic(textContent);
+    await generateFullSchemaFromTopic(textContent, { originPanelId: 'main', focusTerms: mainSelectedFocusTerms.slice() });
 });
 
 // ==========================================
@@ -2376,6 +2812,9 @@ document.getElementById('btnClearReader')?.addEventListener('click', async () =>
         if (docContextInput) docContextInput.value = "";
         docContextEditRow?.classList.add('hidden');
         updateDocContextChip();
+        mainSelectedFocusTerms.length = 0;
+        const chipsEl = document.getElementById('keyTermsChips');
+        if (chipsEl) { chipsEl.innerHTML = ''; chipsEl.classList.add('hidden'); chipsEl.classList.remove('flex'); }
     }
 });
 

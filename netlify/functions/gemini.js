@@ -369,12 +369,21 @@ async function rawHandler(event, context) {
         // ==========================================
         if (action === 'parse_text') {
             const isShortTopic = text.trim().split(/\s+/).length < 25;
-            
-            const inputContext = isShortTopic 
+            const { focusTerms } = JSON.parse(event.body);
+
+            const inputContext = isShortTopic
                 ? `Construye un esquema conceptual exhaustivo de 3 niveles sobre el tema: "${text}".
                    REGLA DE EXHAUSTIVIDAD: Si el concepto o sus sub-ramas tienen fases, partes, clasificaciones o elementos canónicos definidos (ej. "Fases de la división celular", "Poderes del Estado"), DEBES incluir TODOS los elementos reales que componen cada nivel sin omitir ninguno. Si es un tema abierto (ej. "Política Exterior de Colombia"), despliega un abanico completo con todas las dimensiones y sub-elementos clave.`
                 : `Analiza minuciosamente el siguiente documento y estructura un mapa conceptual de 3 niveles estrictamente fiel a su contenido:\n"""${text}"""\n
                    REGLA DE FIDELIDAD AL TEXTO: Descompón el esquema únicamente en las fases, categorías y sub-elementos que mencione o desarrolle la lectura.`;
+
+            const focusHint = (Array.isArray(focusTerms) && focusTerms.length > 0)
+                ? `\n\nTÉRMINOS DE ENFOQUE PRIORITARIO: El usuario ha marcado estos términos/pasajes como especialmente importantes: ${focusTerms.map(t => `"${t}"`).join(', ')}. Asegúrate de que cada uno de ellos quede representado explícitamente como un nodo (en el nivel que corresponda), sin forzar la estructura si no calza naturalmente.`
+                : '';
+
+            const sourceQuoteNote = !isShortTopic
+                ? ' Además, para cada nodo incluye "sourceQuote": una cita literal y breve (máx. 15 palabras), copiada EXACTAMENTE tal como aparece en el documento original, que sea la evidencia textual de ese nodo. Si el nodo resume varias partes del texto, cita el fragmento más representativo. Nunca inventes ni paraphrasees la cita; debe ser texto literal copiado del documento.'
+                : ' El campo "sourceQuote" en este caso puede dejarse como cadena vacía ("") ya que no hay documento fuente, solo un tema.';
 
             const schema = {
                 type: 'OBJECT',
@@ -384,7 +393,8 @@ async function rawHandler(event, context) {
                         description: 'Nivel 1: Nodo central o título general.',
                         properties: {
                             id: { type: 'STRING' },
-                            label: { type: 'STRING' }
+                            label: { type: 'STRING' },
+                            sourceQuote: { type: 'STRING', description: 'Cita literal breve del documento origen, o cadena vacía si no aplica.' }
                         },
                         required: ["id", "label"]
                     },
@@ -396,7 +406,8 @@ async function rawHandler(event, context) {
                             properties: {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
-                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' }
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' },
+                                sourceQuote: { type: 'STRING', description: 'Cita literal breve del documento origen, o cadena vacía si no aplica.' }
                             },
                             required: ["id", "label", "relationship"]
                         }
@@ -410,7 +421,8 @@ async function rawHandler(event, context) {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
                                 parentId: { type: 'STRING', description: 'ID exacto del nodo en "branches" (Nivel 2) al que pertenece.' },
-                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' }
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' },
+                                sourceQuote: { type: 'STRING', description: 'Cita literal breve del documento origen, o cadena vacía si no aplica.' }
                             },
                             required: ["id", "label", "parentId", "relationship"]
                         }
@@ -426,11 +438,39 @@ async function rawHandler(event, context) {
                 1. ESTRUCTURA DE 3 NIVELES: Genera el nodo raíz (Nivel 1), todas sus ramas principales correspondientes (Nivel 2) y desglosa cada rama principal en sus sub-nodos correspondientes (Nivel 3).
                 2. CERO NODOS DE EJEMPLO: Está PROHIBIDO incluir nodos de "Ejemplo:" en este esquema inicial. Todos los nodos deben ser conceptos, fases, componentes o categorías teóricas/fácticas del tema.
                 3. PROHIBICIÓN DE PLACEHOLDERS: Nunca uses textos genéricos como "Subconcepto 1" o "Fase A". Usa los nombres reales.
-                4. "relationship": Usa conectores precisos de 1 a 3 palabras.`,
+                4. "relationship": Usa conectores precisos de 1 a 3 palabras.
+                5. "sourceQuote":${sourceQuoteNote}${focusHint}`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
                     temperature: 0.15
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
+        // ==========================================
+        // 5b. EXTRAER TÉRMINOS CLAVE DE UN TEXTO
+        // ==========================================
+        if (action === 'extract_key_terms') {
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    terms: {
+                        type: 'ARRAY',
+                        description: 'Entre 6 y 14 términos o frases cortas clave del texto, cada uno copiado literalmente (misma mayúscula/minúscula y forma) tal como aparece en el documento, para poder ubicarlos con una búsqueda exacta.',
+                        items: { type: 'STRING' }
+                    }
+                },
+                required: ["terms"]
+            };
+
+            const response = await generateWithFallback({
+                contents: `Lee el siguiente texto y extrae los términos o frases clave (sustantivos o expresiones cortas, de 1 a 4 palabras) que mejor representan sus ideas centrales. Cada término DEBE aparecer copiado literalmente (exactamente igual, incluyendo mayúsculas/minúsculas) en el texto, para que pueda ser localizado con una búsqueda exacta de substring.\n\nTEXTO:\n"""${text.slice(0, 12000)}"""\n\nDevuelve entre 6 y 14 términos, sin duplicados, priorizando los más relevantes y distribuidos a lo largo del texto.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.2
                 }
             });
             return { statusCode: 200, body: response.text };

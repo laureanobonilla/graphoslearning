@@ -1045,3 +1045,120 @@ suelto o como parte de otro esquema — en vez de limitarte a Conceptos
 Relacionados/Ejemplos (que agregan unos pocos nodos), genera un árbol
 completo nuevo a partir de ese concepto, igual de completo que si hubieras
 empezado desde cero con ese tema.
+
+## 20. Ocho ideas de interactividad texto↔esquema, todas implementadas
+
+Esta ronda implementa las 8 ideas que te propuse para que el texto pegado en
+el Modo Lector y el esquema generado a partir de él dejen de ser dos cosas
+separadas y empiecen a "hablarse" entre sí. Todas dependen de una base nueva:
+cuando generas un esquema **desde un documento** (no desde un tema corto
+escrito a mano), cada nodo ahora guarda también una `sourceQuote` — una cita
+literal y breve, copiada tal cual del texto, que es la evidencia de por qué
+ese nodo existe — y un `originPanelId`, que identifica de cuál Modo Lector
+(el principal o alguno de los adicionales ➕) salió. Todo lo demás de esta
+sección se apoya en esos dos datos.
+
+### a) 📍 "Ver en el texto" (nuevo ítem del menú de nodo)
+
+Al hacer clic en cualquier nodo que venga de un documento, aparece un nuevo
+botón **📍 Ver en el texto** (justo después de "✏️ Editar texto"). Al pulsarlo,
+Claude/la app abre (o enfoca, si ya estaba abierto) el panel de lectura
+exacto de donde salió ese nodo, hace scroll hasta la cita correspondiente y
+la destella en amarillo un par de segundos para que la ubiques de inmediato.
+Si el nodo no vino de un documento (p. ej. nació de un tema escrito a mano,
+o de Sinergia/Antítesis), te avisa que no tiene una cita asociada.
+
+### b) Resaltado permanente de "lo que ya se convirtió en nodo"
+
+Después de generar un esquema desde un documento, cada cita que se usó para
+crear un nodo queda subrayada de forma permanente y discreta (fondo verde
+agua tenue) directamente en el texto del panel de lectura correspondiente.
+De un vistazo puedes ver qué partes del documento ya "pasaron" al esquema y
+cuáles todavía no se han explorado.
+
+### c) Nodos coloreados por panel de origen + resaltado al pasar el mouse
+
+Si tienes más de un Modo Lector abierto a la vez (ver sección 16g), los
+nodos de cada esquema ahora llevan el borde pintado con un color de acento
+distinto según de cuál panel salieron (ese mismo color también se ve como
+una franja en la cabecera de cada panel). Además, si pasas el mouse por la
+cabecera de un panel, los nodos que vinieron de ese panel se resaltan y el
+resto del esquema se atenúa, para ubicar rápido "qué le corresponde a cuál
+texto" cuando hay varios esquemas mezclados en el lienzo. Con un solo panel
+abierto no cambia nada visualmente — este efecto solo entra en juego cuando
+hay dos o más.
+
+### d) Arrastrar un fragmento subrayado directo al lienzo
+
+Ya no es obligatorio usar el tooltip "⚡ Crear elemento en esquema": ahora
+también puedes seleccionar un fragmento en cualquier panel de lectura y
+arrastrarlo (con el mouse, como arrastrarías cualquier texto seleccionado) y
+soltarlo en el lienzo. El nodo nuevo se crea exactamente en el punto donde lo
+soltaste.
+
+### e) "🔗 Vincular a nodo..." — adjuntar la selección como hijo de un nodo ya existente
+
+El tooltip de selección del lector ahora tiene un segundo botón, además del
+de siempre. Antes, "⚡ Crear elemento en esquema" siempre dejaba el nodo nuevo
+suelto (sin conectar a nada). Con **🔗 Vincular a nodo...**, en cambio, la app
+espera a que hagas clic en cualquier nodo del lienzo y crea el nodo nuevo ya
+conectado como hijo de ese nodo que elegiste — útil para enganchar un dato
+suelto del texto directo a la rama del esquema donde corresponde, sin tener
+que reordenar nada después. Si en vez de un nodo le das clic al lienzo vacío,
+se cancela sin crear nada.
+
+### f) 🔑 "Sugerir términos clave"
+
+Nuevo botón debajo de "Generar Esquema" en cada panel de lectura. Le pide a
+la IA que lea el texto pegado y proponga entre 6 y 14 términos o frases clave
+reales del documento, que aparecen como chips debajo del texto. Puedes marcar
+los que te importen más — los que queden marcados se le indican a la IA como
+prioridad al generar el esquema, para asegurar que esos términos queden
+representados como nodos aunque la estructura general los hubiera resumido o
+agrupado con otra cosa.
+
+### g) Esquema "armándose en vivo", con destello sincronizado en el texto
+
+Cuando generas un esquema, en vez de que todos los nodos aparezcan de golpe,
+ahora se revelan uno por uno en orden (raíz → ramas → sub-ramas), cada uno
+con un pequeño destello — y si ese nodo tiene una cita en el texto, el mismo
+fragmento destella en el panel de lectura exactamente en ese instante. Es la
+sensación de "esquema armándose en tiempo real" que pedías.
+
+**Nota honesta sobre esta idea en concreto:** la idea original era un
+streaming real, palabra por palabra, directo desde el servidor de IA
+(Gemini) mientras responde. Implementar eso a ciegas — sin un entorno
+Netlify + Gemini en vivo para probarlo paso a paso — es demasiado riesgoso: si
+algo sale mal a mitad de un streaming real, el usuario puede quedarse con un
+esquema a medio generar y sin saber si seguir esperando o no. Por eso lo que
+se construyó es esta animación de revelado: el esquema completo ya se calculó
+y está listo (así no se rompe la lógica cuidadosa de evitar traslapes, ver
+sección 18b), y lo que se anima es solamente la aparición visual, en el mismo
+orden en que la IA los pensó. El efecto para quien lo ve es muy similar al
+streaming real, pero sin el riesgo de un esquema roto a medio camino.
+
+### h) Sugerencia descartable: "estos dos fragmentos están cerca, ¿los vinculo?"
+
+Después de generar un esquema desde un documento, si dos nodos de ramas
+distintas tienen sus citas muy cerca una de la otra dentro del texto original
+(y todavía no están conectados entre sí), aparece un aviso discreto abajo del
+lienzo: *"'X' y 'Y' aparecen muy cerca en el texto. ¿Vincularlos?"*, con
+botones **Vincular** / **Descartar**. Nunca se crea el vínculo solo —
+siempre es una sugerencia que tú aceptas o ignoras, y desaparece sola a los
+14 segundos si no la atiendes.
+
+### Archivos tocados en esta ronda
+
+- `netlify/functions/gemini.js`: `parse_text` ahora pide y devuelve
+  `sourceQuote` por nodo (y acepta un `focusTerms` opcional); nueva acción
+  `extract_key_terms`.
+- `netlify/functions/_lib/billing.js`: `extract_key_terms` registrada como
+  acción conocida y gratuita.
+- `app.js`: registro de paneles de lectura (`readerPanelRegistry`), resaltado
+  de cobertura, "Ver en el texto", colores por panel + hover, arrastrar al
+  lienzo, "Vincular a nodo...", sugerencia de términos clave, revelado
+  animado y sugerencia de vínculo por proximidad.
+- `index.html`: nuevo botón del menú ("📍 Ver en el texto"), nuevo botón del
+  tooltip de selección ("🔗 Vincular a nodo..."), nuevo botón + chips de
+  términos clave en el panel de lectura, estilos nuevos para el resaltado de
+  cobertura y los chips.

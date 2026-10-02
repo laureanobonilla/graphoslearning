@@ -50,6 +50,42 @@
             background-color: var(--void);
             overscroll-behavior-y: none;
         }
+        /* Interactividad texto↔esquema: resaltado de cobertura, términos clave y
+           modo "elige un nodo destino" al vincular un fragmento subrayado. */
+        mark.gk-coverage-mark {
+            background-color: rgba(79, 209, 197, 0.22);
+            border-bottom: 2px solid rgba(79, 209, 197, 0.55);
+            color: inherit;
+            border-radius: 2px;
+            cursor: default;
+            transition: background-color 0.4s ease;
+        }
+        mark.gk-coverage-mark.gk-coverage-flash {
+            background-color: rgba(250, 204, 21, 0.55);
+            border-bottom-color: #ca8a04;
+        }
+        .gk-term-chip {
+            font-size: 11px;
+            padding: 3px 9px;
+            border-radius: 999px;
+            border: 1px solid #334155;
+            background: #1e293b;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .gk-term-chip:hover { border-color: #818cf8; }
+        .gk-term-chip.gk-term-selected {
+            background: #4f46e5;
+            border-color: #818cf8;
+            color: #fff;
+            font-weight: 600;
+        }
+        body.gk-picking-link-target #network-container,
+        body.gk-picking-link-target .vis-network {
+            cursor: crosshair !important;
+        }
         h1, h2, h3, .font-heading {
             font-family: var(--font-display);
             letter-spacing: -0.015em;
@@ -285,6 +321,10 @@
                 <button id="btnParseReaderText" data-role="btnGenerate" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
                     <span>🌐 Generar Esquema</span>
                 </button>
+                <button id="btnSuggestTerms" data-role="btnSuggestTerms" title="Pide a la IA que detecte los términos más importantes de este texto, para enfocar el esquema en ellos" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5">
+                    <span>🔑 Sugerir términos clave</span>
+                </button>
+                <div id="keyTermsChips" data-role="keyTermsChips" class="hidden flex-wrap gap-1.5"></div>
                 <!-- El contexto (para desambiguar definiciones después) ya no es un campo
                      que el usuario tenga que llenar: se detecta solo del texto o del título
                      de la página leída. Solo aparece, muy discreto, cuando hay algo que mostrar. -->
@@ -322,7 +362,8 @@
     <!-- Menú Flotante ÚNICO al Subrayar en el Lector -->
     <div id="selectionTooltip" class="hidden absolute bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-[120] text-xs select-none">
         <span id="tooltipSelectedTextPreview" class="text-slate-300 italic max-w-[150px] truncate">"..."</span>
-        <button id="tipBtnCreateNode" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear elemento en esquema</button>
+        <button id="tipBtnCreateNode" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors whitespace-nowrap">⚡ Crear elemento en esquema</button>
+        <button id="tipBtnLinkToNode" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded font-semibold transition-colors whitespace-nowrap">🔗 Vincular a nodo...</button>
     </div>
 
     <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
@@ -381,6 +422,10 @@
             <button id="btnMenuEditText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
                 <span>✏️ Editar texto</span>
                 <span class="text-[#5b6388] text-[10px]">Renombrar</span>
+            </button>
+            <button id="btnMenuLocateText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <span>📍 Ver en el texto</span>
+                <span class="text-[#5b6388] text-[10px]">Origen</span>
             </button>
             <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2 hover:bg-[#1c2a1a] text-lime-300 font-medium text-xs text-left flex items-center justify-between transition-colors">
                 <span>💡 Explicación sencilla</span>
