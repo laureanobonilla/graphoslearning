@@ -717,6 +717,109 @@ usaban "Ver definición" y otras acciones que sí funcionaban bien. Con esto:
   inicio de sesión, no la tienda (un invitado no puede comprar sin cuenta).
 - Demasiadas peticiones seguidas (429): su propio aviso, como antes.
 
+## 14. Se quitó YouTube, se agregó "leer una página web"
+
+YouTube bloquea sistemáticamente los pedidos que vienen de un servidor (no
+de un navegador real), así que la extracción de subtítulos nunca funcionó de
+forma confiable — quedó documentado en la sección 8, y ahora, siguiendo tu
+pedido, se quitó de la interfaz. `netlify/functions/youtube-transcript.js`
+se queda en el proyecto sin usar (por si algún día quieres retomarlo), pero
+ya no se llama desde ningún lado.
+
+**En su lugar:** el Modo Lector ahora acepta un enlace a una página web
+(artículo, noticia, blog, etc.), además del texto pegado a mano. La
+nueva función `netlify/functions/read-webpage.js`:
+
+1. Descarga esa página en el servidor.
+2. Extrae el texto principal del artículo con `@mozilla/readability` — la
+   misma librería que usa el "Modo lectura" de Firefox para quedarse solo con
+   el contenido y descartar menús, anuncios, barras laterales, etc.
+3. Ese texto se usa exactamente igual que si lo hubieras pegado a mano: se
+   "agota" con Gemini para generar el esquema.
+
+A diferencia de YouTube, la mayoría de páginas de artículos/noticias **sí**
+permiten que un servidor las lea — no tienen el mismo nivel de protección
+anti-bot. Igual puede fallar en casos puntuales (una página que carga el
+texto con JavaScript después, un muro de pago/login, un sitio que si
+bloquea accesos automatizados) — en esos casos, el error dice claramente qué
+pasó e invita a pegar el texto a mano en su lugar.
+
+**Antes de desplegar**, instala las 2 dependencias nuevas (ve al `package.json`
+de la raíz del proyecto):
+```
+npm install
+```
+Netlify también las instala solo al desplegar, siempre que `package.json`
+esté en el repo (ya lo está, con `@mozilla/readability` y `jsdom` agregados).
+
+> La nota que había aquí, sin resolver, preguntaba si el campo "Generar" de
+> arriba debía siempre intentar un esquema completo a partir de un tema corto.
+> Tu respuesta fue que no — "Generar" de arriba debe **siempre** crear un
+> solo nodo suelto, nunca un esquema completo. Ver sección 15, donde quedó
+> implementado.
+
+## 15. "Generar" de arriba ahora SIEMPRE crea un solo nodo, y los paneles flotantes ya no se tapan entre sí
+
+Dos ajustes pedidos directamente sobre el comportamiento anterior:
+
+### a) El campo "Generar" de la cabecera ya solo crea un nodo suelto
+
+Antes, `handleTopicInput()` (en `app.js`) tenía lógica para decidir "¿esto es
+un tema corto para investigar, o un texto largo/enlace para usar tal cual?" —
+y hasta probaba si el lienzo estaba vacío para decidir si disparaba un
+esquema completo. Eso hacía que el campo de arriba, a veces, generara un
+esquema completo en vez de un solo nodo, lo cual no es lo que esperabas de
+ese campo.
+
+Ahora `handleTopicInput()` hace una sola cosa, siempre: toma exactamente lo
+que escribiste y crea un nodo nuevo en el lienzo con ese texto (via
+`insertSingleNode()`), sin investigar nada ni distinguir temas cortos de
+textos largos o enlaces. Generar un esquema completo a partir de un tema,
+un texto largo pegado o un enlace a una página web sigue existiendo, pero
+**solo** dentro del Modo Lector (el botón "🌐 Generar Esquema del texto o
+tema" del panel de lectura) — que es donde ya tenía sentido "investigar" en
+vez de solo anotar algo. También actualicé el placeholder, el título (tooltip)
+del campo y el texto de ayuda de la cabecera para que digan esto con claridad.
+
+Los demás puntos de entrada a "generar esquema completo" (el botón 🎲 de
+sorpresa, las sugerencias de tema de la pantalla de bienvenida) no se
+tocaron — siguen funcionando igual que antes, porque no pasan por
+`handleTopicInput()`.
+
+### b) Los paneles flotantes ya no quedan debajo de sus iguales ni del Modo Lector
+
+Había dos causas distintas para que un panel nuevo (definición, Explicación
+sencilla, Reto Socrático) apareciera tapado por otro, o exactamente en el
+mismo lugar que otro:
+
+1. **Bug de contexto de apilamiento en CSS (la causa de "por debajo de
+   otro")**: el Modo Lector vivía en el HTML como **hermano** de la capa de
+   paneles flotantes (`#floatingPanelsLayer`), no como hijo suyo. Esa capa
+   tiene `position: absolute` + un `z-index` propio (20), y en CSS eso crea
+   su propio "contexto de apilamiento": todo lo que esté DENTRO de esa capa
+   compite en z-index solo entre sí, sin que nada de fuera pueda intercalarse
+   — ni para quedar arriba, ni para quedar abajo. El Modo Lector, al estar
+   fuera, siempre terminaba por encima o por debajo de TODOS los paneles de
+   definición, sin importar cuál se hubiera tocado de último (el sistema que
+   sube el z-index al hacer clic en un panel para traerlo al frente nunca
+   lograba ponerlo por encima del Modo Lector, porque viven en "mundos"
+   distintos de apilamiento). Arreglado moviendo el `#readerPanel` para que
+   sea hijo de `#floatingPanelsLayer` en el HTML: ahora compite de igual a
+   igual con los demás paneles por el mismo z-index compartido, y el que se
+   tocó de último manda, sea cual sea.
+
+2. **Bug de posición repetida (la causa de "en el mismo lugar")**: cada panel
+   nuevo se colocaba en un escalón de posición calculado con
+   `openFloatingPanels.size % 6` — es decir, "cuántos paneles hay abiertos
+   AHORA". El problema: si cerrabas un panel y abrías otro, ese número volvía
+   a repetirse, y el panel nuevo caía exactamente en el mismo escalón (mismo
+   `left`/`top` en pantalla) que uno que seguía abierto. Arreglado usando en
+   su lugar el contador global que nunca se reinicia (`floatingPanelCount`,
+   el mismo que ya se usaba para el z-index), así cada panel nuevo cae en un
+   escalón distinto al de cualquier otro que siga abierto, sin importar
+   cuántos se hayan cerrado entre medio. De paso subí el ciclo de 6 a 10
+   escalones para que el patrón de cascada tarde más en repetirse.
+
 ## Archivos modificados en esta ronda
 
 - `app.js` — `findFreeSpot`/`flashNewNode` (nodo suelto visible);
@@ -734,6 +837,15 @@ usaban "Ver definición" y otras acciones que sí funcionaban bien. Con esto:
   (parse_text, expand, examples, synergy, connect, custom_prompt ×2,
   antithesis, socratic_question, socratic_evaluate) ahora usan `apiFetch` y
   `handleBillingError` (sección 13 de este documento).
+- `netlify/functions/read-webpage.js` (nuevo) — lee una página web y extrae
+  su texto principal (sección 14).
+- `app.js` — `looksLikeYouTubeLink`/`resolveTextOrYouTubeLink` reemplazadas
+  por `looksLikeWebLink`/`resolveTextOrWebLink`, usadas tanto en el campo de
+  la cabecera como en el Modo Lector.
+- `index.html` — textos de la cabecera y el Modo Lector actualizados (ya no
+  mencionan YouTube/video, mencionan enlaces web).
+- `package.json` — agregadas las dependencias `@mozilla/readability` y
+  `jsdom`.
 - `app.js` — bloque "0. COBRO MANUAL" (constantes `SUPPORT_WHATSAPP_NUMBER`,
   `SUPPORT_EMAIL`, `AUTOMATIC_PAYMENTS_ENABLED`); `updateManualPurchaseBox()` y
   `openStoreModal()` nuevas; `initPaypalButtons` ahora respeta

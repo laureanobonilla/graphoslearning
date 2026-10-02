@@ -207,7 +207,7 @@
 
             <!-- Buscador: el momento protagonista de la barra -->
             <div class="flex gap-2 flex-1 min-w-0">
-                <input type="text" id="topicInput" placeholder="Un tema corto para investigar, o pega un texto largo / enlace de YouTube..." title="Un tema corto (ej. 'La célula') se investiga y se genera un esquema completo. Un texto largo o un enlace de YouTube se usa tal cual, fiel a su contenido." class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg pl-3.5 pr-2 py-2.5 md:py-2 text-sm text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans flex-1">
+                <input type="text" id="topicInput" placeholder="Escribe algo y crea un nodo nuevo con eso..." title="Crea un solo nodo en el lienzo con exactamente lo que escribas aquí. Para generar un esquema completo a partir de un tema, un texto largo o un enlace a una página web, usa el Modo Lector." class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg pl-3.5 pr-2 py-2.5 md:py-2 text-sm text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans flex-1">
                 <button id="btnGenerate" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0">
                     Generar
                 </button>
@@ -240,9 +240,9 @@
         <!-- Fila 2: Controles secundarios, discretos -->
         <div class="flex items-center gap-2 w-full">
             <button id="btnToggleReader" class="text-[#c9b37a] hover:text-[#e4cf96] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>📖</span> Pegar documento / video (Modo Lector)
+                <span>📖</span> Pegar documento / enlace (Modo Lector)
             </button>
-            <span class="text-[10px] text-[#5b6388] hidden lg:inline truncate">💡 Corto = investiga el tema · Largo o enlace = usa tal cual ese contenido</span>
+            <span class="text-[10px] text-[#5b6388] hidden lg:inline truncate">💡 "Generar" crea un nodo suelto · Para un esquema completo (tema, texto largo o enlace), usa el Modo Lector</span>
             <div class="flex-1"></div>
             <button id="btnClear" class="text-[#8a92b2] hover:text-rose-300 text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🧹</span> Limpiar
@@ -251,48 +251,57 @@
     </header>
 
 <div class="flex flex-1 h-full relative overflow-hidden">
-    <!-- Capa de paneles flotantes de definición: cada "Ver definición" abre aquí su propia
-         ventana, posicionada para no tapar las anteriores y arrastrable por el usuario.
+    <!-- Capa de paneles flotantes: cada "Ver definición" abre aquí su propia ventana,
+         posicionada para no tapar las anteriores y arrastrable por el usuario, y el
+         Modo Lector vive aquí también (ver nota más abajo) — así los dos tipos de
+         panel compiten por el mismo z-index y el que se tocó de último SIEMPRE queda
+         encima, sin importar si es un panel de definición o el propio Modo Lector.
+         Antes el Modo Lector vivía FUERA de esta capa, como hermano con su propio
+         z-index fijo — eso lo dejaba siempre por encima (o por debajo, según el
+         orden del HTML) de los demás paneles sin importar cuál se hubiera tocado
+         de último, porque esta capa crea su propio contexto de apilamiento en CSS
+         y ningún z-index de fuera puede "ver" los de adentro para compararlos.
          Nunca toca el lienzo del mapa. Ver openFloatingPanel() en app.js -->
-    <div id="floatingPanelsLayer" class="absolute inset-0 pointer-events-none z-20"></div>
+    <div id="floatingPanelsLayer" class="absolute inset-0 pointer-events-none z-20">
+        <!-- Panel flotante de Lectura Activa / Modo Lector: ya no va fijo a un costado
+             ocupando siempre espacio del lienzo — es una ventana flotante y arrastrable,
+             igual en espíritu a los paneles de definición (vive en la misma capa que
+             ellos, ver comentario arriba), que se abre solo cuando se necesita pegar
+             un documento largo o un enlace a una página web. -->
+        <div id="readerPanel" class="hidden absolute w-[420px] max-w-[92vw] h-[70vh] max-h-[80vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px;">
+            <div id="readerPanelHeader" class="px-3 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 select-none cursor-move">
+                <div class="flex items-center justify-between gap-2">
+                    <h3 class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
+                    <div class="flex items-center gap-1.5">
+                        <button id="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">🧹</button>
+                        <button id="btnCloseReader" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all">✕</button>
+                    </div>
+                </div>
+                <button id="btnParseReaderText" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+                    <span>🌐 Generar Esquema del texto o tema</span>
+                </button>
+                <!-- El contexto (para desambiguar definiciones después) ya no es un campo
+                     que el usuario tenga que llenar: se detecta solo del texto o del título
+                     de la página leída. Solo aparece, muy discreto, cuando hay algo que mostrar. -->
+                <div id="docContextChip" class="hidden items-center gap-1.5 text-[10px] text-slate-500">
+                    <span class="truncate">📎 Contexto: <span id="docContextChipText" class="text-slate-400"></span></span>
+                    <button id="btnEditContext" class="underline hover:text-indigo-300 shrink-0">editar</button>
+                </div>
+                <div id="docContextEditRow" class="hidden items-center gap-2">
+                    <input type="text" id="docContextInput" placeholder="Detectado automático, o escríbelo tú..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
+                </div>
+            </div>
+
+            <!-- Área de Lectura (Fondo Blanco Limpio) -->
+            <div id="readerContentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
+                <div id="readerTextMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:pointer-events-none" contenteditable="true" data-placeholder="Pega aquí un texto largo, o el enlace de un artículo o página web..."></div>
+            </div>
+        </div>
+    </div>
 
     <div id="nodeSelectionTooltip" class="hidden fixed bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-40 text-xs select-none">
         <span id="nodeTooltipPreview" class="text-slate-300 italic max-w-[150px] truncate">"..."</span>
         <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear elemento en esquema</button>
-    </div>
-
-    <!-- Panel flotante de Lectura Activa / Modo Lector: ya no va fijo a un costado
-         ocupando siempre espacio del lienzo — es una ventana flotante y arrastrable,
-         igual en espíritu a los paneles de definición, que se abre solo cuando se
-         necesita pegar un documento largo o un enlace de YouTube. -->
-    <div id="readerPanel" class="hidden absolute w-[420px] max-w-[92vw] h-[70vh] max-h-[80vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col z-40 shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px;">
-        <div id="readerPanelHeader" class="px-3 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 select-none cursor-move">
-            <div class="flex items-center justify-between gap-2">
-                <h3 class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
-                <div class="flex items-center gap-1.5">
-                    <button id="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">🧹</button>
-                    <button id="btnCloseReader" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all">✕</button>
-                </div>
-            </div>
-            <button id="btnParseReaderText" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-                <span>🌐 Generar Esquema del texto o tema</span>
-            </button>
-            <!-- El contexto (para desambiguar definiciones después) ya no es un campo
-                 que el usuario tenga que llenar: se detecta solo del texto o el título
-                 del video. Solo aparece, muy discreto, cuando hay algo que mostrar. -->
-            <div id="docContextChip" class="hidden items-center gap-1.5 text-[10px] text-slate-500">
-                <span class="truncate">📎 Contexto: <span id="docContextChipText" class="text-slate-400"></span></span>
-                <button id="btnEditContext" class="underline hover:text-indigo-300 shrink-0">editar</button>
-            </div>
-            <div id="docContextEditRow" class="hidden items-center gap-2">
-                <input type="text" id="docContextInput" placeholder="Detectado automático, o escríbelo tú..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
-            </div>
-        </div>
-
-        <!-- Área de Lectura (Fondo Blanco Limpio) -->
-        <div id="readerContentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
-            <div id="readerTextMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none whitespace-pre-wrap select-text empty:before:content-[attr(data-placeholder)] empty:before:text-slate-400 empty:before:pointer-events-none" contenteditable="true" data-placeholder="Pega aquí un texto largo o el enlace de un video de YouTube..."></div>
-        </div>
     </div>
 
     <!-- Menú Flotante ÚNICO al Subrayar en el Lector -->

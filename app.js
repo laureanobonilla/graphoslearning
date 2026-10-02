@@ -701,32 +701,16 @@ function insertSingleNode(topic) {
     }, 50);
 }
 
-// Campo pequeño de la cabecera: es el único punto de entrada para "generar",
-// esté el lienzo vacío o no. Un tema corto se investiga (esquema completo);
-// un texto largo o un enlace de YouTube se usa tal cual, fiel a ese contenido
-// (igual que el Modo Lector, solo que sin tener que abrir ese panel aparte).
-// Si el lienzo YA tiene contenido y lo escrito es un tema corto, se mantiene
-// el agregado rápido de un solo nodo suelto (no gasta tokens de IA de más).
+// Campo pequeño de la cabecera: SIEMPRE crea un solo nodo en solitario con
+// exactamente lo que se escribió, sin importar si es un tema corto, un texto
+// largo o un enlace web. Generar un esquema completo a partir de un tema
+// (investigándolo) o de un documento/enlace es una capacidad exclusiva del
+// Modo Lector (ver btnParseReaderText más abajo) — aquí arriba el usuario
+// espera que lo escrito aparezca tal cual como un nodo nuevo, nada más.
 async function handleTopicInput() {
     const raw = topicInput.value.trim();
     if (!raw) return;
-
-    if (looksLikeYouTubeLink(raw)) {
-        topicInput.value = '';
-        const text = await resolveTextOrYouTubeLink(raw);
-        if (text === null) return;
-        currentDocumentText = text;
-        await generateFullSchemaFromTopic(text);
-        return;
-    }
-
-    const isLongText = raw.split(/\s+/).length >= 25;
-    if (nodes.length === 0 || isLongText) {
-        if (isLongText) currentDocumentText = raw;
-        generateFullSchemaFromTopic(raw);
-    } else {
-        insertSingleNode(raw);
-    }
+    insertSingleNode(raw);
 }
 
 document.getElementById('btnGenerate')?.addEventListener('click', handleTopicInput);
@@ -1348,7 +1332,15 @@ function openFloatingPanel(nodeId, title) {
     const existing = openFloatingPanels.get(nodeId);
     if (existing) { focusFloatingPanel(nodeId); return existing; }
 
-    const offset = openFloatingPanels.size % 6;
+    // El escalón de posición usaba openFloatingPanels.size (cuántos paneles
+    // hay abiertos AHORA), así que al cerrar uno y abrir otro se repetía el
+    // mismo "size" y el panel nuevo caía exactamente encima del anterior.
+    // Usamos floatingPanelCount (el contador global que solo crece, nunca
+    // vuelve a 0) para que cada panel nuevo caiga en un escalón distinto al
+    // de cualquier otro que siga abierto, sin importar cuántos se hayan
+    // cerrado entre medio. El módulo también sube de 6 a 10 escalones para
+    // que haya más posiciones antes de que el patrón se repita.
+    const offset = floatingPanelCount % 10;
     const el = document.createElement('div');
     el.className = 'absolute w-80 max-h-[70vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col pointer-events-auto select-text';
     el.style.left = `${24 + offset * 36}px`;
@@ -1798,41 +1790,48 @@ nodeBtnExtractChild?.addEventListener('click', () => {
 // ==========================================
 // GENERAR ESQUEMA COMPLETO A PARTIR DEL TEXTO DEL LECTOR
 // ==========================================
-// Detecta (en el cliente, sin validar a fondo) si lo pegado es un enlace de
-// YouTube en vez de texto, para decidir si hay que pedirle al backend la
-// transcripción antes de generar el esquema.
-function looksLikeYouTubeLink(str) {
+// Detecta (en el cliente, sin validar a fondo) si lo pegado es un enlace web
+// en vez de texto, para decidir si hay que pedirle al backend que lo lea
+// antes de generar el esquema. Antes esto intentaba lo mismo con enlaces de
+// YouTube (ver netlify/functions/youtube-transcript.js, que se deja en el
+// proyecto sin usar) — se quitó porque YouTube bloquea sistemáticamente los
+// pedidos que vienen de un servidor, así que nunca funcionó de forma
+// confiable. Leer una página web normal (artículo, noticia) es mucho más
+// viable desde un servidor.
+function looksLikeWebLink(str) {
     const t = (str || '').trim();
-    return t.length > 0 && t.length < 300 && !/\s/.test(t) && /(youtube\.com\/|youtu\.be\/)/i.test(t);
+    if (!t || t.length > 2000 || /\s/.test(t)) return false;
+    return /^https?:\/\//i.test(t);
 }
 
-// Si lo que se pasó es un enlace de YouTube, extrae sus subtítulos y devuelve
-// ESE texto en su lugar (mismo mecanismo para el Modo Lector y para el campo
-// pequeño de arriba, así ambos pueden recibir un enlace indistintamente).
-// Devuelve null si falló (y ya mostró la alerta correspondiente).
-async function resolveTextOrYouTubeLink(raw, { fillReaderPanel } = {}) {
-    if (!looksLikeYouTubeLink(raw)) return raw;
+// Si lo que se pasó es un enlace web, le pide al backend que extraiga el
+// texto principal de esa página y devuelve ESE texto en su lugar (mismo
+// mecanismo para el Modo Lector y para el campo pequeño de arriba, así ambos
+// pueden recibir un enlace indistintamente). Devuelve null si falló (y ya
+// mostró la alerta correspondiente).
+async function resolveTextOrWebLink(raw, { fillReaderPanel } = {}) {
+    if (!looksLikeWebLink(raw)) return raw;
 
-    showLoader('Extrayendo subtítulos del video...');
+    showLoader('Leyendo la página...');
     try {
-        const resp = await fetch('/.netlify/functions/youtube-transcript', {
+        const resp = await fetch('/.netlify/functions/read-webpage', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: raw })
         });
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'No se pudo obtener la transcripción de ese video.');
+        if (!resp.ok) throw new Error(data.error || 'No se pudo leer esa página.');
         if (fillReaderPanel && readerTextMode) readerTextMode.innerText = data.text;
         if (data.title && !globalDocumentContext) {
             globalDocumentContext = data.title;
             if (docContextInput) docContextInput.value = data.title;
             updateDocContextChip();
         }
-        track('youtube_transcript_success');
+        track('webpage_read_success');
         return data.text;
     } catch (err) {
-        track('youtube_transcript_error', { message: String(err?.message || '').slice(0, 160) });
-        alert(err.message || "No se pudo extraer el texto de ese video.");
+        track('webpage_read_error', { message: String(err?.message || '').slice(0, 160) });
+        alert(err.message || "No se pudo leer esa página.");
         return null;
     } finally {
         hideLoader();
@@ -1841,9 +1840,9 @@ async function resolveTextOrYouTubeLink(raw, { fillReaderPanel } = {}) {
 
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     let textContent = readerTextMode.innerText.trim();
-    if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de un video de YouTube en el lector.");
+    if (!textContent || textContent.length < 3) return alert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
 
-    textContent = await resolveTextOrYouTubeLink(textContent, { fillReaderPanel: true });
+    textContent = await resolveTextOrWebLink(textContent, { fillReaderPanel: true });
     if (textContent === null) return;
 
     currentDocumentText = textContent;
