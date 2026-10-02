@@ -5,8 +5,8 @@
 // contacto para que el cliente escriba, pague por otro medio, y tú le
 // acredites los nodos a mano (ver LEEME_ETAPA_2.md, sección 11). Reemplaza
 // estos 2 valores por los tuyos reales antes de publicar.
-const SUPPORT_WHATSAPP_NUMBER = '50600000000'; // Código de país + número, solo dígitos, sin "+" ni espacios (ej. Costa Rica: 506XXXXXXXX)
-const SUPPORT_EMAIL = 'tu-correo@dominio.com';
+const SUPPORT_WHATSAPP_NUMBER = '50600000000'; // Código de país + número, solo dígitos, sin "+" ni espacios (ej. Costa Rica: 506XXXXXXXX) — PENDIENTE: poner el número real
+const SUPPORT_EMAIL = 'bonillapretiz@gmail.com';
 // Déjalo en false: la integración de PayPal (createOrder/captureOrder, ya
 // verificada en el servidor) queda intacta y sin usar. Cuando PayPal habilite
 // el pago con tarjeta de invitado para tu cuenta (o integres Paddle/Lemon
@@ -112,14 +112,20 @@ function updateManualPurchaseBox() {
     const packageLabel = `${title} (${nodesText}) — $${price}`;
     const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : '(tu correo de la cuenta)';
 
+    // El nombre corto (sin precio) es lo que se usa en la frase "Para activar
+    // el Pase de Estudio...". El precio/nodos solo hace falta en el mensaje
+    // que se manda, no repetido en esa frase.
     const labelSpan = document.getElementById('manualPurchasePackageLabel');
-    if (labelSpan) labelSpan.innerText = packageLabel;
+    if (labelSpan) labelSpan.innerText = title;
 
-    const message = `Hola, quiero comprar el paquete "${packageLabel}" para mi cuenta de Graphikosmos. Mi correo de la cuenta es: ${userEmail}`;
+    const emailAddressEl = document.getElementById('manualPurchaseEmailAddress');
+    if (emailAddressEl) emailAddressEl.innerText = SUPPORT_EMAIL;
+
+    const message = `Hola, quiero activar el paquete "${packageLabel}" en mi cuenta de Graphikosmos. Mi correo de la cuenta es: ${userEmail}`;
     const waLink = document.getElementById('manualPurchaseWhatsapp');
     const mailLink = document.getElementById('manualPurchaseEmail');
     if (waLink) waLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
-    if (mailLink) mailLink.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Compra de nodos — ' + packageLabel)}&body=${encodeURIComponent(message)}`;
+    if (mailLink) mailLink.href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Activar paquete — ' + packageLabel)}&body=${encodeURIComponent(message)}`;
 }
 document.querySelectorAll('input[name="nodePackage"]').forEach(r => r.addEventListener('change', updateManualPurchaseBox));
 
