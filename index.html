@@ -261,11 +261,51 @@
             </button>
             <span class="text-[10px] text-[#5b6388] hidden lg:inline truncate">💡 "Generar" crea un nodo suelto · Para un esquema completo (tema, texto largo o enlace), usa el Modo Lector</span>
             <div class="flex-1"></div>
+
+            <!-- Controles de exploración del esquema: buscar, repetir la aparición,
+                 modo foco (resalta lo más conectado) y modo presentación (oculta toda
+                 la interfaz de edición para mostrar solo el lienzo). -->
+            <button id="btnSearchNodes" title="Buscar un nodo (Ctrl/Cmd+K)" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span>🔍</span> <span class="hidden md:inline">Buscar</span>
+            </button>
+            <button id="btnReplay" title="Repetir la aparición del esquema, nodo por nodo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span>▶️</span> <span class="hidden md:inline">Replay</span>
+            </button>
+            <button id="btnFocusMode" title="Modo foco: resalta los conceptos más conectados del esquema" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span>🎯</span> <span class="hidden md:inline">Modo foco</span>
+            </button>
+            <button id="btnPresentationMode" title="Modo presentación: oculta toda la interfaz y deja solo el lienzo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span>🖥️</span> <span class="hidden md:inline">Presentación</span>
+            </button>
+            <button id="btnSoundToggle" title="Sonido al crear nodos: apagado" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span id="soundToggleIcon">🔇</span>
+            </button>
             <button id="btnClear" class="text-[#8a92b2] hover:text-rose-300 text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🧹</span> Limpiar
             </button>
         </div>
     </header>
+
+    <!-- Botón flotante para salir del Modo presentación (lo único visible, además
+         del lienzo, mientras ese modo está activo). -->
+    <button id="btnExitPresentation" class="hidden fixed top-4 right-4 z-[250] bg-slate-950/90 border border-slate-700 text-slate-200 hover:text-white hover:border-[#4fd1c5] text-xs font-semibold py-2 px-3.5 rounded-full shadow-xl transition-colors">
+        ✕ Salir de presentación
+    </button>
+
+    <!-- Paleta de búsqueda rápida (Ctrl/Cmd+K): escribe para filtrar nodos por
+         texto y Enter/clic para enfocarlo en el lienzo. -->
+    <div id="searchPalette" class="hidden fixed inset-0 z-[260] bg-slate-950/70 backdrop-blur-sm items-start justify-center pt-24 px-4">
+        <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <input id="searchPaletteInput" type="text" placeholder="Buscar un nodo por su texto..." class="w-full bg-transparent px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none border-b border-slate-800 font-sans">
+            <div id="searchPaletteResults" class="max-h-72 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Minimapa: resumen a escala de todo el lienzo, con un rectángulo que marca
+         lo que ves ahora. Clic en cualquier punto para saltar ahí. -->
+    <div id="minimapContainer" class="fixed bottom-4 right-4 z-[90] bg-slate-950/80 border border-slate-700 rounded-lg shadow-xl overflow-hidden" style="width:180px; height:130px;">
+        <canvas id="minimapCanvas" width="180" height="130" class="cursor-pointer"></canvas>
+    </div>
 
 <div class="flex flex-1 h-full relative overflow-hidden">
     <!-- Capa de paneles flotantes: cada "Ver definición" abre aquí su propia ventana,

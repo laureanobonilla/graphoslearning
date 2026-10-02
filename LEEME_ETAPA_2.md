@@ -1175,3 +1175,92 @@ Dos ajustes al ítem de menú **🌐 Generar esquema completo a partir de aquí*
 - `index.html`: nuevo botón del menú ("📍 Ver en el texto"), nuevo botón del
   tooltip de selección ("🔗 Vincular a nodo..."), estilos del resaltado de
   texto (ahora con color dinámico en vez de uno fijo).
+
+## 22. Experiencia, organicidad y claridad de importancia (sin 3D ni layout tipo sistema solar, por ahora)
+
+A partir del brainstorm de 4 preguntas, se implementó todo lo que no
+necesitaba 3D ni el layout radial tipo "sistema solar" (esos dos quedan
+pendientes, a propósito, para evaluarlos aparte).
+
+### Experiencia de usuario más interesante
+
+- **Buscador rápido (Ctrl/Cmd+K o botón "🔍 Buscar")**: abre una paleta de
+  búsqueda flotante; escribes parte del texto de un nodo y aparece en la
+  lista; clic (o Enter sobre un resultado) y la cámara salta directo a ese
+  nodo, con el mismo pulso visual que al crear un nodo nuevo. `Esc` la cierra.
+- **"▶️ Replay"**: reproduce la aparición del esquema actual, nodo por nodo,
+  en orden de profundidad (primero las raíces, luego ramas, luego
+  sub-ramas) — útil para explicar el esquema a alguien más sin tener que
+  reconstruirlo desde cero.
+- **"🎯 Modo foco"**: calcula qué nodos son los más conectados (el 30% con
+  más vínculos) y atenúa el resto al 22% de opacidad, para que resalte de
+  un vistazo qué es lo más central del esquema. Se puede prender/apagar.
+- **"🖥️ Presentación"**: oculta la barra superior y todos los paneles
+  (lector y flotantes) y deja solo el lienzo visible — ideal para mostrar el
+  esquema en una pantalla compartida sin que distraigan los controles. Un
+  botón "✕ Salir de presentación" (o `Esc`) la cierra y todo vuelve a
+  aparecer exactamente como estaba.
+- **Sonido opcional ("🔇/🔊")**: una campanita de cristal muy breve
+  (sintetizada con Web Audio, no es un archivo de audio) que suena cada vez
+  que aparece un nodo nuevo, en cualquier función de la app (no solo al
+  generar esquemas). Apagado por omisión; se prende con el botón.
+- **Minimapa** (esquina inferior derecha): una vista reducida de todo el
+  esquema con un recuadro que marca qué parte de ese esquema estás viendo
+  ahora. Clic en cualquier punto del minimapa y la cámara viaja ahí.
+- **Zoom semántico**: si acercas mucho la cámara a un nodo que ya tiene una
+  definición generada, aparece automáticamente un adelanto de esa
+  definición junto al nodo (sin tener que hacer clic en nada). Al alejar la
+  cámara o quitar el cursor del nodo, desaparece solo.
+
+### Organicidad
+
+- **Asentado físico orgánico**: cuando se agregan nodos nuevos (al generar
+  un esquema, o añadir uno a partir de un nodo existente), ya no aparecen
+  "congelados" en su posición geométrica final — quedan libres un instante
+  con una física suave de repulsión mientras el resto del esquema se queda
+  fijo, y decantan a un acomodo natural antes de asentarse solos (reutiliza
+  el mismo mecanismo que ya apagaba la física automáticamente al
+  estabilizarse).
+- **Conectores curvos**: esto en realidad ya estaba — las líneas entre
+  nodos siempre han sido curvas dinámicas (`smooth: { type: 'dynamic' }`),
+  no se necesitó ningún cambio.
+- **Aura por rama**: cada rama principal y sus sub-ramas ahora tienen un
+  halo de color muy suave (del mismo color del borde de la rama) dibujado
+  detrás de ellas en el lienzo, como una "burbuja" que agrupa visualmente
+  ese conjunto sin necesidad de dibujar un contorno duro ni mover nada.
+
+### Claridad de importancia de conceptos
+
+- **Tamaño/sombra por grado de conexión**: los nodos con más vínculos se
+  dibujan con un borde más grueso y una sombra más amplia que los nodos con
+  pocos o ningún vínculo — se recalcula solo, en vivo, cada vez que se
+  agrega o quita un nodo o una conexión.
+- **Grosor de enlace por jerarquía**: las conexiones raíz→rama se dibujan
+  más gruesas que las de rama→sub-rama, reforzando visualmente qué nivel es
+  más "principal". (Las conexiones de otras funciones — ejemplos,
+  antítesis, sugerencias de vínculo, etc. — no se tocan, conservan su
+  estilo propio.)
+- El "Modo foco" de la sección anterior también cumple este propósito desde
+  otro ángulo (atenuar lo periférico en vez de resaltar lo central).
+
+### Archivos tocados en esta ronda
+
+- `app.js`: `settleNewNodesOrganically`, bloque completo de sonido
+  (`playChime`/`soundEnabled`), buscador rápido, "Replay", "Modo foco",
+  "Modo presentación", minimapa (dibujo + clic-para-navegar), zoom semántico
+  (`hoverNode`/`blurNode`/`zoom`),
+  `applyImportanceStyling` (enganchada a los eventos `add`/`remove` de los
+  DataSets de nodos y aristas), aura por rama (hook `beforeDrawing` del
+  lienzo), y el campo `depthLevel` (0/1/2) agregado a cada nodo al crearlo
+  en `renderThreeLevelTree` (usado por el orden del Replay, el grosor de
+  enlace y la agrupación por rama).
+- `index.html`: botones nuevos en la barra superior ("🔍 Buscar", "▶️
+  Replay", "🎯 Modo foco", "🖥️ Presentación", sonido), botón flotante
+  "✕ Salir de presentación", paleta de búsqueda (`#searchPalette`) y
+  minimapa (`#minimapContainer`/`#minimapCanvas`).
+
+### Pendiente, a propósito
+
+- Layout tipo "sistema solar" (radial) — no implementado aún, para
+  comparar primero cómo se ve todo lo anterior con el layout actual.
+- 3D — no implementado, mismo motivo.

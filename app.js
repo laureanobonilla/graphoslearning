@@ -41,6 +41,38 @@ function getRandomColor() {
     return elegantPalette[Math.floor(Math.random() * elegantPalette.length)];
 }
 
+// ==========================================
+// 1.b MICRO-SONIDO AL CREAR NODOS (togglable, Web Audio sintetizado — sin
+// archivos de audio que cargar)
+// ==========================================
+let soundEnabled = false;
+let audioCtxSingleton = null;
+function getAudioCtx() {
+    if (!audioCtxSingleton) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        audioCtxSingleton = new AC();
+    }
+    if (audioCtxSingleton.state === 'suspended') audioCtxSingleton.resume();
+    return audioCtxSingleton;
+}
+// Un "tin" breve y suave (campanita de cristal), no un beep genérico.
+function playChime(freq = 880) {
+    if (!soundEnabled) return;
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.09, ctx.currentTime + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.38);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+}
+
 let network = new vis.Network(container, { nodes, edges }, {
     layout: { hierarchical: false },
     physics: {
@@ -582,6 +614,34 @@ function checkBalance(cost) {
 // ==========================================
 // 6. GENERACIÓN DE ESQUEMA EN 3 NIVELES Y NODOS
 // ==========================================
+// "Asentado" orgánico: en vez de que los nodos nuevos aparezcan ya fijos en
+// su posición final (geométrica, rígida), los dejamos libres un instante con
+// física suave encendida SOLO para ellos — los nodos ya existentes quedan
+// fijos mientras tanto para no desordenar el resto del esquema — y dejamos
+// que decanten a un acomodo natural. El listener global ya existente
+// (stopPhysicsAndUnlock, arriba) apaga la física y libera TODOS los nodos en
+// cuanto el motor se estabiliza, así que no hace falta duplicar esa lógica.
+function settleNewNodesOrganically(newIds) {
+    if (!newIds || !newIds.length) return;
+    const allIds = nodes.getIds();
+    const updates = allIds.map(id => ({
+        id,
+        fixed: newIds.includes(id) ? { x: false, y: false } : { x: true, y: true }
+    }));
+    nodes.update(updates);
+    network.setOptions({
+        physics: {
+            enabled: true,
+            solver: 'repulsion',
+            repulsion: { nodeDistance: 140, centralGravity: 0.01, springLength: 120, springConstant: 0.03, damping: 0.4 },
+            stabilization: { enabled: true, iterations: 120, fit: false }
+        }
+    });
+    // Respaldo: si por lo que sea el motor nunca dispara "stabilized" (p.ej.
+    // ya estaba perfectamente quieto), forzamos el apagado tras un momento.
+    setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
+}
+
 async function renderThreeLevelTree(data, opts = {}) {
     const { originPanelId = null, attachToNodeId = null } = opts;
     // Si hay más de un panel de lectura registrado, coloreamos el borde de
@@ -606,6 +666,11 @@ async function renderThreeLevelTree(data, opts = {}) {
         }
         return { color: getRandomColor(), highlightColorIdx: null };
     };
+
+    // IDs de los nodos que se agregan EN ESTA llamada (para el "asentado"
+    // orgánico de física al final — ver settleNewNodesOrganically más abajo —
+    // y para la vista previa de importancia por grado de conexión).
+    const newNodeIds = [];
 
     const root = data.root;
     const branches = data.branches || [];
@@ -721,9 +786,10 @@ async function renderThreeLevelTree(data, opts = {}) {
             x: rootX, y: rootY, fixed: { x: false, y: false },
             widthConstraint: { minimum: 140, maximum: 220 },
             sourceQuote: root.sourceQuote || '', originPanelId: originPanelId,
-            highlightColorIdx: rootAppearance.highlightColorIdx
+            highlightColorIdx: rootAppearance.highlightColorIdx, depthLevel: 0
         });
         trackNodeUsage(root.label);
+        newNodeIds.push(root.id);
     }
 
     let currentLeftX = rootX - (totalTreeWidth / 2);
@@ -743,10 +809,11 @@ async function renderThreeLevelTree(data, opts = {}) {
             x: branchX, y: branchY, fixed: { x: false, y: false },
             widthConstraint: { minimum: 130, maximum: 200 },
             sourceQuote: branch.sourceQuote || '', originPanelId: originPanelId,
-            highlightColorIdx: branchAppearance.highlightColorIdx
+            highlightColorIdx: branchAppearance.highlightColorIdx, depthLevel: 1
         });
         edges.add({ from: rootId, to: branch.id, label: branch.relationship });
         trackNodeUsage(branch.label);
+        newNodeIds.push(branch.id);
 
         const subs = childrenByBranch[branch.id];
         const cols = subs.length <= 1 ? 1 : 2;
@@ -769,16 +836,21 @@ async function renderThreeLevelTree(data, opts = {}) {
                 x: subX, y: subY, fixed: { x: false, y: false },
                 widthConstraint: { minimum: 120, maximum: 185 },
                 sourceQuote: sub.sourceQuote || '', originPanelId: originPanelId,
-                highlightColorIdx: subAppearance.highlightColorIdx
+                highlightColorIdx: subAppearance.highlightColorIdx, depthLevel: 2
             });
             edges.add({ from: branch.id, to: sub.id, label: sub.relationship });
             trackNodeUsage(sub.label);
+            newNodeIds.push(sub.id);
         });
 
         currentLeftX += sectionWidth;
     });
 
     network.setOptions({ physics: { enabled: false } });
+
+    // Dejamos que los nodos recién creados decanten con un asentado físico
+    // breve y suave, en vez de quedar ya "congelados" en su posición final.
+    settleNewNodesOrganically(newNodeIds);
 
     // Resaltar de forma permanente, en el panel de lectura de origen, los
     // fragmentos que ya quedaron convertidos en nodos de este esquema.
@@ -864,6 +936,7 @@ function findFreeSpot(centerX, centerY, minDist = 170) {
 // Pulso visual breve (agranda y resalta el borde un par de veces) para que sea
 // obvio que un nodo nuevo acaba de aparecer, incluso si ya hay muchos en pantalla.
 function flashNewNode(nodeId, baseSize = 25) {
+    playChime();
     let tick = 0;
     const totalTicks = 6;
     const pulse = setInterval(() => {
@@ -1859,7 +1932,7 @@ function openFloatingPanel(nodeId, title) {
     // que haya más posiciones antes de que el patrón se repita.
     const offset = floatingPanelCount % 10;
     const el = document.createElement('div');
-    el.className = 'absolute w-80 max-h-[70vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col pointer-events-auto select-text';
+    el.className = 'gk-floating-panel absolute w-80 max-h-[70vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col pointer-events-auto select-text';
     el.style.left = `${24 + offset * 36}px`;
     el.style.top = `${24 + offset * 36}px`;
     el.style.zIndex = String(500 + (++floatingPanelCount));
@@ -2785,6 +2858,307 @@ document.getElementById('btnMenuDelete')?.addEventListener('click', async () => 
 
     actionMenu.classList.add('hidden');
     selectedNodeId = null;
+});
+
+// ==========================================
+// NUEVO: SONIDO, BÚSQUEDA RÁPIDA, REPLAY, MODO FOCO, MODO PRESENTACIÓN,
+// MINIMAPA, ESTILO POR IMPORTANCIA Y AURA DE RAMA
+// ==========================================
+
+// --- Sonido al crear nodos (togglable) ---
+const btnSoundToggle = document.getElementById('btnSoundToggle');
+const soundToggleIcon = document.getElementById('soundToggleIcon');
+btnSoundToggle?.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    if (soundToggleIcon) soundToggleIcon.textContent = soundEnabled ? '🔊' : '🔇';
+    if (btnSoundToggle) btnSoundToggle.title = `Sonido al crear nodos: ${soundEnabled ? 'encendido' : 'apagado'}`;
+    if (soundEnabled) { getAudioCtx(); playChime(660); }
+});
+
+// --- Buscador rápido de nodos (Ctrl/Cmd+K) ---
+const searchPalette = document.getElementById('searchPalette');
+const searchPaletteInput = document.getElementById('searchPaletteInput');
+const searchPaletteResults = document.getElementById('searchPaletteResults');
+function openSearchPalette() {
+    if (!searchPalette) return;
+    searchPalette.classList.remove('hidden');
+    searchPalette.classList.add('flex');
+    searchPaletteInput.value = '';
+    renderSearchResults('');
+    setTimeout(() => searchPaletteInput?.focus(), 30);
+}
+function closeSearchPalette() {
+    if (!searchPalette) return;
+    searchPalette.classList.add('hidden');
+    searchPalette.classList.remove('flex');
+}
+function renderSearchResults(query) {
+    if (!searchPaletteResults) return;
+    const q = query.trim().toLowerCase();
+    const all = nodes.get();
+    const matches = (q
+        ? all.filter(n => (n.baseTitle || n.id || '').toLowerCase().includes(q))
+        : all
+    ).slice(0, 40);
+    if (!matches.length) {
+        searchPaletteResults.innerHTML = `<div class="px-4 py-3 text-xs text-slate-500 font-sans">Sin resultados.</div>`;
+        return;
+    }
+    searchPaletteResults.innerHTML = matches.map(n => `
+        <button type="button" data-node-id="${n.id}" class="gk-search-result w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 transition-colors font-sans border-b border-slate-800/60 last:border-0 truncate">
+            ${(n.baseTitle || n.id || '').toString().replace(/</g, '&lt;')}
+        </button>
+    `).join('');
+}
+searchPaletteInput?.addEventListener('input', (e) => renderSearchResults(e.target.value));
+searchPaletteResults?.addEventListener('click', (e) => {
+    const btn = e.target.closest('.gk-search-result');
+    if (!btn) return;
+    const nodeId = btn.dataset.nodeId;
+    closeSearchPalette();
+    if (nodeId && nodes.get(nodeId)) {
+        network.selectNodes([nodeId]);
+        network.focus(nodeId, { scale: 1.2, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        flashNewNode(nodeId);
+    }
+});
+searchPalette?.addEventListener('click', (e) => { if (e.target === searchPalette) closeSearchPalette(); });
+document.getElementById('btnSearchNodes')?.addEventListener('click', openSearchPalette);
+document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (searchPalette && !searchPalette.classList.contains('hidden')) closeSearchPalette();
+        else openSearchPalette();
+    } else if (e.key === 'Escape' && searchPalette && !searchPalette.classList.contains('hidden')) {
+        closeSearchPalette();
+    }
+});
+
+// --- "Replay": re-anima la aparición del esquema actual, nodo por nodo ---
+document.getElementById('btnReplay')?.addEventListener('click', async () => {
+    const all = nodes.get();
+    if (!all.length) return;
+    // Orden de aparición: por profundidad (raíces primero) y, dentro de cada
+    // nivel, por el orden en que ya existen — así el replay respeta la misma
+    // jerarquía con la que se construyó el esquema.
+    const order = [...all].sort((a, b) => (a.depthLevel ?? 1) - (b.depthLevel ?? 1));
+    const originalOpacities = new Map(order.map(n => [n.id, n.opacity ?? 1]));
+    nodes.update(order.map(n => ({ id: n.id, opacity: 0.06 })));
+    for (const n of order) {
+        if (!nodes.get(n.id)) continue;
+        nodes.update({ id: n.id, opacity: originalOpacities.get(n.id) ?? 1 });
+        flashNewNode(n.id, n.size || 25);
+        await new Promise(r => setTimeout(r, 180));
+    }
+});
+
+// --- Modo foco: resalta los conceptos más conectados, atenúa el resto ---
+let focusModeActive = false;
+function toggleFocusMode() {
+    focusModeActive = !focusModeActive;
+    const btn = document.getElementById('btnFocusMode');
+    if (btn) btn.classList.toggle('ring-2', focusModeActive);
+    if (btn) btn.classList.toggle('ring-[#4fd1c5]', focusModeActive);
+    if (!focusModeActive) {
+        nodes.update(nodes.getIds().map(id => ({ id, opacity: 1 })));
+        return;
+    }
+    const all = nodes.get();
+    const degrees = all.map(n => ({ id: n.id, degree: network.getConnectedEdges(n.id).length }));
+    const sorted = [...degrees].sort((a, b) => b.degree - a.degree);
+    const topCount = Math.max(1, Math.ceil(sorted.length * 0.3));
+    const importantIds = new Set(sorted.slice(0, topCount).map(d => d.id));
+    nodes.update(all.map(n => ({ id: n.id, opacity: importantIds.has(n.id) ? 1 : 0.22 })));
+}
+document.getElementById('btnFocusMode')?.addEventListener('click', toggleFocusMode);
+
+// --- Modo presentación: oculta toda la interfaz, deja solo el lienzo ---
+let presentationModeActive = false;
+function togglePresentationMode(forceOff = false) {
+    presentationModeActive = forceOff ? false : !presentationModeActive;
+    const header = document.getElementById('mainHeader');
+    const exitBtn = document.getElementById('btnExitPresentation');
+    const panels = document.querySelectorAll('.reader-panel-instance, .gk-floating-panel');
+    if (presentationModeActive) {
+        header?.classList.add('hidden');
+        panels.forEach(p => { p.dataset.gkWasHidden = p.classList.contains('hidden') ? '1' : '0'; p.classList.add('hidden'); });
+        exitBtn?.classList.remove('hidden');
+    } else {
+        header?.classList.remove('hidden');
+        panels.forEach(p => { if (p.dataset.gkWasHidden !== '1') p.classList.remove('hidden'); delete p.dataset.gkWasHidden; });
+        exitBtn?.classList.add('hidden');
+    }
+}
+document.getElementById('btnPresentationMode')?.addEventListener('click', () => togglePresentationMode());
+document.getElementById('btnExitPresentation')?.addEventListener('click', () => togglePresentationMode(true));
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && presentationModeActive) togglePresentationMode(true);
+});
+
+// --- Minimapa: vista reducida de todo el lienzo con clic-para-navegar ---
+const minimapCanvas = document.getElementById('minimapCanvas');
+const minimapCtx = minimapCanvas?.getContext('2d');
+function drawMinimap() {
+    if (!minimapCtx || !minimapCanvas) return;
+    const w = minimapCanvas.width, h = minimapCanvas.height;
+    minimapCtx.clearRect(0, 0, w, h);
+    const allIds = nodes.getIds();
+    if (!allIds.length) return;
+    const positions = network.getPositions(allIds);
+    const xs = Object.values(positions).map(p => p.x);
+    const ys = Object.values(positions).map(p => p.y);
+    const minX = Math.min(...xs) - 60, maxX = Math.max(...xs) + 60;
+    const minY = Math.min(...ys) - 60, maxY = Math.max(...ys) + 60;
+    const spanX = Math.max(1, maxX - minX), spanY = Math.max(1, maxY - minY);
+    const scale = Math.min(w / spanX, h / spanY);
+    const toMini = (x, y) => ({
+        mx: (x - minX) * scale + (w - spanX * scale) / 2,
+        my: (y - minY) * scale + (h - spanY * scale) / 2
+    });
+    // Puntos de los nodos.
+    minimapCtx.fillStyle = 'rgba(79, 209, 197, 0.85)';
+    allIds.forEach(id => {
+        const { mx, my } = toMini(positions[id].x, positions[id].y);
+        minimapCtx.beginPath();
+        minimapCtx.arc(mx, my, 2.2, 0, Math.PI * 2);
+        minimapCtx.fill();
+    });
+    // Rectángulo de la vista actual.
+    const viewPos = network.getViewPosition();
+    const scaleFactor = network.getScale();
+    const canvasRect = container.getBoundingClientRect();
+    const halfW = (canvasRect.width / scaleFactor) / 2;
+    const halfH = (canvasRect.height / scaleFactor) / 2;
+    const topLeft = toMini(viewPos.x - halfW, viewPos.y - halfH);
+    const bottomRight = toMini(viewPos.x + halfW, viewPos.y + halfH);
+    minimapCtx.strokeStyle = 'rgba(255,255,255,0.85)';
+    minimapCtx.lineWidth = 1.5;
+    minimapCtx.strokeRect(topLeft.mx, topLeft.my, bottomRight.mx - topLeft.mx, bottomRight.my - topLeft.my);
+    minimapCtx._bounds = { minX, minY, scale, w, h, spanX, spanY };
+}
+minimapCanvas?.addEventListener('click', (e) => {
+    const b = minimapCanvas._bounds;
+    if (!b) return;
+    const rect = minimapCanvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left, clickY = e.clientY - rect.top;
+    const offsetX = (b.w - b.spanX * b.scale) / 2, offsetY = (b.h - b.spanY * b.scale) / 2;
+    const worldX = (clickX - offsetX) / b.scale + b.minX;
+    const worldY = (clickY - offsetY) / b.scale + b.minY;
+    network.moveTo({ position: { x: worldX, y: worldY }, animation: { duration: 350, easingFunction: 'easeInOutQuad' } });
+});
+network.on('afterDrawing', () => drawMinimap());
+setInterval(drawMinimap, 1500);
+
+// --- Zoom semántico: al acercar mucho la cámara a un nodo con definición,
+// aparece un adelanto de esa definición sin tener que abrir nada ---
+let semanticZoomEl = null;
+function ensureSemanticZoomEl() {
+    if (semanticZoomEl) return semanticZoomEl;
+    const el = document.createElement('div');
+    el.id = 'gkSemanticZoomPreview';
+    el.className = 'hidden fixed z-[220] max-w-[260px] bg-slate-900/95 border border-[#4fd1c5]/50 rounded-lg shadow-xl px-3 py-2 text-xs text-slate-200 leading-relaxed pointer-events-none font-sans';
+    document.body.appendChild(el);
+    semanticZoomEl = el;
+    return el;
+}
+const SEMANTIC_ZOOM_THRESHOLD = 1.7;
+network.on('hoverNode', (params) => {
+    if (network.getScale() < SEMANTIC_ZOOM_THRESHOLD) return;
+    const node = nodes.get(params.node);
+    const def = node && node.definition;
+    if (!def) return;
+    const el = ensureSemanticZoomEl();
+    const domPos = network.canvasToDOM(network.getPositions([params.node])[params.node]);
+    const canvasRect = container.getBoundingClientRect();
+    el.style.left = `${canvasRect.left + domPos.x + 16}px`;
+    el.style.top = `${canvasRect.top + domPos.y - 10}px`;
+    el.textContent = def.length > 220 ? def.slice(0, 220) + '…' : def;
+    el.classList.remove('hidden');
+});
+network.on('blurNode', () => { if (semanticZoomEl) semanticZoomEl.classList.add('hidden'); });
+network.on('zoom', () => {
+    if (semanticZoomEl && network.getScale() < SEMANTIC_ZOOM_THRESHOLD) semanticZoomEl.classList.add('hidden');
+});
+
+// --- Estilo visual por importancia: tamaño/sombra por grado de conexión,
+// grosor de enlace reforzando la jerarquía por profundidad ---
+let importanceStylingTimer = null;
+function scheduleImportanceStyling() {
+    clearTimeout(importanceStylingTimer);
+    importanceStylingTimer = setTimeout(applyImportanceStyling, 220);
+}
+function applyImportanceStyling() {
+    const all = nodes.get();
+    if (!all.length) return;
+    const nodeUpdates = all.map(n => {
+        const degree = network.getConnectedEdges(n.id).length;
+        const borderWidth = Math.min(5, 1.5 + degree * 0.45);
+        const shadowSize = Math.min(32, 12 + degree * 2.5);
+        return { id: n.id, borderWidth, shadow: { enabled: true, color: 'rgba(79, 209, 197, 0.18)', size: shadowSize, x: 0, y: 0 } };
+    });
+    nodes.update(nodeUpdates);
+
+    // Grosor de enlace: solo tocamos los que forman parte del árbol principal
+    // (ambos extremos con depthLevel conocido), para no pisar colores/estilos
+    // ya puestos a propósito por otras funciones (antítesis, ejemplos, etc.).
+    const allEdges = edges.get();
+    const edgeUpdates = [];
+    allEdges.forEach(e => {
+        const fromNode = nodes.get(e.from), toNode = nodes.get(e.to);
+        if (!fromNode || !toNode) return;
+        if (typeof fromNode.depthLevel !== 'number' || typeof toNode.depthLevel !== 'number') return;
+        const deeperLevel = Math.max(fromNode.depthLevel, toNode.depthLevel);
+        const width = deeperLevel <= 1 ? 3 : 2.2;
+        edgeUpdates.push({ id: e.id, width });
+    });
+    if (edgeUpdates.length) edges.update(edgeUpdates);
+}
+nodes.on('add', scheduleImportanceStyling);
+nodes.on('remove', scheduleImportanceStyling);
+edges.on('add', scheduleImportanceStyling);
+edges.on('remove', scheduleImportanceStyling);
+
+// --- Agrupación visual por rama: un "aura" suave detrás de cada rama y sus
+// sub-nodos, para que se lea de un vistazo qué pertenece a qué grupo ---
+function hexToRgba(hex, alpha) {
+    if (!hex || hex[0] !== '#') return `rgba(79, 209, 197, ${alpha})`;
+    const h = hex.replace('#', '');
+    const bigint = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+    const r = (bigint >> 16) & 255, g = (bigint >> 8) & 255, b = bigint & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+network.on('beforeDrawing', (ctx) => {
+    const all = nodes.get();
+    const branches = all.filter(n => n.depthLevel === 1);
+    if (!branches.length) return;
+    branches.forEach(branch => {
+        const connectedSubIds = network.getConnectedNodes(branch.id).filter(id => {
+            const n = nodes.get(id);
+            return n && n.depthLevel === 2;
+        });
+        const groupIds = [branch.id, ...connectedSubIds];
+        if (groupIds.length < 2) return; // Sin sub-nodos no hace falta aura.
+        const positions = network.getPositions(groupIds);
+        const pts = Object.values(positions);
+        const minX = Math.min(...pts.map(p => p.x)) - 70;
+        const maxX = Math.max(...pts.map(p => p.x)) + 70;
+        const minY = Math.min(...pts.map(p => p.y)) - 50;
+        const maxY = Math.max(...pts.map(p => p.y)) + 50;
+        const borderColor = (branch.color && branch.color.border) || '#4fd1c5';
+        ctx.save();
+        ctx.beginPath();
+        const r = 28;
+        const w = maxX - minX, h = maxY - minY;
+        ctx.moveTo(minX + r, minY);
+        ctx.arcTo(maxX, minY, maxX, minY + h, r);
+        ctx.arcTo(maxX, maxY, minX, maxY, r);
+        ctx.arcTo(minX, maxY, minX, minY, r);
+        ctx.arcTo(minX, minY, maxX, minY, r);
+        ctx.closePath();
+        ctx.fillStyle = hexToRgba(borderColor, 0.07);
+        ctx.fill();
+        ctx.restore();
+    });
 });
 
 // ==========================================
