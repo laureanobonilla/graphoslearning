@@ -1674,33 +1674,66 @@ function escapeHtmlForMark(s) {
 // correspondiente (idea 6). No reescribe nada si ninguna cita calza (p. ej.
 // esquemas generados solo a partir de un tema, sin texto).
 function buildHighlightedMarkup(rawText, quotes) {
-    let html = escapeHtmlForMark(rawText);
+    const baseText = escapeHtmlForMark(rawText);
     const seen = new Set();
     const uniqueQuotes = [];
     quotes.forEach(q => {
         const key = (q.quote || '').trim();
         if (key && key.length > 2 && !seen.has(key)) { seen.add(key); uniqueQuotes.push({ ...q, quote: key }); }
     });
-    // Las citas más largas primero, para no dejar fragmentos de una cita larga
-    // sueltos cuando otra cita más corta está contenida dentro de ella.
-    uniqueQuotes.sort((a, b) => b.quote.length - a.quote.length);
+
+    // Ubicamos cada cita en el texto base (en el mismo dominio ya escapado,
+    // para que las posiciones calcen exactamente).
+    const matches = [];
     uniqueQuotes.forEach(({ quote, nodeId, colorIdx }) => {
         const escaped = escapeHtmlForMark(quote);
-        const idx = html.indexOf(escaped);
+        const idx = baseText.indexOf(escaped);
         if (idx === -1) return;
-        const before = html.slice(0, idx);
-        const openMarks = (before.match(/<mark/g) || []).length;
-        const closeMarks = (before.match(/<\/mark>/g) || []).length;
-        if (openMarks > closeMarks) return; // ya quedó dentro de otra cita marcada, no anidar
-        const hc = highlightColorPalette[(colorIdx != null ? colorIdx : 0) % highlightColorPalette.length].mark;
-        html = html.slice(0, idx)
-            + `<mark class="gk-coverage-mark" data-node-id="${nodeId}" `
+        matches.push({ start: idx, end: idx + escaped.length, nodeId, colorIdx, length: escaped.length });
+    });
+    if (!matches.length) return baseText;
+
+    // Cuando dos citas se solapan, la más CORTA es casi siempre la más
+    // específica/precisa (por ejemplo, un nodo nuevo generado "a partir de"
+    // un nodo existente suele describir un fragmento más puntual dentro de
+    // la cita más amplia de ese nodo original) — así que la dejamos ganar
+    // ese pedazo de texto, y la cita más larga se queda solo con lo que le
+    // sobra alrededor, en vez de perder el fragmento entero o taparlo.
+    matches.sort((a, b) => a.length - b.length);
+    const placed = []; // intervalos finales, ya sin solapes: {start, end, nodeId, colorIdx}
+    matches.forEach(m => {
+        let segments = [{ start: m.start, end: m.end }];
+        placed.forEach(p => {
+            const next = [];
+            segments.forEach(seg => {
+                if (p.end <= seg.start || p.start >= seg.end) { next.push(seg); return; } // sin solape con lo ya colocado
+                if (p.start > seg.start) next.push({ start: seg.start, end: Math.min(p.start, seg.end) });
+                if (p.end < seg.end) next.push({ start: Math.max(p.end, seg.start), end: seg.end });
+            });
+            segments = next;
+        });
+        segments.filter(s => s.end > s.start).forEach(seg => {
+            placed.push({ start: seg.start, end: seg.end, nodeId: m.nodeId, colorIdx: m.colorIdx });
+        });
+    });
+    placed.sort((a, b) => a.start - b.start);
+
+    // Reconstruimos el HTML final intercalando texto plano y <mark>.
+    let result = '';
+    let cursor = 0;
+    placed.forEach(seg => {
+        if (seg.start < cursor) return; // seguridad ante algún borde raro
+        result += baseText.slice(cursor, seg.start);
+        const hc = highlightColorPalette[(seg.colorIdx != null ? seg.colorIdx : 0) % highlightColorPalette.length].mark;
+        const fragment = baseText.slice(seg.start, seg.end);
+        result += `<mark class="gk-coverage-mark" data-node-id="${seg.nodeId}" `
             + `style="background-color:${hc.bg}; border-bottom-color:${hc.border};" `
             + `data-base-bg="${hc.bg}" data-base-border="${hc.border}">`
-            + escaped + `</mark>`
-            + html.slice(idx + escaped.length);
+            + fragment + `</mark>`;
+        cursor = seg.end;
     });
-    return html;
+    result += baseText.slice(cursor);
+    return result;
 }
 
 function highlightCoverageForPanel(panelId) {
@@ -1717,6 +1750,145 @@ function highlightCoverageForPanel(panelId) {
     entry.textEl.innerHTML = buildHighlightedMarkup(rawText, quotes);
 }
 
+// --- Geometría de paneles: qué parte del lienzo está realmente libre ------
+// Se recalcula en cada llamada (nunca se guarda en caché) para que tome en
+// cuenta de inmediato cualquier panel que el usuario haya movido, agrandado
+// o cerrado justo antes.
+function getVisibleOverlayRects(containerRect) {
+    return [...document.querySelectorAll('.reader-panel-instance, .gk-floating-panel')]
+        .filter(el => !el.classList.contains('hidden') && el.offsetWidth > 0 && el.offsetHeight > 0)
+        .map(el => el.getBoundingClientRect())
+        .filter(r => r.right > containerRect.left && r.left < containerRect.right && r.bottom > containerRect.top && r.top < containerRect.bottom);
+}
+
+// Resta un rectángulo "hueco" de un rectángulo base, devolviendo hasta 4
+// pedazos rectangulares con lo que queda (el método correcto de resta de
+// rectángulos, no solo un bounding-box aproximado — eso es lo que fallaba
+// antes cuando un panel quedaba en una esquina en vez de pegado a un borde
+// completo: el bounding-box de varios paneles sueltos "comía" espacio que en
+// realidad seguía libre).
+function subtractRect(rect, hole) {
+    if (hole.right <= rect.left || hole.left >= rect.right || hole.bottom <= rect.top || hole.top >= rect.bottom) {
+        return [rect]; // no se tocan
+    }
+    const pieces = [];
+    if (hole.top > rect.top) pieces.push({ left: rect.left, right: rect.right, top: rect.top, bottom: hole.top });
+    if (hole.bottom < rect.bottom) pieces.push({ left: rect.left, right: rect.right, top: hole.bottom, bottom: rect.bottom });
+    const midTop = Math.max(rect.top, hole.top), midBottom = Math.min(rect.bottom, hole.bottom);
+    if (hole.left > rect.left) pieces.push({ left: rect.left, right: hole.left, top: midTop, bottom: midBottom });
+    if (hole.right < rect.right) pieces.push({ left: hole.right, right: rect.right, top: midTop, bottom: midBottom });
+    return pieces.filter(p => p.right - p.left > 0.5 && p.bottom - p.top > 0.5);
+}
+
+function computeFreeRects(containerRect, overlays) {
+    let free = [containerRect];
+    overlays.forEach(hole => {
+        const next = [];
+        free.forEach(r => next.push(...subtractRect(r, hole)));
+        free = next;
+    });
+    return free;
+}
+
+// El rectángulo libre más grande (por área), o el lienzo completo si no hay
+// paneles encima o no quedó ningún espacio libre razonable.
+function pickBestFreeRect(containerRect, overlays, minSize = 90) {
+    if (!overlays.length) return containerRect;
+    const free = computeFreeRects(containerRect, overlays)
+        .filter(r => (r.right - r.left) >= minSize && (r.bottom - r.top) >= minSize);
+    if (!free.length) return containerRect;
+    free.sort((a, b) => (b.right - b.left) * (b.bottom - b.top) - (a.right - a.left) * (a.bottom - a.top));
+    return free[0];
+}
+
+function isPointFree(x, y, overlays) {
+    return !overlays.some(r => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom);
+}
+
+// ¿Este nodo ya se ve bien en el lienzo ahora mismo (dentro del área visible
+// y no tapado por ningún panel), con un margen para que no cuenten los que
+// apenas se asoman recortados en el borde?
+function isNodeVisibleOnCanvas(nodeId, margin = 30) {
+    const positions = network.getPositions([nodeId]);
+    const pos = positions[nodeId];
+    if (!pos) return false;
+    const containerRect = container.getBoundingClientRect();
+    const dom = network.canvasToDOM(pos);
+    const x = containerRect.left + dom.x, y = containerRect.top + dom.y;
+    if (x < containerRect.left + margin || x > containerRect.right - margin ||
+        y < containerRect.top + margin || y > containerRect.bottom - margin) return false;
+    const overlays = getVisibleOverlayRects(containerRect);
+    return isPointFree(x, y, overlays);
+}
+
+// --- Enfocar un nodo evitando que quede tapado por un panel -------------
+// Si el nodo al que vamos a saltar (desde un clic en el texto) quedaría
+// detrás del panel de lectura o de un panel flotante abierto, no basta con
+// centrar el lienzo en él de la forma normal — hay que correr la cámara
+// hacia el espacio libre del lienzo que SÍ se ve, para que el nodo termine
+// visible y no oculto bajo el panel.
+function focusNodeAvoidingOverlays(nodeId, opts = {}) {
+    const { scale: fixedScale = 1.25, duration = 500, keepScale = false } = opts;
+    const scale = keepScale ? network.getScale() : fixedScale;
+    const positions = network.getPositions([nodeId]);
+    const nodePos = positions[nodeId];
+    if (!nodePos) return;
+    const containerRect = container.getBoundingClientRect();
+    const overlays = getVisibleOverlayRects(containerRect);
+    const animation = { duration, easingFunction: 'easeInOutQuad' };
+
+    const naiveX = containerRect.left + containerRect.width / 2;
+    const naiveY = containerRect.top + containerRect.height / 2;
+    if (!overlays.length || isPointFree(naiveX, naiveY, overlays)) {
+        if (keepScale) network.moveTo({ position: nodePos, scale, animation });
+        else network.focus(nodeId, { scale, animation });
+        return;
+    }
+
+    const best = pickBestFreeRect(containerRect, overlays);
+    const safeCenterX = (best.left + best.right) / 2;
+    const safeCenterY = (best.top + best.bottom) / 2;
+    const deltaDomX = safeCenterX - naiveX;
+    const deltaDomY = safeCenterY - naiveY;
+    const adjustedPosition = { x: nodePos.x - deltaDomX / scale, y: nodePos.y - deltaDomY / scale };
+    network.moveTo({ position: adjustedPosition, scale, animation });
+}
+
+// Variante para VARIOS nodos a la vez: encuadra (ajustando el zoom) el
+// espacio libre del lienzo para que todos queden visibles de una vez,
+// en vez de ir uno por uno.
+function fitNodesAvoidingOverlays(nodeIds, opts = {}) {
+    const { duration = 500, maxScale = 1.4, minScale = 0.25 } = opts;
+    const validIds = nodeIds.filter(id => nodes.get(id));
+    if (!validIds.length) return;
+    if (validIds.length === 1) { focusNodeAvoidingOverlays(validIds[0], { keepScale: true, duration }); return; }
+
+    const positions = network.getPositions(validIds);
+    const pts = Object.values(positions);
+    const margin = 70;
+    const minX = Math.min(...pts.map(p => p.x)) - margin, maxX = Math.max(...pts.map(p => p.x)) + margin;
+    const minY = Math.min(...pts.map(p => p.y)) - margin, maxY = Math.max(...pts.map(p => p.y)) + margin;
+    const worldW = Math.max(1, maxX - minX), worldH = Math.max(1, maxY - minY);
+
+    const containerRect = container.getBoundingClientRect();
+    const overlays = getVisibleOverlayRects(containerRect);
+    const target = pickBestFreeRect(containerRect, overlays);
+    const targetW = target.right - target.left, targetH = target.bottom - target.top;
+
+    let scale = Math.min(targetW / worldW, targetH / worldH);
+    scale = Math.max(minScale, Math.min(maxScale, scale));
+
+    const worldCenter = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    const naiveX = containerRect.left + containerRect.width / 2;
+    const naiveY = containerRect.top + containerRect.height / 2;
+    const safeCenterX = (target.left + target.right) / 2;
+    const safeCenterY = (target.top + target.bottom) / 2;
+    const deltaDomX = safeCenterX - naiveX;
+    const deltaDomY = safeCenterY - naiveY;
+    const adjustedPosition = { x: worldCenter.x - deltaDomX / scale, y: worldCenter.y - deltaDomY / scale };
+    network.moveTo({ position: adjustedPosition, scale, animation: { duration, easingFunction: 'easeInOutQuad' } });
+}
+
 // --- Clic en un fragmento resaltado → acercamiento al nodo (Idea 4) -------
 // Delegado en el <div> de texto (no en cada <mark>, porque el HTML se
 // reconstruye entero cada vez que se resalta cobertura nueva).
@@ -1727,7 +1899,7 @@ function wireMarkClickToFocusNode(textEl) {
         const nodeId = mark.dataset.nodeId;
         if (!nodeId || !nodes.get(nodeId)) return;
         network.selectNodes([nodeId]);
-        network.focus(nodeId, { scale: 1.25, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        focusNodeAvoidingOverlays(nodeId, { scale: 1.25, duration: 500 });
         flashNewNode(nodeId);
     });
 }
@@ -1736,11 +1908,13 @@ function wireMarkClickToFocusNode(textEl) {
 // Mientras el usuario hace scroll dentro de un panel de lectura, se detecta
 // qué citas resaltadas están actualmente visibles y se resaltan (atenuando
 // el resto) los nodos correspondientes en el lienzo — así el esquema "sigue"
-// la lectura sin que haya que ir buscando manualmente cuál nodo toca.
+// la lectura sin que haya que ir buscando manualmente cuál nodo toca. Además,
+// si alguno de esos nodos no se ve en el lienzo ahora mismo (porque hay zoom
+// hacia otra zona, o quedó tapado por un panel), la cámara se traslada sola
+// para dejarlo visible — y si son varios, se hace zoom para que entren todos.
 function wireScrollFocus(panelId, contentContainer, textEl) {
     if (!contentContainer || !textEl || !panelId) return;
     let debounceTimer = null;
-    let clearTimer = null;
     contentContainer.addEventListener('scroll', () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => updateScrollFocus(panelId, contentContainer, textEl), 180);
@@ -1768,6 +1942,17 @@ function updateScrollFocus(panelId, contentContainer, textEl) {
         }
     });
     if (updates.length) nodes.update(updates);
+
+    // Si lo que se está leyendo ahora corresponde a nodo(s) que no se ven en
+    // el lienzo (zoom/paneo hacia otra parte, o tapados por un panel), traer
+    // la cámara hacia ellos. Si ya se ven todos, no se mueve nada.
+    if (visibleIds.size > 0) {
+        const idsHere = [...visibleIds].filter(id => nodes.get(id));
+        const allAlreadyVisible = idsHere.length > 0 && idsHere.every(id => isNodeVisibleOnCanvas(id));
+        if (idsHere.length > 0 && !allAlreadyVisible) {
+            fitNodesAvoidingOverlays(idsHere, { duration: 550 });
+        }
+    }
 }
 
 // --- Sugerir vínculo entre nodos cercanos en el texto (Idea 8) ------------
@@ -2144,7 +2329,7 @@ function highlightSelectedTextAndLink(nodeId) {
         span.addEventListener('click', () => {
             if (nodes.get(nodeId)) {
                 network.selectNodes([nodeId]);
-                network.focus(nodeId, { scale: 1.2, animation: { duration: 600 }});
+                focusNodeAvoidingOverlays(nodeId, { scale: 1.2, duration: 600 });
             }
         });
     } catch (err) {}

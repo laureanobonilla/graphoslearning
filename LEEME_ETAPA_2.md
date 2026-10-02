@@ -1264,3 +1264,79 @@ pendientes, a propósito, para evaluarlos aparte).
 - Layout tipo "sistema solar" (radial) — no implementado aún, para
   comparar primero cómo se ve todo lo anterior con el layout actual.
 - 3D — no implementado, mismo motivo.
+
+## 23. Dos ajustes finos sobre texto↔esquema
+
+### a) Si el nodo al que se salta queda tapado por un panel, la cámara se corre para que se vea
+
+Antes, al hacer clic en un fragmento resaltado del texto (o en un texto
+vinculado manualmente a un nodo), el lienzo simplemente se centraba en ese
+nodo — y si el panel del lector (u otro panel flotante) estaba encima de esa
+zona del lienzo, el nodo podía terminar "centrado" pero tapado detrás del
+panel. Ahora, antes de saltar, se revisa si el centrado normal caería tapado
+por algún panel visible; si es así, la cámara se corre hacia el espacio
+libre del lienzo que sí se ve (el borde con más espacio: derecha, izquierda,
+arriba o abajo del panel) en vez de hacia el centro geométrico, para que el
+nodo quede realmente visible.
+
+### b) Al generar nodos nuevos más precisos, el resaltado del texto ahora se reparte entre el nodo viejo y el nuevo
+
+Antes, si un nodo ya tenía una cita amplia resaltada en el texto y luego se
+generaba (p. ej. con "🌐 Generar esquema completo a partir de aquí") un nodo
+nuevo cuya cita era un fragmento más preciso DENTRO de esa misma cita
+amplia, el resaltado completo se quedaba apuntando solo al nodo original —
+el nodo nuevo, aunque más exacto para ese pedacito de texto, no se reflejaba
+en el resaltado. Ahora, cuando dos citas se solapan, la más corta (casi
+siempre la más específica) se queda con ese fragmento puntual del texto, y
+la cita más amplia conserva el resto a su alrededor — así el resaltado
+termina repartido entre ambos nodos, cada uno dueño de la parte que describe
+con más precisión.
+
+### Archivos tocados
+
+- `app.js`: nueva función `focusNodeAvoidingOverlays` (usada por el clic en
+  texto resaltado y por el texto vinculado manualmente a un nodo); reescritura
+  de `buildHighlightedMarkup` para resolver solapes por especificidad en vez
+  de simplemente priorizar la cita más larga.
+
+## 24. El esquema ahora "sigue" al texto también cuando el nodo está fuera de pantalla, y el cálculo de espacio libre quedó más preciso
+
+### a) El cálculo de "espacio libre" ya toma en cuenta bien los paneles movidos o agrandados
+
+El ajuste anterior (sección 23a) calculaba el espacio libre asumiendo que
+los paneles tapaban franjas completas del lienzo (todo el borde izquierdo,
+todo el borde superior, etc.). Si movías el panel del lector a, por ejemplo,
+una esquina (sin que tocara un borde entero), ese cálculo subestimaba el
+espacio libre real y terminaba centrando el nodo igual detrás del panel.
+Ahora se calcula el espacio libre de verdad: se resta el área exacta de cada
+panel visible del lienzo (como "recortar" un hueco de una hoja) y se usa el
+pedazo libre más grande que quede, sin importar en qué esquina o posición
+esté el panel. Esto se recalcula cada vez — si moviste o agrandaste el
+panel justo antes de hacer clic en el texto, ya lo toma en cuenta.
+
+### b) Al leer, si el nodo correspondiente no se ve en el lienzo, la cámara se mueve sola
+
+Antes, el "enfoque por scroll" (sección 20c) solo atenuaba/resaltaba nodos
+según qué cita estuviera visible en el texto, pero nunca movía la cámara —
+si el esquema estaba con zoom en otra parte, el nodo correspondiente se
+resaltaba pero seguía sin verse. Ahora, cada vez que el scroll trae a la
+vista una cita nueva, se revisa si el nodo (o nodos) correspondientes ya se
+ven bien en el lienzo (dentro del área visible y sin quedar tapados por
+ningún panel). Si no se ven:
+
+- **Un solo nodo**: la cámara se traslada hasta dejarlo visible, sin tocar
+  el nivel de zoom actual (solo "paneo", como pediste).
+- **Varios nodos a la vez**: se hace zoom (ajustando la escala) para que
+  todos entren a la vez en el espacio libre del lienzo, en vez de mostrar
+  solo uno.
+
+Si los nodos ya se ven bien, no se mueve nada — para no estar moviendo la
+cámara de más mientras lees algo cuyo esquema ya está a la vista.
+
+### Archivos tocados
+
+- `app.js`: `getVisibleOverlayRects`, `subtractRect`/`computeFreeRects`/
+  `pickBestFreeRect` (resta real de rectángulos en vez del cálculo por
+  bandas), `isPointFree`/`isNodeVisibleOnCanvas`, `fitNodesAvoidingOverlays`
+  (encuadre de varios nodos a la vez), y `updateScrollFocus` ahora también
+  dispara el traslado/zoom automático cuando corresponde.
