@@ -994,3 +994,54 @@ comentario suelto que haya hecho en su momento — como evidentemente pasó con
 esta recomendación de los modales, que no quedé con un registro escrito de
 ella hasta que la mencionaste ahora. Si recuerdas alguna otra sugerencia
 mía de sesiones anteriores que no se haya hecho, dímela y la reviso.
+
+## 18. Dos bugs del lector adicional (➕): texto copiado y esquemas traslapados
+
+### a) Un panel de lector nuevo ya no copia el texto del que lo originó
+
+`createExtraReaderPanel()` clona el HTML del panel principal con
+`cloneNode(true)` para crear cada panel adicional — pero eso clona el DOM
+**tal cual está en ese momento**, así que si el panel de donde hiciste clic
+en ➕ ya tenía texto escrito, el panel nuevo nacía con una copia de ese mismo
+texto en vez de empezar vacío. Ahora, justo después de clonar, se limpian
+explícitamente el texto, el contexto detectado y la pista de inicio del
+clon, así que todo panel nuevo arranca siempre en blanco, sin importar qué
+tenía el panel desde el que lo abriste.
+
+### b) Dos esquemas generados desde paneles distintos ya no se traslapan
+
+`renderThreeLevelTree()` (la función que dibuja el árbol de un esquema
+nuevo) usaba un desplazamiento fijo de 900px desde el centro de la vista
+cuando elegías "agregar al actual" en vez de limpiar el lienzo. Ese número
+fijo fallaba en más de un caso: si el esquema que ya estaba ahí era más
+ancho que 900px, o si la cámara no estaba centrada exactamente sobre él
+(por ejemplo, porque lo generaste desde un segundo panel de lector con la
+vista en otro lado), el esquema nuevo terminaba cayendo parcialmente encima
+del que ya existía — justo lo que viste.
+
+Ahora, en vez de un número fijo, se calcula el **borde derecho real** de
+absolutamente todo lo que ya hay en el lienzo (usando las posiciones
+actuales de los nodos, se hayan movido o no) y el esquema nuevo se coloca
+a la derecha de ese borde, con margen de sobra calculado a partir del ancho
+que va a ocupar el árbol nuevo (según cuántas ramas/sub-ramas tenga). Así
+los dos esquemas quedan siempre completamente separados, sin importar desde
+qué panel de lector se generó cada uno ni hacia dónde esté mirando la
+cámara en ese momento.
+
+## 19. Nuevo ítem de menú: "Generar esquema completo a partir de aquí"
+
+Al hacer clic en un nodo, al final de la lista de acciones (justo antes del
+pie con "Eliminar") hay un ítem nuevo: **🌐 Generar esquema completo a
+partir de aquí**. Toma el texto de ese nodo y lo trata exactamente como si
+lo hubieras escrito en el campo "Generar" de la cabecera y hubieras
+presionado el botón — llama a la misma función de siempre
+(`generateFullSchemaFromTopic`), así que el comportamiento es idéntico en
+todo: mismo costo en nodos, mismo diálogo de "¿deseas limpiar el lienzo?" si
+ya hay algo más dibujado, y el mismo arreglo reciente de posicionamiento
+(sección 18b) para que el esquema nuevo no se traslape con lo que ya había.
+
+Es útil para "profundizar en serio" sobre un concepto que surgió como nodo
+suelto o como parte de otro esquema — en vez de limitarte a Conceptos
+Relacionados/Ejemplos (que agregan unos pocos nodos), genera un árbol
+completo nuevo a partir de ese concepto, igual de completo que si hubieras
+empezado desde cero con ese tema.

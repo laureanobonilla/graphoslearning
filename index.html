@@ -417,6 +417,15 @@
                     Explorar
                 </button>
             </div>
+            <!-- Último ítem de la lista principal (antes del pie de "Eliminar"): usa el
+                 texto del nodo como si se hubiera escrito en el campo "Generar" de la
+                 cabecera, y dispara exactamente la misma generación de esquema completo
+                 (mismo generateFullSchemaFromTopic, mismo costo, mismo diálogo de "¿limpiar
+                 el lienzo?" si ya hay algo ahí) — ver btnMenuFullSchema en app.js. -->
+            <button id="btnMenuFullSchema" class="w-full px-3.5 py-2 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                <span>🌐 Generar esquema completo a partir de aquí</span>
+                <span class="text-[#4fd1c5]/70 text-[10px] uppercase font-bold tracking-wider">IA</span>
+            </button>
         </div>
 
 

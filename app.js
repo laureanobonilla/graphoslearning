@@ -583,7 +583,39 @@ function checkBalance(cost) {
 // 6. GENERACIÓN DE ESQUEMA EN 3 NIVELES Y NODOS
 // ==========================================
 async function renderThreeLevelTree(data) {
-    let offsetX = 0;
+    const root = data.root;
+    const branches = data.branches || [];
+    const subBranches = data.subBranches || [];
+
+    // Estos cálculos solo dependen de los datos del esquema nuevo (no del
+    // lienzo), así que se adelantan: los necesitamos YA para saber qué tan
+    // ancho va a quedar el árbol y poder ubicarlo sin pisar lo que ya hay
+    // (ver más abajo, "agregar al actual").
+    const childrenByBranch = {};
+    branches.forEach(b => { childrenByBranch[b.id] = []; });
+    subBranches.forEach(sb => {
+        if (childrenByBranch[sb.parentId]) {
+            childrenByBranch[sb.parentId].push(sb);
+        } else if (branches.length > 0) {
+            childrenByBranch[branches[0].id].push(sb);
+        }
+    });
+
+    // Distribuimos las sub-ramas en máximo 2 columnas por rama para que el árbol no se estire a lo ancho
+    const colSpacing = 185;
+    const rowSpacing = 95;
+    const branchGap = 60;   // Separación limpia entre grupos de ramas
+
+    const branchWidths = branches.map(b => {
+        const count = childrenByBranch[b.id].length;
+        const cols = count <= 1 ? 1 : 2; // Máximo 2 columnas por cada rama de Nivel 2
+        return (cols * colSpacing) + branchGap;
+    });
+
+    const totalTreeWidth = branchWidths.reduce((sum, w) => sum + w, 0);
+
+    let rootX, rootY;
+    const viewCenter = network.getViewPosition();
 
     if (nodes.length > 1) {
         const shouldClear = await appConfirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?", {
@@ -599,8 +631,27 @@ async function renderThreeLevelTree(data) {
             nodes.clear();
             edges.clear();
             isClearingCanvas = false;
+            rootX = viewCenter.x;
+            rootY = viewCenter.y - 200;
         } else {
-            offsetX = 900; // Si cancela, se suma al mismo proyecto actual
+            // "Agregar al actual": antes esto sumaba un offset fijo (900px) al
+            // centro de la vista, que no era confiable — si el esquema que ya
+            // estaba ahí era más ancho que eso (o la vista no estaba centrada
+            // sobre él, p. ej. porque el usuario la movió, o porque este
+            // esquema nuevo se generó desde un segundo panel de lector), el
+            // árbol nuevo terminaba traslapado con el que ya había. Ahora se
+            // calcula el borde derecho REAL de todo lo que ya existe en el
+            // lienzo (con sus posiciones actuales, muevan o no) y el árbol
+            // nuevo se ubica a la derecha de ESE borde, con margen de sobra
+            // para su propio ancho — así nunca se superponen, sin importar
+            // desde qué panel se generó ni dónde esté mirando la cámara.
+            const existingPositions = Object.values(network.getPositions());
+            const rightEdge = existingPositions.length > 0
+                ? Math.max(...existingPositions.map(p => p.x)) + 140 // +140 ≈ mitad del ancho máximo de un nodo
+                : viewCenter.x;
+            const margin = 220;
+            rootX = rightEdge + margin + (totalTreeWidth / 2);
+            rootY = viewCenter.y - 200;
         }
     } else {
         // Si el lienzo tenía 0 o 1 nodo, SIEMPRE inicia como un proyecto nuevo independiente
@@ -611,8 +662,10 @@ async function renderThreeLevelTree(data) {
         nodes.clear();
         edges.clear();
         isClearingCanvas = false;
+        rootX = viewCenter.x;
+        rootY = viewCenter.y - 200;
     }
-    
+
     // Reducir el Modo Lector a su tamaño mínimo (300px) para maximizar el lienzo
     if (readerPanel && !readerPanel.classList.contains('hidden')) {
         readerPanel.classList.remove('w-1/3');
@@ -620,14 +673,6 @@ async function renderThreeLevelTree(data) {
         readerPanel.style.width = '300px';
         if (typeof network !== 'undefined') network.redraw();
     }
-
-    const viewCenter = network.getViewPosition();
-    const rootX = viewCenter.x + offsetX;
-    const rootY = viewCenter.y - 200;
-
-    const root = data.root;
-    const branches = data.branches || [];
-    const subBranches = data.subBranches || [];
 
     // 2. Crear Raíz (Nivel 1) con ancho controlado para mantener compacidad
     nodes.add({
@@ -638,29 +683,6 @@ async function renderThreeLevelTree(data) {
     });
     trackNodeUsage(root.label);
 
-    // 3. Agrupar Sub-ramas (Nivel 3) por cada Rama (Nivel 2)
-    const childrenByBranch = {};
-    branches.forEach(b => { childrenByBranch[b.id] = []; });
-    subBranches.forEach(sb => {
-        if (childrenByBranch[sb.parentId]) {
-            childrenByBranch[sb.parentId].push(sb);
-        } else if (branches.length > 0) {
-            childrenByBranch[branches[0].id].push(sb);
-        }
-    });
-
-    // Distribuimos las sub-ramas en máximo 2 columnas por rama para que el árbol no se estire a lo ancho
-    const colSpacing = 185; 
-    const rowSpacing = 95;  
-    const branchGap = 60;   // Separación limpia entre grupos de ramas
-
-    const branchWidths = branches.map(b => {
-        const count = childrenByBranch[b.id].length;
-        const cols = count <= 1 ? 1 : 2; // Máximo 2 columnas por cada rama de Nivel 2
-        return (cols * colSpacing) + branchGap;
-    });
-
-    const totalTreeWidth = branchWidths.reduce((sum, w) => sum + w, 0);
     let currentLeftX = rootX - (totalTreeWidth / 2);
 
     const branchY = rootY + 150;
@@ -1780,9 +1802,27 @@ function wireReaderPanelClone(root) {
 
 function createExtraReaderPanel() {
     extraReaderPanelCount++;
+    // cloneNode(true) copia el DOM TAL CUAL está en ese momento — si el panel
+    // que se clonó ya tenía texto/contexto escrito, el clon nacía con esa
+    // misma copia en vez de empezar vacío. Un panel nuevo siempre debe
+    // arrancar en blanco, así que se limpia explícitamente después de clonar.
     const clone = readerPanel.cloneNode(true);
     clone.removeAttribute('id');
     clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+
+    const cloneText = clone.querySelector('[data-role="textMode"]');
+    if (cloneText) cloneText.innerText = '';
+    const cloneChip = clone.querySelector('[data-role="docContextChip"]');
+    if (cloneChip) { cloneChip.classList.add('hidden'); cloneChip.classList.remove('flex'); }
+    const cloneChipText = clone.querySelector('[data-role="docContextChipText"]');
+    if (cloneChipText) cloneChipText.innerText = '';
+    const cloneEditRow = clone.querySelector('[data-role="docContextEditRow"]');
+    if (cloneEditRow) { cloneEditRow.classList.add('hidden'); cloneEditRow.classList.remove('flex'); }
+    const cloneContextInput = clone.querySelector('[data-role="docContextInput"]');
+    if (cloneContextInput) cloneContextInput.value = '';
+    const cloneEmptyHint = clone.querySelector('[data-role="emptyHint"]');
+    if (cloneEmptyHint) cloneEmptyHint.classList.remove('hidden');
+
     const n = extraReaderPanelCount;
     const titleEl = clone.querySelector('[data-role="title"]');
     if (titleEl) titleEl.innerText = `📖 Modo Lector ${n + 1}`;
@@ -1915,6 +1955,23 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
     showDefinitionInFloatingPanel(selectedNodeId);
+});
+
+// Último ítem del menú de un nodo: toma el texto del nodo (su baseTitle, el
+// mismo texto "limpio" que usa ✏️ Editar texto) y lo trata exactamente como si
+// se hubiera escrito en el campo "Generar" de la cabecera y se hubiera
+// presionado el botón — misma función (generateFullSchemaFromTopic), mismo
+// costo, mismo diálogo de "¿limpiar el lienzo?" si ya hay algo más en el
+// lienzo, y el mismo arreglo de posicionamiento para que el esquema nuevo no
+// se traslape con lo que ya había (ver renderThreeLevelTree).
+document.getElementById('btnMenuFullSchema')?.addEventListener('click', async () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    const node = nodes.get(selectedNodeId);
+    if (!node) return;
+    const topic = node.baseTitle || selectedNodeId;
+    await generateFullSchemaFromTopic(topic);
 });
 
 // Editar el texto de un nodo existente. El usuario ve/edita el texto "limpio"
