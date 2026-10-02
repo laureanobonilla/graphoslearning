@@ -583,19 +583,29 @@ function checkBalance(cost) {
 // 6. GENERACIÓN DE ESQUEMA EN 3 NIVELES Y NODOS
 // ==========================================
 async function renderThreeLevelTree(data, opts = {}) {
-    const { originPanelId = null } = opts;
+    const { originPanelId = null, attachToNodeId = null } = opts;
     // Si hay más de un panel de lectura registrado, coloreamos el borde de
-    // cada nodo según de qué panel vino (Idea 3), para que se note a simple
-    // vista qué parte del esquema salió de cuál texto. Con un solo panel en
-    // juego no cambiamos nada del aspecto visual de siempre.
+    // cada nodo según de qué panel vino, para que se note a simple vista qué
+    // parte del esquema salió de cuál texto. Con un solo panel en juego no
+    // cambiamos nada del aspecto visual de siempre.
     const multiPanelMode = readerPanelRegistry.size > 1 && !!originPanelId;
     const originAccent = originPanelId ? readerPanelRegistry.get(originPanelId)?.accent : null;
-    const nodeColorFor = () => {
-        const base = getRandomColor();
-        return (multiPanelMode && originAccent) ? { background: base.background, border: originAccent } : base;
+    // Si el nodo trae una cita del texto, lo coloreamos a juego con el color
+    // que va a usarse para resaltar esa misma cita en el lector (ver
+    // highlightColorPalette más abajo) — así el color conecta visualmente el
+    // nodo con el fragmento exacto de donde salió. Si no hay cita (esquema
+    // generado solo a partir de un tema, sin documento), seguimos usando la
+    // paleta aleatoria de siempre.
+    const appearanceFor = (hasQuote) => {
+        if (hasQuote) {
+            const hc = nextHighlightColor();
+            return {
+                color: { background: hc.node.background, border: (multiPanelMode && originAccent) ? originAccent : hc.node.border },
+                highlightColorIdx: hc.idx
+            };
+        }
+        return { color: getRandomColor(), highlightColorIdx: null };
     };
-    // Orden en que se van a "revelar" los nodos al final (Idea 7, adaptada).
-    const revealOrder = [];
 
     const root = data.root;
     const branches = data.branches || [];
@@ -628,10 +638,19 @@ async function renderThreeLevelTree(data, opts = {}) {
 
     const totalTreeWidth = branchWidths.reduce((sum, w) => sum + w, 0);
 
-    let rootX, rootY;
+    let rootX, rootY, rootId;
     const viewCenter = network.getViewPosition();
 
-    if (nodes.length > 1) {
+    if (attachToNodeId && nodes.get(attachToNodeId)) {
+        // "Generar esquema completo a partir de aquí" sobre un nodo que ya
+        // existe en el lienzo: el esquema nuevo PARTE de ese nodo (no se crea
+        // una raíz aparte ni se pregunta si limpiar el lienzo — siempre se
+        // agrega alrededor del nodo elegido).
+        const existingPos = network.getPositions([attachToNodeId])[attachToNodeId];
+        rootId = attachToNodeId;
+        rootX = existingPos.x;
+        rootY = existingPos.y;
+    } else if (nodes.length > 1) {
         const shouldClear = await appConfirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?", {
             title: '¿Limpiar el lienzo?',
             okText: 'Sí, crear proyecto nuevo',
@@ -647,6 +666,7 @@ async function renderThreeLevelTree(data, opts = {}) {
             isClearingCanvas = false;
             rootX = viewCenter.x;
             rootY = viewCenter.y - 200;
+            rootId = root.id;
         } else {
             // "Agregar al actual": antes esto sumaba un offset fijo (900px) al
             // centro de la vista, que no era confiable — si el esquema que ya
@@ -666,6 +686,7 @@ async function renderThreeLevelTree(data, opts = {}) {
             const margin = 220;
             rootX = rightEdge + margin + (totalTreeWidth / 2);
             rootY = viewCenter.y - 200;
+            rootId = root.id;
         }
     } else {
         // Si el lienzo tenía 0 o 1 nodo, SIEMPRE inicia como un proyecto nuevo independiente
@@ -678,6 +699,7 @@ async function renderThreeLevelTree(data, opts = {}) {
         isClearingCanvas = false;
         rootX = viewCenter.x;
         rootY = viewCenter.y - 200;
+        rootId = root.id;
     }
 
     // Reducir el Modo Lector a su tamaño mínimo (300px) para maximizar el lienzo
@@ -688,16 +710,21 @@ async function renderThreeLevelTree(data, opts = {}) {
         if (typeof network !== 'undefined') network.redraw();
     }
 
-    // 2. Crear Raíz (Nivel 1) con ancho controlado para mantener compacidad
-    nodes.add({
-        id: root.id, label: `*${root.label}*`, baseTitle: root.label,
-        color: nodeColorFor(), definition: root.definition || null,
-        x: rootX, y: rootY, fixed: { x: false, y: false },
-        widthConstraint: { minimum: 140, maximum: 220 },
-        sourceQuote: root.sourceQuote || '', originPanelId: originPanelId
-    });
-    trackNodeUsage(root.label);
-    revealOrder.push(root.id);
+    // 2. Crear Raíz (Nivel 1) — salvo que el esquema esté partiendo de un
+    // nodo que YA existe en el lienzo (attachToNodeId): en ese caso ese nodo
+    // ya es la raíz, no se crea uno nuevo aparte ni se toca su texto.
+    if (!attachToNodeId) {
+        const rootAppearance = appearanceFor(!!(root.sourceQuote && root.sourceQuote.trim()));
+        nodes.add({
+            id: root.id, label: `*${root.label}*`, baseTitle: root.label,
+            color: rootAppearance.color, definition: root.definition || null,
+            x: rootX, y: rootY, fixed: { x: false, y: false },
+            widthConstraint: { minimum: 140, maximum: 220 },
+            sourceQuote: root.sourceQuote || '', originPanelId: originPanelId,
+            highlightColorIdx: rootAppearance.highlightColorIdx
+        });
+        trackNodeUsage(root.label);
+    }
 
     let currentLeftX = rootX - (totalTreeWidth / 2);
 
@@ -709,16 +736,17 @@ async function renderThreeLevelTree(data, opts = {}) {
         const sectionWidth = branchWidths[idx];
         const branchX = currentLeftX + (sectionWidth / 2);
 
+        const branchAppearance = appearanceFor(!!(branch.sourceQuote && branch.sourceQuote.trim()));
         nodes.add({
             id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label,
-            color: nodeColorFor(), definition: branch.definition || null,
+            color: branchAppearance.color, definition: branch.definition || null,
             x: branchX, y: branchY, fixed: { x: false, y: false },
             widthConstraint: { minimum: 130, maximum: 200 },
-            sourceQuote: branch.sourceQuote || '', originPanelId: originPanelId
+            sourceQuote: branch.sourceQuote || '', originPanelId: originPanelId,
+            highlightColorIdx: branchAppearance.highlightColorIdx
         });
-        edges.add({ from: root.id, to: branch.id, label: branch.relationship });
+        edges.add({ from: rootId, to: branch.id, label: branch.relationship });
         trackNodeUsage(branch.label);
-        revealOrder.push(branch.id);
 
         const subs = childrenByBranch[branch.id];
         const cols = subs.length <= 1 ? 1 : 2;
@@ -726,7 +754,7 @@ async function renderThreeLevelTree(data, opts = {}) {
         subs.forEach((sub, sIdx) => {
             const row = Math.floor(sIdx / cols);
             const col = sIdx % cols;
-            
+
             // Si es la última fila y quedó un nodo impar suelto, lo centramos bajo su rama
             const isLastOdd = (sIdx === subs.length - 1) && (subs.length % 2 !== 0) && (cols === 2);
             const offsetX = isLastOdd ? 0 : (col === 0 ? -colSpacing / 2 : colSpacing / 2);
@@ -734,16 +762,17 @@ async function renderThreeLevelTree(data, opts = {}) {
             const subX = branchX + (cols === 1 ? 0 : offsetX);
             const subY = subBranchBaseY + (row * rowSpacing);
 
+            const subAppearance = appearanceFor(!!(sub.sourceQuote && sub.sourceQuote.trim()));
             nodes.add({
                 id: sub.id, label: `*${sub.label}*`, baseTitle: sub.label,
-                color: nodeColorFor(), definition: sub.definition || null,
+                color: subAppearance.color, definition: sub.definition || null,
                 x: subX, y: subY, fixed: { x: false, y: false },
                 widthConstraint: { minimum: 120, maximum: 185 },
-                sourceQuote: sub.sourceQuote || '', originPanelId: originPanelId
+                sourceQuote: sub.sourceQuote || '', originPanelId: originPanelId,
+                highlightColorIdx: subAppearance.highlightColorIdx
             });
             edges.add({ from: branch.id, to: sub.id, label: sub.relationship });
             trackNodeUsage(sub.label);
-            revealOrder.push(sub.id);
         });
 
         currentLeftX += sectionWidth;
@@ -751,46 +780,26 @@ async function renderThreeLevelTree(data, opts = {}) {
 
     network.setOptions({ physics: { enabled: false } });
 
-    // Idea 2: resaltar de forma permanente, en el panel de lectura de origen,
-    // los fragmentos que ya quedaron convertidos en nodos de este esquema.
+    // Resaltar de forma permanente, en el panel de lectura de origen, los
+    // fragmentos que ya quedaron convertidos en nodos de este esquema.
     if (originPanelId) highlightCoverageForPanel(originPanelId);
 
-    // Esperamos un instante a que el DOM reajuste los 300px del lector para encuadrar de cerca
+    // Esperamos un instante a que el DOM reajuste los 300px del lector para encuadrar de cerca.
+    // Si el esquema partió de un nodo existente dentro de algo más grande, no
+    // tiene sentido alejar la cámara para que quepa TODO el lienzo — mejor
+    // quedarse encuadrados cerca de ese nodo y lo que se le acaba de agregar.
     setTimeout(() => {
-        network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+        if (attachToNodeId) {
+            network.focus(attachToNodeId, { scale: 0.85, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+        } else {
+            network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+        }
     }, 60);
 
-    // Idea 7 (adaptada): no hay forma segura de probar streaming real contra
-    // Gemini sin un entorno Netlify+Gemini en vivo, así que en su lugar
-    // simulamos la sensación de "esquema armándose en vivo": el árbol ya
-    // quedó calculado y puesto en su posición final (para no romper la
-    // lógica de evitar traslapes), pero cada nodo aparece en orden con un
-    // pequeño destello, y si tiene una cita asociada, el fragmento
-    // correspondiente también destella en el texto al mismo tiempo.
-    if (revealOrder.length > 0) {
-        nodes.update(revealOrder.map(id => ({ id, opacity: 0.05 })));
-        revealOrder.forEach((id, i) => {
-            setTimeout(() => {
-                if (!nodes.get(id)) return;
-                nodes.update({ id, opacity: 1 });
-                flashNewNode(id, 22);
-                const n = nodes.get(id);
-                if (n && n.originPanelId && n.sourceQuote) {
-                    const entry = readerPanelRegistry.get(n.originPanelId);
-                    const mark = entry?.textEl?.querySelector(`mark[data-node-id="${id}"]`);
-                    if (mark) {
-                        mark.classList.add('gk-coverage-flash');
-                        setTimeout(() => mark.classList.remove('gk-coverage-flash'), 900);
-                    }
-                }
-            }, 150 * (i + 1));
-        });
-    }
-
-    // Idea 8: una sola sugerencia descartable de vínculo, una vez que el
-    // esquema terminó de "revelarse" visualmente.
+    // Una sola sugerencia descartable de vínculo entre nodos cuyas citas
+    // quedaron muy cerca en el texto original.
     if (originPanelId) {
-        setTimeout(() => suggestProximityLinks(originPanelId), 150 * (revealOrder.length + 2));
+        setTimeout(() => suggestProximityLinks(originPanelId), 700);
     }
 }
 
@@ -799,7 +808,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     // Verificamos que tenga al menos saldo disponible para iniciar
     if (!checkBalance(1)) return;
 
-    const { originPanelId = null, focusTerms = [] } = opts;
+    const { originPanelId = null, attachToNodeId = null } = opts;
     const isLong = topicText.trim().split(/\s+/).length >= 25;
     track('schema_generate_attempt', { mode: isLong ? 'text' : 'topic', length: topicText.length });
 
@@ -809,7 +818,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'parse_text', text: topicText, focusTerms })
+            body: JSON.stringify({ action: 'parse_text', text: topicText })
         });
         if (!ok) {
             if (!handleBillingError(status, data)) appAlert(data?.error || 'Intenta de nuevo en unos segundos.');
@@ -817,9 +826,11 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
             return;
         }
 
-        const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
+        // Si se parte de un nodo existente, esa raíz ya estaba pagada (no se
+        // crea un nodo nuevo para ella), así que no se vuelve a cobrar.
+        const totalNodes = (attachToNodeId ? 0 : 1) + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
-        await renderThreeLevelTree(data, { originPanelId });
+        await renderThreeLevelTree(data, { originPanelId, attachToNodeId });
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes });
     } catch (err) {
@@ -1529,6 +1540,25 @@ const docContextEditRow = document.getElementById('docContextEditRow');
 const panelAccentPalette = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#8b5cf6'];
 const readerPanelRegistry = new Map(); // panelId -> { root, textEl, accent }
 
+// Paleta de colores de "resaltado" — se usa TANTO para el fondo del <mark>
+// en el texto COMO para el color del nodo correspondiente en el esquema, así
+// el color conecta visualmente un nodo con su fragmento de origen. Se repite
+// en ciclo si hay más nodos-con-cita que colores en la paleta.
+const highlightColorPalette = [
+    { mark: { bg: 'rgba(79, 209, 197, 0.32)', border: '#0d9488' }, node: { background: '#d4f6f1', border: '#0d9488' } },
+    { mark: { bg: 'rgba(250, 204, 21, 0.35)', border: '#ca8a04' }, node: { background: '#fef3c7', border: '#ca8a04' } },
+    { mark: { bg: 'rgba(129, 140, 248, 0.32)', border: '#4f46e5' }, node: { background: '#e0e7ff', border: '#4f46e5' } },
+    { mark: { bg: 'rgba(244, 114, 182, 0.30)', border: '#db2777' }, node: { background: '#fce7f3', border: '#db2777' } },
+    { mark: { bg: 'rgba(74, 222, 128, 0.30)', border: '#15803d' }, node: { background: '#dcfce7', border: '#15803d' } },
+    { mark: { bg: 'rgba(251, 146, 60, 0.32)', border: '#c2410c' }, node: { background: '#ffedd5', border: '#c2410c' } },
+];
+let highlightColorCounter = 0;
+function nextHighlightColor() {
+    const idx = highlightColorCounter % highlightColorPalette.length;
+    highlightColorCounter++;
+    return { idx, mark: highlightColorPalette[idx].mark, node: highlightColorPalette[idx].node };
+}
+
 function applyPanelAccent(root, accent) {
     if (!root) return;
     const headerEl = root.querySelector('[data-role="header"]');
@@ -1567,8 +1597,9 @@ function escapeHtmlForMark(s) {
 }
 
 // Reconstruye el HTML del panel de texto envolviendo en <mark> cada cita que
-// ya quedó convertida en un nodo del esquema. No reescribe nada si ninguna
-// cita calza (p. ej. esquemas generados solo a partir de un tema, sin texto).
+// ya quedó convertida en un nodo del esquema, con el MISMO color que su nodo
+// correspondiente (idea 6). No reescribe nada si ninguna cita calza (p. ej.
+// esquemas generados solo a partir de un tema, sin texto).
 function buildHighlightedMarkup(rawText, quotes) {
     let html = escapeHtmlForMark(rawText);
     const seen = new Set();
@@ -1580,7 +1611,7 @@ function buildHighlightedMarkup(rawText, quotes) {
     // Las citas más largas primero, para no dejar fragmentos de una cita larga
     // sueltos cuando otra cita más corta está contenida dentro de ella.
     uniqueQuotes.sort((a, b) => b.quote.length - a.quote.length);
-    uniqueQuotes.forEach(({ quote, nodeId }) => {
+    uniqueQuotes.forEach(({ quote, nodeId, colorIdx }) => {
         const escaped = escapeHtmlForMark(quote);
         const idx = html.indexOf(escaped);
         if (idx === -1) return;
@@ -1588,8 +1619,11 @@ function buildHighlightedMarkup(rawText, quotes) {
         const openMarks = (before.match(/<mark/g) || []).length;
         const closeMarks = (before.match(/<\/mark>/g) || []).length;
         if (openMarks > closeMarks) return; // ya quedó dentro de otra cita marcada, no anidar
+        const hc = highlightColorPalette[(colorIdx != null ? colorIdx : 0) % highlightColorPalette.length].mark;
         html = html.slice(0, idx)
-            + `<mark class="gk-coverage-mark" data-node-id="${nodeId}">`
+            + `<mark class="gk-coverage-mark" data-node-id="${nodeId}" `
+            + `style="background-color:${hc.bg}; border-bottom-color:${hc.border};" `
+            + `data-base-bg="${hc.bg}" data-base-border="${hc.border}">`
             + escaped + `</mark>`
             + html.slice(idx + escaped.length);
     });
@@ -1604,10 +1638,63 @@ function highlightCoverageForPanel(panelId) {
     const quotes = [];
     nodes.getIds().forEach(id => {
         const n = nodes.get(id);
-        if (n && n.originPanelId === panelId && n.sourceQuote) quotes.push({ quote: n.sourceQuote, nodeId: id });
+        if (n && n.originPanelId === panelId && n.sourceQuote) quotes.push({ quote: n.sourceQuote, nodeId: id, colorIdx: n.highlightColorIdx });
     });
     if (quotes.length === 0) return;
     entry.textEl.innerHTML = buildHighlightedMarkup(rawText, quotes);
+}
+
+// --- Clic en un fragmento resaltado → acercamiento al nodo (Idea 4) -------
+// Delegado en el <div> de texto (no en cada <mark>, porque el HTML se
+// reconstruye entero cada vez que se resalta cobertura nueva).
+function wireMarkClickToFocusNode(textEl) {
+    textEl?.addEventListener('click', (e) => {
+        const mark = e.target.closest('mark.gk-coverage-mark');
+        if (!mark) return;
+        const nodeId = mark.dataset.nodeId;
+        if (!nodeId || !nodes.get(nodeId)) return;
+        network.selectNodes([nodeId]);
+        network.focus(nodeId, { scale: 1.25, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        flashNewNode(nodeId);
+    });
+}
+
+// --- Enfocar el esquema según por dónde se va leyendo (Idea 3) -----------
+// Mientras el usuario hace scroll dentro de un panel de lectura, se detecta
+// qué citas resaltadas están actualmente visibles y se resaltan (atenuando
+// el resto) los nodos correspondientes en el lienzo — así el esquema "sigue"
+// la lectura sin que haya que ir buscando manualmente cuál nodo toca.
+function wireScrollFocus(panelId, contentContainer, textEl) {
+    if (!contentContainer || !textEl || !panelId) return;
+    let debounceTimer = null;
+    let clearTimer = null;
+    contentContainer.addEventListener('scroll', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => updateScrollFocus(panelId, contentContainer, textEl), 180);
+    });
+}
+
+function updateScrollFocus(panelId, contentContainer, textEl) {
+    const marks = textEl.querySelectorAll('mark.gk-coverage-mark');
+    if (!marks.length) return;
+    const containerRect = contentContainer.getBoundingClientRect();
+    const visibleIds = new Set();
+    marks.forEach(mark => {
+        const r = mark.getBoundingClientRect();
+        if (r.bottom > containerRect.top && r.top < containerRect.bottom) {
+            const id = mark.dataset.nodeId;
+            if (id) visibleIds.add(id);
+        }
+    });
+    const allIds = nodes.getIds();
+    const updates = [];
+    allIds.forEach(id => {
+        const n = nodes.get(id);
+        if (n && n.originPanelId === panelId) {
+            updates.push({ id, opacity: visibleIds.size === 0 ? 1 : (visibleIds.has(id) ? 1 : 0.3) });
+        }
+    });
+    if (updates.length) nodes.update(updates);
 }
 
 // --- Sugerir vínculo entre nodos cercanos en el texto (Idea 8) ------------
@@ -1698,8 +1785,20 @@ function locateNodeInText(nodeId) {
         return;
     }
     mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    mark.classList.add('gk-coverage-flash');
-    setTimeout(() => mark.classList.remove('gk-coverage-flash'), 2200);
+    flashMark(mark);
+}
+
+// Destella un <mark> (fondo amarillo brillante un instante) y luego restaura
+// su color de resaltado normal (el que le corresponde según su nodo — ver
+// data-base-bg/data-base-border, puestos por buildHighlightedMarkup).
+function flashMark(mark) {
+    if (!mark) return;
+    mark.style.backgroundColor = 'rgba(250, 204, 21, 0.65)';
+    mark.style.borderBottomColor = '#ca8a04';
+    setTimeout(() => {
+        mark.style.backgroundColor = mark.dataset.baseBg || '';
+        mark.style.borderBottomColor = mark.dataset.baseBorder || '';
+    }, 2200);
 }
 
 // --- "🔗 Vincular a nodo..." desde el tooltip de selección (Idea 5) --------
@@ -2031,63 +2130,6 @@ document.getElementById('tipBtnLinkToNode')?.addEventListener('click', () => {
 // de uno nunca puede terminar mezclado con el de otro.
 let extraReaderPanelCount = 0;
 
-// "🔑 Sugerir términos clave" (Idea 6): pide a la IA los términos más
-// importantes del texto pegado y los muestra como chips que el usuario puede
-// marcar/desmarcar. Los que queden marcados se mandan como "focusTerms" al
-// generar el esquema, para que la IA se asegure de representarlos. Devuelve
-// el arreglo "selected" — se mantiene SIEMPRE el mismo arreglo (se vacía y
-// se vuelve a llenar con splice/push, nunca se reasigna), así que quien lo
-// guardó en una variable sigue viendo los cambios.
-function wireKeyTermsSuggestion(btn, chipsContainer, textEl) {
-    const selected = [];
-    btn?.addEventListener('click', async () => {
-        const text = textEl ? textEl.innerText.trim() : '';
-        if (!text || text.length < 20) {
-            appAlert('Pega primero un texto con suficiente contenido para poder sugerir términos.');
-            return;
-        }
-        showLoader('Buscando términos clave...');
-        try {
-            const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
-                method: 'POST',
-                body: JSON.stringify({ action: 'extract_key_terms', text })
-            });
-            if (!ok) {
-                if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudieron sugerir términos.');
-                return;
-            }
-            const terms = Array.isArray(data.terms) ? data.terms : [];
-            if (terms.length === 0) {
-                appAlert('No se encontraron términos claros en este texto.');
-                return;
-            }
-            selected.length = 0;
-            if (chipsContainer) {
-                chipsContainer.innerHTML = '';
-                chipsContainer.classList.remove('hidden');
-                chipsContainer.classList.add('flex');
-                terms.forEach(term => {
-                    const chipEl = document.createElement('span');
-                    chipEl.className = 'gk-term-chip';
-                    chipEl.textContent = term;
-                    chipEl.addEventListener('click', () => {
-                        const idx = selected.indexOf(term);
-                        if (idx === -1) { selected.push(term); chipEl.classList.add('gk-term-selected'); }
-                        else { selected.splice(idx, 1); chipEl.classList.remove('gk-term-selected'); }
-                    });
-                    chipsContainer.appendChild(chipEl);
-                });
-            }
-        } catch (err) {
-            console.error(err);
-            appAlert('No se pudieron sugerir términos, intenta de nuevo.');
-        } finally {
-            hideLoader();
-        }
-    });
-    return selected;
-}
-
 function wireReaderPanelClone(root, panelId) {
     const q = (role) => root.querySelector(`[data-role="${role}"]`);
     const header = q('header');
@@ -2102,11 +2144,9 @@ function wireReaderPanelClone(root, panelId) {
     const btnEditContext = q('btnEditContext');
     const editRow = q('docContextEditRow');
     const contextInput = q('docContextInput');
-    const btnSuggestTerms = q('btnSuggestTerms');
-    const keyTermsChips = q('keyTermsChips');
+    const contentContainer = q('contentContainer');
 
     let localContext = "";
-    let selectedFocusTerms = wireKeyTermsSuggestion(btnSuggestTerms, keyTermsChips, textEl);
 
     function updateChip() {
         if (!chip) return;
@@ -2186,8 +2226,6 @@ function wireReaderPanelClone(root, panelId) {
             if (textEl) textEl.innerText = "";
             if (contextInput) contextInput.value = "";
             editRow?.classList.add('hidden');
-            selectedFocusTerms.length = 0;
-            if (keyTermsChips) { keyTermsChips.innerHTML = ''; keyTermsChips.classList.add('hidden'); keyTermsChips.classList.remove('flex'); }
             updateChip(); updateEmptyHintLocal();
         }
     });
@@ -2205,10 +2243,12 @@ function wireReaderPanelClone(root, panelId) {
         if (textContent === null) return;
         updateEmptyHintLocal();
 
-        await generateFullSchemaFromTopic(textContent, { originPanelId: panelId, focusTerms: selectedFocusTerms.slice() });
+        await generateFullSchemaFromTopic(textContent, { originPanelId: panelId });
     });
 
     wireDragToCanvas(textEl);
+    wireMarkClickToFocusNode(textEl);
+    wireScrollFocus(panelId, contentContainer, textEl);
 
     updateEmptyHintLocal();
     wirePanelHoverHighlight(root, panelId);
@@ -2236,8 +2276,6 @@ function createExtraReaderPanel() {
     if (cloneContextInput) cloneContextInput.value = '';
     const cloneEmptyHint = clone.querySelector('[data-role="emptyHint"]');
     if (cloneEmptyHint) cloneEmptyHint.classList.remove('hidden');
-    const cloneChips = clone.querySelector('[data-role="keyTermsChips"]');
-    if (cloneChips) { cloneChips.innerHTML = ''; cloneChips.classList.add('hidden'); cloneChips.classList.remove('flex'); }
 
     const n = extraReaderPanelCount;
     const titleEl = clone.querySelector('[data-role="title"]');
@@ -2391,10 +2429,12 @@ document.getElementById('btnMenuFullSchema')?.addEventListener('click', async ()
     const node = nodes.get(selectedNodeId);
     if (!node) return;
     const topic = node.baseTitle || selectedNodeId;
-    // Si el nodo ya venía de un panel de lectura (tiene origen registrado),
-    // conservamos esa herencia para que el nuevo esquema también quede
+    // El esquema nuevo PARTE de este nodo existente (attachToNodeId): no se
+    // crea una raíz aparte ni se pregunta si limpiar el lienzo, siempre se
+    // agrega directo alrededor de este nodo. Si el nodo ya venía de un panel
+    // de lectura, conservamos esa herencia para que lo nuevo también quede
     // tageado/resaltable con ese mismo panel.
-    await generateFullSchemaFromTopic(topic, { originPanelId: node.originPanelId || null });
+    await generateFullSchemaFromTopic(topic, { originPanelId: node.originPanelId || null, attachToNodeId: selectedNodeId });
 });
 
 document.getElementById('btnMenuLocateText')?.addEventListener('click', () => {
@@ -2617,12 +2657,6 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
     }
 }
 
-const mainSelectedFocusTerms = wireKeyTermsSuggestion(
-    document.getElementById('btnSuggestTerms'),
-    document.getElementById('keyTermsChips'),
-    readerTextMode
-);
-
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     let textContent = readerTextMode.innerText.trim();
     if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
@@ -2641,8 +2675,11 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
     updateReaderEmptyHint();
 
     currentDocumentText = textContent;
-    await generateFullSchemaFromTopic(textContent, { originPanelId: 'main', focusTerms: mainSelectedFocusTerms.slice() });
+    await generateFullSchemaFromTopic(textContent, { originPanelId: 'main' });
 });
+
+wireMarkClickToFocusNode(readerTextMode);
+wireScrollFocus('main', document.getElementById('readerContentContainer'), readerTextMode);
 
 // ==========================================
 // 15. PANTALLA DE BIENVENIDA (SOLO EN LA PRIMERA VISITA)
@@ -2812,9 +2849,6 @@ document.getElementById('btnClearReader')?.addEventListener('click', async () =>
         if (docContextInput) docContextInput.value = "";
         docContextEditRow?.classList.add('hidden');
         updateDocContextChip();
-        mainSelectedFocusTerms.length = 0;
-        const chipsEl = document.getElementById('keyTermsChips');
-        if (chipsEl) { chipsEl.innerHTML = ''; chipsEl.classList.add('hidden'); chipsEl.classList.remove('flex'); }
     }
 });
 

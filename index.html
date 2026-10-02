@@ -50,37 +50,18 @@
             background-color: var(--void);
             overscroll-behavior-y: none;
         }
-        /* Interactividad texto↔esquema: resaltado de cobertura, términos clave y
-           modo "elige un nodo destino" al vincular un fragmento subrayado. */
+        /* Interactividad texto↔esquema: resaltado de cobertura (coloreado a
+           juego con el nodo correspondiente, ver highlightColorPalette en
+           app.js) y modo "elige un nodo destino" al vincular una selección. */
         mark.gk-coverage-mark {
-            background-color: rgba(79, 209, 197, 0.22);
-            border-bottom: 2px solid rgba(79, 209, 197, 0.55);
             color: inherit;
+            border-bottom: 2px solid transparent;
             border-radius: 2px;
-            cursor: default;
-            transition: background-color 0.4s ease;
-        }
-        mark.gk-coverage-mark.gk-coverage-flash {
-            background-color: rgba(250, 204, 21, 0.55);
-            border-bottom-color: #ca8a04;
-        }
-        .gk-term-chip {
-            font-size: 11px;
-            padding: 3px 9px;
-            border-radius: 999px;
-            border: 1px solid #334155;
-            background: #1e293b;
-            color: #cbd5e1;
             cursor: pointer;
-            transition: all 0.15s ease;
-            user-select: none;
+            transition: background-color 0.4s ease, border-color 0.4s ease;
         }
-        .gk-term-chip:hover { border-color: #818cf8; }
-        .gk-term-chip.gk-term-selected {
-            background: #4f46e5;
-            border-color: #818cf8;
-            color: #fff;
-            font-weight: 600;
+        mark.gk-coverage-mark:hover {
+            filter: brightness(0.94);
         }
         body.gk-picking-link-target #network-container,
         body.gk-picking-link-target .vis-network {
@@ -321,10 +302,6 @@
                 <button id="btnParseReaderText" data-role="btnGenerate" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
                     <span>🌐 Generar Esquema</span>
                 </button>
-                <button id="btnSuggestTerms" data-role="btnSuggestTerms" title="Pide a la IA que detecte los términos más importantes de este texto, para enfocar el esquema en ellos" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5">
-                    <span>🔑 Sugerir términos clave</span>
-                </button>
-                <div id="keyTermsChips" data-role="keyTermsChips" class="hidden flex-wrap gap-1.5"></div>
                 <!-- El contexto (para desambiguar definiciones después) ya no es un campo
                      que el usuario tenga que llenar: se detecta solo del texto o del título
                      de la página leída. Solo aparece, muy discreto, cuando hay algo que mostrar. -->
