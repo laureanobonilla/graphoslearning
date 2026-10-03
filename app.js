@@ -1052,7 +1052,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
         return;
     }
 
-    const nodeCountVal = document.getElementById('nodeCount').value;
+    const nodeCountVal = document.getElementById('nodeCount')?.value || 'auto';
     const maxNodes = nodeCountVal === 'auto' ? 'entre 3 y 5 (según relevancia)' : parseInt(nodeCountVal, 10);
     const estimatedCost = nodeCountVal === 'auto' ? 4 : maxNodes;
     if (!checkBalance(estimatedCost)) return;
@@ -1119,7 +1119,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
     actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
 
-    const nodeCountVal = document.getElementById('nodeCount').value;
+    const nodeCountVal = document.getElementById('nodeCount')?.value || 'auto';
     const maxNodes = nodeCountVal === 'auto' ? 'varios (entre 3 y 5 representativos)' : parseInt(nodeCountVal, 10);
     const estimatedCost = nodeCountVal === 'auto' ? 4 : maxNodes;
     if (!checkBalance(estimatedCost)) return;
@@ -1159,6 +1159,100 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
 // ==========================================
 // 13. EVENTOS DEL CANVAS (MENÚ DINÁMICO, VÍNCULOS Y SINERGIA)
 // ==========================================
+
+// Resalta el nodo sobre el que se abrió el menú contextual (borde y sombra
+// más marcados) para que se sienta que el menú "salió" de ese nodo y no de
+// cualquier parte. Se revierte solo, apenas el menú se oculta por cualquier
+// motivo (otra acción, clic afuera, Esc, zoom, etc.) gracias al observer de
+// abajo, así que no hay que acordarse de limpiarlo en cada lugar que cierra
+// el menú.
+let menuHighlightedNodeId = null;
+function setNodeMenuHighlight(nodeId) {
+    if (menuHighlightedNodeId && menuHighlightedNodeId !== nodeId) clearNodeMenuHighlight();
+    menuHighlightedNodeId = nodeId;
+    if (!nodes.get(nodeId)) return;
+    nodes.update({
+        id: nodeId,
+        borderWidth: 4.5,
+        shadow: { enabled: true, color: 'rgba(79, 209, 197, 0.7)', size: 32, x: 0, y: 0 }
+    });
+}
+function clearNodeMenuHighlight() {
+    if (!menuHighlightedNodeId) return;
+    menuHighlightedNodeId = null;
+    // En vez de adivinar el borde/sombra "normales", dejamos que el cálculo
+    // de importancia (sección 22) los recalcule — así queda consistente con
+    // el grado de conexión de cada nodo en vez de un valor fijo.
+    scheduleImportanceStyling();
+}
+new MutationObserver(() => {
+    if (actionMenu.classList.contains('hidden') && menuHighlightedNodeId) clearNodeMenuHighlight();
+}).observe(actionMenu, { attributes: true, attributeFilter: ['class'] });
+
+// --- Submenús del menú contextual ("Enlazar" / "Generar") ------------------
+// Cada grupo (el <div class="gk-menu-group"> que envuelve un botón-cabecera
+// y su submenú) se abre al pasar el mouse por encima (con un pequeño margen
+// antes de cerrarse, para poder mover el cursor hacia el submenú sin que se
+// cierre de golpe) y también con un clic/toque, para que funcione igual en
+// pantallas táctiles donde no existe el "hover". Solo un grupo puede estar
+// abierto a la vez.
+function closeAllMenuGroups(exceptEl = null) {
+    document.querySelectorAll('.gk-menu-group .gk-submenu').forEach(sub => {
+        if (sub !== exceptEl) sub.classList.add('hidden');
+    });
+}
+
+function positionSubmenu(groupEl, submenuEl) {
+    // Por omisión se abre a la derecha del menú principal; si no hay espacio,
+    // se abre a la izquierda en su lugar — igual que ya hace el propio menú
+    // contextual al aparecer.
+    submenuEl.style.left = '100%';
+    submenuEl.style.right = 'auto';
+    submenuEl.style.marginLeft = '4px';
+    submenuEl.style.marginRight = '';
+    const rect = submenuEl.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) {
+        submenuEl.style.left = 'auto';
+        submenuEl.style.right = '100%';
+        submenuEl.style.marginLeft = '';
+        submenuEl.style.marginRight = '4px';
+    }
+}
+
+function wireMenuGroup(groupEl) {
+    const submenuId = groupEl.dataset.submenu;
+    const submenuEl = document.getElementById(submenuId);
+    const headerBtn = groupEl.querySelector('button[id^="btnMenu"]');
+    if (!submenuEl || !headerBtn) return;
+
+    let closeTimer = null;
+    const openGroup = () => {
+        clearTimeout(closeTimer);
+        closeAllMenuGroups(submenuEl);
+        submenuEl.classList.remove('hidden');
+        positionSubmenu(groupEl, submenuEl);
+    };
+    const scheduleClose = () => {
+        clearTimeout(closeTimer);
+        closeTimer = setTimeout(() => submenuEl.classList.add('hidden'), 220);
+    };
+
+    groupEl.addEventListener('mouseenter', openGroup);
+    groupEl.addEventListener('mouseleave', scheduleClose);
+    headerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = !submenuEl.classList.contains('hidden');
+        if (isOpen) submenuEl.classList.add('hidden');
+        else openGroup();
+    });
+}
+document.querySelectorAll('.gk-menu-group').forEach(wireMenuGroup);
+// Al cerrarse el menú principal (por cualquier motivo), cerramos también
+// cualquier submenú que hubiera quedado abierto dentro de él.
+new MutationObserver(() => {
+    if (actionMenu.classList.contains('hidden')) closeAllMenuGroups();
+}).observe(actionMenu, { attributes: true, attributeFilter: ['class'] });
+
 network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNodeId = params.nodes[0];
@@ -1302,6 +1396,11 @@ network.on('click', async function (params) {
 
         // --- 3. MOSTRAR MENÚ CONTEXTUAL ---
         selectedNodeId = clickedNodeId;
+
+        // Para que el menú se sienta como que "salió" de este nodo (y no de
+        // cualquier parte), lo resaltamos mientras el menú esté abierto —
+        // ver setNodeMenuHighlight/clearNodeMenuHighlight más abajo.
+        setNodeMenuHighlight(clickedNodeId);
         // "Expandir subesquema" solo aplica a un nodo colapsado (ver sección SUBESQUEMAS).
         if (typeof btnMenuExpandSub !== 'undefined' && btnMenuExpandSub) {
             const clickedNodeData = nodes.get(clickedNodeId);
@@ -2047,6 +2146,11 @@ function locateNodeInText(nodeId) {
     }
     mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
     flashMark(mark);
+    // El nodo mismo puede haber quedado atenuado por el enfoque-por-scroll
+    // (sección 20c/24b) si su cita no estaba visible en el texto — ahora que
+    // SÍ la acabamos de traer a la vista, lo restauramos de una vez en vez de
+    // esperar a que el listener de scroll lo note por su cuenta.
+    if (nodes.get(nodeId)) nodes.update({ id: nodeId, opacity: 1 });
 }
 
 // Destella un <mark> (fondo amarillo brillante un instante) y luego restaura

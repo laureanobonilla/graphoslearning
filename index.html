@@ -408,66 +408,17 @@
     </div>
 
     <!-- Menú Contextual (Nodos). Sin transformaciones CSS para facilitar cálculo dinámico de posición. -->
-    <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col overflow-hidden min-w-[200px] shadow-xl">
-        <div class="px-3 py-2 bg-[#161c35] border-b border-[#2c3458] flex justify-between items-center">
-            <span class="text-[10px] font-semibold text-[#8a92b2] uppercase tracking-wider">Densidad / Ramas</span>
-            <div class="flex items-center gap-1.5">
-                <select id="nodeCount" class="bg-[#0f1428] border border-[#2c3458] rounded px-1.5 py-0.5 text-xs font-bold text-[#eef1fb] focus:outline-none focus:border-[#4fd1c5] font-mono">
-                    <option value="auto" selected>Auto</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                    <option value="6">6</option>
-                </select>
-            </div>
-        </div>
-
+    <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col overflow-hidden min-w-[220px] shadow-xl">
         <div class="py-1">
-            <button id="btnMenuExpand" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                <span>Conceptos Relacionados</span>
-                <span class="text-[#5b6388] text-[11px]">↵</span>
-            </button>
-            <button id="btnMenuExamples" class="w-full px-3.5 py-2 hover:bg-[#2a2314] text-amber-300 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                <span>Ejemplos Prácticos</span>
-                <span class="text-amber-500/70 text-[10px] uppercase font-bold tracking-wider">Ej</span>
-            </button>
             <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
                 <span>Ver definición</span>
                 <span class="text-[#5b6388] text-[10px]">Panel flotante</span>
-            </button>
-            <button id="btnMenuEditText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                <span>✏️ Editar texto</span>
-                <span class="text-[#5b6388] text-[10px]">Renombrar</span>
-            </button>
-            <button id="btnMenuLocateText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                <span>📍 Ver en el texto</span>
-                <span class="text-[#5b6388] text-[10px]">Origen</span>
             </button>
             <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2 hover:bg-[#1c2a1a] text-lime-300 font-medium text-xs text-left flex items-center justify-between transition-colors">
                 <span>💡 Explicación sencilla</span>
                 <span class="text-lime-400/80 text-[10px] uppercase font-bold tracking-wider">Fácil</span>
             </button>
-            <button id="btnMenuExpandSub" class="hidden w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                <span>🔍 Expandir subesquema</span>
-                <span class="text-[#8b7cf6]/80 text-[10px] uppercase font-bold tracking-wider">Entrar</span>
-            </button>
-            <button id="btnMenuConnect" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                <span>Vincular con...</span>
-                <span class="text-[#5b6388] text-[11px]">🔗</span>
-            </button>
-            <button id="btnMenuSynergy" class="w-full px-3.5 py-2 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458] mt-1">
-                <span>Generar Sinergia</span>
-                <span class="text-fuchsia-400/80 text-[10px] uppercase font-bold tracking-wider">⚡ Fusión</span>
-            </button>
-            <button id="btnMenuAntithesis" class="w-full px-3.5 py-2 hover:bg-[#2a1620] text-rose-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                <span>⚡ Cuestionar / Antítesis</span>
-                <span class="text-rose-400/80 text-[10px] uppercase font-bold tracking-wider">Crítica</span>
-            </button>
-            <button id="btnMenuChallenge" class="w-full px-3.5 py-2 hover:bg-[#122a22] text-emerald-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                <span>🧠 Ponme a prueba</span>
-                <span class="text-emerald-400/80 text-[10px] uppercase font-bold tracking-wider">Reto</span>
-            </button>
+
             <!-- Botón y Campo de Petición Personalizada -->
             <button id="btnMenuCustom" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
                 <span>Prompt personalizado</span>
@@ -479,17 +430,76 @@
                     Explorar
                 </button>
             </div>
-            <!-- Último ítem de la lista principal (antes del pie de "Eliminar"): usa el
-                 texto del nodo como si se hubiera escrito en el campo "Generar" de la
-                 cabecera, y dispara exactamente la misma generación de esquema completo
+
+            <!-- Usa el texto del nodo como si se hubiera escrito en el campo "Generar" de
+                 la cabecera, y dispara exactamente la misma generación de esquema completo
                  (mismo generateFullSchemaFromTopic, mismo costo, mismo diálogo de "¿limpiar
                  el lienzo?" si ya hay algo ahí) — ver btnMenuFullSchema en app.js. -->
             <button id="btnMenuFullSchema" class="w-full px-3.5 py-2 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
                 <span>🌐 Generar esquema completo a partir de aquí</span>
                 <span class="text-[#4fd1c5]/70 text-[10px] uppercase font-bold tracking-wider">IA</span>
             </button>
-        </div>
 
+            <button id="btnMenuEditText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                <span>✏️ Editar</span>
+            </button>
+
+            <button id="btnMenuExpandSub" class="hidden w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                <span>🔍 Expandir subesquema</span>
+                <span class="text-[#8b7cf6]/80 text-[10px] uppercase font-bold tracking-wider">Entrar</span>
+            </button>
+
+            <!-- Grupo "Enlazar": al pasar el mouse (o tocar, en pantallas táctiles) abre un
+                 submenú con las acciones que conectan este nodo con otro, o con su origen
+                 en el texto. Las acciones (btnMenuConnect/Synergy/LocateText) son las
+                 mismas de siempre, solo que agrupadas — ver wireMenuGroup en app.js. -->
+            <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuLink">
+                <button type="button" id="btnMenuLinkGroup" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                    <span>🔗 Enlazar</span>
+                    <span class="text-[#5b6388] text-[11px]">›</span>
+                </button>
+                <div id="submenuLink" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden min-w-[200px] shadow-xl z-50">
+                    <button id="btnMenuConnect" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                        <span>Vincular con...</span>
+                        <span class="text-[#5b6388] text-[11px]">🔗</span>
+                    </button>
+                    <button id="btnMenuSynergy" class="w-full px-3.5 py-2 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                        <span>Generar Sinergia con...</span>
+                        <span class="text-fuchsia-400/80 text-[10px] uppercase font-bold tracking-wider">⚡</span>
+                    </button>
+                    <button id="btnMenuLocateText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                        <span>📍 Ver en el texto</span>
+                        <span class="text-[#5b6388] text-[10px]">Origen</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grupo "Generar": acciones que crean nodos nuevos a partir de este. -->
+            <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuGenerate">
+                <button type="button" id="btnMenuGenerateGroup" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                    <span>✨ Generar</span>
+                    <span class="text-[#5b6388] text-[11px]">›</span>
+                </button>
+                <div id="submenuGenerate" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden min-w-[200px] shadow-xl z-50">
+                    <button id="btnMenuExpand" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                        <span>Conceptos Relacionados</span>
+                        <span class="text-[#5b6388] text-[11px]">↵</span>
+                    </button>
+                    <button id="btnMenuAntithesis" class="w-full px-3.5 py-2 hover:bg-[#2a1620] text-rose-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                        <span>⚡ Cuestionar / Antítesis</span>
+                        <span class="text-rose-400/80 text-[10px] uppercase font-bold tracking-wider">Crítica</span>
+                    </button>
+                    <button id="btnMenuChallenge" class="w-full px-3.5 py-2 hover:bg-[#122a22] text-emerald-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                        <span>🧠 Ponme a prueba</span>
+                        <span class="text-emerald-400/80 text-[10px] uppercase font-bold tracking-wider">Reto</span>
+                    </button>
+                    <button id="btnMenuExamples" class="w-full px-3.5 py-2 hover:bg-[#2a2314] text-amber-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
+                        <span>Ejemplos Prácticos</span>
+                        <span class="text-amber-500/70 text-[10px] uppercase font-bold tracking-wider">Ej</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
        <div class="border-t border-[#2c3458] p-1">
             <button id="btnMenuDelete" class="w-full px-3 py-1.5 hover:bg-[#2a1620] text-rose-400 font-medium text-[11px] rounded text-left transition-colors flex items-center gap-1.5">

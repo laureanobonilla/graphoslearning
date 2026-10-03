@@ -1405,3 +1405,81 @@ Antes era un bloque simple con texto chico. Ahora:
 - `index.html`: rediseño completo del bloque de contacto dentro de
   `#storeModal` (ícono, encabezado, botón de WhatsApp, divisor, correo
   grande y clicable).
+
+## 27. El nodo se resalta mientras su menú está abierto (y "Ver en el texto" ya restaura su opacidad)
+
+Primer intento: hacer que CADA clic en un nodo saltara también al texto —
+pero pensándolo mejor, para eso ya existe el botón del menú ("📍 Ver en el
+texto"), así que esa parte se revirtió. Lo que sí hacía falta era otra cosa:
+que al hacer clic en un nodo y abrírsele el menú, se sintiera que el menú
+"salió" de ese nodo — ahora mismo no quedaba claro cuál nodo estaba
+seleccionado.
+
+- Mientras el menú contextual está abierto, el nodo sobre el que se abrió
+  queda con un borde y un resplandor más marcados, para que sea evidente de
+  cuál nodo salió el menú.
+- Apenas el menú se cierra (por cualquier motivo: elegir una acción, hacer
+  clic afuera, hacer zoom, etc.), el nodo vuelve solo a su aspecto normal
+  — recalculado con el mismo criterio de importancia de la sección 22 (borde
+  y sombra según cuántas conexiones tiene), no un valor fijo.
+- De paso quedó un ajuste chico en "📍 Ver en el texto": si el nodo estaba
+  atenuado por el enfoque-por-scroll (sección 24b) porque su cita no estaba
+  en la parte visible del texto, al usar ese botón el nodo recupera su
+  opacidad normal de inmediato, sin esperar a que el scroll lo note por su
+  cuenta.
+
+### Archivos tocados
+
+- `app.js`: `setNodeMenuHighlight`/`clearNodeMenuHighlight` (con un
+  observador que limpia el resaltado en cuanto el menú se oculta, sin
+  importar por dónde se cerró); `locateNodeInText` ahora también restaura
+  la opacidad del nodo al usarlo.
+
+## 28. Menú del nodo reorganizado en grupos + se quitó el selector de Densidad/Ramas
+
+### a) Menú más corto, con dos submenús
+
+El menú que aparece al hacer clic en un nodo tenía demasiados ítems sueltos
+al mismo nivel. Ahora queda así:
+
+**Siempre visibles:**
+1. Ver definición
+2. 💡 Explicación sencilla
+3. Prompt personalizado
+4. 🌐 Generar esquema completo a partir de aquí
+5. ✏️ Editar
+6. 🔗 **Enlazar** (al pasar el mouse, o con un toque en pantallas táctiles,
+   despliega: *Vincular con...*, *Generar Sinergia con...*, *Ver en el texto*)
+7. ✨ **Generar** (despliega: *Conceptos Relacionados*, *Cuestionar/Antítesis*,
+   *Ponme a prueba*, *Ejemplos Prácticos*)
+8. Eliminar (al pie, como siempre)
+
+("🔍 Expandir subesquema" sigue apareciendo, pero solo para los nodos que
+SÍ son un subesquema colapsado — igual que antes.)
+
+Cada submenú se abre solo (nunca dos a la vez), se posiciona a la derecha
+del menú principal o a la izquierda si no hay espacio, y todas las acciones
+de adentro son exactamente las mismas de siempre (mismo costo, mismo
+comportamiento) — solo cambió dónde viven dentro del menú.
+
+### b) Se quitó el selector de "Densidad / Ramas"
+
+Vivía arriba del menú del nodo y dejaba elegir cuántas ramas pedirle a la IA
+(2 a 6, o "Auto"). Como no se iba a usar, se quitó del menú — el
+comportamiento por defecto ("Auto": la IA decide cuántas según relevancia)
+queda fijo, igual que ya era el valor por omisión.
+
+### Archivos tocados
+
+- `index.html`: reestructuración completa de `#actionMenu` (se quitó el
+  selector de densidad; "Vincular con...", "Generar Sinergia con..." y "Ver
+  en el texto" pasaron a vivir dentro de `#submenuLink`; "Conceptos
+  Relacionados", "Cuestionar/Antítesis", "Ponme a prueba" y "Ejemplos
+  Prácticos" pasaron a vivir dentro de `#submenuGenerate`; "Editar texto" se
+  renombró a solo "Editar").
+- `app.js`: `wireMenuGroup`/`closeAllMenuGroups`/`positionSubmenu` (lógica
+  genérica de apertura/cierre y posicionamiento de los submenús); las dos
+  líneas que leían `document.getElementById('nodeCount').value` directo
+  (sin ese elemento ya habrían roto "Conceptos Relacionados" y "Ejemplos
+  Prácticos") ahora usan `?.value || 'auto'`, así que siguen funcionando
+  exactamente igual que con el selector, solo que siempre en modo Auto.
