@@ -1639,3 +1639,93 @@ falta.
 - `index.html`: se quitó `overflow-hidden` de `#actionMenu`; nuevo selector
   "Modo" (🌳 Árbol / 🪐 Sistema solar) en la cabecera; nuevo botón
   "↩️ Deshacer" en la cabecera.
+
+## 30. Cinco correcciones sobre la ronda anterior: flecha en vivo, minimizar de verdad, menú sin iconos, submenú ilegible, sonido que no sonaba — y una animación de entrada nueva
+
+### a) La flecha del panel de definición llegaba tarde
+
+Al arrastrar un panel de definición, la flecha hacia su nodo de origen se
+quedaba apuntando al lugar viejo hasta que pasaba algo que redibujara el
+mapa (un clic, un pan...). La causa: arrastrar el panel es un gesto de
+mouse puro sobre el DOM — nunca mueve ni hace zoom al lienzo — así que
+nunca disparaba el evento `afterDrawing` de vis-network, que era el único
+momento en que se recalculaba la flecha. Se corrigió llamando a esa misma
+función de recálculo (`updateFloatingPanelAnchors`) directamente en cada
+movimiento del mouse mientras se arrastra el panel, además de en
+`afterDrawing` — así la flecha ahora se mueve en vivo, a la par del panel.
+
+### b) Minimizar un panel de definición no lo achicaba
+
+El botón "—" solo escondía el texto de adentro, pero el panel seguía
+ocupando el mismo espacio grande en pantalla porque tenía una altura fija.
+Ahora, al minimizar, el panel de verdad se encoge a solo su cabecera
+(altura automática) y se desactiva el asa de redimensionar mientras está
+así (no tiene sentido agrandar un panel vacío); el botón cambia a "▢" para
+indicar que está minimizado. Al volver a pulsarlo, recupera exactamente la
+altura que tenía antes de minimizarse.
+
+### c) Se quitaron todos los iconos y etiquetas del menú del nodo
+
+Tanto en el menú principal como en los submenús "Enlazar" y "Generar": ya
+no hay emojis al inicio de cada opción (💡, 🌐, ✏️, 🔗, ✨, 🧠, ⚡, 📍, 🔍,
+el ícono de basurero de "Eliminar") ni las etiquetas pequeñas a la derecha
+("Panel flotante", "Fácil", "Libre", "IA", "Entrar", "Origen", "Crítica",
+"Reto", "Ej", los iconos sueltos usados como etiqueta). Cada opción quedó
+como texto simple. Se conservó únicamente el "›" de "Enlazar" y "Generar",
+porque no es un ícono decorativo sino el indicador de que esa fila abre un
+submenú.
+
+### d) Texto invisible en los submenús "Enlazar"/"Generar"
+
+La causa: esos submenús usan la clase genérica `.glass-dock`, pensada en
+otras partes de la app para paneles **claros** (fondo blanco translúcido).
+`#actionMenu` tenía su propia regla que lo oscurecía, pero esa regla no
+alcanzaba a los submenús (son elementos distintos, no descendientes del
+mismo selector), así que quedaban con fondo blanco y el texto claro del
+menú (pensado para fondo oscuro) se perdía casi por completo encima. Se
+igualaron `#submenuLink` y `#submenuGenerate` al mismo fondo oscuro de
+`#actionMenu` para que no se note el cambio de un menú al otro.
+
+### e) El sonido no sonaba nunca
+
+El interruptor de sonido sí funcionaba (de hecho suena una campanita de
+confirmación apenas se activa), pero la función que reproduce el sonido
+(`playChime`, dentro de `flashNewNode`) solo estaba conectada a las
+creaciones de **un** nodo a la vez (Conceptos Relacionados, extraer del
+texto, etc.) — nunca al caso más común de todos: **generar un esquema
+completo**, que crea varios nodos de golpe y pasa por una función
+distinta (`settleNewNodesOrganically`) que nunca llamaba a `playChime`.
+Por eso con el sonido encendido "nunca sonaba nada" en el uso normal. Se
+agregó ahí un "tin" por cada nodo nuevo, en cascada (no todos a la vez,
+que sonaría como un acorde feo) y con un tono levemente distinto cada vez
+para que no se sienta repetitivo.
+
+### f) Nueva animación de entrada
+
+Al cargar la app aparece, una sola vez, una pantalla de bienvenida breve:
+el logo "Γ" (el mismo degradado turquesa→violeta de la cabecera, aquí
+agrandado) aparece en el centro con dos puntitos de color orbitando
+alrededor a velocidades distintas. Después de un momento todo "se
+acomoda": las órbitas se encogen hacia el centro y se desvanecen, el logo
+da un pequeño rebote de asentamiento, y toda la pantalla se funde a
+transparente para revelar la app debajo. Un clic o cualquier tecla la salta
+de inmediato, por si alguien no quiere esperar los ~1.8 segundos que dura
+completa. Vive en su propio bloque de CSS/JS, independiente de `app.js`,
+así que arranca y termina sola aunque el resto de la app tarde en cargar
+(y si `#introSplash` no existiera por algún motivo, el script simplemente
+no hace nada, sin romper el resto de la página). También respeta
+`prefers-reduced-motion` (quita las órbitas giratorias para quien lo tenga
+activado en su sistema).
+
+### Archivos tocados
+
+- `app.js`: `updateFloatingPanelAnchors()` ahora también se llama desde el
+  propio `mousemove` del arrastre de paneles de definición, no solo desde
+  `afterDrawing`; botón "fp-minimize" reescrito para encoger/restaurar la
+  altura real del panel (`el.style.height`, `el.style.resize`) en vez de
+  solo esconder el contenido; `settleNewNodesOrganically` ahora llama a
+  `playChime` por cada nodo nuevo, en cascada.
+- `index.html`: `#actionMenu` y sus submenús reescritos sin iconos ni
+  etiquetas; nueva regla CSS que oscurece `#submenuLink`/`#submenuGenerate`
+  igual que `#actionMenu`; nuevo `#introSplash` (markup + CSS + script de
+  orquestación) justo después de abrir `<body>` y antes de `</body>`.

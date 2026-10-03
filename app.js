@@ -725,6 +725,17 @@ function checkBalance(cost) {
 // cuanto el motor se estabiliza, así que no hace falta duplicar esa lógica.
 function settleNewNodesOrganically(newIds) {
     if (!newIds || !newIds.length) return;
+    // El "sonido al crear nodos" (toggle de la cabecera) solo sonaba para
+    // creaciones de UN nodo a la vez (flashNewNode, usado por "Conceptos
+    // Relacionados", extraer del texto, etc.) — pero NUNCA para el caso más
+    // común de todos: generar un esquema completo, que crea varios nodos de
+    // golpe y pasa por AQUÍ, no por flashNewNode. Por eso con el sonido
+    // encendido "nunca sonaba nada" en el uso normal. Un "tin" por nodo, en
+    // cascada (no los varios a la vez, que sonaría como un acorde feo), con
+    // un tono levemente distinto cada vez para que no se sienta repetitivo.
+    newIds.forEach((id, i) => {
+        setTimeout(() => playChime(600 + Math.random() * 200), i * 65);
+    });
     const allIds = nodes.getIds();
     const updates = allIds.map(id => ({
         id,
@@ -2481,8 +2492,32 @@ function openFloatingPanel(nodeId, title) {
     titleEl.innerText = title;
 
     el.querySelector('.fp-close').addEventListener('click', () => closeFloatingPanel(nodeId));
-    el.querySelector('.fp-minimize').addEventListener('click', () => {
-        contentEl.classList.toggle('hidden');
+    // Minimizar de verdad: antes solo se escondía el texto de adentro pero el
+    // panel seguía ocupando el mismo espacio grande en pantalla (su altura fija
+    // no cambiaba). Ahora, al minimizar, el panel se encoge a solo su cabecera
+    // (altura automática) y se desactiva el asa de resize mientras está así —
+    // no tiene sentido redimensionar un panel que no muestra contenido. Al
+    // restaurar vuelve exactamente a la altura que tenía antes de minimizarlo.
+    const minimizeBtn = el.querySelector('.fp-minimize');
+    let isMinimized = false;
+    let heightBeforeMinimize = null;
+    minimizeBtn.addEventListener('click', () => {
+        isMinimized = !isMinimized;
+        if (isMinimized) {
+            heightBeforeMinimize = el.style.height || `${el.offsetHeight}px`;
+            el.style.height = 'auto';
+            el.style.resize = 'none';
+            contentEl.classList.add('hidden');
+            minimizeBtn.textContent = '▢';
+            minimizeBtn.title = 'Restaurar';
+        } else {
+            el.style.height = heightBeforeMinimize || '';
+            el.style.resize = '';
+            contentEl.classList.remove('hidden');
+            minimizeBtn.textContent = '—';
+            minimizeBtn.title = 'Minimizar';
+        }
+        if (typeof network !== 'undefined' && network) network.redraw();
     });
     el.addEventListener('mousedown', () => focusFloatingPanel(nodeId));
 
@@ -2501,8 +2536,15 @@ function openFloatingPanel(nodeId, title) {
         // Mientras se arrastra, se re-ancla en cada frame al punto del mapa
         // bajo el panel: así, al terminar de moverlo, queda "pegado" a su
         // nueva posición y no salta de vuelta a la anterior en el próximo
-        // pan/zoom (ver updateFloatingPanelAnchors, que repone left/top).
+        // pan/zoom. IMPORTANTE: arrastrar el panel es un gesto de mouse puro
+        // (no mueve ni hace zoom al lienzo), así que NUNCA dispara el evento
+        // 'afterDrawing' de vis-network — por eso antes la flecha se quedaba
+        // apuntando al lugar viejo hasta el próximo redibujado del mapa (un
+        // clic, un pan, etc.). Por eso aquí se llama a updateFloatingPanelAnchors()
+        // a mano, en cada movimiento del mouse, para que la flecha se seabra
+        // se redibuje en vivo junto con el panel y no se quede atrás.
         anchorFloatingPanelToWorld(nodeId, el);
+        updateFloatingPanelAnchors();
     });
     document.addEventListener('mouseup', () => { dragState = null; });
 

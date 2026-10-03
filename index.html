@@ -50,6 +50,100 @@
             background-color: var(--void);
             overscroll-behavior-y: none;
         }
+
+        /* ===== Animación de entrada (#introSplash) =====
+           Caja cuadrada central (intro-orbit-wrap) que contiene el logo y dos
+           "anillos" invisibles del mismo tamaño que giran a velocidades/
+           direcciones distintas; cada anillo lleva un puntito de color
+           pegado a su borde superior, así que al girar el anillo el punto
+           dibuja una órbita alrededor del logo sin necesidad de animar su
+           posición a mano con JavaScript. */
+        .intro-orbit-wrap {
+            position: relative;
+            width: 170px;
+            height: 170px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .intro-logo {
+            width: 76px;
+            height: 76px;
+            border-radius: 1.25rem;
+            background: linear-gradient(135deg, var(--cyan), var(--violet));
+            color: var(--void);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-weight: 800;
+            font-size: 2.25rem;
+            box-shadow: 0 0 46px rgba(79, 209, 197, 0.45);
+            opacity: 0;
+            transform: scale(0.4);
+            animation: intro-logo-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s forwards;
+        }
+        .intro-orbit-ring {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            opacity: 0;
+            animation: intro-ring-fade-in 0.5s ease-out 0.3s forwards, intro-spin 2.4s linear 0.3s infinite;
+        }
+        .intro-orbit-ring-1 { animation-duration: 0.5s, 2.1s; }
+        .intro-orbit-ring-2 { inset: 14px; animation-duration: 0.5s, 3s; animation-direction: normal, reverse; }
+        .intro-dot {
+            position: absolute;
+            top: -4px;
+            left: 50%;
+            width: 9px;
+            height: 9px;
+            margin-left: -4.5px;
+            border-radius: 50%;
+        }
+        .intro-dot-cyan { background: var(--cyan); box-shadow: 0 0 10px rgba(79, 209, 197, 0.9); }
+        .intro-dot-violet { background: var(--violet); box-shadow: 0 0 10px rgba(139, 124, 246, 0.9); }
+
+        @keyframes intro-logo-in {
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes intro-ring-fade-in {
+            to { opacity: 1; }
+        }
+        @keyframes intro-spin {
+            to { transform: rotate(360deg); }
+        }
+        /* "Se acomoda al final": las órbitas se encogen hacia el centro y se
+           desvanecen, el logo deja de girar (se "fija") con un pequeño rebote
+           de asentamiento, y toda la pantalla se funde a transparente para
+           revelar la app debajo. La clase .intro-settling la agrega el script
+           al pie del body después de un momento. */
+        #introSplash.intro-settling .intro-orbit-ring {
+            animation: intro-ring-fade-in 0.5s ease-out 0.3s forwards, intro-spin 2.4s linear 0.3s infinite, intro-ring-collapse 0.5s ease-in forwards;
+        }
+        #introSplash.intro-settling .intro-logo {
+            animation: intro-logo-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s forwards, intro-logo-settle 0.45s ease-in-out forwards;
+        }
+        @keyframes intro-ring-collapse {
+            to { transform: scale(0.15); opacity: 0; }
+        }
+        @keyframes intro-logo-settle {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.12); }
+            100% { transform: scale(1); }
+        }
+        #introSplash.intro-fading-out {
+            opacity: 0;
+            transition: opacity 0.55s ease;
+            pointer-events: none;
+        }
+        #introSplash.intro-gone {
+            display: none;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .intro-orbit-ring { display: none; }
+            .intro-logo { animation: intro-logo-in 0.01s forwards; }
+        }
         /* Interactividad texto↔esquema: resaltado de cobertura (coloreado a
            juego con el nodo correspondiente, ver highlightColorPalette en
            app.js) y modo "elige un nodo destino" al vincular una selección. */
@@ -127,8 +221,13 @@
             box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08);
         }
 
-        /* El menú contextual de nodos SÍ es parte de la consola: oscuro. */
-        #actionMenu {
+        /* El menú contextual de nodos SÍ es parte de la consola: oscuro. Los
+           submenús ("Enlazar"/"Generar") usan la clase genérica .glass-dock
+           (pensada para paneles CLAROS en otras partes de la app), así que sin
+           esta regla se veían con fondo blanco y el texto claro del menú
+           (pensado para fondo oscuro) quedaba casi invisible encima. Se igualan
+           al mismo estilo oscuro de #actionMenu para que no se note el salto. */
+        #actionMenu, #submenuLink, #submenuGenerate {
             max-width: 90vw;
             background: rgba(17, 22, 43, 0.97);
             backdrop-filter: blur(20px);
@@ -166,6 +265,23 @@
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+    <!-- Animación de entrada: se ve una sola vez, al cargar la app. El logo
+         (el mismo "Γ" con degradado turquesa→violeta de la cabecera, aquí
+         agrandado) aparece en el centro con un par de puntos orbitando
+         alrededor; después de un momento todo se "acomoda" — las órbitas se
+         encogen hacia el centro y desaparecen, el logo se asienta a su tamaño
+         final y toda la pantalla se desvanece, dejando ver la app debajo.
+         Un clic en cualquier parte la salta de una vez, por si alguien no
+         quiere esperar. Ver #introSplash en la hoja de estilos y su script
+         al pie del body — es independiente de app.js, así que arranca y
+         termina sola aunque el resto de la app tarde en cargar. -->
+    <div id="introSplash" class="fixed inset-0 z-[400] flex items-center justify-center" style="background:var(--void);">
+        <div class="intro-orbit-wrap">
+            <div class="intro-orbit-ring intro-orbit-ring-1"><span class="intro-dot intro-dot-cyan"></span></div>
+            <div class="intro-orbit-ring intro-orbit-ring-2"><span class="intro-dot intro-dot-violet"></span></div>
+            <div class="intro-logo">Γ</div>
+        </div>
+    </div>
     <!-- Banner Modo Sinergia -->
     <div id="synergyBanner" class="absolute top-24 md:top-20 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white backdrop-blur-md px-4 md:px-5 py-2 rounded-full shadow-2xl font-medium text-[10px] md:text-xs tracking-wide z-40 hidden flex items-center gap-2 cursor-pointer border border-fuchsia-700/60 transition-transform active:scale-95 whitespace-nowrap">
         <span class="flex items-center gap-1.5 text-fuchsia-300">
@@ -428,19 +544,16 @@
     <!-- Menú Contextual (Nodos). Sin transformaciones CSS para facilitar cálculo dinámico de posición. -->
     <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col min-w-[220px] shadow-xl">
         <div class="py-1">
-            <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                <span>Ver definición</span>
-                <span class="text-[#5b6388] text-[10px]">Panel flotante</span>
+            <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors">
+                Ver definición
             </button>
-            <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2 hover:bg-[#1c2a1a] text-lime-300 font-medium text-xs text-left flex items-center justify-between transition-colors">
-                <span>💡 Explicación sencilla</span>
-                <span class="text-lime-400/80 text-[10px] uppercase font-bold tracking-wider">Fácil</span>
+            <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2 hover:bg-[#1c2a1a] text-lime-300 font-medium text-xs text-left transition-colors">
+                Explicación sencilla
             </button>
 
             <!-- Botón y Campo de Petición Personalizada -->
-            <button id="btnMenuCustom" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                <span>Prompt personalizado</span>
-                <span class="text-[#8b7cf6]/80 text-[10px] uppercase font-bold tracking-wider">Libre</span>
+            <button id="btnMenuCustom" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                Prompt personalizado
             </button>
             <div id="customPromptBox" class="hidden px-3 py-2.5 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-2">
                 <textarea id="customPromptInput" rows="2" placeholder="" class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg p-2 text-xs text-[#eef1fb] placeholder-[#5b6388] focus:outline-none focus:border-[#8b7cf6] resize-none font-sans"></textarea>
@@ -453,18 +566,16 @@
                  la cabecera, y dispara exactamente la misma generación de esquema completo
                  (mismo generateFullSchemaFromTopic, mismo costo, mismo diálogo de "¿limpiar
                  el lienzo?" si ya hay algo ahí) — ver btnMenuFullSchema en app.js. -->
-            <button id="btnMenuFullSchema" class="w-full px-3.5 py-2 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                <span>🌐 Generar esquema completo a partir de aquí</span>
-                <span class="text-[#4fd1c5]/70 text-[10px] uppercase font-bold tracking-wider">IA</span>
+            <button id="btnMenuFullSchema" class="w-full px-3.5 py-2 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                Generar esquema completo a partir de aquí
             </button>
 
-            <button id="btnMenuEditText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                <span>✏️ Editar</span>
+            <button id="btnMenuEditText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                Editar
             </button>
 
-            <button id="btnMenuExpandSub" class="hidden w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                <span>🔍 Expandir subesquema</span>
-                <span class="text-[#8b7cf6]/80 text-[10px] uppercase font-bold tracking-wider">Entrar</span>
+            <button id="btnMenuExpandSub" class="hidden w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                Expandir subesquema
             </button>
 
             <!-- Grupo "Enlazar": al pasar el mouse (o tocar, en pantallas táctiles) abre un
@@ -473,21 +584,18 @@
                  mismas de siempre, solo que agrupadas — ver wireMenuGroup en app.js. -->
             <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuLink">
                 <button type="button" id="btnMenuLinkGroup" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>🔗 Enlazar</span>
+                    <span>Enlazar</span>
                     <span class="text-[#5b6388] text-[11px]">›</span>
                 </button>
                 <div id="submenuLink" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden min-w-[200px] shadow-xl z-50">
-                    <button id="btnMenuConnect" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                        <span>Vincular con...</span>
-                        <span class="text-[#5b6388] text-[11px]">🔗</span>
+                    <button id="btnMenuConnect" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors">
+                        Vincular con...
                     </button>
-                    <button id="btnMenuSynergy" class="w-full px-3.5 py-2 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                        <span>Generar Sinergia con...</span>
-                        <span class="text-fuchsia-400/80 text-[10px] uppercase font-bold tracking-wider">⚡</span>
+                    <button id="btnMenuSynergy" class="w-full px-3.5 py-2 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                        Generar Sinergia con...
                     </button>
-                    <button id="btnMenuLocateText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                        <span>📍 Ver en el texto</span>
-                        <span class="text-[#5b6388] text-[10px]">Origen</span>
+                    <button id="btnMenuLocateText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                        Ver en el texto
                     </button>
                 </div>
             </div>
@@ -495,33 +603,28 @@
             <!-- Grupo "Generar": acciones que crean nodos nuevos a partir de este. -->
             <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuGenerate">
                 <button type="button" id="btnMenuGenerateGroup" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                    <span>✨ Generar</span>
+                    <span>Generar</span>
                     <span class="text-[#5b6388] text-[11px]">›</span>
                 </button>
                 <div id="submenuGenerate" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden min-w-[200px] shadow-xl z-50">
-                    <button id="btnMenuExpand" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
-                        <span>Conceptos Relacionados</span>
-                        <span class="text-[#5b6388] text-[11px]">↵</span>
+                    <button id="btnMenuExpand" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors">
+                        Conceptos Relacionados
                     </button>
-                    <button id="btnMenuAntithesis" class="w-full px-3.5 py-2 hover:bg-[#2a1620] text-rose-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                        <span>⚡ Cuestionar / Antítesis</span>
-                        <span class="text-rose-400/80 text-[10px] uppercase font-bold tracking-wider">Crítica</span>
+                    <button id="btnMenuAntithesis" class="w-full px-3.5 py-2 hover:bg-[#2a1620] text-rose-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                        Cuestionar / Antítesis
                     </button>
-                    <button id="btnMenuChallenge" class="w-full px-3.5 py-2 hover:bg-[#122a22] text-emerald-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                        <span>🧠 Ponme a prueba</span>
-                        <span class="text-emerald-400/80 text-[10px] uppercase font-bold tracking-wider">Reto</span>
+                    <button id="btnMenuChallenge" class="w-full px-3.5 py-2 hover:bg-[#122a22] text-emerald-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                        Ponme a prueba
                     </button>
-                    <button id="btnMenuExamples" class="w-full px-3.5 py-2 hover:bg-[#2a2314] text-amber-300 font-medium text-xs text-left flex items-center justify-between transition-colors border-t border-[#2c3458]">
-                        <span>Ejemplos Prácticos</span>
-                        <span class="text-amber-500/70 text-[10px] uppercase font-bold tracking-wider">Ej</span>
+                    <button id="btnMenuExamples" class="w-full px-3.5 py-2 hover:bg-[#2a2314] text-amber-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                        Ejemplos Prácticos
                     </button>
                 </div>
             </div>
         </div>
 
        <div class="border-t border-[#2c3458] p-1">
-            <button id="btnMenuDelete" class="w-full px-3 py-1.5 hover:bg-[#2a1620] text-rose-400 font-medium text-[11px] rounded text-left transition-colors flex items-center gap-1.5">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <button id="btnMenuDelete" class="w-full px-3 py-1.5 hover:bg-[#2a1620] text-rose-400 font-medium text-[11px] rounded text-left transition-colors">
                 Eliminar
             </button>
         </div>
@@ -790,6 +893,36 @@
             </div>
         </div>
     </div>    
+    <!-- Orquesta la animación de #introSplash. Va suelto aquí (no en app.js)
+         a propósito: así arranca y se puede saltar de inmediato sin esperar a
+         que app.js (que hace bastante trabajo de inicialización) termine de
+         cargar. Si por lo que sea #introSplash no existe, no hace nada. -->
+    <script>
+        (function () {
+            const splash = document.getElementById('introSplash');
+            if (!splash) return;
+            let done = false;
+            function finishSplash() {
+                if (done) return;
+                done = true;
+                splash.classList.add('intro-fading-out');
+                setTimeout(() => splash.classList.add('intro-gone'), 600);
+            }
+            // Secuencia normal: gira un momento, se "acomoda" (las órbitas se
+            // encogen y el logo se asienta), y recién entonces se desvanece.
+            const settleTimer = setTimeout(() => {
+                splash.classList.add('intro-settling');
+                setTimeout(finishSplash, 550);
+            }, 1300);
+            // Para quien no quiera esperar: un clic/tecla salta directo al final.
+            function skip() {
+                clearTimeout(settleTimer);
+                finishSplash();
+            }
+            splash.addEventListener('click', skip, { once: true });
+            document.addEventListener('keydown', skip, { once: true });
+        })();
+    </script>
     <script src="/app.js"></script>
 </body>
 </html>
