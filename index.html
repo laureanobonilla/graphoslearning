@@ -410,6 +410,9 @@
                     <span class="hidden xl:inline">Capturar</span>
                 </button>
                 <button id="btnHelp" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#8a92b2] hover:text-[#eef1fb] w-8 h-8 md:w-auto md:px-3 rounded-lg font-medium transition-colors">?</button>
+                <button id="btnFeedback" title="Enviar un comentario o sugerencia" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#8a92b2] hover:text-[#4fd1c5] p-2 md:px-2.5 md:py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                    <span>💬</span><span class="hidden xl:inline">Sugerencias</span>
+                </button>
 
                 <!-- Lectura de telemetría: balance de nodos -->
                 <div id="nodeCounterBtn" class="cursor-pointer bg-[#161c35] border border-[#2c3458] pl-2.5 pr-3 py-1.5 rounded-full flex items-center gap-2 transition-all active:scale-95 ml-1">
@@ -769,14 +772,27 @@
 
                     <div class="flex items-center gap-3 w-full">
                         <div class="flex-1 h-px bg-slate-200"></div>
-                        <span class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">o al correo</span>
+                        <span class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">o te escribimos nosotros</span>
                         <div class="flex-1 h-px bg-slate-200"></div>
                     </div>
 
-                    <a href="mailto:bonillapretiz@gmail.com" id="manualPurchaseEmailLink"
-                       class="text-lg font-bold text-slate-800 hover:text-emerald-600 transition-colors break-all leading-snug">
-                        <span id="manualPurchaseEmailAddress">bonillapretiz@gmail.com</span>
-                    </a>
+                    <!-- Antes era un enlace mailto: (abre TU cliente de correo y
+                         dependía de que vos le dieras "enviar"). Ahora se manda el
+                         correo de una vez desde el servidor (ver send-feedback.js) —
+                         solo hace falta dejar el correo donde contestarte. -->
+                    <form id="rechargeRequestForm" class="w-full flex flex-col gap-2">
+                        <input type="email" id="rechargeRequestEmail" required placeholder="Tu correo"
+                               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+                        <button type="submit" id="btnRechargeRequestSend"
+                                class="w-full bg-slate-800 hover:bg-slate-900 active:scale-[0.98] text-white font-bold text-sm py-3 rounded-xl transition-all">
+                            Enviar
+                        </button>
+                        <p id="rechargeRequestStatus" class="text-xs text-slate-500 min-h-[1em]"></p>
+                    </form>
+                    <p class="text-[11px] text-slate-400 -mt-1">
+                        También podés escribirnos directo a
+                        <a href="mailto:bonillapretiz@gmail.com" id="manualPurchaseEmailLink" class="underline hover:text-emerald-600"><span id="manualPurchaseEmailAddress">bonillapretiz@gmail.com</span></a>.
+                    </p>
 
                     <!-- El contenedor de PayPal queda armado pero oculto: la integración
                          server-verificada sigue intacta (app.js, initPaypalButtons) para
@@ -790,6 +806,48 @@
 
         </div>
     </div>
+
+<!-- Modal: Comentarios / Sugerencias — manda un correo real de una vez (ver
+     send-feedback.js), con el mismo estilo que el modal de la Tienda arriba. -->
+<div id="feedbackModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
+    <div class="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col border border-slate-200 max-h-[90vh]">
+
+        <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 rounded-t-3xl">
+            <div>
+                <h2 class="text-xl font-bold font-heading text-slate-900">¿Alguna idea o comentario?</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Leemos todo — nos ayuda a mejorar Graphikosmos.</p>
+            </div>
+            <button id="closeFeedback" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto rounded-b-3xl">
+            <div class="px-7 py-7 flex flex-col gap-4 bg-gradient-to-b from-indigo-50/60 via-white to-white">
+                <!-- Estado "formulario": visible mientras no se envió nada. -->
+                <form id="feedbackForm" class="flex flex-col gap-3">
+                    <textarea id="feedbackMessage" required rows="5" maxlength="4000"
+                              placeholder="Contanos qué se te ocurrió, qué no te funcionó, o qué te gustaría que la app hiciera..."
+                              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none"></textarea>
+                    <input type="email" id="feedbackEmail" placeholder="Tu correo (opcional, si querés que te respondamos)"
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                    <button type="submit" id="btnFeedbackSend"
+                            class="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-sm py-3 rounded-xl transition-all shadow-md">
+                        Enviar
+                    </button>
+                    <p id="feedbackStatus" class="text-xs text-slate-500 min-h-[1em] text-center"></p>
+                </form>
+
+                <!-- Estado "enviado": se muestra en vez del formulario tras un envío exitoso. -->
+                <div id="feedbackSentView" class="hidden flex-col items-center text-center gap-3 py-4">
+                    <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl">✓</div>
+                    <p class="text-sm font-semibold text-slate-800">¡Gracias! Ya lo leímos.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
 
     <!-- Modal: Muro de Autenticación -->
     <div id="authWallModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">

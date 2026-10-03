@@ -251,6 +251,14 @@ function updateManualPurchaseBox() {
     const message = `Hola, uso Graphikosmos y me gustaría seguir utilizándolo. ¿Podrían contarme las opciones disponibles para continuar? Mi correo de cuenta es: ${userEmail}`;
     const waLink = document.getElementById('manualPurchaseWhatsapp');
     if (waLink) waLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+
+    // Si ya hay sesión, no tiene sentido pedirle el correo de nuevo — se
+    // precarga (sigue siendo editable) en el formulario que manda el correo
+    // de verdad (ver sendFeedbackRequest / send-feedback.js más abajo).
+    const rechargeEmailInput = document.getElementById('rechargeRequestEmail');
+    if (rechargeEmailInput && !rechargeEmailInput.value && currentUser?.email) {
+        rechargeEmailInput.value = currentUser.email;
+    }
 }
 
 function openStoreModal() {
@@ -258,6 +266,115 @@ function openStoreModal() {
     storeModal?.classList.add('flex');
     updateManualPurchaseBox();
 }
+
+// ==========================================
+// ENVÍO DE CORREO REAL DESDE EL SERVIDOR (Resend) — a diferencia del enlace
+// de WhatsApp de arriba (que abre TU cliente y depende de que vos le des
+// "enviar"), esto manda el correo de una vez, desde netlify/functions/
+// send-feedback.js. Se usa tanto para el formulario de "seguir usando la
+// app" de la Tienda como para el modal de Sugerencias/Comentarios.
+// ==========================================
+async function sendFeedbackRequest(kind, { email, message }, statusEl, submitBtn) {
+    if (statusEl) { statusEl.textContent = 'Enviando...'; statusEl.className = 'text-xs text-slate-500 min-h-[1em]'; }
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+        const { ok, data } = await apiFetch('/.netlify/functions/send-feedback', {
+            method: 'POST',
+            body: JSON.stringify({ kind, email, message })
+        });
+        if (!ok) {
+            if (statusEl) {
+                statusEl.textContent = data?.error === 'rate_limited'
+                    ? 'Ya nos escribiste varias veces seguidas — dános un momento para contestarte.'
+                    : 'No se pudo enviar. Intenta de nuevo en unos minutos.';
+                statusEl.className = 'text-xs text-rose-500 min-h-[1em]';
+            }
+            return false;
+        }
+        return true;
+    } catch (err) {
+        console.error(err);
+        if (statusEl) { statusEl.textContent = 'No se pudo enviar. Revisa tu conexión e intenta de nuevo.'; statusEl.className = 'text-xs text-rose-500 min-h-[1em]'; }
+        return false;
+    } finally {
+        if (submitBtn) submitBtn.disabled = false;
+    }
+}
+
+// Formulario de "seguir usando la app" dentro de la Tienda (reemplaza el
+// mailto: que antes había ahí — ver index.html, storeModal).
+document.getElementById('rechargeRequestForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const emailInput = document.getElementById('rechargeRequestEmail');
+    const statusEl = document.getElementById('rechargeRequestStatus');
+    const submitBtn = document.getElementById('btnRechargeRequestSend');
+    const email = emailInput?.value.trim() || '';
+    if (!email) return;
+
+    const message = `El usuario quiere seguir usando Graphikosmos y pide que le contactemos con las opciones disponibles.`;
+    const sent = await sendFeedbackRequest('recharge_request', { email, message }, statusEl, submitBtn);
+    if (sent) {
+        // No se llama track('...') aquí: el servidor (send-feedback.js) ya
+        // registra el evento "feedback_sent" una sola vez por envío exitoso
+        // (lo usa también para el límite anti-spam) — duplicarlo del lado
+        // del cliente solo inflaría el conteo sin agregar información.
+        if (statusEl) { statusEl.textContent = '¡Listo! Te vamos a escribir a ese correo.'; statusEl.className = 'text-xs text-emerald-600 min-h-[1em] font-semibold'; }
+        if (emailInput) emailInput.disabled = true;
+        if (submitBtn) submitBtn.disabled = true;
+    }
+});
+
+// ==========================================
+// MODAL DE SUGERENCIAS / COMENTARIOS
+// ==========================================
+const feedbackModal = document.getElementById('feedbackModal');
+
+function openFeedbackModal() {
+    feedbackModal?.classList.remove('hidden');
+    feedbackModal?.classList.add('flex');
+    // Vuelve a mostrar el formulario (por si la última vez que se abrió había
+    // quedado en el estado "enviado" de una sugerencia anterior).
+    document.getElementById('feedbackForm')?.classList.remove('hidden');
+    document.getElementById('feedbackForm')?.classList.add('flex');
+    document.getElementById('feedbackSentView')?.classList.add('hidden');
+    document.getElementById('feedbackSentView')?.classList.remove('flex');
+    const emailInput = document.getElementById('feedbackEmail');
+    if (emailInput && !emailInput.value && currentUser?.email) emailInput.value = currentUser.email;
+    track('feedback_modal_opened');
+}
+function closeFeedbackModal() {
+    feedbackModal?.classList.add('hidden');
+    feedbackModal?.classList.remove('flex');
+}
+
+document.getElementById('btnFeedback')?.addEventListener('click', openFeedbackModal);
+document.getElementById('closeFeedback')?.addEventListener('click', closeFeedbackModal);
+feedbackModal?.addEventListener('mousedown', (e) => { if (e.target === feedbackModal) closeFeedbackModal(); });
+
+document.getElementById('feedbackForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const messageInput = document.getElementById('feedbackMessage');
+    const emailInput = document.getElementById('feedbackEmail');
+    const statusEl = document.getElementById('feedbackStatus');
+    const submitBtn = document.getElementById('btnFeedbackSend');
+    const message = messageInput?.value.trim() || '';
+    if (!message) return;
+
+    const sent = await sendFeedbackRequest('feedback', { email: emailInput?.value.trim() || '', message }, statusEl, submitBtn);
+    if (sent) {
+        // Igual que en el formulario de la Tienda: el servidor ya registra
+        // "feedback_sent" una vez por envío, no hace falta duplicarlo aquí.
+        document.getElementById('feedbackForm')?.classList.add('hidden');
+        document.getElementById('feedbackForm')?.classList.remove('flex');
+        document.getElementById('feedbackSentView')?.classList.remove('hidden');
+        document.getElementById('feedbackSentView')?.classList.add('flex');
+        setTimeout(() => {
+            closeFeedbackModal();
+            if (messageInput) messageInput.value = '';
+            if (statusEl) { statusEl.textContent = ''; }
+        }, 2200);
+    }
+});
 
 const authWallModal = document.getElementById('authWallModal');
 const landscapeToggle = document.getElementById('landscapeToggle');

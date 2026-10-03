@@ -83,5 +83,15 @@ module.exports = {
             body: JSON.stringify({ title, data, node_count: nodeCount, updated_at: new Date().toISOString() })
         });
         return rows && rows[0] ? rows[0] : null; // null => no existía o no era del dueño
+    },
+
+    // Tope sencillo contra spam para send-feedback.js: cuenta cuántos eventos
+    // con ese nombre (p. ej. "feedback_sent") registró este actor en la
+    // última hora, reutilizando la tabla `events` que ya existe en vez de
+    // crear una tabla/RPC aparte solo para esto.
+    async countEventsLastHour(actorId, eventName) {
+        const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const rows = await table(`events?actor_id=eq.${encodeURIComponent(actorId)}&event_name=eq.${encodeURIComponent(eventName)}&created_at=gt.${encodeURIComponent(since)}&select=id`);
+        return Array.isArray(rows) ? rows.length : 0;
     }
 };

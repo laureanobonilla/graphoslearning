@@ -2052,3 +2052,82 @@ Tailwind desde su CDN para probar la página completa.
 - `index.html`: botón `#btnImportPdf` con color sólido y texto "Subir PDF";
   nuevos controles `#pdfZoomControls`/`#btnPdfZoomIn`/`#btnPdfZoomOut`/
   `#pdfZoomLabel`; CSS de `.gk-pdf-page-outer`.
+
+## 35. Botón de Sugerencias/Comentarios que manda un correo real (Resend), y el formulario de la Tienda deja de depender de tu cliente de correo
+
+### a) Nuevo botón "💬 Sugerencias"
+
+Hay un botón nuevo en la cabecera, junto a "?" (Ayuda), que abre un modal
+simple: un cuadro de texto para escribir cualquier idea, error o comentario,
+y un campo de correo opcional (si querés que te respondamos). Al enviarlo,
+el mensaje llega como un correo real a la bandeja de quien administra la
+app — no abre WhatsApp ni tu programa de correo, lo manda el servidor
+directamente.
+
+### b) El formulario "para seguir usando la app" también manda correo de una vez
+
+Antes, en la Tienda, la opción "o al correo" era un enlace `mailto:` — abría
+TU programa de correo (si tenías uno configurado) con el mensaje ya escrito,
+pero dependía de que vos le dieras "enviar". Eso fallaba sobre todo en
+celulares o navegadores sin un cliente de correo configurado. Ahora es un
+campo de correo + botón "Enviar": al confirmarlo, el correo sale de una vez
+desde el servidor, igual que el de Sugerencias. El botón de WhatsApp (que sí
+funcionaba bien) se mantiene como está.
+
+### c) Cómo funciona por dentro (y qué hace falta configurar)
+
+Ambos formularios llaman a una función nueva,
+`netlify/functions/send-feedback.js`, que usa **Resend** (un servicio de
+envío de correo) para mandar el mensaje. Esto necesita una variable de
+entorno `RESEND_API_KEY` configurada en Netlify (cuenta gratis en
+resend.com) — sin ella, la función responde con un error claro en vez de
+fallar en silencio.
+
+Un detalle importante de cómo funciona Resend mientras no se verifique un
+dominio propio: el remitente de prueba (`onboarding@resend.dev`) solo puede
+entregar correos a la dirección con la que te registraste en Resend. Por
+eso el destino del correo se puede fijar con la variable `FEEDBACK_TO_EMAIL`
+(si no se define, usa `bonillapretiz@gmail.com` como respaldo) — debe ser
+esa misma dirección de tu cuenta de Resend. El día que quieran mandar a
+otra dirección o usar un dominio propio como remitente, hay que verificar
+ese dominio en Resend y ajustar el `from` en `send-feedback.js`.
+
+Protecciones agregadas para que esto no se pueda abusar:
+
+- Tope de 5 correos por hora por persona (usuario o invitado), reutilizando
+  la tabla `events` que ya existe (`countEventsLastHour` en `_lib/store.js`)
+  en vez de crear una tabla aparte solo para esto.
+- Validación del correo de respuesta (si se escribe uno, tiene que tener
+  forma de correo) y topes de longitud en el mensaje.
+- Cada envío exitoso también queda registrado como evento `feedback_sent`
+  en la tabla `events` (con qué tipo de formulario fue), así que también
+  sirve como parte del embudo de uso.
+
+### Sobre el mensaje "Intenta de nuevo en unos segundos"
+
+Revisé todo el código que puede abrir el panel de la Tienda por falta de
+saldo (tanto el chequeo optimista en el navegador como la respuesta del
+servidor cuando de verdad no alcanza el saldo): en los dos casos, el código
+está escrito explícitamente para NO mostrar ese mensaje genérico antes de
+abrir el panel — se salta esa alerta a propósito. No encontré, leyendo el
+código, el camino exacto que produce lo que describiste. Quedó pendiente:
+si vuelve a pasar, lo más útil sería anotar qué botón se usó justo antes
+(¿"Generar Esquema" con un documento largo? ¿una opción del menú contextual
+de un nodo?) y si tenías sesión iniciada o eras invitado — con ese detalle
+sí se puede encontrar el camino exacto en el código en vez de adivinar un
+arreglo a ciegas que podría no tocar el problema real.
+
+### Archivos tocados
+
+- `netlify/functions/send-feedback.js` (nuevo): recibe `{ kind, email,
+  message }`, valida y manda el correo vía la API de Resend, con tope anti-
+  spam y registro del evento.
+- `netlify/functions/_lib/store.js`: nueva función `countEventsLastHour`
+  (cuenta eventos de un actor en la última hora, para el tope anti-spam).
+- `app.js`: `sendFeedbackRequest` (helper compartido por los dos
+  formularios), `openFeedbackModal`/`closeFeedbackModal`, los listeners de
+  `#feedbackForm` y `#rechargeRequestForm`; `updateManualPurchaseBox`
+  precarga el correo si ya hay sesión iniciada.
+- `index.html`: botón `#btnFeedback` en la cabecera; modal nuevo
+  `#feedbackModal`; el bloque `mailto:` de la Tienda se reemplaza por el
+  formulario `#rechargeRequestForm`.
