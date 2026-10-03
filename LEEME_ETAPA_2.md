@@ -1483,3 +1483,159 @@ queda fijo, igual que ya era el valor por omisión.
   (sin ese elemento ya habrían roto "Conceptos Relacionados" y "Ejemplos
   Prácticos") ahora usan `?.value || 'auto'`, así que siguen funcionando
   exactamente igual que con el selector, solo que siempre en modo Auto.
+
+## 29. Siete arreglos de ronda: error de `isResizing`, "Modo" de acomodo del esquema, nodo marcado, menos traslape, paneles resizables, paneles "pegados" al mapa, y Deshacer
+
+Ronda grande de siete pedidos relacionados con la usabilidad del lienzo.
+
+### a) Error `ReferenceError: isResizing is not defined`
+
+El mensaje de la consola no mentía: en `app.js` había quedado un
+`document.addEventListener('mouseup', ...)` de un intento anterior que
+revisaba una variable `isResizing` que nunca se llegó a declarar ni a poner
+en `true` en ningún lado. Como el listener estaba en `document` (no en un
+panel en particular), disparaba ese error en **cada** mouseup de toda la
+página — no solo al redimensionar un panel.
+
+Se quitó ese bloque muerto. Lo que sí hacía falta — redibujar el lienzo
+después de agrandar o achicar un panel con el asa nativa del navegador (el
+`resize` de CSS) — se resolvió con un `ResizeObserver` (`wireResizeRedraw`),
+que no depende de interceptar el mouse y es el mecanismo correcto para esto.
+
+Importante: este error **no** era la causa de que los submenús "Enlazar"/
+"Generar" no aparecieran al pasar el mouse (ver siguiente punto) — eran dos
+fallas independientes, las dos ya corregidas.
+
+### b) Los submenús "Enlazar"/"Generar" no se desplegaban con el hover
+
+La causa real: `#actionMenu` (el menú del nodo) tenía la clase
+`overflow-hidden`, que recorta cualquier contenido que se salga de su
+recuadro — incluyendo los submenús, que se posicionan *fuera* de ese
+recuadro (a la derecha o a la izquierda) para no tapar el menú principal. La
+lógica de mostrar/ocultar en JavaScript (`wireMenuGroup`, `positionSubmenu`,
+de la ronda anterior) funcionaba bien; el submenú simplemente quedaba
+invisible porque su propio contenedor lo recortaba antes de que llegara a
+verse en pantalla. Se quitó `overflow-hidden` de `#actionMenu`.
+
+### c) El acomodo "sistema solar" ahora es un modo opcional, no el único
+
+En la prueba anterior (sección 25), el acomodo radial ("sistema solar") se
+había colado como el único comportamiento al generar un esquema. Ahora hay
+un selector **"Modo"** en la cabecera, junto a los demás controles:
+
+- 🌳 **Árbol** — el acomodo de bloques de siempre, de arriba hacia abajo.
+  Es el valor por omisión.
+- 🪐 **Sistema solar** — el acomodo radial (ramas "orbitando" la raíz,
+  sub-ramas orbitando su rama). Sigue disponible para quien quiera probarlo.
+
+`renderThreeLevelTree()` (la función que calcula dónde va cada nodo nuevo)
+ahora calcula las posiciones de dos formas distintas según el modo activo,
+pero comparte todo lo demás (creación de nodos, flechas, animación de
+aparición, etc.) — cambiar el modo no duplica lógica, solo cambia la
+matemática de "dónde cae cada cosa".
+
+### d) El nodo donde se abrió el menú ahora se marca con más fuerza
+
+Antes solo se le engrosaba el borde y se le agregaba una sombra turquesa, y
+al parecer no se notaba lo suficiente. Ahora, mientras el menú de un nodo
+está abierto, ese nodo también cambia de color de borde a un ámbar muy
+contrastante (`#fbbf24`), además del borde más grueso y la sombra — un
+cambio mucho más difícil de pasar por alto. Al cerrar el menú (por cualquier
+motivo: clic afuera, Escape, elegir una opción) se restaura exactamente el
+color/borde/sombra originales del nodo, no una aproximación.
+
+*(Nota: no fue posible probarlo en vivo en un navegador real desde este
+entorno de trabajo — si al probarlo en tu máquina el resaltado sigue sin
+notarse, avísame y lo hacemos aún más fuerte.)*
+
+### e) Menos traslape entre nodos
+
+Se aumentó la distancia mínima que la física del lienzo (el "acomodo
+orgánico" que ya existía, sección anterior) intenta mantener entre nodos
+nuevos: de 140 a 190 unidades de separación objetivo, con una fuerza de
+repulsión y un tiempo de estabilización más largos (de 120 a 180
+iteraciones) para que de verdad llegue a acomodarse así antes de soltar los
+nodos. No es una garantía matemática de cero traslapes en absolutamente
+todos los casos (dos nodos con texto muy largo siempre pueden llegar a
+tocarse), pero sí hace bastante más difícil que ocurra en el uso normal.
+
+*(Misma nota que el punto anterior: ajuste "a ciegas", sin poder verlo en un
+navegador real desde aquí — es la dirección correcta, pero si en la
+práctica sigue sintiéndose apretado, se puede subir más.)*
+
+### f) Todos los paneles flotantes son redimensionables
+
+Antes solo el Modo Lector tenía el asa de "agrandar/achicar" en la esquina.
+Ahora **todos** los paneles flotantes de definición (los que abre "Ver
+definición", "Explicación sencilla", "Ponme a prueba", etc.) y los lectores
+adicionales (botón ➕) tienen el mismo comportamiento: una esquina
+arrastrable para cambiar el tamaño, usando el mismo truco CSS (`resize` +
+`overflow-hidden` + ancho/alto explícitos) que ya tenía el panel del
+lector, más el nuevo `wireResizeRedraw` del punto (a) para que el lienzo se
+redibuje bien después de soltar el asa.
+
+### g) Los paneles de definición ahora son parte del mapa
+
+Pedido: que una flecha señale al nodo del que salió cada panel de
+definición, y que el panel "viaje" con el mapa al hacer pan/zoom — sin
+volverse un nodo de verdad (sigue sin ser parte del grafo de vis-network, y
+se sigue cerrando con la ✕, igual que siempre).
+
+Cómo quedó: cada panel de definición guarda un punto "ancla" en las
+coordenadas del **mundo** (las mismas coordenadas internas que usan los
+nodos, no las de la pantalla). En cada redibujado del lienzo —al mover el
+mapa, hacer zoom, o arrastrar un nodo— ese punto se vuelve a traducir a
+coordenadas de pantalla (`network.canvasToDOM`) y el panel se reposiciona
+ahí; al mismo tiempo se dibuja una flecha turquesa punteada, en una capa
+SVG, desde la posición actual del nodo hasta el panel. Si arrastrás el panel
+a otro lugar, su ancla se actualiza al nuevo punto del mapa donde lo
+dejaste, así que sigue viajando desde ahí en el próximo pan/zoom.
+
+**Una aclaración importante** sobre "se movieran como nodos": el panel
+cambia de **posición** junto con el mapa (igual que un nodo), pero su
+**tamaño en pantalla no cambia con el zoom** — el texto de adentro queda
+siempre del mismo tamaño en píxeles, nunca se encoge ni se agranda. Esto es
+a propósito: si el panel también se achicara al alejar el mapa, el texto se
+volvería ilegible justo cuando hay más esquema visible (que es cuando más
+se suele alejar). Si se prefiere que también cambie de tamaño con el zoom,
+se puede ajustar, pero se perdería legibilidad en esos casos.
+
+### h) Deshacer (Ctrl/Cmd+Z)
+
+Nuevo botón **↩️ Deshacer** en la cabecera (se deshabilita solo cuando no
+hay nada que deshacer), más el atajo de teclado Ctrl+Z / Cmd+Z (se
+desactiva automáticamente si el foco está en un campo de texto, como el
+Modo Lector, para no interferir con el deshacer normal de texto del
+navegador).
+
+Cómo funciona: cada vez que cualquier parte de la app agrega, edita, borra o
+limpia nodos o flechas, se guarda automáticamente una "foto" completa de
+cómo estaba el esquema justo *antes* de ese cambio. Al presionar Deshacer,
+se restaura la foto más reciente. Como la foto es del esquema completo (no
+solo del último campo que cambió), un solo Deshacer revierte tanto un
+cambio chiquito (editar el texto de un nodo) como uno grande (generar un
+esquema entero de un tirón, que internamente crea muchos nodos y flechas de
+golpe) — cada clic del usuario cuenta como **una** acción deshacer-ble, sin
+importar cuántas piezas internas haya tocado.
+
+Se guardan hasta 40 pasos atrás. No hay todavía un botón de "Rehacer"
+(Deshacer el Deshacer) — no se pidió, pero se puede agregar después si hace
+falta.
+
+### Archivos tocados
+
+- `app.js`: bloque muerto de `isResizing` eliminado y reemplazado por
+  `wireResizeRedraw` (ResizeObserver); `schemaLayoutMode` + rama "solar" en
+  `renderThreeLevelTree`; `setNodeMenuHighlight`/`clearNodeMenuHighlight`
+  con cambio de color de borde; `settleNewNodesOrganically` con distancias
+  mayores; `wireResizeRedraw` aplicado también a `openFloatingPanel` y
+  `createExtraReaderPanel`; nuevo bloque de anclaje de paneles
+  (`floatingPanelAnchors`, `anchorFloatingPanelToWorld`,
+  `updateFloatingPanelAnchors`, `ensureFloatingPanelsArrowSvg`) enganchado a
+  `network.on('afterDrawing', ...)`; nuevo bloque de Deshacer
+  (`wireUndoTracking`, `captureUndoSnapshotIfNeeded`, `performUndo`) que
+  envuelve `nodes`/`edges` (`add`/`update`/`remove`/`clear`) justo donde se
+  crean los `DataSet`.
+- `index.html`: se quitó `overflow-hidden` de `#actionMenu`; nuevo selector
+  "Modo" (🌳 Árbol / 🪐 Sistema solar) en la cabecera; nuevo botón
+  "↩️ Deshacer" en la cabecera.

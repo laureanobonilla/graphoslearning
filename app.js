@@ -19,8 +19,108 @@ const AUTOMATIC_PAYMENTS_ENABLED = false;
 const container = document.getElementById('network-container');
 let nodes = new vis.DataSet([]);
 let edges = new vis.DataSet([]);
+
+// ==========================================
+// DESHACER (Ctrl/Cmd+Z): cualquier cambio que el usuario haga en el esquema
+// (crear/editar/borrar un nodo o una flecha, generar un esquema completo,
+// arrastrar un nodo a otra posición...) debe poder regresarse a como estaba
+// justo antes de esa acción.
+//
+// Enfoque: en vez de modificar cada uno de los muchos lugares del código que
+// llaman a nodes.add/update/remove/clear o edges.add/update/remove/clear, se
+// envuelven esos 4 métodos UNA sola vez aquí mismo, justo donde nacen los
+// DataSets. Cada envoltura, antes de dejar pasar la llamada real, guarda una
+// "foto" (snapshot) de cómo estaba TODO el esquema (todos los nodos y todas
+// las flechas) en ese instante — así no importa cuál función interna haya
+// disparado el cambio, ni si el día de mañana se agrega una nueva.
+//
+// Para que "generar un esquema completo" (que internamente llama a
+// nodes.add/edges.add muchas veces, una por cada rama/sub-rama) cuente como
+// UNA sola acción deshacer-ble y no como una entrada distinta por cada nodo,
+// se usa una ventana corta: la primera mutación de un grupo toma la foto y
+// abre la ventana; cualquier otra mutación que llegue mientras esa ventana
+// sigue abierta (es decir, en el mismo tick síncrono) NO toma una foto nueva.
+// La ventana se cierra sola con un setTimeout(…, 0), lo que agrupa bien las
+// acciones típicas (un clic = una tanda de cambios síncronos) sin necesidad
+// de marcar a mano cada función que muta el esquema.
+// ==========================================
+const MAX_UNDO_STEPS = 40;
+let undoStack = [];
+let isApplyingUndo = false;
+let undoSnapshotWindowOpen = false;
+
+function snapshotSchemaState() {
+    return { nodeData: nodes.get(), edgeData: edges.get() };
+}
+
+function captureUndoSnapshotIfNeeded() {
+    if (isApplyingUndo || undoSnapshotWindowOpen) return;
+    undoSnapshotWindowOpen = true;
+    undoStack.push(snapshotSchemaState());
+    if (undoStack.length > MAX_UNDO_STEPS) undoStack.shift();
+    refreshUndoButtonState();
+    setTimeout(() => { undoSnapshotWindowOpen = false; }, 0);
+}
+
+// Envuelve add/update/remove/clear de un DataSet para que cada llamada real
+// quede precedida por una foto del estado (si hace falta, ver arriba).
+function wireUndoTracking(dataset) {
+    ['add', 'update', 'remove', 'clear'].forEach((method) => {
+        const original = dataset[method].bind(dataset);
+        dataset[method] = function (...args) {
+            captureUndoSnapshotIfNeeded();
+            return original(...args);
+        };
+    });
+}
+wireUndoTracking(nodes);
+wireUndoTracking(edges);
+
+function refreshUndoButtonState() {
+    const btn = document.getElementById('btnUndo');
+    if (btn) btn.disabled = undoStack.length === 0;
+}
+
+// Regresa el esquema completo (nodos + flechas) a como estaba justo antes de
+// la última acción del usuario. No es un "deshacer campo por campo": restaura
+// la foto entera, así que cualquier tipo de cambio (crear, editar, borrar,
+// mover, generar en lote) se deshace de la misma forma.
+function performUndo() {
+    if (!undoStack.length) return;
+    const snapshot = undoStack.pop();
+    isApplyingUndo = true;
+    try {
+        nodes.clear();
+        edges.clear();
+        if (snapshot.nodeData.length) nodes.add(snapshot.nodeData);
+        if (snapshot.edgeData.length) edges.add(snapshot.edgeData);
+    } finally {
+        isApplyingUndo = false;
+    }
+    refreshUndoButtonState();
+    if (typeof network !== 'undefined' && network) network.redraw();
+}
+
+document.getElementById('btnUndo')?.addEventListener('click', performUndo);
+document.addEventListener('keydown', (e) => {
+    const key = e.key ? e.key.toLowerCase() : '';
+    if ((e.ctrlKey || e.metaKey) && key === 'z' && !e.shiftKey) {
+        // No interferir si el foco está en un campo de texto donde Ctrl/Cmd+Z
+        // tiene su propio significado normal (deshacer texto escrito, no el esquema).
+        const tag = document.activeElement ? document.activeElement.tagName : '';
+        const isEditableField = tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable);
+        if (isEditableField) return;
+        e.preventDefault();
+        performUndo();
+    }
+});
+
 let currentDocumentText = "";
 let selectedDensity = 'auto';
+// Cómo se acomodan las ramas/sub-ramas al generar un esquema nuevo — "tree"
+// (el árbol de bloques de siempre) es el default; "solar" es el acomodo
+// radial en prueba. Se cambia con el selector "Modo" de la cabecera.
+let schemaLayoutMode = 'tree';
 let sourceNodeForSynergy = null;
 const synergyBanner = document.getElementById('synergyBanner');
 
@@ -635,13 +735,17 @@ function settleNewNodesOrganically(newIds) {
         physics: {
             enabled: true,
             solver: 'repulsion',
-            repulsion: { nodeDistance: 140, centralGravity: 0.01, springLength: 120, springConstant: 0.03, damping: 0.4 },
-            stabilization: { enabled: true, iterations: 120, fit: false }
+            // `nodeDistance` más grande que el tamaño real de las tarjetas:
+            // así el solver sigue empujando a dos nodos aunque ya no se
+            // vean superpuestos a simple vista, dejando más aire entre
+            // ellos en vez de conformarse con el primer "ya no se tocan".
+            repulsion: { nodeDistance: 190, centralGravity: 0.015, springLength: 140, springConstant: 0.03, damping: 0.4 },
+            stabilization: { enabled: true, iterations: 180, fit: false }
         }
     });
     // Respaldo: si por lo que sea el motor nunca dispara "stabilized" (p.ej.
     // ya estaba perfectamente quieto), forzamos el apagado tras un momento.
-    setTimeout(() => { stopPhysicsAndUnlock(); }, 1500);
+    setTimeout(() => { stopPhysicsAndUnlock(); }, 2000);
 }
 
 async function renderThreeLevelTree(data, opts = {}) {
@@ -692,23 +796,37 @@ async function renderThreeLevelTree(data, opts = {}) {
         }
     });
 
-    // --- Layout tipo "sistema solar" (en prueba): las ramas quedan en
-    // órbita alrededor de la raíz, repartidas en círculo, y cada sub-rama en
-    // una órbita más pequeña alrededor de SU rama — en abanico hacia afuera
-    // (nunca hacia el centro), para que no se cruce con las ramas vecinas.
+    // Dos modos de acomodo, elegidos con el selector "Modo" de la cabecera
+    // (default: "tree", el árbol de bloques de siempre). "solar" es el
+    // acomodo radial en prueba (ramas en órbita alrededor de la raíz).
+    const isSolarMode = (typeof schemaLayoutMode !== 'undefined' && schemaLayoutMode === 'solar');
     const branchCount = Math.max(1, branches.length);
-    const minBranchSpacing = 210; // separación mínima centro a centro entre ramas vecinas en su órbita
-    const branchOrbitRadius = branchCount <= 1 ? 220 : Math.max(220, (branchCount * minBranchSpacing) / (2 * Math.PI));
-    const subOrbitRadius = 165;
-    // Cuánto se puede abanicar el grupo de sub-ramas de una rama sin invadir
-    // el sector angular de la rama vecina.
-    const maxSubSpread = branchCount > 1 ? (2 * Math.PI / branchCount) * 0.85 : (Math.PI * 0.75);
 
-    // Radio total aproximado que ocupa el árbol completo — se usa para
-    // ubicarlo sin pisar lo que ya haya en el lienzo (ver "agregar al
-    // actual" más abajo), igual que antes hacía `totalTreeWidth`.
-    const treeRadius = branchOrbitRadius + subOrbitRadius + 110;
-    const totalTreeWidth = treeRadius * 2;
+    // --- Modo "Árbol": ramas en bloques horizontales, de arriba hacia abajo. ---
+    const colSpacing = 200;
+    const rowSpacing = 110;
+    const branchGap = 80; // separación limpia entre grupos de ramas
+    const branchWidths = branches.map(b => {
+        const count = childrenByBranch[b.id].length;
+        const cols = count <= 1 ? 1 : 2; // Máximo 2 columnas por cada rama de Nivel 2
+        return (cols * colSpacing) + branchGap;
+    });
+    const treeTotalWidth = branchWidths.reduce((sum, w) => sum + w, 0);
+
+    // --- Modo "Sistema solar": ramas en órbita alrededor de la raíz,
+    // repartidas en círculo, y cada sub-rama en una órbita más pequeña
+    // alrededor de SU rama — en abanico hacia afuera (nunca hacia el
+    // centro), para que no se cruce con las ramas vecinas.
+    const minBranchSpacing = 230; // separación mínima centro a centro entre ramas vecinas en su órbita
+    const branchOrbitRadius = branchCount <= 1 ? 220 : Math.max(220, (branchCount * minBranchSpacing) / (2 * Math.PI));
+    const subOrbitRadius = 180;
+    const maxSubSpread = branchCount > 1 ? (2 * Math.PI / branchCount) * 0.85 : (Math.PI * 0.75);
+    const solarTotalWidth = (branchOrbitRadius + subOrbitRadius + 110) * 2;
+
+    // Ancho/diámetro aproximado que va a ocupar el árbol completo en el modo
+    // activo — se usa para ubicarlo sin pisar lo que ya haya en el lienzo
+    // (ver "agregar al actual" más abajo).
+    const totalTreeWidth = isSolarMode ? solarTotalWidth : treeTotalWidth;
 
     let rootX, rootY, rootId;
     const viewCenter = network.getViewPosition();
@@ -737,7 +855,7 @@ async function renderThreeLevelTree(data, opts = {}) {
             edges.clear();
             isClearingCanvas = false;
             rootX = viewCenter.x;
-            rootY = viewCenter.y; // centrado: el layout radial se extiende en todas direcciones, no solo hacia abajo
+            rootY = viewCenter.y - (isSolarMode ? 0 : 200); // en modo árbol se empuja arriba (crece hacia abajo); en modo solar queda centrado (crece en todas direcciones)
             rootId = root.id;
         } else {
             // "Agregar al actual": antes esto sumaba un offset fijo (900px) al
@@ -757,7 +875,7 @@ async function renderThreeLevelTree(data, opts = {}) {
                 : viewCenter.x;
             const margin = 220;
             rootX = rightEdge + margin + (totalTreeWidth / 2);
-            rootY = viewCenter.y; // centrado: el layout radial se extiende en todas direcciones, no solo hacia abajo
+            rootY = viewCenter.y - (isSolarMode ? 0 : 200); // en modo árbol se empuja arriba (crece hacia abajo); en modo solar queda centrado (crece en todas direcciones)
             rootId = root.id;
         }
     } else {
@@ -770,7 +888,7 @@ async function renderThreeLevelTree(data, opts = {}) {
         edges.clear();
         isClearingCanvas = false;
         rootX = viewCenter.x;
-        rootY = viewCenter.y; // centrado: el layout radial se extiende en todas direcciones, no solo hacia abajo
+        rootY = viewCenter.y - (isSolarMode ? 0 : 200); // en modo árbol se empuja arriba (crece hacia abajo); en modo solar queda centrado (crece en todas direcciones)
         rootId = root.id;
     }
 
@@ -799,16 +917,26 @@ async function renderThreeLevelTree(data, opts = {}) {
         newNodeIds.push(root.id);
     }
 
-    // 4. Posicionar Nivel 2 (ramas, en órbita alrededor de la raíz) y Nivel 3
-    // (sub-ramas, en órbita alrededor de SU rama, abanicadas hacia afuera).
+    // 4. Posicionar Nivel 2 (ramas) y Nivel 3 (sub-ramas), según el modo activo.
+    let currentLeftX = rootX - (treeTotalWidth / 2); // solo lo usa el modo "Árbol"
+    const branchYTree = rootY + 150;
+    const subBranchBaseYTree = branchYTree + 140;
+
     branches.forEach((branch, idx) => {
-        // Empezamos arriba (como las 12 del reloj) y repartimos el resto en
-        // círculo, en sentido horario.
-        const branchAngle = branchCount === 1
-            ? -Math.PI / 2
-            : (idx * (2 * Math.PI / branchCount)) - Math.PI / 2;
-        const branchX = rootX + branchOrbitRadius * Math.cos(branchAngle);
-        const branchY = rootY + branchOrbitRadius * Math.sin(branchAngle);
+        let branchX, branchY, branchAngle = null;
+        if (isSolarMode) {
+            // Empezamos arriba (como las 12 del reloj) y repartimos el resto
+            // en círculo, en sentido horario.
+            branchAngle = branchCount === 1
+                ? -Math.PI / 2
+                : (idx * (2 * Math.PI / branchCount)) - Math.PI / 2;
+            branchX = rootX + branchOrbitRadius * Math.cos(branchAngle);
+            branchY = rootY + branchOrbitRadius * Math.sin(branchAngle);
+        } else {
+            const sectionWidth = branchWidths[idx];
+            branchX = currentLeftX + (sectionWidth / 2);
+            branchY = branchYTree;
+        }
 
         const branchAppearance = appearanceFor(!!(branch.sourceQuote && branch.sourceQuote.trim()));
         nodes.add({
@@ -824,15 +952,27 @@ async function renderThreeLevelTree(data, opts = {}) {
         newNodeIds.push(branch.id);
 
         const subs = childrenByBranch[branch.id];
-        const spread = subs.length <= 1 ? 0 : Math.min(maxSubSpread, (subs.length - 1) * 0.55);
+        const subSpread = isSolarMode && subs.length > 1 ? Math.min(maxSubSpread, (subs.length - 1) * 0.55) : 0;
+        const subCols = !isSolarMode ? (subs.length <= 1 ? 1 : 2) : null;
 
         subs.forEach((sub, sIdx) => {
-            // Las lunas se reparten centradas en la misma dirección de su
-            // rama (la que mira hacia afuera de la raíz), nunca hacia adentro.
-            const t = subs.length === 1 ? 0 : (sIdx / (subs.length - 1)) - 0.5;
-            const subAngle = branchAngle + (t * spread);
-            const subX = branchX + subOrbitRadius * Math.cos(subAngle);
-            const subY = branchY + subOrbitRadius * Math.sin(subAngle);
+            let subX, subY;
+            if (isSolarMode) {
+                // Las lunas se reparten centradas en la misma dirección de su
+                // rama (la que mira hacia afuera de la raíz), nunca hacia adentro.
+                const t = subs.length === 1 ? 0 : (sIdx / (subs.length - 1)) - 0.5;
+                const subAngle = branchAngle + (t * subSpread);
+                subX = branchX + subOrbitRadius * Math.cos(subAngle);
+                subY = branchY + subOrbitRadius * Math.sin(subAngle);
+            } else {
+                const row = Math.floor(sIdx / subCols);
+                const col = sIdx % subCols;
+                // Si es la última fila y quedó un nodo impar suelto, lo centramos bajo su rama
+                const isLastOdd = (sIdx === subs.length - 1) && (subs.length % 2 !== 0) && (subCols === 2);
+                const offsetX = isLastOdd ? 0 : (col === 0 ? -colSpacing / 2 : colSpacing / 2);
+                subX = branchX + (subCols === 1 ? 0 : offsetX);
+                subY = subBranchBaseYTree + (row * rowSpacing);
+            }
 
             const subAppearance = appearanceFor(!!(sub.sourceQuote && sub.sourceQuote.trim()));
             nodes.add({
@@ -847,6 +987,8 @@ async function renderThreeLevelTree(data, opts = {}) {
             trackNodeUsage(sub.label);
             newNodeIds.push(sub.id);
         });
+
+        if (!isSolarMode) currentLeftX += branchWidths[idx];
     });
 
     network.setOptions({ physics: { enabled: false } });
@@ -1167,22 +1309,38 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
 // abajo, así que no hay que acordarse de limpiarlo en cada lugar que cierra
 // el menú.
 let menuHighlightedNodeId = null;
+let menuHighlightedOriginalStyle = null; // { color, borderWidth, shadow } del nodo, para restaurar EXACTO al cerrar
 function setNodeMenuHighlight(nodeId) {
     if (menuHighlightedNodeId && menuHighlightedNodeId !== nodeId) clearNodeMenuHighlight();
+    const node = nodes.get(nodeId);
+    if (!node) return;
     menuHighlightedNodeId = nodeId;
-    if (!nodes.get(nodeId)) return;
+    menuHighlightedOriginalStyle = { color: node.color, borderWidth: node.borderWidth, shadow: node.shadow };
+    // Un color de borde bien contrastante (ámbar) además de más grueso/con más
+    // sombra — solo con grosor/sombra no se notaba lo suficiente, sobre todo
+    // una vez que vis.js aplica su propio estilo de "nodo seleccionado" encima.
+    // También se fija `color.highlight` al mismo ámbar para que ese estilo de
+    // "seleccionado" no lo tape con otra cosa.
+    const bg = (node.color && node.color.background) || '#fdfbf7';
     nodes.update({
         id: nodeId,
-        borderWidth: 4.5,
-        shadow: { enabled: true, color: 'rgba(79, 209, 197, 0.7)', size: 32, x: 0, y: 0 }
+        borderWidth: 5,
+        color: { background: bg, border: '#fbbf24', highlight: { background: bg, border: '#fbbf24' } },
+        shadow: { enabled: true, color: 'rgba(251, 191, 36, 0.85)', size: 34, x: 0, y: 0 }
     });
 }
 function clearNodeMenuHighlight() {
     if (!menuHighlightedNodeId) return;
+    const id = menuHighlightedNodeId;
+    const original = menuHighlightedOriginalStyle;
     menuHighlightedNodeId = null;
-    // En vez de adivinar el borde/sombra "normales", dejamos que el cálculo
-    // de importancia (sección 22) los recalcule — así queda consistente con
-    // el grado de conexión de cada nodo en vez de un valor fijo.
+    menuHighlightedOriginalStyle = null;
+    if (nodes.get(id) && original) {
+        nodes.update({ id, color: original.color, borderWidth: original.borderWidth, shadow: original.shadow });
+    }
+    // Por si el grado de conexión cambió mientras el menú estaba abierto
+    // (poco común, pero posible), dejamos que el cálculo de importancia
+    // (sección 22) recalcule grosor/sombra "normales" de paso.
     scheduleImportanceStyling();
 }
 new MutationObserver(() => {
@@ -2194,11 +2352,86 @@ wirePanelHoverHighlight(readerPanel, 'main');
 let floatingPanelCount = 1;
 const openFloatingPanels = new Map(); // nodeId -> { el, contentEl, titleEl }
 
+// ============================================================
+// Paneles de definición "anclados" al mapa (flecha + seguimiento)
+// Cada panel de definición queda asociado al nodo que lo originó: una
+// flecha dibujada en SVG apunta de ese nodo al panel, y al mover/hacer zoom
+// en el lienzo el panel SIGUE la posición del nodo (como si fuera parte del
+// mapa). El tamaño del panel en pantalla NO cambia con el zoom — solo su
+// posición — así el texto adentro sigue siendo legible sin importar cuánto
+// se aleje o acerque el mapa (si también se achicara con el zoom, se
+// volvería illegible al alejar mucho). El panel sigue cerrándose con la X
+// y sigue sin ser un nodo real de vis-network: solo "viaja" junto al mapa.
+// ============================================================
+const floatingPanelAnchors = new Map(); // nodeId -> punto en coordenadas del MUNDO (canvas) al que llega la flecha
+let floatingPanelsArrowSvg = null;
+
+function ensureFloatingPanelsArrowSvg() {
+    if (floatingPanelsArrowSvg) return floatingPanelsArrowSvg;
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('id', 'floatingPanelsArrowSvg');
+    svg.style.position = 'absolute';
+    svg.style.inset = '0';
+    svg.style.width = '100%';
+    svg.style.height = '100%';
+    svg.style.pointerEvents = 'none';
+    svg.style.overflow = 'visible';
+    // Se inserta como PRIMER hijo de floatingPanelsLayer: como ningún panel
+    // le pone z-index explícito menor a 500, el SVG (sin z-index, "auto")
+    // siempre queda detrás de todos ellos sin tener que calcular nada.
+    floatingPanelsLayer.insertBefore(svg, floatingPanelsLayer.firstChild);
+    floatingPanelsArrowSvg = svg;
+    return svg;
+}
+
+// Guarda en qué punto del MUNDO (coordenadas del lienzo, no de la pantalla)
+// "vive" el panel de un nodo, a partir de su posición actual en pantalla.
+// Se llama al crear el panel y mientras se arrastra, para que quede
+// "pegado" al punto del mapa donde el usuario lo dejó.
+function anchorFloatingPanelToWorld(nodeId, el) {
+    if (!network || !el || !nodes.get(nodeId)) return;
+    const screenPoint = { x: el.offsetLeft, y: el.offsetTop + 20 };
+    floatingPanelAnchors.set(nodeId, network.DOMtoCanvas(screenPoint));
+}
+
+// Se llama en cada redibujado del lienzo (pan, zoom, arrastre de nodos...):
+// recoloca cada panel anclado según su punto del mundo guardado, y vuelve a
+// dibujar la flecha que lo conecta con el nodo que lo originó.
+function updateFloatingPanelAnchors() {
+    if (!network || !floatingPanelAnchors.size) { if (floatingPanelsArrowSvg) floatingPanelsArrowSvg.innerHTML = ''; return; }
+    const svg = ensureFloatingPanelsArrowSvg();
+    const lines = [];
+    for (const [nodeId, worldPoint] of Array.from(floatingPanelAnchors.entries())) {
+        const panel = openFloatingPanels.get(nodeId);
+        const node = nodes.get(nodeId);
+        if (!panel || !node) { floatingPanelAnchors.delete(nodeId); continue; }
+        const domPoint = network.canvasToDOM(worldPoint);
+        panel.el.style.left = `${domPoint.x}px`;
+        panel.el.style.top = `${domPoint.y - 20}px`;
+
+        const positions = network.getPositions([nodeId]);
+        const nodePos = positions && positions[nodeId];
+        if (!nodePos) continue;
+        const nodeDom = network.canvasToDOM(nodePos);
+        lines.push(`<line x1="${nodeDom.x}" y1="${nodeDom.y}" x2="${domPoint.x}" y2="${domPoint.y}" stroke="#4fd1c5" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#gkFloatingPanelArrowHead)" />`);
+    }
+    svg.innerHTML = `
+        <defs>
+            <marker id="gkFloatingPanelArrowHead" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                <path d="M0,0 L9,4.5 L0,9 Z" fill="#4fd1c5" />
+            </marker>
+        </defs>
+        ${lines.join('')}
+    `;
+}
+network.on('afterDrawing', () => updateFloatingPanelAnchors());
+
 function closeFloatingPanel(nodeId) {
     const panel = openFloatingPanels.get(nodeId);
     if (!panel) return;
     panel.el.remove();
     openFloatingPanels.delete(nodeId);
+    floatingPanelAnchors.delete(nodeId);
 }
 
 function focusFloatingPanel(nodeId) {
@@ -2224,7 +2457,10 @@ function openFloatingPanel(nodeId, title) {
     // que haya más posiciones antes de que el patrón se repita.
     const offset = floatingPanelCount % 10;
     const el = document.createElement('div');
-    el.className = 'gk-floating-panel absolute w-80 max-h-[70vh] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col pointer-events-auto select-text';
+    // "resize" + "overflow-hidden" + un ancho/alto explícitos (no solo
+    // max-*) son lo que hace que el navegador dibuje el asa de resize nativa
+    // en la esquina — el mismo truco que ya usaba el panel del lector.
+    el.className = 'gk-floating-panel absolute w-[340px] max-w-[92vw] h-[420px] max-h-[80vh] min-w-[260px] min-h-[160px] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col pointer-events-auto select-text resize overflow-hidden';
     el.style.left = `${24 + offset * 36}px`;
     el.style.top = `${24 + offset * 36}px`;
     el.style.zIndex = String(500 + (++floatingPanelCount));
@@ -2262,8 +2498,18 @@ function openFloatingPanel(nodeId, title) {
         if (!dragState) return;
         el.style.left = `${dragState.left + (e.clientX - dragState.startX)}px`;
         el.style.top = `${dragState.top + (e.clientY - dragState.startY)}px`;
+        // Mientras se arrastra, se re-ancla en cada frame al punto del mapa
+        // bajo el panel: así, al terminar de moverlo, queda "pegado" a su
+        // nueva posición y no salta de vuelta a la anterior en el próximo
+        // pan/zoom (ver updateFloatingPanelAnchors, que repone left/top).
+        anchorFloatingPanelToWorld(nodeId, el);
     });
     document.addEventListener('mouseup', () => { dragState = null; });
+
+    wireResizeRedraw(el);
+    // Ancla el panel, recién nacido, al punto del mapa donde cayó — así la
+    // flecha aparece desde ya y el panel viaja con el nodo si se hace pan/zoom.
+    anchorFloatingPanelToWorld(nodeId, el);
 
     const panel = { el, contentEl, titleEl };
     openFloatingPanels.set(nodeId, panel);
@@ -2340,13 +2586,22 @@ document.addEventListener('mousemove', (e) => {
 });
 document.addEventListener('mouseup', () => { readerDragState = null; });
 
-document.addEventListener('mouseup', () => { 
-    if (isResizing) {
-        isResizing = false; 
-        document.body.style.userSelect = '';
-        setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 50);
-    }
-});
+// (Antes había aquí un listener de 'mouseup' que revisaba una variable
+// `isResizing` que nunca se llegó a declarar ni a poner en `true` en ningún
+// lado — quedó de un intento anterior y disparaba un ReferenceError en
+// CADA mouseup de toda la página. Lo que de verdad hace falta — redibujar
+// el lienzo después de agrandar/achicar un panel con el asa nativa del
+// navegador (el "resize" de CSS) — se resuelve mejor con un ResizeObserver,
+// ver wireResizeRedraw más abajo, que no depende de interceptar el mouse.
+function wireResizeRedraw(el) {
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let redrawTimer = null;
+    new ResizeObserver(() => {
+        clearTimeout(redrawTimer);
+        redrawTimer = setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 120);
+    }).observe(el);
+}
+wireResizeRedraw(readerPanel);
 
 const readerEmptyHint = document.getElementById('readerEmptyHint');
 function updateReaderEmptyHint() {
@@ -2655,6 +2910,7 @@ function createExtraReaderPanel() {
     const accent = panelAccentPalette[n % panelAccentPalette.length];
     registerReaderPanel(panelId, clone, cloneText, accent);
     wireReaderPanelClone(clone, panelId);
+    wireResizeRedraw(clone);
     return clone;
 }
 
@@ -3156,6 +3412,11 @@ document.getElementById('btnMenuDelete')?.addEventListener('click', async () => 
 // NUEVO: SONIDO, BÚSQUEDA RÁPIDA, REPLAY, MODO FOCO, MODO PRESENTACIÓN,
 // MINIMAPA, ESTILO POR IMPORTANCIA Y AURA DE RAMA
 // ==========================================
+
+// --- Modo de acomodo del esquema (Árbol / Sistema solar) ---
+document.getElementById('schemaLayoutMode')?.addEventListener('change', (e) => {
+    schemaLayoutMode = e.target.value;
+});
 
 // --- Sonido al crear nodos (togglable) ---
 const btnSoundToggle = document.getElementById('btnSoundToggle');
