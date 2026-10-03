@@ -1340,3 +1340,68 @@ cámara de más mientras lees algo cuyo esquema ya está a la vista.
   bandas), `isPointFree`/`isNodeVisibleOnCanvas`, `fitNodesAvoidingOverlays`
   (encuadre de varios nodos a la vez), y `updateScrollFocus` ahora también
   dispara el traslado/zoom automático cuando corresponde.
+
+## 25. Prueba: layout tipo "sistema solar" (radial)
+
+A pedido tuyo, se activó como PRUEBA (para ver cómo se siente) el layout
+radial que habíamos dejado pendiente: en vez del árbol de bloques
+horizontales de siempre, las ramas ahora quedan repartidas en círculo
+alrededor de la raíz (como planetas orbitando el sol), y las sub-ramas de
+cada rama se abren en abanico hacia afuera de esa rama (como lunas), nunca
+hacia el centro, para no cruzarse con las ramas vecinas.
+
+Esto reemplaza directamente el acomodo anterior (no quedó como opción
+alternable) — si no te convence, avísame y lo revierto al árbol de bloques
+de antes sin problema; no se perdió ese código, solo se reemplazó.
+
+Detalles:
+- El radio de la órbita de las ramas crece solo si hay muchas (para que no
+  queden amontonadas); con una sola rama, igual queda separada de la raíz.
+- Después de ubicarlas, sigue aplicándose el mismo asentado físico orgánico
+  de la sección 22 — así que el resultado final no es un círculo
+  perfectamente geométrico, decanta un poco para verse más natural.
+- "Agregar al actual" (cuando ya hay algo en el lienzo) sigue calculando
+  bien el espacio para que el nuevo "sistema" no se traslape con el que ya
+  existía, usando el radio total del nuevo árbol en vez del ancho que usaba
+  el layout anterior.
+
+### Archivos tocados
+
+- `app.js`: `renderThreeLevelTree` — se reemplazó el cálculo de posiciones
+  de ramas/sub-ramas (antes en bloques horizontales por columnas) por el
+  cálculo radial (órbitas); el resto de la función (creación de nodos,
+  colores, asentado orgánico, encuadre de cámara, etc.) no cambió.
+
+## 26. Número de WhatsApp real + pantalla de contacto más elegante
+
+### a) El botón de WhatsApp ahora sí te contacta a ti
+
+El número que tenía el botón era un número de relleno (`50600000000`) que
+dejé puesto desde el inicio como ejemplo — nunca era tu número real, así
+que si alguien le daba clic, WhatsApp intentaba abrir ese número ficticio
+(que probablemente ni existe) y el mensaje nunca te llegaba. Ya quedó
+puesto tu número real: `50687772993`.
+
+### b) La pantalla de "ya se te acabaron los nodos" quedó más elegante
+
+Antes era un bloque simple con texto chico. Ahora:
+
+- Encabezado más cálido: **"Contáctanos para seguir usando la aplicación"**,
+  con una frase corta debajo invitando a escribir.
+- El ícono de WhatsApp quedó más grande y nítido, con un efecto sutil al
+  pasar el mouse por encima del botón.
+- El correo (`bonillapretiz@gmail.com`) ahora se ve grande y en negrita,
+  separado del botón de WhatsApp con un pequeño divisor "o al correo" — y
+  además es clicable (abre el programa de correo directo, con `mailto:`).
+- El mensaje que se manda por WhatsApp también quedó más cercano: "¡Hola! 👋
+  Ya usé mis nodos disponibles en Graphikosmos y quiero seguir creando
+  esquemas. Mi correo de la cuenta es: ...".
+
+### Archivos tocados
+
+- `app.js`: `SUPPORT_WHATSAPP_NUMBER` con el número real; mensaje de
+  WhatsApp con tono más cercano; `updateManualPurchaseBox` ahora también
+  rellena el `href` del correo (`mailto:`).
+- `index.html`: rediseño completo del bloque de contacto dentro de
+  `#storeModal` (ícono, encabezado, botón de WhatsApp, divisor, correo
+  grande y clicable).

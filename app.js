@@ -5,7 +5,7 @@
 // contacto para que el cliente escriba, pague por otro medio, y tú le
 // acredites los nodos a mano (ver LEEME_ETAPA_2.md, sección 11). Reemplaza
 // estos 2 valores por los tuyos reales antes de publicar.
-const SUPPORT_WHATSAPP_NUMBER = '50600000000'; // Código de país + número, solo dígitos, sin "+" ni espacios (ej. Costa Rica: 506XXXXXXXX) — PENDIENTE: poner el número real
+const SUPPORT_WHATSAPP_NUMBER = '50687772993'; // Código de país + número, solo dígitos, sin "+" ni espacios (ej. Costa Rica: 506XXXXXXXX)
 const SUPPORT_EMAIL = 'bonillapretiz@gmail.com';
 // Déjalo en false: la integración de PayPal (createOrder/captureOrder, ya
 // verificada en el servidor) queda intacta y sin usar. Cuando PayPal habilite
@@ -141,8 +141,10 @@ function updateManualPurchaseBox() {
 
     const emailAddressEl = document.getElementById('manualPurchaseEmailAddress');
     if (emailAddressEl) emailAddressEl.innerText = SUPPORT_EMAIL;
+    const emailLinkEl = document.getElementById('manualPurchaseEmailLink');
+    if (emailLinkEl) emailLinkEl.href = `mailto:${SUPPORT_EMAIL}`;
 
-    const message = `Hola, ya usé mis nodos disponibles en Graphikosmos y quiero seguir usando la app. Mi correo de la cuenta es: ${userEmail}`;
+    const message = `Hola! 👋 Ya usé mis nodos disponibles en Graphikosmos y quiero seguir creando esquemas. Mi correo de la cuenta es: ${userEmail}`;
     const waLink = document.getElementById('manualPurchaseWhatsapp');
     if (waLink) waLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
@@ -690,18 +692,23 @@ async function renderThreeLevelTree(data, opts = {}) {
         }
     });
 
-    // Distribuimos las sub-ramas en máximo 2 columnas por rama para que el árbol no se estire a lo ancho
-    const colSpacing = 185;
-    const rowSpacing = 95;
-    const branchGap = 60;   // Separación limpia entre grupos de ramas
+    // --- Layout tipo "sistema solar" (en prueba): las ramas quedan en
+    // órbita alrededor de la raíz, repartidas en círculo, y cada sub-rama en
+    // una órbita más pequeña alrededor de SU rama — en abanico hacia afuera
+    // (nunca hacia el centro), para que no se cruce con las ramas vecinas.
+    const branchCount = Math.max(1, branches.length);
+    const minBranchSpacing = 210; // separación mínima centro a centro entre ramas vecinas en su órbita
+    const branchOrbitRadius = branchCount <= 1 ? 220 : Math.max(220, (branchCount * minBranchSpacing) / (2 * Math.PI));
+    const subOrbitRadius = 165;
+    // Cuánto se puede abanicar el grupo de sub-ramas de una rama sin invadir
+    // el sector angular de la rama vecina.
+    const maxSubSpread = branchCount > 1 ? (2 * Math.PI / branchCount) * 0.85 : (Math.PI * 0.75);
 
-    const branchWidths = branches.map(b => {
-        const count = childrenByBranch[b.id].length;
-        const cols = count <= 1 ? 1 : 2; // Máximo 2 columnas por cada rama de Nivel 2
-        return (cols * colSpacing) + branchGap;
-    });
-
-    const totalTreeWidth = branchWidths.reduce((sum, w) => sum + w, 0);
+    // Radio total aproximado que ocupa el árbol completo — se usa para
+    // ubicarlo sin pisar lo que ya haya en el lienzo (ver "agregar al
+    // actual" más abajo), igual que antes hacía `totalTreeWidth`.
+    const treeRadius = branchOrbitRadius + subOrbitRadius + 110;
+    const totalTreeWidth = treeRadius * 2;
 
     let rootX, rootY, rootId;
     const viewCenter = network.getViewPosition();
@@ -730,7 +737,7 @@ async function renderThreeLevelTree(data, opts = {}) {
             edges.clear();
             isClearingCanvas = false;
             rootX = viewCenter.x;
-            rootY = viewCenter.y - 200;
+            rootY = viewCenter.y; // centrado: el layout radial se extiende en todas direcciones, no solo hacia abajo
             rootId = root.id;
         } else {
             // "Agregar al actual": antes esto sumaba un offset fijo (900px) al
@@ -750,7 +757,7 @@ async function renderThreeLevelTree(data, opts = {}) {
                 : viewCenter.x;
             const margin = 220;
             rootX = rightEdge + margin + (totalTreeWidth / 2);
-            rootY = viewCenter.y - 200;
+            rootY = viewCenter.y; // centrado: el layout radial se extiende en todas direcciones, no solo hacia abajo
             rootId = root.id;
         }
     } else {
@@ -763,7 +770,7 @@ async function renderThreeLevelTree(data, opts = {}) {
         edges.clear();
         isClearingCanvas = false;
         rootX = viewCenter.x;
-        rootY = viewCenter.y - 200;
+        rootY = viewCenter.y; // centrado: el layout radial se extiende en todas direcciones, no solo hacia abajo
         rootId = root.id;
     }
 
@@ -792,15 +799,16 @@ async function renderThreeLevelTree(data, opts = {}) {
         newNodeIds.push(root.id);
     }
 
-    let currentLeftX = rootX - (totalTreeWidth / 2);
-
-    const branchY = rootY + 150;
-    const subBranchBaseY = branchY + 140;
-
-    // 4. Posicionar Nivel 2 y Nivel 3 en bloques compactos
+    // 4. Posicionar Nivel 2 (ramas, en órbita alrededor de la raíz) y Nivel 3
+    // (sub-ramas, en órbita alrededor de SU rama, abanicadas hacia afuera).
     branches.forEach((branch, idx) => {
-        const sectionWidth = branchWidths[idx];
-        const branchX = currentLeftX + (sectionWidth / 2);
+        // Empezamos arriba (como las 12 del reloj) y repartimos el resto en
+        // círculo, en sentido horario.
+        const branchAngle = branchCount === 1
+            ? -Math.PI / 2
+            : (idx * (2 * Math.PI / branchCount)) - Math.PI / 2;
+        const branchX = rootX + branchOrbitRadius * Math.cos(branchAngle);
+        const branchY = rootY + branchOrbitRadius * Math.sin(branchAngle);
 
         const branchAppearance = appearanceFor(!!(branch.sourceQuote && branch.sourceQuote.trim()));
         nodes.add({
@@ -816,18 +824,15 @@ async function renderThreeLevelTree(data, opts = {}) {
         newNodeIds.push(branch.id);
 
         const subs = childrenByBranch[branch.id];
-        const cols = subs.length <= 1 ? 1 : 2;
+        const spread = subs.length <= 1 ? 0 : Math.min(maxSubSpread, (subs.length - 1) * 0.55);
 
         subs.forEach((sub, sIdx) => {
-            const row = Math.floor(sIdx / cols);
-            const col = sIdx % cols;
-
-            // Si es la última fila y quedó un nodo impar suelto, lo centramos bajo su rama
-            const isLastOdd = (sIdx === subs.length - 1) && (subs.length % 2 !== 0) && (cols === 2);
-            const offsetX = isLastOdd ? 0 : (col === 0 ? -colSpacing / 2 : colSpacing / 2);
-
-            const subX = branchX + (cols === 1 ? 0 : offsetX);
-            const subY = subBranchBaseY + (row * rowSpacing);
+            // Las lunas se reparten centradas en la misma dirección de su
+            // rama (la que mira hacia afuera de la raíz), nunca hacia adentro.
+            const t = subs.length === 1 ? 0 : (sIdx / (subs.length - 1)) - 0.5;
+            const subAngle = branchAngle + (t * spread);
+            const subX = branchX + subOrbitRadius * Math.cos(subAngle);
+            const subY = branchY + subOrbitRadius * Math.sin(subAngle);
 
             const subAppearance = appearanceFor(!!(sub.sourceQuote && sub.sourceQuote.trim()));
             nodes.add({
@@ -842,8 +847,6 @@ async function renderThreeLevelTree(data, opts = {}) {
             trackNodeUsage(sub.label);
             newNodeIds.push(sub.id);
         });
-
-        currentLeftX += sectionWidth;
     });
 
     network.setOptions({ physics: { enabled: false } });
