@@ -75,6 +75,13 @@ exports.handler = async (event, context) => {
         if (isNew) cookieHeaders['Set-Cookie'] = buildSetCookie(guestId);
     }
 
+    // Las cuentas admin (ver ADMIN_EMAILS en _lib/auth.js — ahí van las del
+    // dueño de la app) no quedan en esta tabla: son pruebas propias, no
+    // clientes reales, y mezclarlas hace más difícil leer el embudo de uso
+    // real después. Se responde 200 igual (nunca debe notarse en la app, ver
+    // principio 1 arriba), solo que no se escribe nada en Supabase.
+    if (user?.isAdmin) return json(200, { ok: true }, cookieHeaders);
+
     try {
         await store.logEvent(actorId, actorKind, anonId, eventName, metadata, displayName);
     } catch (err) {

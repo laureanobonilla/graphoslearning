@@ -4730,6 +4730,15 @@ function renderProjectsList() {
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5">
+                    <!-- Abre /juego (ver juego/juego.js) en una pestaña nueva, ya con este
+                         proyecto elegido vía ?id=... — ese módulo lee el mismo snapshot que
+                         ya guarda saveCurrentProjectToBin (gk_proj_snapshot_<id>), así que no
+                         hace falta ninguna llamada ni dato nuevo para esto. -->
+                    <a href="/juego/?id=${encodeURIComponent(proj.id)}" target="_blank" rel="noopener"
+                       title="Explorar este esquema en 3D, en primera persona"
+                       class="text-xs bg-fuchsia-50 text-fuchsia-600 hover:bg-fuchsia-600 hover:text-white px-2.5 py-1.5 rounded-lg font-bold transition-colors">
+                        🌌 3D
+                    </a>
                     <button class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors btn-load-proj" data-id="${proj.id}">
                         Abrir
                     </button>

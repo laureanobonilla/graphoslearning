@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Graphikosmos 3D — Vuela por tu esquema</title>
+<meta name="description" content="Recorré tu propio mapa conceptual en primera persona, en 3D.">
+
+<!-- Pineamos una versión exacta de three.js por CDN (jsdelivr) — nada de
+     dependencias nuevas en package.json, esto corre 100% en el navegador y
+     reutiliza los datos que la app principal ya guarda en localStorage
+     (gk_projects_*, gk_proj_snapshot_*). Ver LEEME_ETAPA_2.md sección 38. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+    :root {
+        --cosmos-bg: #05040d;
+        --panel-bg: rgba(12, 10, 26, 0.86);
+        --panel-border: rgba(165, 180, 252, 0.25);
+        --accent: #a5b4fc;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        background: var(--cosmos-bg);
+        color: #e7e5ff;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        overflow: hidden;
+    }
+    #gameCanvas {
+        position: fixed; inset: 0; display: block; width: 100%; height: 100%;
+    }
+
+    /* ---------- Pantalla de selección de proyecto ---------- */
+    #pickerScreen {
+        position: fixed; inset: 0; z-index: 50;
+        display: flex; align-items: center; justify-content: center;
+        background: radial-gradient(ellipse at 50% 20%, #15123a 0%, #05040d 70%);
+        padding: 24px;
+    }
+    #pickerBox {
+        max-width: 560px; width: 100%;
+        background: var(--panel-bg);
+        border: 1px solid var(--panel-border);
+        border-radius: 18px;
+        padding: 28px 28px 20px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        max-height: 86vh;
+        display: flex; flex-direction: column;
+    }
+    #pickerBox h1 {
+        font-size: 22px; margin: 0 0 4px; font-weight: 800;
+        background: linear-gradient(90deg, #a5b4fc, #67e8f9, #fda4af);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    #pickerBox p.sub {
+        margin: 0 0 18px; font-size: 13px; color: #9ca3d6; line-height: 1.5;
+    }
+    #projectList {
+        overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 8px;
+        margin-bottom: 14px; padding-right: 4px;
+    }
+    .proj-item {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        background: rgba(165, 180, 252, 0.07);
+        border: 1px solid rgba(165, 180, 252, 0.15);
+        border-radius: 10px; padding: 10px 14px; cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .proj-item:hover { background: rgba(165, 180, 252, 0.16); border-color: rgba(165, 180, 252, 0.4); }
+    .proj-item .proj-title { font-size: 14px; font-weight: 600; color: #e7e5ff; }
+    .proj-item .proj-meta { font-size: 11px; color: #8d8fc4; margin-top: 2px; }
+    .proj-item .proj-go { font-size: 20px; opacity: 0.7; }
+    #emptyState {
+        text-align: center; padding: 28px 10px; color: #8d8fc4; font-size: 13px; line-height: 1.6;
+    }
+    #emptyState a { color: var(--accent); text-decoration: underline; }
+    #pickerFooter {
+        display: flex; justify-content: space-between; align-items: center;
+        border-top: 1px solid var(--panel-border); padding-top: 14px;
+    }
+    #backToApp {
+        font-size: 12.5px; color: #9ca3d6; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 6px;
+    }
+    #backToApp:hover { color: #e7e5ff; }
+
+    /* ---------- Instrucciones previas al vuelo ---------- */
+    #introScreen {
+        position: fixed; inset: 0; z-index: 45;
+        display: none;
+        align-items: center; justify-content: center;
+        background: radial-gradient(ellipse at 50% 20%, #15123a 0%, #05040d 72%);
+        padding: 24px;
+    }
+    #introBox {
+        max-width: 480px; width: 100%;
+        background: var(--panel-bg); border: 1px solid var(--panel-border);
+        border-radius: 18px; padding: 30px; text-align: center;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    #introBox h2 { margin: 0 0 6px; font-size: 19px; font-weight: 800; color: #e7e5ff; }
+    #introBox .proj-name { color: var(--accent); }
+    #introBox .controls {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 20px 0;
+        text-align: left; font-size: 12.5px; color: #c7c9ee;
+    }
+    #introBox .controls div { background: rgba(165,180,252,0.08); border-radius: 8px; padding: 8px 10px; }
+    #introBox .controls b { color: #fff; }
+    #btnStartFly {
+        background: linear-gradient(90deg, #6366f1, #818cf8);
+        color: #fff; border: none; border-radius: 10px; padding: 12px 22px;
+        font-size: 14.5px; font-weight: 700; cursor: pointer; width: 100%;
+        box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+    }
+    #btnStartFly:hover { filter: brightness(1.08); }
+    #introBack { display: block; margin-top: 12px; font-size: 12px; color: #8d8fc4; text-decoration: none; }
+    #introBack:hover { color: #e7e5ff; }
+
+    /* ---------- HUD en vuelo ---------- */
+    #hud {
+        position: fixed; inset: 0; z-index: 30; pointer-events: none; display: none;
+    }
+    #hudTop {
+        position: absolute; top: 16px; left: 16px; right: 16px;
+        display: flex; justify-content: space-between; align-items: flex-start;
+        font-size: 12.5px;
+    }
+    #hudTitle {
+        background: var(--panel-bg); border: 1px solid var(--panel-border);
+        border-radius: 10px; padding: 8px 14px; font-weight: 700; color: #e7e5ff;
+        max-width: 60%;
+    }
+    #hudCounter {
+        background: var(--panel-bg); border: 1px solid var(--panel-border);
+        border-radius: 10px; padding: 8px 14px; font-weight: 700; color: var(--accent);
+        white-space: nowrap;
+    }
+    #crosshair {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        width: 8px; height: 8px; border-radius: 50%;
+        background: rgba(255,255,255,0.65); box-shadow: 0 0 6px rgba(255,255,255,0.5);
+    }
+    #hudHint {
+        position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+        background: var(--panel-bg); border: 1px solid var(--panel-border);
+        border-radius: 10px; padding: 7px 16px; font-size: 12px; color: #c7c9ee;
+        text-align: center; white-space: nowrap;
+    }
+    #btnExitFly {
+        position: absolute; top: 16px; right: 16px; pointer-events: auto;
+        background: var(--panel-bg); border: 1px solid var(--panel-border);
+        border-radius: 10px; padding: 8px 12px; font-size: 12px; color: #e7e5ff;
+        cursor: pointer; display: none;
+    }
+
+    /* ---------- Panel de definición al descubrir un nodo ---------- */
+    #nodePanel {
+        position: fixed; z-index: 35; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(14px);
+        max-width: 520px; width: calc(100% - 48px);
+        background: var(--panel-bg); border: 1px solid var(--panel-border);
+        border-radius: 14px; padding: 16px 20px; pointer-events: none;
+        opacity: 0; transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    #nodePanel.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    #nodePanel h3 { margin: 0 0 6px; font-size: 15px; color: #fff; }
+    #nodePanel p { margin: 0; font-size: 12.5px; color: #c7c9ee; line-height: 1.5; }
+
+    /* ---------- Click-to-lock overlay ---------- */
+    #lockOverlay {
+        position: fixed; inset: 0; z-index: 40; display: none;
+        align-items: center; justify-content: center; cursor: pointer;
+        background: rgba(5,4,13,0.55);
+        font-size: 15px; color: #e7e5ff; text-align: center; padding: 20px;
+    }
+    #lockOverlay span {
+        background: var(--panel-bg); border: 1px solid var(--panel-border);
+        border-radius: 12px; padding: 14px 26px;
+    }
+
+    #loadError {
+        position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+        background: rgba(120, 20, 30, 0.9); border: 1px solid rgba(253,164,175,0.5);
+        color: #ffe4e6; border-radius: 10px; padding: 10px 18px; font-size: 13px;
+        display: none; z-index: 60; max-width: 90%; text-align: center;
+    }
+
+    a { color: inherit; }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- Pantalla 1: elegir esquema guardado -->
+<div id="pickerScreen">
+    <div id="pickerBox">
+        <h1>🌌 Graphikosmos 3D</h1>
+        <p class="sub">Elegí uno de tus esquemas guardados para volar por él en primera persona. Cada nodo se convierte en un punto de luz en el espacio, y las flechas en rutas entre ellos.</p>
+        <div id="projectList"><!-- se llena por JS --></div>
+        <div id="pickerFooter">
+            <a id="backToApp" href="../index.html">← Volver a Graphikosmos</a>
+        </div>
+    </div>
+</div>
+
+<!-- Pantalla 2: instrucciones antes de volar -->
+<div id="introScreen">
+    <div id="introBox">
+        <h2>Listo para volar por <span class="proj-name" id="introProjName">tu esquema</span></h2>
+        <div class="controls">
+            <div><b>Mouse</b> — mirar alrededor</div>
+            <div><b>Click</b> — activar el control</div>
+            <div><b>W A S D</b> — moverse</div>
+            <div><b>Espacio / Shift</b> — subir / bajar</div>
+            <div><b>Shift+mover</b> — impulso (boost)</div>
+            <div><b>Esc</b> — liberar el mouse</div>
+        </div>
+        <button id="btnStartFly">🚀 Empezar a volar</button>
+        <a id="introBack" href="#" data-action="back">← Elegir otro esquema</a>
+    </div>
+</div>
+
+<!-- Overlay para (re)activar el pointer lock -->
+<div id="lockOverlay"><span>🖱️ Click para activar el control de vuelo</span></div>
+
+<!-- HUD durante el vuelo -->
+<div id="hud">
+    <div id="hudTop">
+        <div id="hudTitle">—</div>
+        <div id="hudCounter">0 / 0 nodos</div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="hudHint">Acercate a un punto de luz para descubrirlo</div>
+</div>
+<button id="btnExitFly">✕ Salir</button>
+<div id="nodePanel"><h3 id="nodePanelTitle"></h3><p id="nodePanelBody"></p></div>
+
+<div id="loadError"></div>
+
+<script type="module" src="juego.js"></script>
+</body>
+</html>

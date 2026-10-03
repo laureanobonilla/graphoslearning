@@ -111,9 +111,14 @@ exports.handler = async (event, context) => {
     }
 
     // Disparar y olvidar, igual que track-event.js: si esto falla no debe
-    // romper la respuesta — el correo ya salió, que es lo que importa.
-    try { await store.logEvent(actorId, actorKind, null, 'feedback_sent', { kind }, actorLabel); } catch (err) {
-        console.error('[send-feedback] no se pudo registrar el evento:', err.message);
+    // romper la respuesta — el correo ya salió, que es lo que importa. Las
+    // cuentas admin (ver ADMIN_EMAILS en _lib/auth.js) no quedan en la tabla
+    // `events` — son pruebas propias, no clientes reales — pero el correo sí
+    // se manda igual, por si el dueño está probando el formulario de verdad.
+    if (!user?.isAdmin) {
+        try { await store.logEvent(actorId, actorKind, null, 'feedback_sent', { kind }, actorLabel); } catch (err) {
+            console.error('[send-feedback] no se pudo registrar el evento:', err.message);
+        }
     }
 
     return json(200, { ok: true }, cookieHeaders);

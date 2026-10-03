@@ -2131,3 +2131,153 @@ arreglo a ciegas que podría no tocar el problema real.
 - `index.html`: botón `#btnFeedback` en la cabecera; modal nuevo
   `#feedbackModal`; el bloque `mailto:` de la Tienda se reemplaza por el
   formulario `#rechargeRequestForm`.
+
+## 36. Más nodos gratis para quien todavía no se loguea — se hace desde Netlify, no desde el código
+
+Se consideró subir el regalo de nodos de un invitado (sin cuenta) de 15 a
+50 editando el valor por defecto en el código, pero ese valor por defecto
+solo se usa si la variable de entorno `GUEST_FREE_NODES` NO está definida
+en Netlify — y es más simple y más directo cambiarla ahí (Site settings →
+Environment variables) que editar código para algo que ya es configurable.
+El código se dejó exactamente como estaba (respaldo en 15, por si algún día
+se borra la variable de Netlify sin querer).
+
+## 37. Las cuentas admin ya no quedan registradas en la tabla `events`
+
+Las dos cuentas del dueño de la app (las que están, o se agreguen, en la
+variable de entorno `ADMIN_EMAILS` — ver `_lib/auth.js`) dejan de aparecer
+en la tabla `events`. Antes, cada vez que el dueño probaba la app quedaba
+una fila más ahí, mezclada con la de clientes reales — lo que hacía más
+difícil leer el embudo de uso real (cuántas visitas, qué tan seguido se
+atasca la gente, etc.) sin tener que filtrar manualmente esas cuentas cada
+vez.
+
+Ahora, tanto `track-event.js` (el registro general de eventos) como
+`send-feedback.js` (sugerencias y el formulario de la Tienda) chequean si
+quien llama es una cuenta admin y, si lo es, responden 200 OK igual (nunca
+debe notarse en la app) pero SIN escribir nada en `events`. El correo de
+sugerencias sí se sigue enviando normalmente aunque sea una cuenta admin
+— lo único que se omite es la fila en la tabla.
+
+**Importante:** esto depende de que esas dos cuentas (`bonillapretiz@gmail.com`
+y `laureanobonilla@aol.com`) estén en la variable de entorno `ADMIN_EMAILS`
+en Netlify (separadas por coma si hay más de una). Si no lo están, hay que
+agregarlas ahí — el código ya está listo para una vez que esa variable las
+incluya. Dicho sea de paso, esto también las vuelve cuentas "admin" en el
+resto de la app (nodos ilimitados, saldo infinito) — es el mismo mecanismo
+que ya existía para administradores, así que no es un comportamiento nuevo,
+solo se extendió para que también filtre `events`.
+
+Esto NO toca nada de `usage_log` (el consumo real de nodos por IA) ni de
+`projects` (tus esquemas guardados): esas tablas ya excluían a las cuentas
+admin desde antes (`billing.js` se salta por completo el descuento de
+saldo si `identity.isAdmin` es cierto), y los proyectos se siguen guardando
+igual que siempre para cualquier cuenta, admin o no.
+
+### Archivos tocados
+
+- `netlify/functions/track-event.js`: si `getUser(context).isAdmin` es
+  cierto, responde 200 sin llamar a `store.logEvent`.
+- `netlify/functions/send-feedback.js`: misma exclusión, pero solo para el
+  registro del evento — el correo se sigue mandando igual.
+
+## 38. `/juego` — vuelo en primera persona (3D) por tus propios esquemas
+
+Se pidió algo "3D e inmersivo". En vez de un juego genérico, se construyó
+algo que usa lo que ya existe en la app: cada esquema guardado se puede
+recorrer en primera persona, como si volaras dentro de tu propio mapa de
+ideas. Es una sección nueva y totalmente separada (`/juego/`), pensada
+para abrirse en una pestaña aparte sin arriesgar nada del editor principal.
+
+### Cómo se entra
+
+- Desde "Mis Proyectos", cada esquema guardado ahora tiene un botón
+  **"🌌 3D"** al lado de "Abrir" que abre `/juego/?id=<id-del-proyecto>`
+  en una pestaña nueva, ya con ese esquema cargado directamente.
+- También se puede entrar directo a `/juego/` y elegir ahí cuál esquema
+  volar, desde una pantalla con la lista de todo lo guardado en ese
+  navegador (lee las mismas claves que ya usa el editor — ver abajo).
+
+### Qué datos usa (nada nuevo que guardar)
+
+No hay backend nuevo ni variable de entorno nueva para esto. `/juego/juego.js`
+lee exactamente lo mismo que el editor ya escribe en `localStorage` con
+`saveCurrentProjectToBin` (en `app.js`):
+- `gk_projects_<userKey>` → catálogo (título, fecha, cantidad de nodos).
+- `gk_proj_snapshot_<id>` → el esquema completo (`nodes`, `edges`, etc.).
+
+Como `/juego` no inicia sesión de Netlify Identity por su cuenta, en vez de
+calcular `userKey` recorre TODAS las claves `gk_projects_*` que existan en
+ese navegador — así aparece lo mismo sin importar con qué cuenta se guardó
+cada esquema, igual que ya conviven todas en el mismo navegador hoy.
+
+### Qué se ve
+
+- **Nodos** → esferas que brillan (su color viene del mismo borde pastel
+  que ya tiene cada nodo en el editor — `elegantPalette`), con su nombre
+  flotando al lado como una placa de texto que siempre mira a la cámara.
+- **Flechas** → líneas de color entre los nodos conectados.
+- **Profundidad = qué tan "adentro" del tema estás**: se recorre el grafo
+  con BFS desde el primer nodo (la raíz, mismo criterio que ya usa el
+  editor para el título del proyecto) y cada nivel de distancia se ubica
+  más atrás en el eje Z — volar hacia adelante se siente como ir "más
+  adentro" del esquema. Dentro de un mismo nivel, los nodos se reparten en
+  un anillo (con algo de variación al azar) para que no queden todos
+  apilados en el mismo punto.
+- **Ambiente**: un fondo de estrellas, nebulosas de color (sprites con
+  gradiente, sin imágenes descargadas — se dibujan con `<canvas>`), niebla
+  a distancia y un efecto de resplandor (bloom) sobre los nodos, para que
+  se sientan como puntos de luz en el espacio y no como figuras planas.
+- **Descubrimiento**: al acercarte a un nodo (dentro de un radio chico)
+  aparece un panel abajo con su nombre y su definición guardada (si tiene),
+  y un contador arriba (`X / Y nodos`) muestra cuántos ya visitaste.
+
+### Controles
+
+Mouse para mirar (con *pointer lock*, como un juego en primera persona),
+WASD para moverse, Espacio/Shift para subir/bajar, Shift mientras te movés
+da un impulso extra (boost). Esc libera el mouse; un botón "✕ Salir" en la
+esquina vuelve al selector de esquemas en cualquier momento.
+
+### Decisiones de alcance (prototipo pulido, no un juego completo)
+
+Se eligió la opción de **volar por los propios esquemas del usuario** (en
+vez de un juego genérico aparte) y un nivel de **prototipo pulido ahora**
+(gráficos cuidados — bloom, niebla, nebulosas, etiquetas — pero sin
+mecánicas de juego como puntaje, enemigos o niveles), según lo que se
+confirmó explícitamente. Cosas que quedan fuera de este alcance, por si se
+quiere ampliar después:
+- Sonido/música ambiente.
+- Guardar el progreso de "descubrimiento" (hoy se reinicia cada vez que
+  entrás a volar).
+- Mini-mapa o brújula hacia el nodo más cercano sin descubrir.
+- Una versión táctil/para mobile de los controles (hoy requiere mouse +
+  teclado, como cualquier juego en primera persona con *pointer lock*).
+
+### Nota honesta sobre verificación visual
+
+Este sandbox no pudo cargar three.js desde el CDN para probarlo con
+Playwright (el proxy de este entorno bloquea algunos dominios de CDN para
+las pruebas automatizadas de este chat — no es una restricción del sitio
+ya publicado en Netlify, que no tiene ese límite). Se validó que ambos
+archivos no tienen errores de sintaxis (`node --check` en `juego.js`,
+chequeo de balance de etiquetas en `index.html`), y la lógica de datos
+(lectura de localStorage, BFS por profundidad, armado de nodos/flechas) se
+razonó contra la misma estructura de datos que ya usa el editor — pero la
+escena 3D en sí (colores, iluminación, que el *pointer lock* funcione bien
+en tu navegador, etc.) conviene mirarla una vez publicado, por si algún
+detalle visual necesita un ajuste fino.
+
+### Archivos nuevos
+
+- `juego/index.html`: pantallas de selección de esquema, instrucciones,
+  HUD de vuelo y panel de nodo descubierto — sin Tailwind, CSS propio para
+  no depender de ningún CDN externo salvo three.js.
+- `juego/juego.js`: módulo ES que carga el esquema elegido desde
+  `localStorage`, construye la escena three.js (nodos, flechas, estrellas,
+  nebulosas, niebla, bloom) y maneja el vuelo en primera persona.
+
+### Archivo tocado
+
+- `app.js`: botón **"🌌 3D"** agregado en `renderProjectsList()`, junto al
+  botón "Abrir" de cada proyecto guardado.
