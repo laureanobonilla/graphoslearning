@@ -3930,6 +3930,26 @@ function looksLikeWebLink(str) {
     return /^https?:\/\//i.test(t);
 }
 
+// Convierte texto plano (con saltos de línea "sueltos", como el que viene de
+// copiar un PDF o un .txt con corte fijo de columna, o el que ya se había
+// guardado de un proyecto antes del editor con formato) en párrafos reales
+// (<p>...</p>) en vez de insertarlo tal cual con sus saltos de línea
+// incluidos. Esto es justo lo que permite que el texto se vuelva a acomodar
+// solo al ancho del panel (al ensancharlo o angostarlo): un salto de línea
+// "suelto" dentro de lo que es el mismo párrafo se trata como un simple
+// espacio (se UNE, no se corta ahí), y solo una línea en blanco de verdad
+// (dos o más saltos de línea seguidos) se conserva como el límite real entre
+// un párrafo y el siguiente.
+function textToParagraphHtml(text) {
+    const paragraphs = String(text || '')
+        .replace(/\r\n?/g, '\n')
+        .split(/\n[ \t]*\n+/)
+        .map(p => p.trim())
+        .filter(p => p.length > 0)
+        .map(p => `<p>${escapeHtml(p).replace(/\n+/g, ' ')}</p>`);
+    return paragraphs.join('');
+}
+
 // Lista blanca de etiquetas que se conservan al traer el HTML de un artículo
 // (ver sanitizeImportedHtml) — deliberadamente angosta: alcanza para que un
 // artículo normal (párrafos, encabezados, negrita/cursiva, listas, citas) se
@@ -4059,8 +4079,21 @@ function wireRichPaste(textEl) {
         e.preventDefault();
         if (html && html.trim()) {
             document.execCommand('insertHTML', false, sanitizeImportedHtml(html));
+            return;
+        }
+        // Sin HTML (portapapeles solo con texto plano): si trae más de un
+        // párrafo (una línea en blanco entre ellos) se inserta como
+        // párrafos reales, igual que el texto que llega de un PDF o un
+        // enlace — así cada uno se puede reacomodar solo al ancho del
+        // panel. Si es una sola "idea" cortada en varias líneas (texto
+        // copiado de algo con ancho fijo de columna, sin líneas en blanco),
+        // se unen con espacios y se inserta como texto corrido normal, sin
+        // forzar ningún corte de línea en medio del párrafo donde se pegó.
+        const normalized = plain.replace(/\r\n?/g, '\n');
+        if (/\n[ \t]*\n/.test(normalized)) {
+            document.execCommand('insertHTML', false, textToParagraphHtml(normalized));
         } else {
-            document.execCommand('insertText', false, plain);
+            document.execCommand('insertText', false, normalized.replace(/\n+/g, ' '));
         }
     });
 }
@@ -4096,18 +4129,22 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
         if (targetTextEl) {
             if (data.contentHtml && data.contentHtml.trim()) {
                 targetTextEl.innerHTML = sanitizeImportedHtml(data.contentHtml);
-                // El esquema y el resaltado posterior deben basarse en el
-                // MISMO texto: si se usó el HTML con formato, ese texto ya no
-                // es exactamente article.textContent (puede variar en saltos
-                // de línea/espacios) — se recalcula leyendo el DOM recién
-                // insertado con el mismo criterio que usará luego
-                // highlightCoverageForPanel (buildEditableTextIndex), para
-                // que las citas que devuelva la IA se puedan ubicar de
-                // verdad en el panel.
-                textForSchema = buildEditableTextIndex(targetTextEl).text;
             } else {
-                targetTextEl.innerText = data.text;
+                // Sin HTML con formato del backend: se arma al menos en
+                // párrafos reales (ver textToParagraphHtml) en vez de
+                // insertar el texto con sus saltos de línea sueltos — así
+                // también puede reacomodarse solo al ancho del panel.
+                targetTextEl.innerHTML = textToParagraphHtml(data.text);
             }
+            // El esquema y el resaltado posterior deben basarse en el MISMO
+            // texto que de verdad quedó en el panel: el HTML insertado (con
+            // o sin formato) no es carácter-por-carácter idéntico al texto
+            // plano que mandó el backend (varían saltos de línea/espacios
+            // alrededor de párrafos) — se recalcula leyendo el DOM recién
+            // insertado con el mismo criterio que usará luego
+            // highlightCoverageForPanel (buildEditableTextIndex), para que
+            // las citas que devuelva la IA se puedan ubicar de verdad ahí.
+            textForSchema = buildEditableTextIndex(targetTextEl).text;
         }
         if (data.title && onTitle) onTitle(data.title);
         track('webpage_read_success');
@@ -4960,7 +4997,13 @@ function applyLoadedProject(projectId, record) {
     // tienen `readerText` — en ese caso se deja el lector como estaba (no se
     // borra un texto que el usuario pudiera tener ahí sin querer).
     if (typeof record.readerText === 'string' && readerTextMode) {
-        readerTextMode.innerText = record.readerText;
+        // Se reconstruye en párrafos reales (ver textToParagraphHtml) en vez
+        // de con innerText tal cual: el texto guardado (ver
+        // saveCurrentProjectToBin, que lo toma leyendo .innerText) puede
+        // traer saltos de línea sueltos entre párrafos, y con innerText esos
+        // saltos se habrían vuelto cortes de línea FORZADOS que no se
+        // acomodan al ancho del panel al reabrir el proyecto.
+        readerTextMode.innerHTML = textToParagraphHtml(record.readerText);
         globalDocumentContext = record.documentContext || '';
         updateDocContextChip();
         if (readerEmptyHint) readerEmptyHint.classList.toggle('hidden', readerTextMode.innerText.trim() !== '');

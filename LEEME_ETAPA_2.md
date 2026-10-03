@@ -2552,3 +2552,146 @@ artículo/noticia para confirmar que el formato se vea razonable.
 - `netlify/functions/read-webpage.js`: ahora también devuelve
   `contentHtml` (el `article.content` de Readability, recortado por las
   dudas) además del texto plano de siempre.
+
+## 43. El menú contextual había quedado demasiado angosto y apretado
+
+La sección 32 arregló que el renglón más largo estirara todo el menú de
+lado a lado, pero se fue al otro extremo: quedó tan angosto (130px/120px)
+y con filas tan bajas (22px, letra de 11px) que resultaba incómodo
+leerlo y hacerle clic. Se ensanchó a 220px (menú principal) y 200px (los
+submenús "Enlazar"/"Generar") — sigue sin tener un ancho que se adapte
+solo al contenido, pero ahora con más aire el texto largo envuelve a 2
+líneas sin que el menú se vea apretado — y cada fila pasó de
+`px-2.5 py-1 text-[11px]` a `px-3.5 py-2.5 text-sm`, así que además de
+verse más grande, cada opción es un blanco de clic notablemente más
+cómodo. No hizo falta tocar nada de `app.js`: el posicionamiento del menú
+y de sus submenús ya se calcula en caliente con `offsetWidth`/
+`getBoundingClientRect()`, nunca con un ancho fijo a mano, así que un
+menú más ancho sigue abriéndose del lado correcto (derecha o izquierda
+según el espacio disponible) sin ningún ajuste adicional.
+
+### Archivos tocados
+
+- `index.html`: anchos y tamaños de `#actionMenu`, `#submenuLink` y
+  `#submenuGenerate` y de todos los botones dentro de ellos.
+
+## 44. El texto del lector no se reacomodaba al ensanchar/angostar el panel
+
+El editor del Modo Lector tenía `white-space: pre-wrap`, pensado
+originalmente para que un texto pegado a mano respetara sus saltos de
+línea. El problema (bien señalado por el usuario): cualquier salto de
+línea "suelto" que quedara en el texto —de un párrafo copiado con corte
+fijo de columna, o del texto que `innerText = "..."` convierte en `<br>`
+al asignarlo programáticamente (ver abajo)— se mostraba como un corte de
+línea FORZADO, que no se movía ni se reacomodaba al ensanchar o angostar
+el panel. Un `<br>`/salto real no es "responsive": siempre corta ahí,
+sea cual sea el ancho disponible.
+
+### El arreglo
+
+En vez de depender de saltos de línea sueltos + `white-space: pre-wrap`,
+el texto se arma en **párrafos reales** (`<p>...</p>`, uno por cada grupo
+de líneas separado por una línea en blanco de verdad) — ver
+`textToParagraphHtml` en `app.js`. Un párrafo de verdad reacomoda sus
+propias palabras solo, al ancho que tenga el panel en ese momento, sin
+que haga falta ningún truco de CSS. Se quitó `whitespace-pre-wrap` de
+`#readerTextMode` y se le agregó el CSS que le faltaba para que párrafos/
+encabezados/listas/citas se vean como tales (Tailwind resetea esos
+márgenes y tamaños a 0 por default, así que sin esto se habrían visto
+todos "pegados", sin aire entre ellos ni diferencia de tamaño en los
+títulos).
+
+## 45. Nueva app en el mismo sitio: "¿Quién eres en realidad?" (`quien-eres/`)
+
+Se agregó, dentro de este mismo proyecto/sitio de Netlify, una app
+completamente distinta de Graphikosmos: un cuestionario de personalidad
+de 16 preguntas que termina en una lectura generada con Gemini, con un
+cobro único vía PayPal para desbloquear la lectura completa. Vive en la
+carpeta `quien-eres/` y queda publicada en `/quien-eres/` del mismo sitio
+(no es un sitio de Netlify aparte — ver `quien-eres/README.md` para el
+detalle completo de por qué y cómo).
+
+Para que convivan sin pisarse, todas las funciones y archivos nuevos de
+esta app llevan el prefijo `qer-` (`netlify/functions/qer-*.js`,
+`netlify/functions/_lib/qer-pricing.js`,
+`netlify/functions/_lib/qer-readings-store.js`). Reutiliza de verdad (sin
+copiar) `netlify/functions/_lib/paypal.js`, que ya usa Graphikosmos. Se
+agregó `@netlify/blobs` a `package.json` (única dependencia nueva) para
+guardar cada lectura temporalmente sin necesitar base de datos.
+
+Variable de entorno nueva y opcional: `READING_PRICE_USD` (si no se
+pone, usa `2.99`). El resto de variables (`GEMINI_API_KEY`,
+`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`) ya existen en
+este sitio para Graphikosmos y esta app nueva las reutiliza directo, sin
+configurar nada aparte.
+
+### Ideas para una colección de apps parecidas
+
+La misma plataforma que soporta "¿Quién eres en realidad?" (PayPal de
+pago único sin cuenta + Gemini generando contenido personalizado +
+Netlify Blobs guardando el resultado temporalmente) sirve, sin cambiar la
+arquitectura, para cualquier app con esta forma: **cuestionario o input
+corto de la persona → IA genera algo personalizado y con "gancho" → se
+muestra una probada gratis → se cobra un monto pequeño para ver el
+resto.** Algunas variantes concretas, cada una como su propia carpeta
+`algo-/` + funciones `algo-*.js`:
+
+- **"¿Qué dice tu letra de ti?"** — la persona sube una foto de algo
+  escrito a mano (Gemini sí puede leer imágenes); el análisis
+  grafológico "revela" rasgos de personalidad. Gancho fuerte porque la
+  letra se siente íntima y nadie la ha mirado con esos ojos antes.
+- **"Tu yo del futuro te escribe una carta"** — unas pocas preguntas
+  sobre miedos/metas actuales, y la IA redacta una carta en primera
+  persona "desde dentro de 10 años". La parte pagada es el resto de la
+  carta (suele cortar justo en la parte más reveladora).
+- **"¿Cuál es tu arquetipo de pareja ideal?"** — cuestionario sobre cómo
+  ama/discute/se reconcilia la persona; la lectura describe el tipo de
+  pareja con la que de verdad conecta (y con cuál chocaría). Buen
+  potencial de compartirse en redes porque la gente discute sobre su
+  resultado con su pareja actual.
+- **"¿Qué edad tiene tu alma?"** / **"¿En qué año deberías haber
+  nacido?"** — formato más liviano/viral, mismo motor: preguntas de
+  gustos y decisiones chicas, resultado con una "edad" o "época" y una
+  explicación que se siente hecha a medida.
+- **"Decodificador de sueños"** — la persona describe un sueño reciente
+  en texto libre (no cuestionario de opciones, sino el campo de
+  respuesta corta que ya existe en esta app); la IA da una
+  interpretación simbólica con el mismo patrón de probada gratis + pago
+  para el análisis completo.
+- **"¿Qué tan compatible eres con [tu mejor amigo / tu jefe / tu
+  signo]?"** — dos personas responden por separado (o una responde "por"
+  la otra) y se compara; el resultado combinado es lo que se cobra.
+
+Todas reutilizarían exactamente el mismo patrón de tres piezas (PayPal +
+Gemini + Blobs) que ya está probado en `quien-eres/`, cambiando solo las
+preguntas, el prompt de Gemini y el diseño visual — así que cada app
+nueva de la colección sería, en esfuerzo, mucho más rápida de armar que
+la primera.
+
+Se aplicó en los tres lugares donde entra texto con saltos de línea
+"sueltos":
+
+1. **Pegar enlace web** (cuando Readability no trae HTML con formato):
+   antes `innerText = texto`, ahora se arma en párrafos.
+2. **Pegar (Ctrl+V) texto plano** sin formato: si trae más de un párrafo
+   (línea en blanco entre ellos) se inserta en párrafos reales; si es una
+   sola idea cortada en varias líneas (sin línea en blanco), se unen con
+   espacios y se inserta corrido, sin forzar ningún corte en medio de un
+   párrafo existente.
+3. **Abrir un proyecto guardado**: el texto que se guardó (como texto
+   plano, ver limitación de la sección 42) se reconstruye en párrafos al
+   volver a abrirlo, en vez de con los saltos de línea sueltos que traía.
+
+El texto que ya entraba como HTML con formato real (PDF extraído, enlace
+con `article.content`, pegado con formato) no tenía este problema — ya
+usaba párrafos propios y sigue igual.
+
+### Archivos tocados
+
+- `index.html`: se quitó `whitespace-pre-wrap` de `#readerTextMode` y se
+  agregó el CSS de párrafos/encabezados/listas/citas/enlaces dentro de
+  él.
+- `app.js`: nueva función `textToParagraphHtml`; se usa en
+  `resolveTextOrWebLink` (reemplaza el `innerText = ...` del camino sin
+  HTML), en `wireRichPaste` (pegado de texto plano) y en
+  `applyLoadedProject` (restaurar el texto guardado de un proyecto).

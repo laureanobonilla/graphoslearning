@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>¿Quién eres en realidad?</title>
+<meta name="description" content="Un cuestionario corto, directo, que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink: #16111f;
+    --ink-2: #1e1830;
+    --ink-3: #251d3a;
+    --parchment: #f2ecdf;
+    --muted: #9c92ac;
+    --brass: #c6a358;
+    --brass-dim: #8a7343;
+    --rosewood: #7c2d37;
+    --rosewood-bright: #9c3b47;
+    --line: rgba(242,236,223,0.14);
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--ink);
+    color: var(--parchment);
+    font-family: 'Work Sans', -apple-system, sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .display{ font-family: 'Fraunces', serif; }
+
+  .shell{
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0 28px;
+    overflow-x: hidden;
+  }
+
+  /* --- Barra de progreso: una línea delgada, sin números ni porcentaje escrito —
+       el cuestionario no debería sentirse como un formulario con "paso 3 de 10",
+       sino como una conversación que avanza sola. --- */
+  #progress{
+    position: sticky;
+    top: 0;
+    height: 2px;
+    background: var(--line);
+    margin: 0 -28px;
+    z-index: 5;
+  }
+  #progress.is-hidden{ display:none; }
+  #progressFill{
+    height: 100%;
+    width: 0%;
+    background: var(--brass);
+    transition: width 0.45s ease;
+  }
+
+  .screen{ display:none; flex:1; flex-direction: column; }
+  .screen.is-active{ display:flex; }
+
+  /* ===================== PORTADA ===================== */
+  #screen-cover{ align-items:center; justify-content:center; text-align:center; padding: 48px 0 40px; gap: 4px; }
+  .mask-wrap{ width: 128px; height: 128px; margin-bottom: 22px; opacity: 0; transform: translateY(6px); animation: riseIn 0.9s ease forwards; }
+  @keyframes riseIn{ to{ opacity:1; transform:none; } }
+  .mask-crack{ stroke-dasharray: 160; stroke-dashoffset: 160; animation: drawCrack 1.4s 0.4s ease forwards; }
+  @keyframes drawCrack{ to{ stroke-dashoffset: 0; } }
+
+  #screen-cover h1{ font-size: 2.3rem; line-height: 1.15; font-weight: 500; margin: 0 0 14px; max-width: 320px; }
+  #screen-cover .sub{ color: var(--muted); font-size: 1.02rem; line-height: 1.5; max-width: 300px; margin: 0 0 30px; }
+  .meta-line{ color: var(--brass-dim); font-size: 0.78rem; letter-spacing: 0.01em; margin-bottom: 36px; }
+  .meta-line b{ color: var(--brass); font-weight: 500; }
+
+  .btn{
+    appearance: none; border: none; cursor: pointer;
+    font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 0.95rem;
+    border-radius: 999px; padding: 15px 34px;
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn-primary{ background: var(--brass); color: #211a0c; }
+  .btn-primary:hover{ background: #d4b366; }
+  .btn-primary:disabled{ background: #4a4436; color: #8a8575; cursor: default; }
+  .btn-ghost{ background: transparent; color: var(--muted); font-weight: 500; font-size: 0.85rem; padding: 10px 14px; text-decoration: underline; text-decoration-color: var(--line); }
+
+  /* ===================== CUESTIONARIO ===================== */
+  #screen-quiz{ padding-top: 22px; }
+  .quiz-top{ display:flex; align-items:center; min-height: 28px; margin-bottom: 8px; }
+  #btnBack{ background:none; border:none; color: var(--muted); font-size: 1.3rem; cursor:pointer; padding: 4px 8px; margin-left: -8px; line-height:1; }
+  #btnBack.is-hidden{ visibility:hidden; }
+
+  .quiz-body{ flex:1; display:flex; flex-direction:column; justify-content:flex-start; padding-top: 28px; }
+  .q-prompt{ font-size: 1.5rem; line-height: 1.32; font-weight: 500; text-align:center; margin: 0 0 34px; }
+
+  .options{ display:flex; flex-direction:column; }
+  .option{
+    text-align:left; background:none; border:none; color: var(--parchment);
+    font-family:'Work Sans', sans-serif; font-size: 0.98rem; line-height: 1.4;
+    padding: 16px 4px; border-top: 1px solid var(--line); cursor:pointer;
+    display:flex; align-items:center; gap: 12px;
+  }
+  .options .option:last-child{ border-bottom: 1px solid var(--line); }
+  .option .dot{ width:8px; height:8px; border-radius:50%; border: 1.5px solid var(--muted); flex-shrink:0; transition: all 0.15s ease; }
+  .option.is-selected{ color: var(--brass); }
+  .option.is-selected .dot{ background: var(--brass); border-color: var(--brass); }
+
+  .short-input-wrap{ margin-top: 4px; }
+  .short-input{
+    width:100%; background:none; border:none; border-bottom: 1.5px solid var(--line);
+    color: var(--parchment); font-family:'Work Sans', sans-serif; font-size: 1.05rem;
+    padding: 10px 2px; outline:none; resize:none; line-height:1.5;
+  }
+  .short-input:focus{ border-bottom-color: var(--brass); }
+  .short-input::placeholder{ color: #5c5370; }
+  .short-hint{ color: var(--muted); font-size: 0.8rem; margin-top: 10px; }
+
+  .blot-wrap{ display:flex; justify-content:center; margin-bottom: 26px; }
+  .blot-wrap svg{ width: 150px; height: 150px; }
+
+  .quiz-bottom{ padding: 22px 0 36px; }
+  .quiz-bottom .btn{ width:100%; }
+
+  /* ===================== CARGANDO ===================== */
+  #screen-loading{ align-items:center; justify-content:center; text-align:center; gap: 18px; }
+  .pulse-mask{ width: 72px; height:72px; animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity: 0.35; } 50%{ opacity: 1; } }
+  #loadingLabel{ color: var(--muted); font-size: 0.92rem; }
+
+  /* ===================== ERROR ===================== */
+  .error-box{ text-align:center; padding: 30px 6px; }
+  .error-box p{ color: var(--muted); line-height:1.5; margin-bottom: 22px; }
+
+  /* ===================== REVELACIÓN ===================== */
+  #screen-reveal{ padding: 40px 0 60px; }
+  .reveal-mask{ width: 92px; height:92px; margin: 0 auto 20px; display:block; }
+  .archetype-name{ text-align:center; font-size: 2.05rem; line-height:1.18; font-weight:500; margin: 0 0 4px; }
+  .rule{ width: 46px; height: 1px; background: var(--brass-dim); margin: 16px auto 18px; }
+  .hook-line{ text-align:center; font-style: italic; color: var(--muted); font-size: 1rem; max-width: 300px; margin: 0 auto 34px; line-height:1.5; }
+
+  .reading-text p{ font-size: 1.02rem; line-height: 1.75; margin: 0 0 20px; max-width: 34ch; margin-left:auto; margin-right:auto; }
+
+  .teaser-fade{ position:relative; }
+  .teaser-fade::after{
+    content:''; position:absolute; left:0; right:0; bottom:0; height: 90px;
+    background: linear-gradient(to bottom, transparent, var(--ink));
+    pointer-events:none;
+  }
+
+  .paywall{
+    background: var(--rosewood);
+    margin: -6px 0 28px;
+    padding: 30px 26px 26px;
+    position: relative;
+    clip-path: polygon(0% 10px, 4% 0%, 8% 10px, 12% 0%, 16% 10px, 20% 0%, 24% 10px, 28% 0%, 32% 10px, 36% 0%, 40% 10px, 44% 0%, 48% 10px, 52% 0%, 56% 10px, 60% 0%, 64% 10px, 68% 0%, 72% 10px, 76% 0%, 80% 10px, 84% 0%, 88% 10px, 92% 0%, 96% 10px, 100% 0%, 100% 100%, 0% 100%);
+  }
+  .paywall-label{ font-family:'Fraunces', serif; font-size: 1.28rem; font-weight:500; text-align:center; margin: 6px 0 6px; }
+  .paywall-price{ text-align:center; color: #e9c9ba; font-size: 0.92rem; margin-bottom: 20px; }
+  .paywall-price b{ color:#fff; font-size: 1.15rem; }
+  #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
+  .paywall-note{ text-align:center; color: #d8a79d; font-size: 0.74rem; margin-bottom: 4px; }
+  .paywall-skip{ text-align:center; margin-top: 14px; }
+  .paywall-skip button{ background:none; border:none; color: #e9c9ba; font-size: 0.82rem; text-decoration:underline; cursor:pointer; opacity: 0.8; }
+
+  #fullContainer.is-hidden{ display:none; }
+  #fullContainer{ animation: fadeUp 0.6s ease; }
+  @keyframes fadeUp{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform:none; } }
+  .closing-line{ font-family:'Fraunces', serif; font-style: italic; text-align:center; font-size: 1.15rem; line-height:1.5; max-width: 30ch; margin: 30px auto 36px; color: var(--brass); }
+
+  .unlocked-badge{ text-align:center; color: var(--brass); font-size: 0.8rem; letter-spacing:0.02em; margin-bottom: 24px; }
+
+  .reveal-actions{ display:flex; flex-direction:column; gap:14px; align-items:center; margin-top: 10px; }
+  .disclaimer{ color:#5c5370; font-size: 0.72rem; text-align:center; line-height:1.5; max-width: 32ch; margin: 30px auto 0; }
+
+  @media (prefers-reduced-motion: reduce){
+    .mask-wrap, .mask-crack, #fullContainer, .pulse-mask{ animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <div id="progress" class="is-hidden"><div id="progressFill"></div></div>
+
+  <!-- ===================== PORTADA ===================== -->
+  <section id="screen-cover" class="screen is-active">
+    <div class="mask-wrap">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4" opacity="0.9"/>
+        <path class="mask-crack" d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="34" cy="42" r="2.4" fill="#c6a358"/>
+        <circle cx="66" cy="42" r="2.4" fill="#c6a358"/>
+      </svg>
+    </div>
+    <h1 class="display">¿Quién eres en realidad?</h1>
+    <p class="sub">¿Quieres saber quién se esconde detrás de tu máscara?</p>
+    <p class="meta-line"><b>16 preguntas</b> · 5 minutos · sin registrarte</p>
+    <button id="btnStart" class="btn btn-primary">Empezar</button>
+  </section>
+
+  <!-- ===================== CUESTIONARIO ===================== -->
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-top">
+      <button id="btnBack" aria-label="Anterior">‹</button>
+    </div>
+    <div class="quiz-body">
+      <p id="qPrompt" class="q-prompt display"></p>
+      <div id="qBody"></div>
+    </div>
+    <div class="quiz-bottom">
+      <button id="btnNext" class="btn btn-primary" disabled>Siguiente</button>
+    </div>
+  </section>
+
+  <!-- ===================== CARGANDO ===================== -->
+  <section id="screen-loading" class="screen">
+    <svg class="pulse-mask" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4"/>
+      <path d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <p id="loadingLabel" class="display">Interpretando tus respuestas…</p>
+  </section>
+
+  <!-- ===================== ERROR ===================== -->
+  <section id="screen-error" class="screen">
+    <div class="error-box">
+      <p id="errorMsg" class="display" style="font-size:1.2rem; color:var(--parchment);"></p>
+      <p id="errorDetail"></p>
+      <button id="btnRetry" class="btn btn-primary">Intentar de nuevo</button>
+    </div>
+  </section>
+
+  <!-- ===================== REVELACIÓN ===================== -->
+  <section id="screen-reveal" class="screen">
+    <svg class="reveal-mask" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4"/>
+      <path class="mask-crack" d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h2 id="archetypeName" class="archetype-name display"></h2>
+    <div class="rule"></div>
+    <p id="hookLine" class="hook-line"></p>
+    <div class="reveal-actions" style="margin-bottom: 30px;">
+      <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);">Compartir mi arquetipo</button>
+    </div>
+
+    <div class="teaser-fade">
+      <div id="teaserText" class="reading-text"></div>
+    </div>
+
+    <div id="paywall" class="paywall">
+      <p class="paywall-label display">Tu lectura continúa</p>
+      <p class="paywall-price">Desbloqueá el resto por <b id="priceLabel">$2.99</b></p>
+      <div id="paypal-button-container"></div>
+      <p class="paywall-note">Pago seguro con PayPal · sin crear cuenta</p>
+      <div class="paywall-skip"><button id="btnSkipPaywall">Seguir sin pagar</button></div>
+    </div>
+
+    <div id="skippedNote" class="is-hidden" style="text-align:center; margin: 10px 0 28px;">
+      <p style="color:var(--muted); font-size:0.88rem; margin-bottom:14px;">Está bien. Tu lectura se queda hasta ahí.</p>
+      <button id="btnRestartFromSkip" class="btn-ghost">Hacer el cuestionario de nuevo</button>
+    </div>
+
+    <div id="fullContainer" class="is-hidden">
+      <p class="unlocked-badge">✦ Desbloqueado</p>
+      <div id="fullText" class="reading-text"></div>
+      <p id="closingLine" class="closing-line"></p>
+      <div class="reveal-actions">
+        <button id="btnRestart" class="btn-ghost">Hacer el cuestionario de nuevo</button>
+      </div>
+    </div>
+
+    <p class="disclaimer">Esta lectura es una experiencia de autoconocimiento con fines de entretenimiento, inspirada en tus respuestas — no es un diagnóstico psicológico.</p>
+  </section>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
