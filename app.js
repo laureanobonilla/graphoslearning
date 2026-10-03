@@ -244,7 +244,11 @@ function updateManualPurchaseBox() {
     const emailLinkEl = document.getElementById('manualPurchaseEmailLink');
     if (emailLinkEl) emailLinkEl.href = `mailto:${SUPPORT_EMAIL}`;
 
-    const message = `Hola! 👋 Ya usé mis nodos disponibles en Graphikosmos y quiero seguir creando esquemas. Mi correo de la cuenta es: ${userEmail}`;
+    // Mensaje profesional: no menciona que "se acabó" nada (eso suena a
+    // cobro automático o a una queja), sino que la persona quiere seguir
+    // usando la herramienta — es información para quien responde por
+    // WhatsApp, que es quien conversa el paquete/precio.
+    const message = `Hola, uso Graphikosmos y me gustaría seguir utilizándolo. ¿Podrían contarme las opciones disponibles para continuar? Mi correo de cuenta es: ${userEmail}`;
     const waLink = document.getElementById('manualPurchaseWhatsapp');
     if (waLink) waLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
@@ -2472,7 +2476,7 @@ const openFloatingPanels = new Map(); // nodeId -> { el, contentEl, titleEl }
 // volvería illegible al alejar mucho). El panel sigue cerrándose con la X
 // y sigue sin ser un nodo real de vis-network: solo "viaja" junto al mapa.
 // ============================================================
-const floatingPanelAnchors = new Map(); // nodeId -> punto en coordenadas del MUNDO (canvas) al que llega la flecha
+const floatingPanelAnchors = new Map(); // panelKey -> { worldPoint, anchorNodeId } — el nodo real al que llega la flecha
 let floatingPanelsArrowSvg = null;
 
 function ensureFloatingPanelsArrowSvg() {
@@ -2497,10 +2501,20 @@ function ensureFloatingPanelsArrowSvg() {
 // "vive" el panel de un nodo, a partir de su posición actual en pantalla.
 // Se llama al crear el panel y mientras se arrastra, para que quede
 // "pegado" al punto del mapa donde el usuario lo dejó.
-function anchorFloatingPanelToWorld(nodeId, el) {
-    if (!network || !el || !nodes.get(nodeId)) return;
+//
+// panelKey es la clave del panel en openFloatingPanels/floatingPanelAnchors
+// (puede ser sintética, como "simple_<id>" o "socratic_<id>_<timestamp>",
+// para que convivan varios paneles del mismo nodo). anchorNodeId es el ID
+// de nodo REAL al que debe apuntar la flecha — antes se asumía que ambos
+// eran el mismo valor, así que para cualquier panel con una clave sintética
+// `nodes.get(panelKey)` nunca encontraba el nodo y la flecha simplemente no
+// se dibujaba (el panel quedaba flotando sin anclar a nada). Si no se pasa,
+// se usa panelKey como antes (caso de "Ver definición", donde sí coinciden).
+function anchorFloatingPanelToWorld(panelKey, el, anchorNodeId) {
+    const realAnchorId = anchorNodeId || panelKey;
+    if (!network || !el || !nodes.get(realAnchorId)) return;
     const screenPoint = { x: el.offsetLeft, y: el.offsetTop + 20 };
-    floatingPanelAnchors.set(nodeId, network.DOMtoCanvas(screenPoint));
+    floatingPanelAnchors.set(panelKey, { worldPoint: network.DOMtoCanvas(screenPoint), anchorNodeId: realAnchorId });
 }
 
 // Se llama en cada redibujado del lienzo (pan, zoom, arrastre de nodos...):
@@ -2510,16 +2524,16 @@ function updateFloatingPanelAnchors() {
     if (!network || !floatingPanelAnchors.size) { if (floatingPanelsArrowSvg) floatingPanelsArrowSvg.innerHTML = ''; return; }
     const svg = ensureFloatingPanelsArrowSvg();
     const lines = [];
-    for (const [nodeId, worldPoint] of Array.from(floatingPanelAnchors.entries())) {
-        const panel = openFloatingPanels.get(nodeId);
-        const node = nodes.get(nodeId);
-        if (!panel || !node) { floatingPanelAnchors.delete(nodeId); continue; }
-        const domPoint = network.canvasToDOM(worldPoint);
+    for (const [panelKey, anchor] of Array.from(floatingPanelAnchors.entries())) {
+        const panel = openFloatingPanels.get(panelKey);
+        const node = nodes.get(anchor.anchorNodeId);
+        if (!panel || !node) { floatingPanelAnchors.delete(panelKey); continue; }
+        const domPoint = network.canvasToDOM(anchor.worldPoint);
         panel.el.style.left = `${domPoint.x}px`;
         panel.el.style.top = `${domPoint.y - 20}px`;
 
-        const positions = network.getPositions([nodeId]);
-        const nodePos = positions && positions[nodeId];
+        const positions = network.getPositions([anchor.anchorNodeId]);
+        const nodePos = positions && positions[anchor.anchorNodeId];
         if (!nodePos) continue;
         const nodeDom = network.canvasToDOM(nodePos);
         lines.push(`<line x1="${nodeDom.x}" y1="${nodeDom.y}" x2="${domPoint.x}" y2="${domPoint.y}" stroke="#4fd1c5" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#gkFloatingPanelArrowHead)" />`);
@@ -2552,7 +2566,12 @@ function focusFloatingPanel(nodeId) {
 
 // Crea (o enfoca, si ya existe) la ventana flotante de un nodo y devuelve sus
 // referencias de título/contenido para que el llamador las rellene.
-function openFloatingPanel(nodeId, title) {
+//
+// nodeId es la clave con la que se registra el panel (puede ser sintética:
+// ver showSimpleExplanationInFloatingPanel/btnMenuChallenge). anchorNodeId,
+// si se pasa, es el nodo real del mapa al que debe apuntar la flecha cuando
+// difiere de nodeId — por defecto es el mismo nodeId (caso normal).
+function openFloatingPanel(nodeId, title, anchorNodeId) {
     const existing = openFloatingPanels.get(nodeId);
     if (existing) { focusFloatingPanel(nodeId); return existing; }
 
@@ -2596,6 +2615,14 @@ function openFloatingPanel(nodeId, title) {
     // (altura automática) y se desactiva el asa de resize mientras está así —
     // no tiene sentido redimensionar un panel que no muestra contenido. Al
     // restaurar vuelve exactamente a la altura que tenía antes de minimizarlo.
+    //
+    // El `height: auto` por sí solo no bastaba: la clase `min-h-[160px]` (que
+    // existe para que el panel abierto nunca quede demasiado chico) seguía
+    // forzando una altura mínima de 160px aunque el contenido estuviera
+    // oculto, así que el panel "minimizado" quedaba con la cabecera arriba y
+    // un espacio vacío grande debajo rellenando esos 160px. La solución es
+    // anular también `min-height` (a 0) mientras está minimizado, y
+    // restaurarla al expandir.
     const minimizeBtn = el.querySelector('.fp-minimize');
     let isMinimized = false;
     let heightBeforeMinimize = null;
@@ -2604,12 +2631,14 @@ function openFloatingPanel(nodeId, title) {
         if (isMinimized) {
             heightBeforeMinimize = el.style.height || `${el.offsetHeight}px`;
             el.style.height = 'auto';
+            el.style.minHeight = '0px';
             el.style.resize = 'none';
             contentEl.classList.add('hidden');
             minimizeBtn.textContent = '▢';
             minimizeBtn.title = 'Restaurar';
         } else {
             el.style.height = heightBeforeMinimize || '';
+            el.style.minHeight = '';
             el.style.resize = '';
             contentEl.classList.remove('hidden');
             minimizeBtn.textContent = '—';
@@ -2641,7 +2670,7 @@ function openFloatingPanel(nodeId, title) {
         // clic, un pan, etc.). Por eso aquí se llama a updateFloatingPanelAnchors()
         // a mano, en cada movimiento del mouse, para que la flecha se seabra
         // se redibuje en vivo junto con el panel y no se quede atrás.
-        anchorFloatingPanelToWorld(nodeId, el);
+        anchorFloatingPanelToWorld(nodeId, el, anchorNodeId);
         updateFloatingPanelAnchors();
     });
     document.addEventListener('mouseup', () => { dragState = null; });
@@ -2649,7 +2678,7 @@ function openFloatingPanel(nodeId, title) {
     wireResizeRedraw(el);
     // Ancla el panel, recién nacido, al punto del mapa donde cayó — así la
     // flecha aparece desde ya y el panel viaja con el nodo si se hace pan/zoom.
-    anchorFloatingPanelToWorld(nodeId, el);
+    anchorFloatingPanelToWorld(nodeId, el, anchorNodeId);
 
     const panel = { el, contentEl, titleEl };
     openFloatingPanels.set(nodeId, panel);
@@ -2817,6 +2846,38 @@ const pdfRangeFileName = document.getElementById('pdfRangeFileName');
 const btnPdfRangeLoad = document.getElementById('btnPdfRangeLoad');
 const btnPdfRangeCancel = document.getElementById('btnPdfRangeCancel');
 const readerPdfView = document.getElementById('readerPdfView');
+const pdfZoomControls = document.getElementById('pdfZoomControls');
+const pdfZoomLabel = document.getElementById('pdfZoomLabel');
+const btnPdfZoomIn = document.getElementById('btnPdfZoomIn');
+const btnPdfZoomOut = document.getElementById('btnPdfZoomOut');
+
+// Zoom del visor de PDF: cambia solo cómo se VE la página ya dibujada (vía
+// transform CSS sobre cada .gk-pdf-page, dentro de un .gk-pdf-page-outer que
+// sí cambia de tamaño real para que el contenedor haga scroll) — nunca se le
+// vuelve a pedir el render a pdf.js, así que acercarse/alejarse es
+// instantáneo. No afecta los offsets de texto usados para resaltar: todo el
+// "page wrap" (canvas + capa de texto) se escala como un bloque, así que las
+// posiciones relativas de los <span> entre sí no cambian.
+let pdfZoomScale = 1;
+const PDF_ZOOM_MIN = 0.6;
+const PDF_ZOOM_MAX = 2.5;
+const PDF_ZOOM_STEP = 0.15;
+
+function applyPdfZoom(newScale) {
+    pdfZoomScale = Math.min(PDF_ZOOM_MAX, Math.max(PDF_ZOOM_MIN, newScale));
+    readerPdfView?.querySelectorAll('.gk-pdf-page-outer').forEach(outer => {
+        const inner = outer.querySelector('.gk-pdf-page');
+        if (!inner) return;
+        const baseW = parseFloat(outer.dataset.baseWidth || '0');
+        const baseH = parseFloat(outer.dataset.baseHeight || '0');
+        outer.style.width = `${Math.floor(baseW * pdfZoomScale)}px`;
+        outer.style.height = `${Math.floor(baseH * pdfZoomScale)}px`;
+        inner.style.transform = `scale(${pdfZoomScale})`;
+    });
+    if (pdfZoomLabel) pdfZoomLabel.textContent = `${Math.round(pdfZoomScale * 100)}%`;
+}
+btnPdfZoomIn?.addEventListener('click', () => applyPdfZoom(pdfZoomScale + PDF_ZOOM_STEP));
+btnPdfZoomOut?.addEventListener('click', () => applyPdfZoom(pdfZoomScale - PDF_ZOOM_STEP));
 
 // Tope del rango que se ofrece por default al elegir un PDF (el usuario
 // puede ampliarlo a mano antes de darle "Cargar") — páginas de más no se
@@ -2907,6 +2968,7 @@ async function renderPdfPageRange(fromPage, toPage) {
     showLoader(`Dibujando páginas ${fromPage}–${toPage}...`);
     try {
         readerPdfView.innerHTML = '';
+        pdfZoomScale = 1; // cada import/rango nuevo arranca al 100%, no hereda el zoom anterior
         for (let pageNum = fromPage; pageNum <= toPage; pageNum++) {
             const page = await activePdfDoc.getPage(pageNum);
             const unscaledViewport = page.getViewport({ scale: 1 });
@@ -2920,10 +2982,25 @@ async function renderPdfPageRange(fromPage, toPage) {
             const scale = targetWidth / unscaledViewport.width;
             const viewport = page.getViewport({ scale });
 
+            // Envoltorio EXTERIOR: es el que de verdad cambia de tamaño con el
+            // zoom (ver applyPdfZoom), para que el contenedor haga scroll de
+            // verdad. Guarda el tamaño "base" (zoom 100%) en data-attributes
+            // para poder recalcular a cualquier zoom sin tener que volver a
+            // consultar el viewport de pdf.js.
+            const pageOuter = document.createElement('div');
+            pageOuter.className = 'gk-pdf-page-outer';
+            pageOuter.dataset.baseWidth = String(Math.floor(viewport.width));
+            pageOuter.dataset.baseHeight = String(Math.floor(viewport.height));
+            pageOuter.style.width = `${Math.floor(viewport.width)}px`;
+            pageOuter.style.height = `${Math.floor(viewport.height)}px`;
+
+            // Envoltorio INTERIOR: el tamaño real dibujado (nunca cambia), al
+            // que se le aplica el transform:scale() del zoom.
             const pageWrap = document.createElement('div');
             pageWrap.className = 'gk-pdf-page';
             pageWrap.style.width = `${Math.floor(viewport.width)}px`;
             pageWrap.style.height = `${Math.floor(viewport.height)}px`;
+            pageOuter.appendChild(pageWrap);
 
             const canvas = document.createElement('canvas');
             // Se dibuja a mayor resolución que el tamaño visual (devicePixelRatio)
@@ -2944,7 +3021,7 @@ async function renderPdfPageRange(fromPage, toPage) {
             textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
             pageWrap.appendChild(textLayerDiv);
 
-            readerPdfView.appendChild(pageWrap);
+            readerPdfView.appendChild(pageOuter);
 
             await page.render({ canvasContext: ctx, viewport, transform }).promise;
             await pdfjsLib.renderTextLayer({
@@ -2963,6 +3040,9 @@ async function renderPdfPageRange(fromPage, toPage) {
         readerTextMode.classList.add('hidden');
         readerEmptyHint?.classList.add('hidden');
         readerPdfView.classList.remove('hidden');
+        pdfZoomControls?.classList.remove('hidden');
+        pdfZoomControls?.classList.add('flex');
+        if (pdfZoomLabel) pdfZoomLabel.textContent = '100%';
         const mainEntry = readerPanelRegistry.get('main');
         if (mainEntry) { mainEntry.textEl = readerPdfView; mainEntry.isPdf = true; }
 
@@ -3000,6 +3080,9 @@ function exitPdfMode() {
     if (mainEntry) { mainEntry.textEl = readerTextMode; mainEntry.isPdf = false; }
     readerPdfView.innerHTML = '';
     readerPdfView.classList.add('hidden');
+    pdfZoomControls?.classList.add('hidden');
+    pdfZoomControls?.classList.remove('flex');
+    pdfZoomScale = 1;
     readerTextMode.classList.remove('hidden');
     activePdfDoc = null;
     pdfFullText = '';
@@ -3328,7 +3411,7 @@ function createExtraReaderPanel() {
     // controles del clon en vez de dejar un botón que se vería igual pero no
     // haría nada (nunca se le conecta ningún listener, porque ese cableado
     // se hizo una sola vez contra el #btnImportPdf original antes de clonar).
-    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"], [data-role="pdfView"]').forEach(el => el.remove());
+    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"], [data-role="pdfView"], [data-role="pdfZoomControls"]').forEach(el => el.remove());
 
     const cloneText = clone.querySelector('[data-role="textMode"]');
     if (cloneText) cloneText.innerText = '';
@@ -3555,7 +3638,10 @@ async function showSimpleExplanationInFloatingPanel(nodeId) {
     // definición" puedan convivir abiertos al mismo tiempo sin pisarse.
     const panelKey = `simple_${nodeId}`;
 
-    const panel = openFloatingPanel(panelKey, `💡 ${title}`);
+    // Tercer argumento: el nodo real al que debe apuntar la flecha (antes se
+    // omitía y, como panelKey no es un id de nodo real, la flecha nunca se
+    // dibujaba para este panel — ver anchorFloatingPanelToWorld).
+    const panel = openFloatingPanel(panelKey, `💡 ${title}`, nodeId);
     panel.el.dataset.nodeId = nodeId;
     // Acento visual distinto (verde-lima) para diferenciarlo del panel de
     // definición normal (teal) con solo mirar el borde/título.
@@ -4952,7 +5038,10 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
         // Panel propio para el reto (no es la definición de ningún nodo existente,
         // así que usa un id sintético para no chocar con el panel de otro nodo).
         const challengePanelId = `socratic_${originId}_${Date.now()}`;
-        const panel = openFloatingPanel(challengePanelId, `🧠 Reto Socrático: ${topicName}`);
+        // Tercer argumento: el nodo real (originId) al que debe apuntar la
+        // flecha — challengePanelId es sintético, así que sin esto la flecha
+        // nunca se dibujaba (ver anchorFloatingPanelToWorld).
+        const panel = openFloatingPanel(challengePanelId, `🧠 Reto Socrático: ${topicName}`, originId);
         panel.el.dataset.nodeId = challengePanelId;
         panel.contentEl.innerHTML = `
             <div class="bg-slate-800/90 border border-emerald-500/40 rounded-xl p-4 mb-4">

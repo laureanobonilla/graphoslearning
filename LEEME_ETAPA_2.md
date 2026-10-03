@@ -1924,3 +1924,131 @@ arrastrar, etc.). El modo PDF solo se activa si el usuario sube uno, y
   dónde quedó un nodo, resaltar al hacer scroll, generar el esquema, limpiar,
   paneles extra) sigan funcionando igual sin importar si el panel está
   mostrando texto plano o un PDF.
+
+## 33. La flecha faltaba en dos paneles del menú contextual, y "Minimizar" dejaba un hueco vacío debajo del encabezado
+
+### a) La flecha de "Ver definición" no llegaba a todos los paneles
+
+Los paneles flotantes que abre el menú contextual ("Ver definición",
+"Explicación sencilla", "Ponme a prueba") comparten la misma función de
+creación (`openFloatingPanel`), así que en teoría todos deberían dibujar la
+misma flecha punteada hacia el nodo que los originó. En la práctica, dos de
+los tres no la mostraban:
+
+- **"Explicación sencilla"** y **"Ponme a prueba"** necesitan poder tener su
+  propio panel abierto *al mismo tiempo* que el de "Ver definición" para el
+  mismo nodo (uno no debe cerrar o reemplazar al otro), así que a cada uno
+  se le asigna una clave distinta a la del nodo real — por ejemplo
+  `simple_<id-del-nodo>` o `socratic_<id-del-nodo>_<momento>` — para que no
+  se pisen entre sí en el registro interno de paneles abiertos.
+- El código que ancla la flecha al nodo, sin embargo, asumía que esa clave
+  *era* el id del nodo, y buscaba un nodo con ese nombre exacto en el mapa.
+  Como `simple_...` o `socratic_...` nunca son ids reales de ningún nodo,
+  esa búsqueda fallaba en silencio y la flecha simplemente nunca se
+  dibujaba para esos dos paneles — quedaban flotando sin ninguna conexión
+  visual con el nodo del que salieron.
+
+La solución fue separar ambos conceptos: la clave con la que se identifica
+y se guarda el panel (para que pueda haber varios a la vez) por un lado, y
+el nodo real al que debe apuntar la flecha por otro. Ahora "Ver definición"
+sigue funcionando igual que siempre (son el mismo valor), y "Explicación
+sencilla" / "Ponme a prueba" reciben explícitamente el nodo real como un
+tercer dato al crear el panel — así la flecha ya aparece y se comporta
+igual en los tres casos: sigue al nodo si se mueve, se redibuja al hacer
+zoom/pan, etc.
+
+### b) "Minimizar" dejaba un hueco vacío debajo del encabezado
+
+El botón "—" (minimizar) ya escondía el contenido del panel y achicaba su
+altura a "automática", pero el panel seguía teniendo una altura *mínima*
+fijada (para que, abierto normalmente, nunca quede demasiado chiquito) que
+seguía aplicando incluso con el contenido oculto. El resultado: el
+encabezado quedaba arriba, pero debajo se mantenía ese espacio mínimo vacío
+en blanco — el panel no se veía realmente "recogido".
+
+La corrección anula también esa altura mínima mientras el panel está
+minimizado (vuelve a 0), y la restaura al expandirlo de nuevo. Ahora
+minimizar deja ver solo el encabezado, sin espacio sobrante debajo, igual
+en los tres paneles (definición, explicación sencilla, reto socrático).
+
+Verifiqué ambos arreglos reproduciendo el CSS exacto de estos paneles fuera
+de la app (ya que el entorno donde trabajo no puede cargar Tailwind desde
+su CDN) y confirmando con un navegador real que, antes del cambio, minimizar
+dejaba 160px de alto (el mínimo fijado) en vez de encogerse al tamaño real
+del encabezado (~55px), y que después del cambio sí se encoge correctamente
+y se restaura a la altura exacta de antes de minimizar.
+
+### Archivos tocados
+
+- `app.js`: `anchorFloatingPanelToWorld`/`updateFloatingPanelAnchors`
+  ahora separan la clave del panel del nodo real al que apunta la flecha
+  (`anchorNodeId`); `openFloatingPanel` acepta un tercer argumento opcional
+  con ese nodo real; `showSimpleExplanationInFloatingPanel` y el manejador
+  de "Ponme a prueba" (`btnMenuChallenge`) ahora lo pasan explícitamente.
+  El botón de minimizar de `openFloatingPanel` también anula `min-height`
+  mientras el panel está minimizado (y la restaura al expandir).
+
+## 34. Mensaje de WhatsApp más profesional, botón de "Subir PDF" llamativo, y zoom en el visor de PDF
+
+### a) Mensaje de WhatsApp
+
+El mensaje que se armaba solo al abrir la tienda (botón "Escribir por
+WhatsApp") decía "Ya usé mis nodos disponibles... quiero seguir creando
+esquemas" — sonaba a que algo se agotó o se cobró mal, en vez de a alguien
+que simplemente quiere seguir usando la herramienta. Se cambió a:
+
+> "Hola, uso Graphikosmos y me gustaría seguir utilizándolo. ¿Podrían
+> contarme las opciones disponibles para continuar? Mi correo de cuenta
+> es: ..."
+
+Sigue sin mencionar paquetes ni precios en el mensaje (eso se conversa por
+chat, como ya estaba decidido), pero con un tono de interés genuino en
+seguir usando la app en vez de una queja.
+
+### b) El botón de "Subir PDF" ahora se nota
+
+Antes era un ícono gris (📄) idéntico en estilo a los botones de
+➕ (otro lector), 🧹 (limpiar) y ✕ (cerrar) — una función importante y poco
+común (poder leer y esquematizar un PDF real, con su formato, no solo su
+texto) quedaba visualmente al mismo nivel que "cerrar el panel". Ahora
+tiene su propio color sólido (rojo/rosa) y dice "📄 Subir PDF" en vez de
+ser solo un ícono — se distingue de un vistazo del resto de los botones.
+
+### c) Zoom en el visor de PDF
+
+Ya se podía importar y leer un PDF con su formato real, pero el tamaño en
+pantalla era fijo (ajustado al ancho del panel al momento de cargarlo) —
+no había manera de acercarse si el texto se veía chico. Ahora, mientras hay
+un PDF cargado, aparecen controles 🔍－ / 100% / 🔍＋ en la esquina del
+panel para acercar o alejar la página.
+
+Importante: acercar o alejar NO le vuelve a pedir nada a `pdf.js` ni
+redibuja el `<canvas>` — sería lento y, al dibujarse ya a mayor resolución
+de la que se ve (por la pantalla de alta densidad, ver ronda anterior), no
+hace falta. En vez de eso, cada página quedó dentro de un envoltorio cuyo
+tamaño sí cambia con el zoom (para que aparezca scroll de verdad) mientras
+la página en sí (canvas + capa de texto de selección) solo se escala
+visualmente con un `transform: scale()` — exactamente como el zoom nativo
+de un navegador. Como esto no toca ni el canvas ni los `<span>` de texto,
+seleccionar, vincular a un nodo y ver los resaltados sigue funcionando
+igual sin importar el zoom activo. El zoom se resetea a 100% cada vez que
+se carga un nuevo rango de páginas.
+
+Verifiqué el mecanismo del zoom (que el contenedor realmente crece/encoge y
+habilita el scroll, y que la página se reposiciona centrada) con una prueba
+en un navegador real, ya que mi entorno de trabajo no puede cargar
+Tailwind desde su CDN para probar la página completa.
+
+### Archivos tocados
+
+- `app.js`: mensaje de WhatsApp reescrito en `updateManualPurchaseBox`;
+  nuevo estado de zoom (`pdfZoomScale`, `applyPdfZoom`) y sus botones
+  (`btnPdfZoomIn`/`btnPdfZoomOut`); `renderPdfPageRange` ahora envuelve
+  cada página en un `.gk-pdf-page-outer` (tamaño real, cambia con el zoom)
+  más la `.gk-pdf-page` de siempre (tamaño fijo, solo se escala visualmente);
+  `exitPdfMode` resetea el zoom y oculta sus controles;
+  `createExtraReaderPanel` también quita los controles de zoom del clon
+  (son solo del panel "main", igual que el resto de lo de PDF).
+- `index.html`: botón `#btnImportPdf` con color sólido y texto "Subir PDF";
+  nuevos controles `#pdfZoomControls`/`#btnPdfZoomIn`/`#btnPdfZoomOut`/
+  `#pdfZoomLabel`; CSS de `.gk-pdf-page-outer`.

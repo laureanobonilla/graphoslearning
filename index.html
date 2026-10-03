@@ -34,9 +34,20 @@
            pixel a pixel sobre su equivalente dibujado en el canvas — el mismo
            truco que usa cualquier visor de PDF de navegador para que se pueda
            seleccionar/subrayar texto sobre la imagen de la página. */
+        /* Envoltorio de cada página pensado para el zoom (ver btnPdfZoomIn/Out
+           y applyPdfZoom en app.js): su tamaño (width/height) SÍ cambia con el
+           zoom, para que el contenedor realmente crezca y aparezca scroll —
+           es lo que ve el usuario como "la página más grande". Adentro, la
+           página real (.gk-pdf-page) mantiene su tamaño original dibujado y
+           solo se le aplica un transform:scale(), así nunca hace falta volver
+           a pedirle a pdf.js que redibuje el canvas o la capa de texto solo
+           por acercarse o alejarse — el zoom es instantáneo. */
+        .gk-pdf-page-outer {
+            margin: 0 auto 14px auto;
+        }
         .gk-pdf-page {
             position: relative;
-            margin: 0 auto 14px auto;
+            transform-origin: top left;
             box-shadow: 0 1px 4px rgba(0,0,0,0.15);
             background: #fff;
         }
@@ -506,7 +517,13 @@
                 <div class="flex items-center justify-between gap-2">
                     <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
                     <div class="flex items-center gap-1.5">
-                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se ve como PDF real, con sus páginas; podés elegir cuáles esquematizar)" class="bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">📄</button>
+                        <!-- A propósito NO es un ícono gris más entre los demás botones: subir un
+                             PDF real (con sus páginas, no solo su texto) es una función importante
+                             y poco común, así que lleva color sólido + su propio texto para que se
+                             note de entrada en vez de que el usuario tenga que descubrirla. -->
+                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se ve como PDF real, con sus páginas; podés elegir cuáles esquematizar)" class="bg-rose-600 hover:bg-rose-500 border border-rose-400/60 text-white px-2.5 py-1 rounded-md text-[11px] font-bold transition-all shadow-sm shadow-rose-900/50 flex items-center gap-1 whitespace-nowrap">
+                            <span>📄</span><span>Subir PDF</span>
+                        </button>
                         <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">➕</button>
                         <button id="btnClearReader" data-role="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">🧹</button>
                         <button id="btnCloseReader" data-role="btnClose" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all">✕</button>
@@ -564,6 +581,15 @@
                      #readerTextMode y #readerEmptyHint se ocultan — el panel muestra UNO
                      de los dos modos a la vez, nunca ambos. -->
                 <div id="readerPdfView" data-role="pdfView" class="hidden w-full h-full overflow-auto select-text"></div>
+                <!-- Controles de zoom del PDF: viven FUERA de #readerPdfView (que se vacía y
+                     se vuelve a llenar en cada render) para no perderse en cada recarga, y
+                     flotan en la esquina del contenedor de lectura. Solo se muestran junto
+                     con la vista de PDF — ver renderPdfPageRange/exitPdfMode en app.js. -->
+                <div id="pdfZoomControls" data-role="pdfZoomControls" class="hidden absolute top-2 right-2 z-10 items-center gap-1 bg-slate-900/90 border border-slate-700 rounded-lg px-1.5 py-1 shadow-lg">
+                    <button id="btnPdfZoomOut" title="Alejar" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">－</button>
+                    <span id="pdfZoomLabel" class="text-slate-300 text-[11px] w-11 text-center select-none">100%</span>
+                    <button id="btnPdfZoomIn" title="Acercar" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">＋</button>
+                </div>
             </div>
         </div>
     </div>
