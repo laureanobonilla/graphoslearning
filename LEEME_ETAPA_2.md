@@ -2307,3 +2307,78 @@ mismo mecanismo de `sourceQuoteOffset` para ese caso.
   originPanelId/sourceQuoteOffset y usan highlightCoverageForPanel). Se
   eliminó `highlightSelectedTextAndLink` (la función con el envoltorio
   manual que causaba el traslape), que ya no se usa en ningún lado.
+
+## 41. Arreglo más de fondo: el PDF se leía en el orden "del archivo", no en el orden visual real
+
+El arreglo anterior (sección 40) no fue suficiente — seguía pasando que el
+resaltado marcaba una zona del texto que no era la que se había
+seleccionado con el mouse, y el esquema generado desde un PDF no parecía
+seguir el texto real. Investigando más a fondo apareció la causa de raíz,
+distinta a la de la sección 40 (esa seguía siendo válida y se queda, pero
+no alcanzaba).
+
+### La causa real
+
+Cualquier PDF guarda su texto en el orden en que fue "dibujado" al crear
+el archivo — que casi nunca es exactamente el orden de lectura visual. Un
+pie de página, una nota al pie o un encabezado pueden quedar guardados en
+medio del texto del cuerpo, aunque visualmente aparezcan antes o después.
+Es una limitación conocida de cualquier lector/extractor de PDF, no algo
+particular de esta app.
+
+El problema es que, mientras los fragmentos de texto invisibles (los
+`<span>` que se superponen al dibujo de la página para poder seleccionar)
+quedaran en ESE orden "de archivo":
+
+- **Seleccionar con el mouse** no funcionaba bien, porque la selección de
+  texto del navegador sigue el orden en que los elementos están guardados
+  internamente (el DOM), NO la posición en pantalla. Si dos palabras se
+  ven juntas visualmente pero están lejos una de otra en el orden interno
+  del archivo, arrastrar el mouse entre ellas podía terminar marcando un
+  fragmento de texto completamente distinto.
+- **Generar un esquema desde el PDF** usaba ese mismo texto desordenado
+  como entrada para la IA — así que el resultado dejaba de seguir la
+  estructura real del documento, lo cual calza con lo que se observó
+  ("parece que genera un esquema... según el tema que detecta" en vez de
+  seguir el texto).
+
+### El arreglo
+
+Pdf.js (la librería que dibuja cada página) sigue siendo quien decide
+DÓNDE va cada fragmento de texto en pantalla — eso no se tocó, es trabajo
+ya resuelto y probado de esa librería. Lo que se agregó es un paso
+adicional, justo después de que termina de dibujar: los mismos elementos
+(sin recrearlos ni cambiarles ningún estilo) se reordenan por su posición
+visual real — primero por línea, de arriba hacia abajo, y dentro de una
+misma línea, de izquierda a derecha. Es el mismo criterio que sigue
+cualquier persona leyendo un documento de una sola columna.
+
+Con ese reordenamiento, tanto la selección con el mouse como el texto que
+se usa para generar esquemas (`pdfFullText`) ahora siguen el orden visual
+real del documento.
+
+### Límite honesto
+
+Este arreglo asume un documento de **una sola columna** de texto corrido
+(como el que se ve en la imagen que se compartió — un libro/ensayo
+normal). Un PDF con varias columnas (como un periódico o un paper
+académico a dos columnas) necesitaría un criterio más complejo (agrupar
+primero por columna, y recién después por línea) que esto todavía no
+cubre — si el documento tiene ese formato, el mismo síntoma podría seguir
+apareciendo ahí.
+
+**Nota honesta sobre verificación:** este sandbox no tiene forma de cargar
+pdf.js para probar visualmente el resultado (el proxy de este entorno
+bloquea ese CDN para las pruebas automatizadas de este chat — el sitio ya
+publicado en Netlify no tiene esa restricción). El diagnóstico se hizo
+leyendo con cuidado cómo arma pdf.js la capa de texto y cómo la usa el
+resto del código (selección nativa del navegador, `rebuildPdfSpanIndex`,
+generación de esquema), y el arreglo solo reordena elementos que pdf.js ya
+posicionó correctamente — pero conviene probarlo con el PDF real donde se
+notó el problema para confirmar que, en efecto, se resolvió.
+
+### Archivos tocados
+
+- `app.js`: nueva función `reorderTextLayerToVisualOrder`, llamada justo
+  después de que `pdfjsLib.renderTextLayer` termina de dibujar cada página
+  (dentro de `renderPdfPageRange`).

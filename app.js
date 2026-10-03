@@ -3202,6 +3202,64 @@ btnPdfRangeCancel?.addEventListener('click', () => {
     activePdfDoc = null;
 });
 
+// pdf.js arma la capa de texto en el mismo orden en que el PDF "dibuja"
+// cada fragmento por dentro — que NO siempre es el orden de lectura visual
+// real. Es un problema conocido de cualquier extractor de texto de PDF: una
+// nota al pie, un encabezado o un pie de página pueden quedar guardados en
+// el archivo en medio del texto del cuerpo, aunque visualmente aparezcan
+// antes o después. Mientras los <span> de la capa de texto queden en ESE
+// orden (el de "dibujado", no el visual):
+//   - seleccionar con el mouse selecciona lo que el navegador "ve" en el
+//     DOM entre el punto donde se empezó y donde se soltó el clic — y el
+//     Range/Selection nativo sigue el orden del DOM, NO la posición en
+//     pantalla — así que puede terminar resaltando un fragmento que no
+//     tiene nada que ver con lo que de verdad se arrastró con el mouse.
+//   - pdfFullText (lo que se usa para generar un esquema y para ubicar
+//     citas) sale en ese mismo desorden, así que un esquema generado desde
+//     el PDF puede dejar de seguir la estructura real del texto.
+// Este es justamente el bug reportado: selecciones que resaltan "en otra
+// zona", y esquemas que no parecen basarse en el texto real.
+//
+// El arreglo: una vez que pdf.js ya calculó y aplicó la posición en
+// pantalla de cada <span> (eso no se toca, sigue siendo pdf.js quien decide
+// dónde va cada uno), se reordenan esos MISMOS elementos — sin recrearlos
+// ni cambiarles ningún estilo — por su posición visual: primero por línea
+// (de arriba hacia abajo) y, dentro de una misma línea, de izquierda a
+// derecha. Es el mismo criterio que sigue cualquier persona leyendo un
+// documento de una sola columna (el caso normal). No resuelve diseños de
+// varias columnas (ahí el orden de lectura real necesitaría agrupar por
+// columna antes que por línea) — eso queda fuera de este arreglo.
+function reorderTextLayerToVisualOrder(textLayerDiv) {
+    const spans = Array.from(textLayerDiv.querySelectorAll(':scope > span'));
+    if (spans.length < 2) return;
+    const withPos = spans.map(span => ({
+        span,
+        top: parseFloat(span.style.top) || 0,
+        left: parseFloat(span.style.left) || 0
+    }));
+    // Agrupamos en "líneas": el top exacto rara vez calza pixel a pixel
+    // entre spans de una misma línea (pequeñas diferencias de fuente/
+    // baseline), así que cualquier span a menos de LINE_TOLERANCE del
+    // primero del grupo se considera parte de la misma línea.
+    const LINE_TOLERANCE = 4; // px
+    withPos.sort((a, b) => a.top - b.top);
+    const lines = [];
+    withPos.forEach(item => {
+        let line = lines[lines.length - 1];
+        if (!line || Math.abs(item.top - line.top) > LINE_TOLERANCE) {
+            line = { top: item.top, items: [] };
+            lines.push(line);
+        }
+        line.items.push(item);
+    });
+    lines.forEach(line => line.items.sort((a, b) => a.left - b.left));
+    lines.forEach(line => line.items.forEach(item => textLayerDiv.appendChild(item.span)));
+    // appendChild sobre un nodo que YA es hijo de este mismo padre no lo
+    // clona: lo MUEVE al final, en el orden en que se va llamando — así,
+    // iterar línea por línea (ya ordenadas) y span por span dentro de cada
+    // una deja el DOM entero reordenado de una sola pasada.
+}
+
 // Dibuja (canvas + capa de texto) las páginas fromPage..toPage y deja el
 // panel "main" en modo PDF — ver entry.isPdf en highlightCoverageForPanel/
 // locateNodeInText, que es lo que hace que "Ver en el texto", el resaltado
@@ -3274,6 +3332,12 @@ async function renderPdfPageRange(fromPage, toPage) {
                 container: textLayerDiv,
                 viewport
             }).promise;
+            // Reordena los <span> ya posicionados al orden de lectura visual real
+            // (ver el comentario completo junto a reorderTextLayerToVisualOrder,
+            // justo arriba de esta función) — soluciona tanto que la selección con
+            // el mouse marcara texto equivocado como que el esquema generado desde
+            // el PDF no siguiera el orden real del documento.
+            reorderTextLayerToVisualOrder(textLayerDiv);
         }
 
         rebuildPdfSpanIndex();
