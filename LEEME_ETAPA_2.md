@@ -2382,3 +2382,173 @@ notó el problema para confirmar que, en efecto, se resolvió.
 - `app.js`: nueva función `reorderTextLayerToVisualOrder`, llamada justo
   después de que `pdfjsLib.renderTextLayer` termina de dibujar cada página
   (dentro de `renderPdfPageRange`).
+
+## 42. Se abandona el "PDF dibujado" — ahora se extrae el texto (y se mejora el pegado de enlaces/portapapeles con formato, y una barra de estilo tipo RTF)
+
+A pesar de los dos arreglos anteriores (secciones 40 y 41), el problema
+seguía apareciendo con el PDF real del usuario: la selección seguía
+marcando una zona distinta a la señalada con el mouse, y el resaltado
+nodo↔texto seguía sin funcionar bien. La decisión, con buen criterio, fue
+dejar de insistir en que "dibujar" el PDF (como un visor de PDF normal,
+con su página y una capa de texto invisible encima) funcione de forma
+confiable, y cambiar de enfoque por completo.
+
+### El cambio de enfoque
+
+Ya no se dibuja el PDF. Ahora se **extrae su texto** (con `pdf.js`, pero
+usando `page.getTextContent()` en vez de `page.render()`) y ese texto se
+inserta, con un formato aproximado al original (párrafos, encabezados,
+negrita/cursiva cuando se puede detectar), **directamente en el mismo
+editor de texto del Modo Lector** que ya se usaba para pegar texto a
+mano. A partir de ahí, para el resto de la app, un PDF importado es
+indistinguible de texto pegado: misma selección nativa del navegador,
+mismo sistema de resaltado permanente, mismo camino de generación de
+esquema. Todo el código de la sección "IMPORTAR PDF" que dibujaba
+páginas (canvas + capa de texto + zoom + navegador de páginas + su
+propio sistema de marcas) se quitó.
+
+Cómo queda el flujo: se elige el PDF y el rango de páginas (igual que
+antes, con la misma barra para escribir "de la página X a la Y"), pero
+al apretar "Cargar" ya no se dibuja nada — se lee el texto de esas
+páginas y aparece en el cuadro de texto de siempre, listo para generar
+el esquema o para editarlo a mano antes.
+
+Cómo se reconstruyen párrafos/encabezados/negrita a partir del texto
+"suelto" que da `getTextContent()` (una lista de fragmentos con su
+posición x/y, sin ninguna noción de "párrafo" o "título"):
+
+- Los fragmentos se agrupan en **líneas** por su posición vertical, y
+  dentro de una línea se ordenan de izquierda a derecha — igual que el
+  reordenamiento visual de la sección 41, pero aplicado directo sobre
+  las coordenadas que da `pdf.js`, no sobre `<span>` ya dibujados.
+- Un salto vertical notable entre una línea y la siguiente se interpreta
+  como salto de **párrafo**.
+- Una línea sola, notablemente más grande que el cuerpo del texto
+  (altura de letra muy por encima de la mediana del documento), se
+  convierte en un **encabezado** (`<h2>`/`<h3>` según cuán grande sea).
+- Se intenta detectar **negrita/cursiva** por el nombre interno de la
+  fuente de cada fragmento (si contiene "Bold", "Italic", etc.) — ver el
+  límite honesto más abajo, esto es lo menos confiable de todo el
+  cambio.
+
+### Límite honesto: la negrita/cursiva puede no detectarse casi nunca
+
+La única forma práctica de saber si un fragmento de texto de un PDF va
+en negrita/cursiva, sin dibujar la página, es mirar el nombre interno de
+su fuente (p. ej. `Helvetica-Bold`). Muchos PDFs (sobre todo los
+generados por conversores de Word/Google Docs/LaTeX) SÍ nombran así sus
+fuentes, pero muchos otros no — y antes esa información normalmente se
+terminaba de completar durante `page.render()` (que ya no se llama en
+este flujo). Esto significa que, en la práctica, es probable que la
+negrita/cursiva del documento original NO se reproduzca en varios PDFs,
+aunque el resto del formato (párrafos, encabezados por tamaño) sí debería
+funcionar razonablemente bien. No se intentó "inventar" una señal más
+confiable porque cualquier alternativa (analizar el trazo del glyph,
+etc.) está fuera de lo que `pdf.js` ofrece sin dibujar.
+
+### Enlaces web: el mismo criterio — traer el formato, no solo el texto
+
+`read-webpage.js` (la función que lee un artículo/noticia cuando se pega
+un enlace) ahora también devuelve `article.content` — el HTML del
+artículo ya "limpiado" por Readability (sin menús/anuncios, pero
+CONSERVANDO párrafos, encabezados, negrita, listas, etc.), además del
+texto plano de siempre. En el cliente, ese HTML se sanitiza con una
+lista blanca de etiquetas (`sanitizeImportedHtml` — párrafos,
+encabezados, negrita/cursiva/subrayado, listas, citas y enlaces; CUALQUIER
+otra etiqueta se quita conservando su texto, y a los enlaces que
+sobreviven solo se les deja el atributo `href`, nada de estilos/clases/
+`onclick` que pudieran traer de la página de origen) y se inserta en el
+editor en vez del texto plano. Si por algún motivo Readability no trae
+HTML (algunos artículos solo devuelven texto), se sigue insertando el
+texto plano como siempre — nunca se rompe el camino anterior.
+
+Como la IA genera el esquema a partir de un texto exacto y después hay
+que volver a encontrar esas mismas citas dentro del editor para
+resaltarlas, y el HTML con formato no es carácter-por-carácter idéntico
+al texto plano de Readability (los saltos de línea/espacios alrededor de
+párrafos y encabezados pueden variar un poco), el texto que se manda a
+generar el esquema se recalcula leyendo el HTML YA insertado en el panel
+(con el mismo criterio — `buildEditableTextIndex` — que usa después el
+resaltado), en vez de usar el texto plano del backend tal cual. Así los
+dos lados (lo que ve la IA y lo que se busca después en el editor) parten
+siempre del mismo texto.
+
+También se agregó soporte de **pegado con formato** (Ctrl+V): antes,
+pegar texto copiado de otra página dejaba que el navegador insertara el
+HTML crudo de esa página (con sus estilos/clases propias, lo que podía
+verse raro o interferir con el resaltado). Ahora se intercepta el pegado
+y se inserta, en su lugar, ese mismo HTML ya pasado por
+`sanitizeImportedHtml` (o el texto plano si el origen no ofreció HTML) —
+es la opción de "copy-paste con RTF" que se pidió como alternativa a la
+detección automática por enlace.
+
+### Barra de formato (RTF) en el editor
+
+Se agregó una barra de herramientas simple arriba del editor del Modo
+Lector (y de cada lector adicional que se abra con ➕, cada uno con la
+suya, independiente): **negrita, cursiva, subrayado, título grande/
+mediano, volver a párrafo normal, lista con viñetas, lista numerada,
+tamaño de letra (4 tamaños) y quitar formato**. Funciona con
+`document.execCommand` (la misma API que usan editores simples como este
+desde hace años en cualquier navegador) sobre el texto que esté
+seleccionado dentro del editor en ese momento.
+
+Un detalle de implementación para que esto funcione bien: hacer clic en
+un botón de la barra, por default, le quitaría el foco (y la selección de
+texto) al editor antes de que el clic termine de procesarse — así que se
+previene ese comportamiento en los botones normales (para que la
+selección se mantenga intacta) y, para el selector de tamaño (que sí
+necesita su comportamiento nativo para poder desplegarse), se guarda la
+selección justo antes de que se abra y se restaura justo antes de aplicar
+el tamaño elegido.
+
+### Qué NO se tocó (para que quede claro el alcance)
+
+- El **guardado/apertura de proyectos** sigue guardando y restaurando el
+  texto del lector como texto PLANO (sin el formato). Esto significa que
+  la negrita/encabezados/etc. que se vean en la sesión actual (de un PDF,
+  un enlace, o puestos a mano con la barra de formato) **no sobreviven**
+  a día de hoy si se guarda el proyecto y se vuelve a abrir más tarde —
+  el texto vuelve, pero aplanado a texto simple. No se tocó este camino
+  en este cambio por ser una zona más sensible (persistencia de
+  proyectos) que conviene no modificar a ciegas sin poder probarla en
+  este entorno; queda identificado como una mejora pendiente razonable
+  para una próxima vuelta si hace falta que el formato también se guarde.
+- Los documentos de **varias columnas** (PDF tipo periódico/paper
+  académico) pueden seguir agrupando líneas de columnas distintas como si
+  fueran una sola — la extracción agrupa por posición vertical/horizontal
+  simple, igual que el reordenamiento de la sección 41, y hereda la misma
+  limitación.
+
+### Nota honesta sobre verificación
+
+Como en los cambios anteriores sobre PDF, este sandbox no tiene forma de
+cargar `pdf.js` para probar visualmente el resultado (el proxy de este
+entorno bloquea ese CDN). Se validó que el archivo no tiene errores de
+sintaxis y que el HTML sigue balanceado, y se revisó con cuidado la
+lógica de agrupado en líneas/párrafos/encabezados contra cómo
+`page.getTextContent()` documenta sus datos — pero conviene probar con un
+PDF real (sobre todo uno con negrita/cursiva, para confirmar si ese
+detalle en particular se nota o no) y con un enlace real a un
+artículo/noticia para confirmar que el formato se vea razonable.
+
+### Archivos tocados
+
+- `app.js`: se quitó toda la maquinaria de "dibujar" el PDF (zoom,
+  navegador de páginas, `renderPdfPageRange`, `exitPdfMode`, el sistema
+  de marcas específico del PDF, `computeOffsetHintForSelection`,
+  `reorderTextLayerToVisualOrder`). En su lugar: `groupPdfItemsIntoLines`,
+  `guessPdfItemStyle`, `medianOfNumbers`, `extractPdfRangeIntoReader`
+  (nuevas), y se simplificaron los puntos que antes distinguían "modo
+  PDF" del texto plano (`btnParseReaderText`, `btnClearReader`) porque ya
+  no existe esa distinción. También nuevas: `escapeHtml`,
+  `sanitizeImportedHtml`, `wireRichPaste`, `wireRtfToolbar`; y
+  `resolveTextOrWebLink` ahora inserta HTML sanitizado cuando el backend
+  lo trae.
+- `index.html`: se quitaron `#readerPdfView`, `#pdfZoomControls` y
+  `#pdfPageNavControls` (con su CSS), se actualizó el texto del botón
+  "Subir PDF", y se agregó la barra de formato (`[data-role="rtfToolbar"]`)
+  arriba del editor.
+- `netlify/functions/read-webpage.js`: ahora también devuelve
+  `contentHtml` (el `article.content` de Readability, recortado por las
+  dudas) además del texto plano de siempre.

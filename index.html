@@ -26,55 +26,11 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        /* ===== Vista de PDF real dentro del Modo Lector (ver #readerPdfView,
-           renderPdfPageRange en app.js) =====
-           Cada página es un <canvas> (la imagen real de la página, como la
-           dibujaría cualquier lector de PDF) con una ".textLayer" superpuesta:
-           texto real pero invisible, un <span> por fragmento, posicionado
-           pixel a pixel sobre su equivalente dibujado en el canvas — el mismo
-           truco que usa cualquier visor de PDF de navegador para que se pueda
-           seleccionar/subrayar texto sobre la imagen de la página. */
-        /* Envoltorio de cada página pensado para el zoom (ver btnPdfZoomIn/Out
-           y applyPdfZoom en app.js): su tamaño (width/height) SÍ cambia con el
-           zoom, para que el contenedor realmente crezca y aparezca scroll —
-           es lo que ve el usuario como "la página más grande". Adentro, la
-           página real (.gk-pdf-page) mantiene su tamaño original dibujado y
-           solo se le aplica un transform:scale(), así nunca hace falta volver
-           a pedirle a pdf.js que redibuje el canvas o la capa de texto solo
-           por acercarse o alejarse — el zoom es instantáneo. */
-        .gk-pdf-page-outer {
-            margin: 0 auto 14px auto;
-        }
-        .gk-pdf-page {
-            position: relative;
-            transform-origin: top left;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-            background: #fff;
-        }
-        .gk-pdf-page canvas { display: block; }
-        .textLayer {
-            position: absolute;
-            inset: 0;
-            overflow: hidden;
-            line-height: 1;
-            opacity: 1;
-        }
-        .textLayer span {
-            color: transparent;
-            position: absolute;
-            white-space: pre;
-            cursor: text;
-            transform-origin: 0% 0%;
-        }
-        .textLayer mark.gk-coverage-mark {
-            /* El <mark> vive DENTRO del span invisible: solo se ve su fondo de
-               color (el texto en sí sigue transparente, como el resto de la
-               capa), que es justo lo que se quiere — un subrayado de color
-               sobre la página real, no texto negro tapando el dibujo. */
-            color: transparent;
-        }
-        .textLayer ::selection { background: rgba(37, 99, 235, 0.35); }
     </style>
+    <!-- pdf.js: ya no dibuja páginas (ver la sección "IMPORTAR PDF" en
+         app.js) — solo se usa para EXTRAER el texto (getTextContent) de las
+         páginas elegidas y traerlo al editor del Modo Lector, igual que si
+         se hubiera pegado a mano. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -521,10 +477,10 @@
                     <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
                     <div class="flex items-center gap-1.5">
                         <!-- A propósito NO es un ícono gris más entre los demás botones: subir un
-                             PDF real (con sus páginas, no solo su texto) es una función importante
-                             y poco común, así que lleva color sólido + su propio texto para que se
-                             note de entrada en vez de que el usuario tenga que descubrirla. -->
-                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se ve como PDF real, con sus páginas; podés elegir cuáles esquematizar)" class="bg-rose-600 hover:bg-rose-500 border border-rose-400/60 text-white px-2.5 py-1 rounded-md text-[11px] font-bold transition-all shadow-sm shadow-rose-900/50 flex items-center gap-1 whitespace-nowrap">
+                             PDF es una función importante y poco común, así que lleva color sólido
+                             + su propio texto para que se note de entrada en vez de que el usuario
+                             tenga que descubrirla. -->
+                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se extrae su texto, con el formato más parecido posible, al editor de abajo; podés elegir qué páginas)" class="bg-rose-600 hover:bg-rose-500 border border-rose-400/60 text-white px-2.5 py-1 rounded-md text-[11px] font-bold transition-all shadow-sm shadow-rose-900/50 flex items-center gap-1 whitespace-nowrap">
                             <span>📄</span><span>Subir PDF</span>
                         </button>
                         <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">➕</button>
@@ -535,8 +491,9 @@
                 <!-- Input de archivo oculto para "Importar PDF" — ver btnImportPdf en app.js. -->
                 <input type="file" id="pdfFileInput" data-role="pdfFileInput" accept="application/pdf" class="hidden">
                 <!-- Barra de rango de páginas: aparece solo después de elegir un PDF,
-                     antes de mostrarlo — así se decide QUÉ páginas esquematizar (y
-                     renderizar) antes de cargar nada pesado. Ver app.js. -->
+                     antes de extraer nada — así se decide de qué páginas traer el
+                     texto antes de procesar el documento entero. Ver app.js
+                     (extractPdfRangeIntoReader). -->
                 <div id="pdfRangeBar" data-role="pdfRangeBar" class="hidden items-center gap-1.5 bg-[#0f1428] border border-[#2c3458] rounded-lg px-2 py-1.5 text-[11px] text-slate-300 flex-wrap">
                     <span class="truncate" id="pdfRangeFileName">documento.pdf</span>
                     <span class="text-slate-500">·</span>
@@ -562,6 +519,36 @@
                 <div id="docContextEditRow" data-role="docContextEditRow" class="hidden items-center gap-2">
                     <input type="text" id="docContextInput" data-role="docContextInput" placeholder="Detectado automático, o escríbelo tú..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
                 </div>
+                <!-- Barra de formato de texto (negrita, cursiva, subrayado, encabezados,
+                     listas, tamaño, quitar formato) sobre el editor del Modo Lector —
+                     un editor de texto con formato "estándar", como pidió el usuario,
+                     en vez de solo texto plano. Actúa sobre la selección actual DENTRO
+                     de #readerTextMode (o del textMode de este panel si es un clon) vía
+                     document.execCommand — ver wireRtfToolbar en app.js. No se marca
+                     "select-text"/cursor-move: debe poder hacer clic normal sin arrastrar
+                     el panel ni perder la selección del editor (ver el truco de
+                     mousedown/preventDefault en wireRtfToolbar). -->
+                <div data-role="rtfToolbar" class="flex items-center gap-1 flex-wrap bg-[#0f1428] border border-[#2c3458] rounded-lg px-2 py-1.5 cursor-default">
+                    <button type="button" data-cmd="bold" title="Negrita" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors">N</button>
+                    <button type="button" data-cmd="italic" title="Cursiva" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs italic transition-colors">I</button>
+                    <button type="button" data-cmd="underline" title="Subrayado" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs underline transition-colors">S</button>
+                    <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
+                    <button type="button" data-cmd="formatBlock" data-value="H2" title="Título grande" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] font-bold transition-colors">H2</button>
+                    <button type="button" data-cmd="formatBlock" data-value="H3" title="Título mediano" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] font-bold transition-colors">H3</button>
+                    <button type="button" data-cmd="formatBlock" data-value="P" title="Párrafo normal" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors">¶</button>
+                    <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
+                    <button type="button" data-cmd="insertUnorderedList" title="Lista con viñetas" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors">•≡</button>
+                    <button type="button" data-cmd="insertOrderedList" title="Lista numerada" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] transition-colors">1.≡</button>
+                    <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
+                    <select data-cmd="fontSize" title="Tamaño de letra" class="bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-200 py-0.5 focus:outline-none focus:border-indigo-500">
+                        <option value="2">Pequeño</option>
+                        <option value="3" selected>Normal</option>
+                        <option value="5">Grande</option>
+                        <option value="6">Muy grande</option>
+                    </select>
+                    <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
+                    <button type="button" data-cmd="removeFormat" title="Quitar formato" class="text-slate-400 hover:text-red-300 hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors">⌫</button>
+                </div>
             </div>
 
             <!-- Área de Lectura (Fondo Blanco Limpio) -->
@@ -576,34 +563,6 @@
                     <p class="text-slate-400 text-base leading-relaxed">
                         Pega aquí un texto o <span class="text-indigo-600 font-semibold">un enlace</span>
                     </p>
-                </div>
-                <!-- Vista de PDF real: cada página se dibuja en un <canvas> (fidelidad
-                     visual, igual que un visor normal) con una capa de texto invisible
-                     encima (para poder seleccionar/subrayar igual que en texto plano).
-                     Se llena en app.js (ver renderPdfPageRange). Mientras está visible,
-                     #readerTextMode y #readerEmptyHint se ocultan — el panel muestra UNO
-                     de los dos modos a la vez, nunca ambos. -->
-                <div id="readerPdfView" data-role="pdfView" class="hidden w-full h-full overflow-auto select-text"></div>
-                <!-- Controles de zoom del PDF: viven FUERA de #readerPdfView (que se vacía y
-                     se vuelve a llenar en cada render) para no perderse en cada recarga, y
-                     flotan en la esquina del contenedor de lectura. Solo se muestran junto
-                     con la vista de PDF — ver renderPdfPageRange/exitPdfMode en app.js. -->
-                <div id="pdfZoomControls" data-role="pdfZoomControls" class="hidden absolute top-2 right-2 z-10 items-center gap-1 bg-slate-900/90 border border-slate-700 rounded-lg px-1.5 py-1 shadow-lg">
-                    <button id="btnPdfZoomOut" title="Alejar" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">－</button>
-                    <span id="pdfZoomLabel" class="text-slate-300 text-[11px] w-11 text-center select-none">100%</span>
-                    <button id="btnPdfZoomIn" title="Acercar" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">＋</button>
-                </div>
-                <!-- Navegador de páginas del PDF (como cualquier lector normal): salta
-                     a una página concreta dentro del RANGO ya cargado, con flechas
-                     anterior/siguiente o escribiendo el número directamente. Vive junto
-                     a pdfZoomControls, también fuera de #readerPdfView por la misma
-                     razón (no perderse al volver a renderizar) — ver renderPdfPageRange/
-                     exitPdfMode y el bloque "Navegador de páginas del PDF" en app.js. -->
-                <div id="pdfPageNavControls" data-role="pdfPageNavControls" class="hidden absolute bottom-2 left-1/2 -translate-x-1/2 z-10 items-center gap-1.5 bg-slate-900/90 border border-slate-700 rounded-lg px-2 py-1 shadow-lg">
-                    <button id="btnPdfPagePrev" title="Página anterior" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">‹</button>
-                    <input id="pdfPageNavInput" type="number" min="1" value="1" class="w-12 bg-slate-800 border border-slate-600 rounded text-center text-[11px] text-white py-0.5 focus:outline-none focus:border-indigo-500" />
-                    <span class="text-slate-400 text-[11px] select-none">/ <span id="pdfPageNavTotal">1</span></span>
-                    <button id="btnPdfPageNext" title="Página siguiente" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">›</button>
                 </div>
             </div>
         </div>

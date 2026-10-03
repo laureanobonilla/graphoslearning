@@ -2139,19 +2139,111 @@ function wirePanelHoverHighlight(root, panelId) {
 }
 
 // --- Resaltado permanente de cobertura (Idea 2) ---------------------------
-function escapeHtmlForMark(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Qué tags cuentan como "bloque" (fuerzan un salto de línea en el texto
+// plano que se arma para comparar/ubicar citas): los mismos que puede
+// producir tanto el toolbar de formato del lector como la extracción de un
+// PDF o de un enlace web con formato (ver más abajo). <br> se trata aparte,
+// inserta un salto sin ser un ancestro de bloque.
+const BLOCK_BREAK_TAGS = new Set(['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'LI', 'BLOCKQUOTE']);
+
+function nearestBlockAncestor(node, containerEl) {
+    let el = node.parentElement;
+    while (el && el !== containerEl) {
+        if (BLOCK_BREAK_TAGS.has(el.tagName)) return el;
+        el = el.parentElement;
+    }
+    return containerEl;
+}
+
+// Arma, a partir del DOM actual de un panel de lectura (que ya puede tener
+// negrita, títulos, listas... ver el toolbar de formato y la importación de
+// PDF/enlaces con formato), un texto plano "de trabajo" y un índice de qué
+// nodo de texto real del DOM corresponde a cada posición de ese texto.
+//
+// Es el mismo truco que ya se había probado para la vista de PDF (antes
+// pdfPageSpanIndex/wrapPdfTextRange, cuando el PDF se dibujaba aparte —
+// ahora generalizado a CUALQUIER HTML dentro del editor): permite agregar
+// un <mark> de resaltado alrededor de una cita SIN destruir el resto del
+// formato reescribiendo todo el innerHTML desde cero, que es justo lo que
+// hacía la versión anterior de esta función (buildHighlightedMarkup) — y
+// por qué crear un nodo desde el texto habría borrado la negrita/títulos
+// que un PDF o un enlace recién importado trajera.
+//
+// No se usa el innerText nativo del navegador como referencia porque no hay
+// forma de mapear una posición de vuelta a un nodo del DOM con la API
+// nativa — así que se define un criterio propio de "salto de línea" y se
+// usa SIEMPRE el mismo, tanto para obtener "el texto de este panel" como
+// para ubicar una cita dentro de él (mientras ambos usos sean consistentes
+// entre sí, no hace falta que calce byte a byte con el innerText real).
+function buildEditableTextIndex(containerEl) {
+    let text = '';
+    const index = []; // [{start, end, node}]
+    const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT, null);
+    let node;
+    let lastBlock = null;
+    while ((node = walker.nextNode())) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+            if (node.tagName === 'BR') text += '\n';
+            continue;
+        }
+        const content = node.nodeValue;
+        if (!content) continue;
+        const block = nearestBlockAncestor(node, containerEl);
+        if (lastBlock !== null && block !== lastBlock && text && !text.endsWith('\n')) text += '\n';
+        lastBlock = block;
+        index.push({ start: text.length, end: text.length + content.length, node });
+        text += content;
+    }
+    return { text, index };
+}
+
+// Deshace los <mark> de resaltado anteriores de un panel, dejando su texto
+// (y cualquier otro formato que tuvieran alrededor) tal cual estaba — paso
+// previo antes de recalcular los resaltados desde cero.
+function unwrapCoverageMarks(containerEl) {
+    containerEl.querySelectorAll('mark.gk-coverage-mark').forEach(mark => {
+        const parent = mark.parentNode;
+        if (!parent) return;
+        while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+        parent.removeChild(mark);
+        parent.normalize(); // fusiona los text nodes vecinos de nuevo en uno solo
+    });
+}
+
+// Envuelve en un <mark> (mismo estilo que usan los nodos con cita — idea 6)
+// el fragmento [seg.start, seg.end) de un índice ya calculado (ver
+// buildEditableTextIndex). Un mismo segmento puede caer repartido entre
+// varios nodos de texto si cruza, por ejemplo, de texto normal a negrita.
+function wrapEditableTextRange(index, seg) {
+    const hc = highlightColorPalette[(seg.colorIdx != null ? seg.colorIdx : 0) % highlightColorPalette.length].mark;
+    index.forEach(entry => {
+        const overlapStart = Math.max(seg.start, entry.start);
+        const overlapEnd = Math.min(seg.end, entry.end);
+        if (overlapEnd <= overlapStart) return;
+        const textNode = entry.node;
+        if (!textNode || !textNode.parentNode) return;
+        const localStart = overlapStart - entry.start;
+        const localEnd = overlapEnd - entry.start;
+        try {
+            const range = document.createRange();
+            range.setStart(textNode, localStart);
+            range.setEnd(textNode, localEnd);
+            const mark = document.createElement('mark');
+            mark.className = 'gk-coverage-mark';
+            mark.dataset.nodeId = seg.nodeId;
+            mark.style.backgroundColor = hc.bg;
+            mark.style.borderBottomColor = hc.border;
+            mark.dataset.baseBg = hc.bg;
+            mark.dataset.baseBorder = hc.border;
+            range.surroundContents(mark);
+        } catch (err) { /* un nodo con estructura rara — se omite ese fragmento nada más */ }
+    });
 }
 
 // Dado un texto base y una lista de citas {quote, nodeId, colorIdx}, calcula
 // los intervalos [start,end) FINALES ya resueltos (sin solapes) donde cada
-// uno debería quedar envuelto en un <mark> — sin tocar el DOM ni construir
-// ningún HTML. Extraído como función propia para poder reusar exactamente la
-// misma lógica de "quién gana cuando dos citas se solapan" tanto para el
-// texto plano (buildHighlightedMarkup, reescribe innerHTML entero) como para
-// la vista de PDF (applyCoverageMarksToPdfView, que en cambio envuelve spans
-// ya existentes de la capa de texto — no puede reescribir HTML porque ahí
-// adentro vive también el <canvas> con el dibujo real de la página).
+// uno debería quedar envuelto en un <mark> — sin tocar el DOM todavía (eso
+// lo hace wrapEditableTextRange, arriba).
 // Si el mismo texto aparece más de una vez en el documento (un título que se
 // repite, una palabra común, dos párrafos parecidos...), buscar solo "la
 // primera aparición" puede marcar un lugar que no tiene nada que ver con el
@@ -2221,45 +2313,23 @@ function resolveQuoteSegments(baseText, quotes) {
     return placed;
 }
 
-// Reconstruye el HTML del panel de texto envolviendo en <mark> cada cita que
-// ya quedó convertida en un nodo del esquema, con el MISMO color que su nodo
-// correspondiente (idea 6). No reescribe nada si ninguna cita calza (p. ej.
-// esquemas generados solo a partir de un tema, sin texto).
-function buildHighlightedMarkup(rawText, quotes) {
-    const baseText = escapeHtmlForMark(rawText);
-    const escapedQuotes = quotes.map(q => ({ ...q, quote: escapeHtmlForMark((q.quote || '').trim()) }));
-    const placed = resolveQuoteSegments(baseText, escapedQuotes);
-    if (!placed.length) return baseText;
-
-    // Reconstruimos el HTML final intercalando texto plano y <mark>.
-    let result = '';
-    let cursor = 0;
-    placed.forEach(seg => {
-        if (seg.start < cursor) return; // seguridad ante algún borde raro
-        result += baseText.slice(cursor, seg.start);
-        const hc = highlightColorPalette[(seg.colorIdx != null ? seg.colorIdx : 0) % highlightColorPalette.length].mark;
-        const fragment = baseText.slice(seg.start, seg.end);
-        result += `<mark class="gk-coverage-mark" data-node-id="${seg.nodeId}" `
-            + `style="background-color:${hc.bg}; border-bottom-color:${hc.border};" `
-            + `data-base-bg="${hc.bg}" data-base-border="${hc.border}">`
-            + fragment + `</mark>`;
-        cursor = seg.end;
-    });
-    result += baseText.slice(cursor);
-    return result;
-}
-
-// Texto "crudo" de un panel de lectura, sin importar si es texto plano o un
-// PDF importado (ver entry.isPdf e IMPORTAR PDF más abajo) — centraliza esa
-// diferencia en un solo lugar para que cualquier función que necesite "todo
-// el texto de este panel" (resaltado de cobertura, sugerencia de vínculos
-// por cercanía...) no tenga que conocer ese detalle por su cuenta.
+// Texto "crudo" de un panel de lectura — centraliza esto en un solo lugar
+// para que cualquier función que necesite "todo el texto de este panel"
+// (resaltado de cobertura, sugerencia de vínculos por cercanía, generar un
+// esquema...) lo pida siempre igual. Un PDF importado (ver "IMPORTAR PDF"
+// más abajo) ya NO es un modo aparte: su texto se extrae una sola vez al
+// importarlo y queda viviendo aquí mismo, en el mismo <div contenteditable>
+// que el texto pegado a mano — por eso basta con un solo camino para todos.
 function getPanelRawText(entry) {
-    if (!entry) return '';
-    if (entry.isPdf) return pdfFullText || '';
-    return entry.textEl ? entry.textEl.innerText : '';
+    if (!entry || !entry.textEl) return '';
+    return buildEditableTextIndex(entry.textEl).text;
 }
 
+// Recalcula el resaltado permanente de un panel: deshace los <mark>
+// anteriores y envuelve de nuevo los fragmentos que correspondan a las
+// citas actuales — SIN tocar ningún otro formato (negrita, títulos...) que
+// el panel ya tuviera, a diferencia de la versión anterior de esta función
+// (que reescribía todo el innerHTML desde texto plano escapado).
 function highlightCoverageForPanel(panelId) {
     const entry = readerPanelRegistry.get(panelId);
     if (!entry || !entry.textEl) return;
@@ -2270,16 +2340,11 @@ function highlightCoverageForPanel(panelId) {
     });
     if (quotes.length === 0) return;
 
-    // Panel en modo PDF (ver "IMPORTAR PDF" más abajo): el texto NO vive en un
-    // solo bloque editable — son muchos <span> de la capa de texto, uno por
-    // página, superpuestos a un <canvas>. No se puede reescribir el innerHTML
-    // (se perdería el dibujo de la página), así que se usa una función
-    // aparte que envuelve los spans existentes en vez de reconstruir el HTML.
-    if (entry.isPdf) { applyCoverageMarksToPdfView(entry, quotes); return; }
-
-    const rawText = entry.textEl.innerText;
+    unwrapCoverageMarks(entry.textEl);
+    const { text: rawText, index } = buildEditableTextIndex(entry.textEl);
     if (!rawText || !rawText.trim()) return;
-    entry.textEl.innerHTML = buildHighlightedMarkup(rawText, quotes);
+    const placed = resolveQuoteSegments(rawText, quotes);
+    placed.forEach(seg => wrapEditableTextRange(index, seg));
 }
 
 // --- Geometría de paneles: qué parte del lienzo está realmente libre ------
@@ -2450,10 +2515,8 @@ function wireScrollFocus(panelId, contentContainer, textEl) {
     contentContainer.addEventListener('scroll', () => {
         clearTimeout(debounceTimer);
         // Se resuelve el textEl ACTUAL del panel en cada scroll (no el que
-        // había al momento de llamar wireScrollFocus): el panel "main" puede
-        // cambiar de textEl en caliente al entrar o salir del modo PDF (ver
-        // renderPdfPageRange/exitPdfMode), y así este único listener sigue
-        // funcionando sin tener que cablearlo dos veces (uno por modo).
+        // había al momento de llamar wireScrollFocus) por si en algún
+        // momento cambiara de referencia.
         debounceTimer = setTimeout(() => {
             const entry = readerPanelRegistry.get(panelId);
             updateScrollFocus(panelId, contentContainer, (entry && entry.textEl) || textEl);
@@ -2593,7 +2656,7 @@ function locateNodeInText(nodeId) {
 
 // Destella un <mark> (fondo amarillo brillante un instante) y luego restaura
 // su color de resaltado normal (el que le corresponde según su nodo — ver
-// data-base-bg/data-base-border, puestos por buildHighlightedMarkup).
+// data-base-bg/data-base-border, puestos por wrapEditableTextRange).
 function flashMark(mark) {
     if (!mark) return;
     mark.style.backgroundColor = 'rgba(250, 204, 21, 0.65)';
@@ -2856,12 +2919,14 @@ let globalDocumentContext = "";
 let activeSelectedText = "";
 let activeSelectionRange = null;
 // De qué panel de lectura viene la selección activa ('main' o 'panel-N' —
-// ver readerPanelRegistry) y, cuando se pudo calcular (solo para la vista de
-// PDF, ver computeOffsetHintForSelection), en qué posición GLOBAL del texto
-// cayó esa selección real — necesario para que un nodo creado a mano (⚡
-// Crear elemento / 🔗 Vincular a nodo) quede de verdad vinculado a esa cita
-// (antes no se guardaba nada de esto, así que esos nodos no tenían forma de
-// participar del resaltado permanente ni de "Ver en el texto").
+// ver readerPanelRegistry) y, cuando se pudo calcular, en qué posición
+// GLOBAL del texto cayó esa selección real — necesario para que un nodo
+// creado a mano (⚡ Crear elemento / 🔗 Vincular a nodo) quede de verdad
+// vinculado a esa cita. Por ahora siempre queda en null para texto plano
+// (incluido el texto extraído de un PDF o importado de un enlace): se
+// resuelve por la primera aparición del texto en el documento, como
+// siempre — el campo queda listo por si en el futuro hiciera falta
+// desambiguar repeticiones con la posición real del clic.
 let activeSelectionPanelId = null;
 let activeSelectionOffsetHint = null;
 let activeNodeDetailId = null;
@@ -2920,7 +2985,7 @@ readerPanel?.addEventListener('mousedown', () => {
 // Arrastre del panel flotante desde su cabecera (igual que los paneles de definición).
 let readerDragState = null;
 readerPanelHeader?.addEventListener('mousedown', (e) => {
-    if (e.target.closest('button') || e.target.closest('input')) return;
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
     readerDragState = { startX: e.clientX, startY: e.clientY, left: readerPanel.offsetLeft, top: readerPanel.offsetTop };
     e.preventDefault();
 });
@@ -3005,14 +3070,26 @@ function wireDragToCanvas(textEl) {
     });
 }
 wireDragToCanvas(readerTextMode);
+wireRichPaste(readerTextMode);
+wireRtfToolbar(readerPanel?.querySelector('[data-role="rtfToolbar"]'), readerTextMode);
 
 // ==========================================
-// IMPORTAR PDF: el panel "main" puede pasar de "texto plano" a "PDF real"
-// (cada página se dibuja en un <canvas>, como en cualquier lector, con una
-// capa de texto invisible encima para poder seleccionar/subrayar igual que
-// con texto plano). Es un modo ADICIONAL y OPCIONAL: mientras el usuario no
-// suba un PDF, el Modo Lector funciona exactamente igual que siempre — nada
-// de lo de aquí abajo se activa ni cambia el comportamiento existente.
+// IMPORTAR PDF: se EXTRAE el texto del PDF (con su formato aproximado —
+// párrafos, encabezados, negrita/cursiva cuando se puede detectar) y se
+// inserta en el mismo editor de texto plano del Modo Lector (readerTextMode).
+// A partir de ahí, para el resto de la app, un PDF importado es
+// indistinguible de texto pegado a mano: misma selección, mismo resaltado
+// permanente, mismo camino de generación de esquema.
+//
+// Antes se intentó "dibujar" el PDF (un <canvas> por página + una capa de
+// texto invisible encima para poder seleccionar, como cualquier lector de
+// PDF). Se abandonó ese enfoque: el orden interno en que un PDF guarda sus
+// fragmentos de texto no siempre coincide con el orden de lectura visual, y
+// eso rompía tanto la selección nativa del navegador (que sigue el orden del
+// DOM, no la posición en pantalla) como el texto usado para generar el
+// esquema — produciendo selecciones y resaltados en el lugar equivocado. Es
+// un modo ADICIONAL y OPCIONAL: mientras el usuario no suba un PDF, el Modo
+// Lector funciona exactamente igual que siempre.
 // ==========================================
 const btnImportPdf = document.getElementById('btnImportPdf');
 const pdfFileInput = document.getElementById('pdfFileInput');
@@ -3023,144 +3100,25 @@ const pdfRangeTotal = document.getElementById('pdfRangeTotal');
 const pdfRangeFileName = document.getElementById('pdfRangeFileName');
 const btnPdfRangeLoad = document.getElementById('btnPdfRangeLoad');
 const btnPdfRangeCancel = document.getElementById('btnPdfRangeCancel');
-const readerPdfView = document.getElementById('readerPdfView');
-const pdfZoomControls = document.getElementById('pdfZoomControls');
-const pdfZoomLabel = document.getElementById('pdfZoomLabel');
-const btnPdfZoomIn = document.getElementById('btnPdfZoomIn');
-const btnPdfZoomOut = document.getElementById('btnPdfZoomOut');
-const pdfPageNavControls = document.getElementById('pdfPageNavControls');
-const pdfPageNavInput = document.getElementById('pdfPageNavInput');
-const pdfPageNavTotal = document.getElementById('pdfPageNavTotal');
-const btnPdfPagePrev = document.getElementById('btnPdfPagePrev');
-const btnPdfPageNext = document.getElementById('btnPdfPageNext');
 
-// Zoom del visor de PDF: cambia solo cómo se VE la página ya dibujada (vía
-// transform CSS sobre cada .gk-pdf-page, dentro de un .gk-pdf-page-outer que
-// sí cambia de tamaño real para que el contenedor haga scroll) — nunca se le
-// vuelve a pedir el render a pdf.js, así que acercarse/alejarse es
-// instantáneo. No afecta los offsets de texto usados para resaltar: todo el
-// "page wrap" (canvas + capa de texto) se escala como un bloque, así que las
-// posiciones relativas de los <span> entre sí no cambian.
-let pdfZoomScale = 1;
-const PDF_ZOOM_MIN = 0.6;
-const PDF_ZOOM_MAX = 2.5;
-const PDF_ZOOM_STEP = 0.15;
-
-function applyPdfZoom(newScale) {
-    pdfZoomScale = Math.min(PDF_ZOOM_MAX, Math.max(PDF_ZOOM_MIN, newScale));
-    readerPdfView?.querySelectorAll('.gk-pdf-page-outer').forEach(outer => {
-        const inner = outer.querySelector('.gk-pdf-page');
-        if (!inner) return;
-        const baseW = parseFloat(outer.dataset.baseWidth || '0');
-        const baseH = parseFloat(outer.dataset.baseHeight || '0');
-        outer.style.width = `${Math.floor(baseW * pdfZoomScale)}px`;
-        outer.style.height = `${Math.floor(baseH * pdfZoomScale)}px`;
-        inner.style.transform = `scale(${pdfZoomScale})`;
-    });
-    if (pdfZoomLabel) pdfZoomLabel.textContent = `${Math.round(pdfZoomScale * 100)}%`;
+// Escapa texto plano para poder insertarlo de forma segura dentro de un
+// string de HTML (usado tanto para el texto extraído de un PDF como, más
+// abajo, para el HTML importado de una página web).
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 }
-btnPdfZoomIn?.addEventListener('click', () => applyPdfZoom(pdfZoomScale + PDF_ZOOM_STEP));
-btnPdfZoomOut?.addEventListener('click', () => applyPdfZoom(pdfZoomScale - PDF_ZOOM_STEP));
-
-// --- Navegador de páginas del PDF (como un lector normal) -----------------
-// Salta a una página concreta DENTRO del rango que ya se cargó (no de todo
-// el documento: solo esas páginas existen como elementos en el DOM). Cada
-// .gk-pdf-page-outer se marca con data-page-num = el número REAL de página
-// del PDF (no su posición dentro del rango), así que "ir a la página 45"
-// funciona tal cual aunque el rango cargado haya sido, por ejemplo, 40–60.
-let pdfPageNavSuppressScroll = false;
-let pdfPageNavSuppressTimer = null;
-let pdfPageNavScrollScheduled = false;
-
-function goToPdfPage(pageNum) {
-    if (!readerPdfView || !pdfPageNavInput) return;
-    const min = parseInt(pdfPageNavInput.min, 10) || 1;
-    const max = parseInt(pdfPageNavInput.max, 10) || min;
-    pageNum = Math.max(min, Math.min(max, Math.round(pageNum) || min));
-    const target = readerPdfView.querySelector(`.gk-pdf-page-outer[data-page-num="${pageNum}"]`);
-    if (!target) return;
-    // Mientras dura la animación del scroll, el listener de 'scroll' de abajo
-    // dejaría el input "peleando" contra el número que el usuario acaba de
-    // escribir (porque el scroll real todavía no llegó) — se silencia un
-    // instante y se reactiva solo cuando el salto ya terminó.
-    pdfPageNavSuppressScroll = true;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    pdfPageNavInput.value = String(pageNum);
-    clearTimeout(pdfPageNavSuppressTimer);
-    pdfPageNavSuppressTimer = setTimeout(() => { pdfPageNavSuppressScroll = false; }, 700);
-}
-
-// Actualiza el número de página mostrado según qué página quedó arriba del
-// todo del contenedor visible — el mismo criterio que usa cualquier lector
-// de PDF normal al hacer scroll manual (sin tocar los botones/el input).
-function updatePdfPageNavFromScroll() {
-    if (pdfPageNavSuppressScroll || !readerPdfView || !pdfPageNavInput) return;
-    if (document.activeElement === pdfPageNavInput) return; // no pisar lo que el usuario está escribiendo
-    const pages = Array.from(readerPdfView.querySelectorAll('.gk-pdf-page-outer'));
-    if (pages.length === 0) return;
-    const scrollTop = readerPdfView.scrollTop;
-    let current = pages[0];
-    for (const p of pages) {
-        if (p.offsetTop - 4 <= scrollTop) current = p; else break;
-    }
-    const pageNum = current.dataset.pageNum;
-    if (pageNum) pdfPageNavInput.value = pageNum;
-}
-
-readerPdfView?.addEventListener('scroll', () => {
-    if (pdfPageNavScrollScheduled) return;
-    pdfPageNavScrollScheduled = true;
-    requestAnimationFrame(() => { pdfPageNavScrollScheduled = false; updatePdfPageNavFromScroll(); });
-});
-
-btnPdfPagePrev?.addEventListener('click', () => goToPdfPage((parseInt(pdfPageNavInput?.value, 10) || 1) - 1));
-btnPdfPageNext?.addEventListener('click', () => goToPdfPage((parseInt(pdfPageNavInput?.value, 10) || 1) + 1));
-pdfPageNavInput?.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    goToPdfPage(parseInt(pdfPageNavInput.value, 10) || 1);
-    pdfPageNavInput.blur();
-});
-pdfPageNavInput?.addEventListener('blur', () => goToPdfPage(parseInt(pdfPageNavInput.value, 10) || 1));
 
 // Tope del rango que se ofrece por default al elegir un PDF (el usuario
 // puede ampliarlo a mano antes de darle "Cargar") — páginas de más no se
-// renderizan de entrada para no volver pesado un PDF largo sin que el
-// usuario lo haya pedido explícitamente.
+// extraen de entrada para no volver pesado un PDF largo sin que el usuario
+// lo haya pedido explícitamente.
 const MAX_PDF_DEFAULT_PAGES = 20;
 
 let activePdfDoc = null;       // documento pdf.js actualmente elegido (antes de "Cargar")
 let pdfCurrentFileName = '';
-// Texto "plano" reconstruido a partir de los <span> reales de la capa de
-// texto ya dibujada (no de una extracción aparte) — así lo que se usa para
-// generar el esquema y para buscar las citas de los nodos es EXACTAMENTE lo
-// mismo que lo que el usuario ve y selecciona con el mouse, sin que ninguna
-// de las dos copias se pueda desincronizar de la otra.
-let pdfFullText = '';
-let pdfPageSpanIndex = []; // [{start, end, span}] offsets GLOBALES dentro de pdfFullText, en orden
-
-// Reconstruye pdfFullText/pdfPageSpanIndex LEYENDO el DOM actual de
-// #readerPdfView (no una copia aparte) — se llama después de renderizar y
-// otra vez después de deshacer un resaltado anterior (unwrap), para que
-// nunca quede desincronizado de lo que hay realmente dibujado en pantalla.
-function rebuildPdfSpanIndex() {
-    pdfFullText = '';
-    pdfPageSpanIndex = [];
-    let offset = 0;
-    const pageEls = Array.from(readerPdfView.querySelectorAll('.gk-pdf-page'));
-    pageEls.forEach((pageEl, pageIdx) => {
-        if (pageIdx > 0) { pdfFullText += ' '; offset += 1; } // separador entre páginas
-        const textLayer = pageEl.querySelector('.textLayer');
-        if (!textLayer) return;
-        textLayer.querySelectorAll('span').forEach(span => {
-            const text = span.textContent || '';
-            if (!text) return;
-            pdfPageSpanIndex.push({ start: offset, end: offset + text.length, span });
-            pdfFullText += text;
-            offset += text.length;
-        });
-    });
-}
 
 async function handlePdfFileSelected(file) {
     if (!file) return;
@@ -3202,167 +3160,154 @@ btnPdfRangeCancel?.addEventListener('click', () => {
     activePdfDoc = null;
 });
 
-// pdf.js arma la capa de texto en el mismo orden en que el PDF "dibuja"
-// cada fragmento por dentro — que NO siempre es el orden de lectura visual
-// real. Es un problema conocido de cualquier extractor de texto de PDF: una
-// nota al pie, un encabezado o un pie de página pueden quedar guardados en
-// el archivo en medio del texto del cuerpo, aunque visualmente aparezcan
-// antes o después. Mientras los <span> de la capa de texto queden en ESE
-// orden (el de "dibujado", no el visual):
-//   - seleccionar con el mouse selecciona lo que el navegador "ve" en el
-//     DOM entre el punto donde se empezó y donde se soltó el clic — y el
-//     Range/Selection nativo sigue el orden del DOM, NO la posición en
-//     pantalla — así que puede terminar resaltando un fragmento que no
-//     tiene nada que ver con lo que de verdad se arrastró con el mouse.
-//   - pdfFullText (lo que se usa para generar un esquema y para ubicar
-//     citas) sale en ese mismo desorden, así que un esquema generado desde
-//     el PDF puede dejar de seguir la estructura real del texto.
-// Este es justamente el bug reportado: selecciones que resaltan "en otra
-// zona", y esquemas que no parecen basarse en el texto real.
-//
-// El arreglo: una vez que pdf.js ya calculó y aplicó la posición en
-// pantalla de cada <span> (eso no se toca, sigue siendo pdf.js quien decide
-// dónde va cada uno), se reordenan esos MISMOS elementos — sin recrearlos
-// ni cambiarles ningún estilo — por su posición visual: primero por línea
-// (de arriba hacia abajo) y, dentro de una misma línea, de izquierda a
-// derecha. Es el mismo criterio que sigue cualquier persona leyendo un
-// documento de una sola columna (el caso normal). No resuelve diseños de
-// varias columnas (ahí el orden de lectura real necesitaría agrupar por
-// columna antes que por línea) — eso queda fuera de este arreglo.
-function reorderTextLayerToVisualOrder(textLayerDiv) {
-    const spans = Array.from(textLayerDiv.querySelectorAll(':scope > span'));
-    if (spans.length < 2) return;
-    const withPos = spans.map(span => ({
-        span,
-        top: parseFloat(span.style.top) || 0,
-        left: parseFloat(span.style.left) || 0
-    }));
-    // Agrupamos en "líneas": el top exacto rara vez calza pixel a pixel
-    // entre spans de una misma línea (pequeñas diferencias de fuente/
-    // baseline), así que cualquier span a menos de LINE_TOLERANCE del
-    // primero del grupo se considera parte de la misma línea.
-    const LINE_TOLERANCE = 4; // px
-    withPos.sort((a, b) => a.top - b.top);
+// Agrupa los items de page.getTextContent() (fragmentos de texto con su
+// posición x/y) en líneas visuales, ordenadas de arriba hacia abajo y, dentro
+// de cada línea, de izquierda a derecha. item.transform es la matriz de
+// transformación de pdf.js: transform[4]/transform[5] son x/y (el eje Y
+// crece hacia arriba), y Math.hypot(transform[2], transform[3]) es la
+// altura aproximada de la fuente — se usa como referencia de tamaño para
+// agrupar líneas y, más abajo, para detectar encabezados.
+function groupPdfItemsIntoLines(items) {
+    const withPos = (items || [])
+        .filter(it => typeof it.str === 'string')
+        .map(it => ({
+            item: it,
+            x: it.transform[4],
+            y: it.transform[5],
+            height: Math.hypot(it.transform[2], it.transform[3]) || 1
+        }));
+    if (withPos.length === 0) return [];
+    withPos.sort((a, b) => b.y - a.y);
     const lines = [];
-    withPos.forEach(item => {
+    withPos.forEach(entry => {
         let line = lines[lines.length - 1];
-        if (!line || Math.abs(item.top - line.top) > LINE_TOLERANCE) {
-            line = { top: item.top, items: [] };
+        const tolerance = Math.max(2, entry.height * 0.4);
+        if (!line || Math.abs(entry.y - line.y) > tolerance) {
+            line = { y: entry.y, items: [] };
             lines.push(line);
         }
-        line.items.push(item);
+        line.items.push(entry);
     });
-    lines.forEach(line => line.items.sort((a, b) => a.left - b.left));
-    lines.forEach(line => line.items.forEach(item => textLayerDiv.appendChild(item.span)));
-    // appendChild sobre un nodo que YA es hijo de este mismo padre no lo
-    // clona: lo MUEVE al final, en el orden en que se va llamando — así,
-    // iterar línea por línea (ya ordenadas) y span por span dentro de cada
-    // una deja el DOM entero reordenado de una sola pasada.
+    lines.forEach(line => line.items.sort((a, b) => a.x - b.x));
+    return lines;
 }
 
-// Dibuja (canvas + capa de texto) las páginas fromPage..toPage y deja el
-// panel "main" en modo PDF — ver entry.isPdf en highlightCoverageForPanel/
-// locateNodeInText, que es lo que hace que "Ver en el texto", el resaltado
-// permanente y el seguimiento por scroll sigan funcionando sobre esta vista
-// igual que sobre el texto plano.
-async function renderPdfPageRange(fromPage, toPage) {
-    if (!activePdfDoc || !readerPdfView) return;
-    showLoader(`Dibujando páginas ${fromPage}–${toPage}...`);
+// Intenta adivinar si un fragmento de texto va en negrita/cursiva a partir
+// del nombre interno de su fuente. Es un indicio débil: muchos PDFs no
+// incluyen "Bold"/"Italic" en el nombre de la fuente, y page.commonObjs
+// normalmente solo se termina de llenar durante un render() real — que esta
+// extracción ya no hace — así que puede no detectar nada en varios
+// documentos. Nunca lanza error: en el peor caso simplemente no marca
+// negrita/cursiva donde sí la había en el PDF original.
+function guessPdfItemStyle(page, item) {
     try {
-        readerPdfView.innerHTML = '';
-        pdfZoomScale = 1; // cada import/rango nuevo arranca al 100%, no hereda el zoom anterior
+        const fontObj = page.commonObjs.get(item.fontName);
+        const name = String(fontObj?.name || item.fontName || '').toLowerCase();
+        return {
+            bold: /bold|black|heavy|semibold/.test(name),
+            italic: /italic|oblique/.test(name)
+        };
+    } catch {
+        return { bold: false, italic: false };
+    }
+}
+
+function medianOfNumbers(numbers) {
+    if (!numbers || numbers.length === 0) return 0;
+    const sorted = [...numbers].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+// Extrae el texto (NO lo dibuja) de fromPage..toPage y lo inserta como HTML
+// dentro de readerTextMode, reconstruyendo párrafos/encabezados/negrita de
+// forma aproximada a partir de la posición y el tamaño de cada fragmento de
+// texto. Desde este momento, para el resto de la app, el PDF importado es
+// exactamente lo mismo que texto pegado a mano en el Modo Lector: mismo
+// editor, misma selección, mismo sistema de resaltado permanente y de
+// generación de esquema (ver highlightCoverageForPanel/getPanelRawText).
+async function extractPdfRangeIntoReader(fromPage, toPage) {
+    if (!activePdfDoc) return;
+    showLoader(`Extrayendo texto de las páginas ${fromPage}–${toPage}...`);
+    try {
+        const pagesData = [];
         for (let pageNum = fromPage; pageNum <= toPage; pageNum++) {
             const page = await activePdfDoc.getPage(pageNum);
-            const unscaledViewport = page.getViewport({ scale: 1 });
-            // Se mide readerContentContainer (el padre, SIEMPRE visible) y no
-            // readerPdfView directamente: hasta este punto readerPdfView
-            // todavía está "hidden" (recién se muestra al terminar de
-            // dibujar todas las páginas, más abajo), y un elemento con
-            // display:none siempre reporta clientWidth = 0.
-            const contentContainerEl = document.getElementById('readerContentContainer');
-            const targetWidth = Math.max((contentContainerEl?.clientWidth || 420) - 24, 260);
-            const scale = targetWidth / unscaledViewport.width;
-            const viewport = page.getViewport({ scale });
-
-            // Envoltorio EXTERIOR: es el que de verdad cambia de tamaño con el
-            // zoom (ver applyPdfZoom), para que el contenedor haga scroll de
-            // verdad. Guarda el tamaño "base" (zoom 100%) en data-attributes
-            // para poder recalcular a cualquier zoom sin tener que volver a
-            // consultar el viewport de pdf.js.
-            const pageOuter = document.createElement('div');
-            pageOuter.className = 'gk-pdf-page-outer';
-            pageOuter.dataset.baseWidth = String(Math.floor(viewport.width));
-            pageOuter.dataset.baseHeight = String(Math.floor(viewport.height));
-            pageOuter.dataset.pageNum = String(pageNum); // usado por el navegador de páginas (ir a la página N)
-            pageOuter.style.width = `${Math.floor(viewport.width)}px`;
-            pageOuter.style.height = `${Math.floor(viewport.height)}px`;
-
-            // Envoltorio INTERIOR: el tamaño real dibujado (nunca cambia), al
-            // que se le aplica el transform:scale() del zoom.
-            const pageWrap = document.createElement('div');
-            pageWrap.className = 'gk-pdf-page';
-            pageWrap.style.width = `${Math.floor(viewport.width)}px`;
-            pageWrap.style.height = `${Math.floor(viewport.height)}px`;
-            pageOuter.appendChild(pageWrap);
-
-            const canvas = document.createElement('canvas');
-            // Se dibuja a mayor resolución que el tamaño visual (devicePixelRatio)
-            // y se achica por CSS — así se ve nítido en pantallas de alta densidad,
-            // el mismo truco que usa cualquier visor de PDF/mapa en un navegador.
-            const outputScale = window.devicePixelRatio || 1;
-            canvas.width = Math.floor(viewport.width * outputScale);
-            canvas.height = Math.floor(viewport.height * outputScale);
-            canvas.style.width = `${Math.floor(viewport.width)}px`;
-            canvas.style.height = `${Math.floor(viewport.height)}px`;
-            const ctx = canvas.getContext('2d');
-            const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined;
-            pageWrap.appendChild(canvas);
-
-            const textLayerDiv = document.createElement('div');
-            textLayerDiv.className = 'textLayer';
-            textLayerDiv.style.width = `${Math.floor(viewport.width)}px`;
-            textLayerDiv.style.height = `${Math.floor(viewport.height)}px`;
-            pageWrap.appendChild(textLayerDiv);
-
-            readerPdfView.appendChild(pageOuter);
-
-            await page.render({ canvasContext: ctx, viewport, transform }).promise;
-            await pdfjsLib.renderTextLayer({
-                textContentSource: page.streamTextContent(),
-                container: textLayerDiv,
-                viewport
-            }).promise;
-            // Reordena los <span> ya posicionados al orden de lectura visual real
-            // (ver el comentario completo junto a reorderTextLayerToVisualOrder,
-            // justo arriba de esta función) — soluciona tanto que la selección con
-            // el mouse marcara texto equivocado como que el esquema generado desde
-            // el PDF no siguiera el orden real del documento.
-            reorderTextLayerToVisualOrder(textLayerDiv);
+            const content = await page.getTextContent();
+            pagesData.push({ page, lines: groupPdfItemsIntoLines(content.items) });
         }
 
-        rebuildPdfSpanIndex();
+        // Altura "normal" de línea de cuerpo de texto, para distinguir
+        // encabezados (fragmentos notablemente más grandes) del resto.
+        const allHeights = [];
+        pagesData.forEach(({ lines }) => lines.forEach(line => line.items.forEach(it => allHeights.push(it.height))));
+        const bodyHeight = medianOfNumbers(allHeights) || 10;
 
-        // El texto plano del panel se oculta (no se borra: si el usuario
-        // "quita el PDF" más tarde, vuelve a aparecer tal como estaba) y la
-        // vista de PDF pasa a ser, para el resto de la app, "el texto" de
-        // este panel.
-        readerTextMode.classList.add('hidden');
-        readerEmptyHint?.classList.add('hidden');
-        readerPdfView.classList.remove('hidden');
-        pdfZoomControls?.classList.remove('hidden');
-        pdfZoomControls?.classList.add('flex');
-        if (pdfZoomLabel) pdfZoomLabel.textContent = '100%';
+        const htmlParts = [];
+        pagesData.forEach(({ page, lines }, pageIdx) => {
+            if (pagesData.length > 1) {
+                htmlParts.push(`<p style="color:#9ca3af;font-size:0.85em;margin:0.6em 0;">— página ${fromPage + pageIdx} —</p>`);
+            }
+            let paragraphLines = [];
+            let prevLine = null;
 
-        // Navegador de páginas: el input se limita a fromPage..toPage porque
-        // son las únicas páginas que de verdad existen en el DOM ahora mismo
-        // (el resto del documento no se renderizó) — "/ total" sigue
-        // mostrando el total real del PDF para que quede claro que hay más.
-        if (pdfPageNavInput) { pdfPageNavInput.min = String(fromPage); pdfPageNavInput.max = String(toPage); pdfPageNavInput.value = String(fromPage); }
-        if (pdfPageNavTotal) pdfPageNavTotal.textContent = String(activePdfDoc.numPages);
-        pdfPageNavControls?.classList.remove('hidden');
-        pdfPageNavControls?.classList.add('flex');
-        const mainEntry = readerPanelRegistry.get('main');
-        if (mainEntry) { mainEntry.textEl = readerPdfView; mainEntry.isPdf = true; }
+            const flushParagraph = () => {
+                if (paragraphLines.length === 0) return;
+                const isHeading = paragraphLines.length === 1 && paragraphLines[0].maxHeight > bodyHeight * 1.18;
+                const innerHtml = paragraphLines.map(l => l.html).join(' ');
+                if (isHeading) {
+                    const tag = paragraphLines[0].maxHeight > bodyHeight * 1.6 ? 'h2' : 'h3';
+                    htmlParts.push(`<${tag}>${innerHtml}</${tag}>`);
+                } else {
+                    htmlParts.push(`<p>${innerHtml}</p>`);
+                }
+                paragraphLines = [];
+            };
+
+            lines.forEach(line => {
+                // Une las "palabras" (fragmentos) de la línea, insertando un
+                // espacio cuando hay un salto horizontal notable entre uno y
+                // el siguiente — pdf.js no siempre guarda el espacio como su
+                // propio fragmento de texto.
+                let lineHtml = '';
+                let maxHeight = 0;
+                let prevItemEnd = null;
+                line.items.forEach(entry => {
+                    const { item } = entry;
+                    maxHeight = Math.max(maxHeight, entry.height);
+                    const text = item.str || '';
+                    if (!text) { prevItemEnd = entry.x + (item.width || 0); return; }
+                    let piece = escapeHtml(text);
+                    const style = guessPdfItemStyle(page, item);
+                    if (style.bold) piece = `<strong>${piece}</strong>`;
+                    if (style.italic) piece = `<em>${piece}</em>`;
+                    if (prevItemEnd != null) {
+                        const gap = entry.x - prevItemEnd;
+                        if (gap > entry.height * 0.22 && !/^\s/.test(text) && !lineHtml.endsWith(' ')) lineHtml += ' ';
+                    }
+                    lineHtml += piece;
+                    prevItemEnd = entry.x + (item.width || 0);
+                });
+                if (!lineHtml.trim()) { prevLine = line; return; }
+
+                // Un hueco vertical notable respecto a la línea anterior se
+                // interpreta como salto de párrafo.
+                if (prevLine && (prevLine.y - line.y) > bodyHeight * 1.6) flushParagraph();
+                paragraphLines.push({ html: lineHtml, maxHeight });
+                prevLine = line;
+            });
+            flushParagraph();
+        });
+
+        const extractedHtml = htmlParts.join('\n');
+        if (!extractedHtml.trim()) {
+            appAlert('No se encontró texto en esas páginas (puede ser un PDF escaneado, sin texto real dentro del archivo).');
+            track('pdf_import_error', { stage: 'extract', message: 'empty' });
+            return;
+        }
+
+        readerTextMode.innerHTML = extractedHtml;
+        updateReaderEmptyHint();
 
         globalDocumentContext = `${pdfCurrentFileName || 'PDF'} (pág. ${fromPage}–${toPage})`;
         if (docContextInput) docContextInput.value = globalDocumentContext;
@@ -3370,11 +3315,12 @@ async function renderPdfPageRange(fromPage, toPage) {
 
         pdfRangeBar?.classList.add('hidden');
         pdfRangeBar?.classList.remove('flex');
+        activePdfDoc = null;
         track('pdf_import_success', { pages: (toPage - fromPage + 1) });
     } catch (err) {
         console.error(err);
-        appAlert('No se pudieron dibujar esas páginas del PDF.');
-        track('pdf_import_error', { stage: 'render', message: String(err?.message || '').slice(0, 120) });
+        appAlert('No se pudo extraer el texto de esas páginas del PDF.');
+        track('pdf_import_error', { stage: 'extract', message: String(err?.message || '').slice(0, 120) });
     } finally {
         hideLoader();
     }
@@ -3386,147 +3332,8 @@ btnPdfRangeLoad?.addEventListener('click', () => {
     let from = Math.max(1, Math.min(total, parseInt(pdfRangeFrom?.value, 10) || 1));
     let to = Math.max(1, Math.min(total, parseInt(pdfRangeTo?.value, 10) || total));
     if (from > to) { const t = from; from = to; to = t; }
-    renderPdfPageRange(from, to);
+    extractPdfRangeIntoReader(from, to);
 });
-
-// Deshace el modo PDF del panel "main" y vuelve al texto plano de siempre
-// (lo que hubiera ahí, incluyendo nada). Se llama desde "🧹 Limpiar" — ver
-// más abajo, sección GUARDADO/PROYECTOS — y deja todo como si el PDF nunca
-// se hubiera importado.
-function exitPdfMode() {
-    const mainEntry = readerPanelRegistry.get('main');
-    if (mainEntry) { mainEntry.textEl = readerTextMode; mainEntry.isPdf = false; }
-    readerPdfView.innerHTML = '';
-    readerPdfView.classList.add('hidden');
-    pdfZoomControls?.classList.add('hidden');
-    pdfZoomControls?.classList.remove('flex');
-    pdfZoomScale = 1;
-    pdfPageNavControls?.classList.add('hidden');
-    pdfPageNavControls?.classList.remove('flex');
-    readerTextMode.classList.remove('hidden');
-    activePdfDoc = null;
-    pdfFullText = '';
-    pdfPageSpanIndex = [];
-    updateReaderEmptyHint();
-}
-
-// Deshace un <mark> de resaltado de cobertura dejando su texto tal cual
-// estaba (sin el envoltorio) — paso previo antes de volver a calcular los
-// resaltados sobre la vista de PDF (ver applyCoverageMarksToPdfView). Vive
-// aquí porque solo hace falta para la vista de PDF: el texto plano no
-// necesita "deshacer" nada, su versión de esto es reescribir el innerHTML
-// entero de una vez (buildHighlightedMarkup).
-function unwrapPdfCoverageMarks() {
-    readerPdfView.querySelectorAll('mark.gk-coverage-mark').forEach(mark => {
-        const parent = mark.parentNode;
-        if (!parent) return;
-        while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
-        parent.removeChild(mark);
-        parent.normalize(); // fusiona los text nodes vecinos de nuevo en uno solo
-    });
-}
-
-// Envuelve en un <mark> (mismo estilo/clases que usa el texto plano — así
-// "Ver en el texto", el clic-para-enfocar-nodo y el seguimiento por scroll
-// funcionan sin ningún cambio) el fragmento [seg.start, seg.end) de
-// pdfFullText, encontrando qué spans reales de la capa de texto le
-// corresponden. Un mismo segmento puede caer repartido entre varios spans
-// (si el fragmento cruza de una tarjeta de texto a la siguiente).
-function wrapPdfTextRange(seg) {
-    const hc = highlightColorPalette[(seg.colorIdx != null ? seg.colorIdx : 0) % highlightColorPalette.length].mark;
-    pdfPageSpanIndex.forEach(entry => {
-        const overlapStart = Math.max(seg.start, entry.start);
-        const overlapEnd = Math.min(seg.end, entry.end);
-        if (overlapEnd <= overlapStart) return;
-        const span = entry.span;
-        const textNode = span.firstChild;
-        // Si este span ya tiene un <mark> de otro fragmento (dos citas que
-        // se reparten el mismo span), se omite esta porción — caso raro, y
-        // mejor dejar ese pedacito sin resaltar que romper el span entero.
-        if (!textNode || textNode.nodeType !== Node.TEXT_NODE) return;
-        const localStart = overlapStart - entry.start;
-        const localEnd = overlapEnd - entry.start;
-        try {
-            const range = document.createRange();
-            range.setStart(textNode, localStart);
-            range.setEnd(textNode, localEnd);
-            const mark = document.createElement('mark');
-            mark.className = 'gk-coverage-mark';
-            mark.dataset.nodeId = seg.nodeId;
-            mark.style.backgroundColor = hc.bg;
-            mark.style.borderBottomColor = hc.border;
-            mark.dataset.baseBg = hc.bg;
-            mark.dataset.baseBorder = hc.border;
-            range.surroundContents(mark);
-        } catch (err) { /* un span con estructura rara — se omite ese fragmento nada más */ }
-    });
-}
-
-// Equivalente a buildHighlightedMarkup, pero para la vista de PDF: en vez de
-// reescribir un innerHTML completo (lo que destruiría el <canvas> con el
-// dibujo de la página), deshace los <mark> anteriores y envuelve de nuevo
-// los spans reales que les correspondan a las citas actuales.
-function applyCoverageMarksToPdfView(entry, quotes) {
-    unwrapPdfCoverageMarks();
-    rebuildPdfSpanIndex(); // el unwrap+normalize cambió los nodos de texto — hay que re-indexar antes de buscar
-    if (!pdfFullText || !pdfFullText.trim()) return;
-    const trimmedQuotes = quotes.map(q => ({ ...q, quote: (q.quote || '').trim() }));
-    const placed = resolveQuoteSegments(pdfFullText, trimmedQuotes);
-    placed.forEach(seg => wrapPdfTextRange(seg));
-}
-
-// Calcula en qué posición GLOBAL de pdfFullText cayó el INICIO de una
-// selección real hecha a mano sobre la vista de PDF — se guarda como
-// sourceQuoteOffset en el nodo (ver tipBtnCreateNode/tipBtnLinkToNode) para
-// que, si ese mismo texto aparece más de una vez en el documento,
-// resolveQuoteSegments pueda elegir la aparición más cercana a donde el
-// usuario de verdad seleccionó, en vez de siempre la primera del documento
-// entero (ese era el bug: "a veces sí marca, pero en zonas erróneas").
-// Se reconstruye pdfPageSpanIndex primero para que coincida exactamente con
-// el DOM actual (funciona igual haya o no marcas ya puestas: span.textContent
-// incluye el texto de cualquier <mark> que ya envuelva parte del span).
-function computeOffsetHintForSelection(range) {
-    if (!range) return null;
-    rebuildPdfSpanIndex();
-    const container = range.startContainer;
-    const spanEntry = pdfPageSpanIndex.find(e => e.span.contains(container));
-    if (!spanEntry) return null;
-    try {
-        const preRange = document.createRange();
-        preRange.selectNodeContents(spanEntry.span);
-        preRange.setEnd(container, range.startOffset);
-        return spanEntry.start + preRange.toString().length;
-    } catch { return null; }
-}
-
-// La misma selección→tooltip ("⚡ Crear elemento"/"🔗 Vincular a nodo") que
-// ya existe para el texto plano (ver el listener 'mouseup' de readerTextMode
-// más abajo), pero sobre la vista de PDF — la selección del navegador
-// funciona igual de nativa sobre los <span> de la capa de texto que sobre
-// un contenteditable, así que no hace falta nada especial aparte de escuchar
-// el mismo evento aquí también.
-readerPdfView.addEventListener('mouseup', (e) => {
-    const selection = window.getSelection();
-    const text = selection.toString().trim();
-    if (text.length > 2) {
-        activeSelectedText = text;
-        activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        activeSelectionPanelId = 'main';
-        activeSelectionOffsetHint = computeOffsetHintForSelection(activeSelectionRange);
-        document.getElementById('tooltipSelectedTextPreview').innerText = `"${text.substring(0, 25)}..."`;
-        selectionTooltip.style.left = `${e.pageX - 60}px`;
-        selectionTooltip.style.top = `${e.pageY - 70}px`;
-        selectionTooltip.classList.remove('hidden');
-    } else {
-        selectionTooltip.classList.add('hidden');
-    }
-});
-
-wireMarkClickToFocusNode(readerPdfView);
-// (El seguimiento por scroll, wireScrollFocus, NO se cablea aquí otra vez:
-// ya está cableado una sola vez para el panel "main" más abajo, y ahora
-// resuelve solo cuál textEl usar según el modo activo — ver el comentario
-// dentro de wireScrollFocus.)
 
 container.addEventListener('dragover', (e) => { e.preventDefault(); });
 container.addEventListener('drop', (e) => {
@@ -3550,26 +3357,16 @@ container.addEventListener('drop', (e) => {
     track('node_created_via_drag');
 });
 
-// ÚNICO BOTÓN AL SUBRAYAR EN EL LECTOR
+// ÚNICO BOTÓN AL SUBRAYAR EN EL LECTOR ("⚡ Crear elemento en esquema")
 //
-// Antes, crear un nodo desde una selección (⚡ Crear elemento) envolvía el
-// fragmento con un <span> aparte (extractContents + insertNode) y nunca
-// guardaba sourceQuote/originPanelId en el nodo. Eso tenía dos problemas
-// reportados por el usuario: (1) ese nodo quedaba fuera del sistema de
-// resaltado permanente — "Ver en el texto" y el resaltado nodo↔texto nunca
-// funcionaban para él, en ningún modo; y (2) sobre la vista de PDF,
-// extractContents() podía PARTIR uno de los <span> de la capa de texto (que
-// están posicionados de forma absoluta, carácter por carácter) justo en el
-// borde de la selección — la mitad resultante heredaba el mismo estilo de
-// posición que el span original, así que terminaba dibujada exactamente
-// encima de otro texto (el bug de "se traslapa con otra frase").
-//
-// Ahora se resuelve igual que un nodo generado por IA a partir de un
-// documento: se guarda sourceQuote/originPanelId/highlightColorIdx (más
-// sourceQuoteOffset si se pudo calcular, ver computeOffsetHintForSelection)
-// y se llama a highlightCoverageForPanel, que para la vista de PDF usa
-// wrapPdfTextRange — la misma función ya probada que envuelve el texto
-// DENTRO de cada span existente sin moverlo ni partirlo de esa forma.
+// Crear un nodo desde una selección de texto se resuelve igual que un nodo
+// generado por IA a partir de un documento: se guarda
+// sourceQuote/originPanelId/highlightColorIdx (más sourceQuoteOffset si se
+// pudo calcular — ver el listener 'mouseup' de readerTextMode/paneles
+// clonados, donde se arma a partir del Range real de la selección) y se
+// llama a highlightCoverageForPanel, que envuelve ese fragmento con un
+// <mark> preservando el resto del formato del panel (ver
+// buildEditableTextIndex/wrapEditableTextRange).
 document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
     if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
@@ -3701,7 +3498,7 @@ function wireReaderPanelClone(root, panelId) {
     // Arrastre desde la cabecera, igual que el panel principal.
     let dragState = null;
     header?.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button') || e.target.closest('input')) return;
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
         dragState = { startX: e.clientX, startY: e.clientY, left: root.offsetLeft, top: root.offsetTop };
         e.preventDefault();
     });
@@ -3746,6 +3543,8 @@ function wireReaderPanelClone(root, panelId) {
     });
 
     wireDragToCanvas(textEl);
+    wireRichPaste(textEl);
+    wireRtfToolbar(q('rtfToolbar'), textEl);
     wireMarkClickToFocusNode(textEl);
     wireScrollFocus(panelId, contentContainer, textEl);
 
@@ -3763,11 +3562,11 @@ function createExtraReaderPanel() {
     clone.removeAttribute('id');
     clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
     // Importar PDF es una funcionalidad SOLO del panel "main" (el estado del
-    // PDF activo, pdfFullText, etc. es global, no por panel) — se quitan esos
-    // controles del clon en vez de dejar un botón que se vería igual pero no
-    // haría nada (nunca se le conecta ningún listener, porque ese cableado
-    // se hizo una sola vez contra el #btnImportPdf original antes de clonar).
-    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"], [data-role="pdfView"], [data-role="pdfZoomControls"], [data-role="pdfPageNavControls"]').forEach(el => el.remove());
+    // PDF activo es global, no por panel) — se quitan esos controles del
+    // clon en vez de dejar un botón que se vería igual pero no haría nada
+    // (nunca se le conecta ningún listener, porque ese cableado se hizo una
+    // sola vez contra el #btnImportPdf original antes de clonar).
+    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"]').forEach(el => el.remove());
 
     const cloneText = clone.querySelector('[data-role="textMode"]');
     if (cloneText) cloneText.innerText = '';
@@ -4131,11 +3930,151 @@ function looksLikeWebLink(str) {
     return /^https?:\/\//i.test(t);
 }
 
+// Lista blanca de etiquetas que se conservan al traer el HTML de un artículo
+// (ver sanitizeImportedHtml) — deliberadamente angosta: alcanza para que un
+// artículo normal (párrafos, encabezados, negrita/cursiva, listas, citas) se
+// vea parecido al original, sin arrastrar nada que pueda romper el editor o
+// inyectar comportamiento (scripts, estilos inline con position/float raros,
+// imágenes rotas que dejen huecos, etc.) — el editor del lector es texto con
+// formato simple, no un visor de páginas web completo.
+const IMPORTED_HTML_ALLOWED_TAGS = new Set([
+    'P', 'BR', 'H1', 'H2', 'H3', 'H4', 'STRONG', 'B', 'EM', 'I', 'U',
+    'UL', 'OL', 'LI', 'BLOCKQUOTE', 'A', 'SPAN'
+]);
+
+// Limpia el HTML que devuelve Readability (o el que trae un copy/paste desde
+// otra página — ver el listener 'paste' de readerTextMode) antes de
+// insertarlo: quita cualquier etiqueta fuera de la lista blanca (conservando
+// su TEXTO, no solo borrándola entera — así no se pierde contenido, solo el
+// marcado que no interesa) y, de las que sí se dejan, solo conserva el
+// atributo href en los enlaces (nada de estilos inline, clases, ids, on*,
+// etc. que pudieran traer de la página de origen).
+function sanitizeImportedHtml(html) {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html || '';
+
+    const stripDisallowed = (node) => {
+        Array.from(node.childNodes).forEach(child => {
+            if (child.nodeType === Node.ELEMENT_NODE) {
+                stripDisallowed(child);
+                if (!IMPORTED_HTML_ALLOWED_TAGS.has(child.tagName)) {
+                    while (child.firstChild) node.insertBefore(child.firstChild, child);
+                    node.removeChild(child);
+                    return;
+                }
+                Array.from(child.attributes).forEach(attr => {
+                    if (!(child.tagName === 'A' && attr.name === 'href')) child.removeAttribute(attr.name);
+                });
+                if (child.tagName === 'A') child.setAttribute('target', '_blank');
+            } else if (child.nodeType !== Node.TEXT_NODE) {
+                node.removeChild(child); // comentarios, etc.
+            }
+        });
+    };
+    stripDisallowed(wrapper);
+    return wrapper.innerHTML;
+}
+
+// ==========================================
+// BARRA DE FORMATO (RTF) DEL EDITOR DEL LECTOR
+// ==========================================
+// Conecta los botones/el selector de tamaño de un panel (ver [data-role=
+// "rtfToolbar"] en index.html) con document.execCommand sobre el textEl de
+// ESE panel — así el usuario puede, además del texto que llega formateado
+// de un PDF o un enlace, darle negrita/cursiva/encabezados/listas a mano,
+// como en cualquier editor de texto con formato simple.
+//
+// El truco de siempre para no perder la selección activa del editor al usar
+// un botón de una barra de herramientas: un mousedown sobre un <button>
+// movería el foco (y con él, la selección de texto dentro del
+// contenteditable) ANTES de que el 'click' llegue a ejecutar el comando —
+// se previene ese mousedown por default, así el foco/selección nunca se
+// mueven y para cuando llega el click, execCommand actúa sobre lo que el
+// usuario de verdad tenía seleccionado. Un <select> es distinto: necesita su
+// mousedown nativo para poder desplegarse, así que en vez de prevenirlo se
+// guarda la selección actual (con un Range real) y se restaura justo antes
+// de ejecutar el comando en su 'change'.
+function wireRtfToolbar(toolbarEl, textEl) {
+    if (!toolbarEl || !textEl) return;
+    let savedRange = null;
+    const saveSelection = () => {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && textEl.contains(sel.anchorNode)) {
+            savedRange = sel.getRangeAt(0).cloneRange();
+        }
+    };
+    const restoreSelection = () => {
+        if (!savedRange) return;
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+    };
+    textEl.addEventListener('mouseup', saveSelection);
+    textEl.addEventListener('keyup', saveSelection);
+
+    toolbarEl.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button')) { e.preventDefault(); return; }
+        if (e.target.closest('select')) saveSelection();
+    });
+
+    toolbarEl.querySelectorAll('button[data-cmd]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            textEl.focus();
+            restoreSelection();
+            document.execCommand(btn.dataset.cmd, false, btn.dataset.value || null);
+            saveSelection();
+        });
+    });
+
+    const sizeSelect = toolbarEl.querySelector('select[data-cmd="fontSize"]');
+    sizeSelect?.addEventListener('change', () => {
+        textEl.focus();
+        restoreSelection();
+        document.execCommand('fontSize', false, sizeSelect.value);
+        saveSelection();
+        // El selector siempre vuelve a "Normal": no representa el tamaño del
+        // texto donde está el cursor ahora, solo el que se aplicará la
+        // próxima vez que se use — mostrar el valor recién aplicado daría la
+        // falsa impresión de ser un estado permanente del selector.
+        sizeSelect.value = '3';
+    });
+}
+
+// Pegar (Ctrl+V) contenido copiado de otra página SOBRESCRIBE el
+// comportamiento nativo del navegador: por default, pegar sobre un
+// contenteditable trae el HTML tal cual lo armó la página de origen
+// (estilos inline, clases, spans de Google Docs/Word, etc.), lo que podría
+// romper tanto la apariencia del lector como el sistema de resaltado (que
+// asume el HTML "limpio" que produce sanitizeImportedHtml). Se intercepta el
+// evento y se inserta, en su lugar, el HTML del portapapeles ya sanitizado
+// (si el origen ofreció texto con formato) o el texto plano si no.
+function wireRichPaste(textEl) {
+    if (!textEl) return;
+    textEl.addEventListener('paste', (e) => {
+        const cd = e.clipboardData;
+        if (!cd) return; // sin clipboardData (muy raro hoy en día): se deja el default nativo
+        const html = cd.getData('text/html');
+        const plain = cd.getData('text/plain');
+        if (!html && !plain) return;
+        e.preventDefault();
+        if (html && html.trim()) {
+            document.execCommand('insertHTML', false, sanitizeImportedHtml(html));
+        } else {
+            document.execCommand('insertText', false, plain);
+        }
+    });
+}
+
 // Si lo que se pasó es un enlace web, le pide al backend que extraiga el
-// texto principal de esa página y devuelve ESE texto en su lugar (mismo
+// artículo de esa página y devuelve el TEXTO PLANO en su lugar (mismo
 // mecanismo para el Modo Lector y para el campo pequeño de arriba, así ambos
-// pueden recibir un enlace indistintamente). Devuelve null si falló (y ya
-// mostró la alerta correspondiente).
+// pueden recibir un enlace indistintamente); el texto plano es lo que se usa
+// para generar el esquema. Cuando el backend también pudo traer el HTML del
+// artículo (article.content de Readability — ver read-webpage.js), se
+// sanitiza (sanitizeImportedHtml) y se inserta en el editor en su lugar del
+// texto plano, para conservar párrafos/encabezados/negrita aproximados al
+// original; si no vino HTML, se inserta el texto plano como siempre. Devuelve
+// null si falló (y ya mostró la alerta correspondiente).
 // Generalizada para servir tanto al panel principal como a cualquier panel de
 // lector adicional: en vez de escribir directo sobre el textarea/contexto del
 // panel principal (lo que mezclaría resultados si se llamaba desde un clon),
@@ -4153,10 +4092,26 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
         });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.error || 'No se pudo leer esa página.');
-        if (targetTextEl) targetTextEl.innerText = data.text;
+        let textForSchema = data.text;
+        if (targetTextEl) {
+            if (data.contentHtml && data.contentHtml.trim()) {
+                targetTextEl.innerHTML = sanitizeImportedHtml(data.contentHtml);
+                // El esquema y el resaltado posterior deben basarse en el
+                // MISMO texto: si se usó el HTML con formato, ese texto ya no
+                // es exactamente article.textContent (puede variar en saltos
+                // de línea/espacios) — se recalcula leyendo el DOM recién
+                // insertado con el mismo criterio que usará luego
+                // highlightCoverageForPanel (buildEditableTextIndex), para
+                // que las citas que devuelva la IA se puedan ubicar de
+                // verdad en el panel.
+                textForSchema = buildEditableTextIndex(targetTextEl).text;
+            } else {
+                targetTextEl.innerText = data.text;
+            }
+        }
         if (data.title && onTitle) onTitle(data.title);
         track('webpage_read_success');
-        return data.text;
+        return textForSchema;
     } catch (err) {
         track('webpage_read_error', { message: String(err?.message || '').slice(0, 160) });
         appAlert(err.message || "No se pudo leer esa página.");
@@ -4167,20 +4122,6 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
 }
 
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
-    const isPdfActive = !!readerPanelRegistry.get('main')?.isPdf;
-
-    // En modo PDF el texto no vive en readerTextMode (está oculto) sino en
-    // pdfFullText, reconstruido de la capa de texto real de las páginas
-    // dibujadas — y no tiene sentido pasarlo por resolveTextOrWebLink (eso
-    // es para pegar un link o detectar un título de página web).
-    if (isPdfActive) {
-        const pdfText = pdfFullText.trim();
-        if (!pdfText) return appAlert("No se pudo leer texto de las páginas del PDF que elegiste (puede ser un PDF escaneado, sin texto real adentro).");
-        currentDocumentText = pdfText;
-        await generateFullSchemaFromTopic(pdfText, { originPanelId: 'main' });
-        return;
-    }
-
     let textContent = readerTextMode.innerText.trim();
     if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
 
@@ -4665,17 +4606,12 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
 
 // 2. Limpiar SOLO el panel del Lector (Botón nuevo a la par de Generar Esquema)
 document.getElementById('btnClearReader')?.addEventListener('click', async () => {
-    const isPdfActive = !!readerPanelRegistry.get('main')?.isPdf;
-    const hasText = (readerTextMode && readerTextMode.innerText.trim() !== "") || isPdfActive;
+    const hasText = !!(readerTextMode && readerTextMode.innerText.trim() !== "");
     const hasContext = !!globalDocumentContext;
 
     if (!hasText && !hasContext) return;
 
     if (await appConfirm("¿Deseas limpiar el texto y el contexto del panel de lectura?")) {
-        // Si había un PDF importado, "Limpiar" también lo quita y vuelve al
-        // texto plano de siempre (ver exitPdfMode) — es la única forma de
-        // salir del modo PDF, para no agregar un botón más solo para eso.
-        if (isPdfActive) exitPdfMode();
         currentDocumentText = "";
         globalDocumentContext = "";
         if (readerTextMode) readerTextMode.innerText = "";
