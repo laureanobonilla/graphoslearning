@@ -53,9 +53,11 @@ module.exports = {
 
     // Registro de eventos de uso (ver track-event.js). El llamador decide si
     // espera esto o lo dispara sin esperar — nunca debe bloquear ni romper
-    // nada si Supabase está lento o falla.
-    logEvent: (actorId, actorKind, anonId, eventName, metadata) =>
-        rpc('log_event', { p_actor: actorId, p_kind: actorKind, p_anon: anonId || null, p_event: eventName, p_metadata: metadata || {} }),
+    // nada si Supabase está lento o falla. actorLabel es solo la etiqueta
+    // legible (correo, o nombre aleatorio de invitado) para no tener que leer
+    // actor_id a mano — ver columna actor_label en supabase/schema.sql.
+    logEvent: (actorId, actorKind, anonId, eventName, metadata, actorLabel) =>
+        rpc('log_event', { p_actor: actorId, p_kind: actorKind, p_anon: anonId || null, p_event: eventName, p_metadata: metadata || {}, p_label: actorLabel || null }),
 
     // --- Proyectos (siempre filtrados por owner=ownerId; nunca por el id que manda el cliente solo) ---
     async getProject(id, ownerId) {

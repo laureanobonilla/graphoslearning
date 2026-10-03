@@ -1729,3 +1729,198 @@ activado en su sistema).
   etiquetas; nueva regla CSS que oscurece `#submenuLink`/`#submenuGenerate`
   igual que `#actionMenu`; nuevo `#introSplash` (markup + CSS + script de
   orquestación) justo después de abrir `<body>` y antes de `</body>`.
+
+## 31. Menú más compacto, submenú que ya no se abre solo, nombre legible en los eventos, y el texto del Modo Lector ahora se guarda con el proyecto
+
+### a) Menú contextual más chico
+
+Antes cada fila usaba `px-3.5 py-2` con texto `text-xs` (~34px de alto por
+fila). Como el texto de cada opción es corto, no hacía falta tanto aire:
+ahora son `px-2.5 py-1` con texto `text-[11px]` (~22px por fila), y el ancho
+mínimo del menú bajó de 220px a 160px (140px en los submenús). El menú
+completo queda bastante por debajo de la mitad del alto que tenía antes.
+
+### b) El submenú ya no se "auto-abría" con el primer clic
+
+Causa: el menú contextual se posiciona justo encima (o justo debajo, si no
+cabe arriba) del punto donde se hizo clic en el nodo. Si ese punto caía
+sobre la fila de "Enlazar" o "Generar" justo cuando el menú aparecía, el
+navegador disparaba `mouseenter` de inmediato — sin que el usuario moviera
+el mouse — y el submenú se abría solo, dando la falsa impresión de que el
+menú funciona con hover en vez de con clic. Ahora se ignora cualquier hover
+que llegue durante los primeros 300ms después de que el menú contextual
+aparece; pasado ese margen, el hover real (mover el mouse hacia esa fila a
+propósito) vuelve a abrir el submenú con normalidad, igual que antes.
+
+### c) Nombre legible en los eventos (en vez de solo IDs larguísimos)
+
+Pedido: poder rastrear en la tabla `events` de Supabase quién hizo qué, sin
+tener que leer un ID larguísimo (el "sub" de Netlify Identity, o
+`guest:<uuid>`) cada vez.
+
+Ahora cada navegador genera, una sola vez, un nombre corto y legible (p. ej.
+`Cometa-482`, guardado en `localStorage` bajo `gk_display_name`) que viaja
+junto con cada evento. En cuanto el usuario inicia sesión, ese nombre se
+reemplaza automáticamente por su correo en los eventos siguientes (los
+eventos *anteriores* al login quedan con el nombre de invitado que tenían
+en ese momento — no se reescribe el pasado). La nueva columna se llama
+`actor_label`.
+
+**Importante — esto necesita correr un script en Supabase**: abrí
+`supabase/schema.sql`, copiá desde el comentario `-- actor_label:` hasta el
+`revoke all on function public.log_event(...)` del final, y corrélo en el
+SQL Editor de Supabase. Es seguro volver a correr el archivo completo
+también — todo usa `if not exists`/`create or replace`, no borra datos. Si
+no corrés esta migración, los eventos seguirán guardándose igual (el
+nombre legible simplemente no se guardaría).
+
+También se agregó una vista `events_friendly` (en el mismo archivo) para
+poder escribir, en el SQL Editor:
+
+```sql
+select * from public.events_friendly limit 50;
+select * from public.events_friendly where who = 'Cometa-482' order by created_at desc;
+```
+
+sin tener que escribir el `coalesce(actor_label, actor_id)` cada vez.
+
+Sobre el otro punto del pedido ("si un usuario hizo un esquema de cierto
+tipo, ¿cómo lo sé?"): los eventos `schema_generate_attempt/success/error`
+ya traían `mode` ('topic' o 'text') y `nodes`/`length`; ahora también traen
+`layoutMode` (🌳 árbol o 🪐 sistema solar, según el selector "Modo" de la
+cabecera) y `topicPreview` — el tema completo si era un tema corto escrito a
+mano (p. ej. "Segunda Guerra Mundial", no hay nada que proteger ahí, es
+justo el dato que querías poder reportar), o la etiqueta corta que la app ya
+detecta sola para un documento largo pegado (nunca el documento completo —
+ver el principio de privacidad al inicio de `track-event.js`). Con esto ya
+se puede responder "¿qué clase de esquemas genera la gente?" filtrando por
+`event_name = 'schema_generate_success'` y mirando `metadata->>'topicPreview'`.
+
+### d) El texto del Modo Lector ahora se guarda (y se recupera) con el proyecto
+
+Antes, al guardar un proyecto solo se guardaban los nodos y las flechas — el
+texto que estaba pegado en el Modo Lector se perdía al reabrir el proyecto
+más tarde. Ahora `saveCurrentProjectToBin` también guarda `readerText` (el
+contenido del Modo Lector) y `documentContext` (la etiqueta corta
+detectada, como "Capítulo 3 del libro..."), y `applyLoadedProject` los
+restaura al abrir el proyecto — igual que ya pasaba con nodos y flechas.
+
+**Sobre el costo, tu pregunta del punto 4**: guardarlo NO sale caro por el
+*almacenamiento* en sí — es una columna `jsonb` normal en Postgres/Supabase,
+y hasta un documento largo (digamos, unas 30-40 páginas de texto) pesa unos
+pocos cientos de KB, que no es nada comparado con lo que ya cuesta la base
+de datos en general. Donde SÍ podría salir caro es si alguien pega un
+documento *enorme* (un libro entero, una transcripción de horas de
+YouTube) y eso se re-envía completo en *cada* autoguardado — y el
+autoguardado se dispara con cualquier cambio en el esquema (mover un nodo,
+agregar uno), no solo cuando el texto cambia. Para evitar ese caso extremo
+sin complicar la lógica del autoguardado, se le puso un tope de ~200,000
+caracteres (`MAX_SAVED_READER_TEXT_LENGTH` en `app.js`) — de sobra para
+cualquier documento normal, pero sin dejar la puerta abierta a guardar algo
+desproporcionado una y otra vez. Si en algún momento preferís un tope
+distinto, es una sola constante para cambiar.
+
+### Archivos tocados
+
+- `index.html`: `#actionMenu` y sus submenús con paddings/tamaños de texto
+  reducidos; `min-w` del menú y los submenús bajado.
+- `app.js`: guard de 300ms en `wireMenuGroup` (`actionMenuOpenedAt`) para el
+  hover "heredado" del clic; `getDisplayName`/`getGuestDisplayName` nuevos,
+  enviados en cada `track(...)` como `displayName`; `schema_generate_*`
+  ahora incluyen `layoutMode` y `topicPreview`; `saveCurrentProjectToBin`
+  guarda `readerText`/`documentContext` (con tope
+  `MAX_SAVED_READER_TEXT_LENGTH`); `applyLoadedProject` los restaura.
+- `netlify/functions/track-event.js`: acepta y sanitiza `displayName` del
+  body, lo pasa a `store.logEvent`.
+- `netlify/functions/_lib/store.js`: `logEvent` acepta un sexto argumento
+  `actorLabel` y lo manda como `p_label` al RPC.
+- `supabase/schema.sql`: nueva columna `events.actor_label` (+ índice);
+  `log_event` reescrita con el parámetro `p_label`; nueva vista
+  `events_friendly`. **Requiere correr el script actualizado en Supabase**
+  (ver punto c arriba).
+
+## 32. El menú de verdad quedó angosto, y ahora se puede importar un PDF y esquematizarlo manteniendo el aspecto original
+
+### a) El menú contextual: el problema real era el ancho, no el alto
+
+En la ronda anterior solo había reducido el padding y la letra (el alto).
+Lo que hacía ver el menú "grueso" era otra cosa: el botón más largo
+("Generar esquema completo a partir de aquí") no tenía un ancho fijo, solo
+un ancho *mínimo* (`min-w`), así que el menú se estiraba hasta donde
+hiciera falta para que ese texto entrara en una sola línea, y todos los
+demás botones quedaban igual de anchos por estar dentro del mismo
+contenedor.
+
+Cambié ese `min-w` por un ancho fijo (`w-[130px]` en el menú principal,
+`w-[120px]` en los submenús), bastante por debajo de la mitad del ancho
+anterior. Ahora el texto largo simplemente envuelve a una segunda línea en
+vez de ensanchar el menú.
+
+### b) Importar un PDF y esquematizarlo tal cual se ve (no como texto plano)
+
+Hay un botón nuevo, 📄, al inicio del Panel Lector. Al usarlo:
+
+1. Eliges un PDF de tu computador.
+2. Aparece una barra pidiendo un rango de páginas (de la X a la Y, con el
+   total de páginas del archivo a la vista) — así nunca se procesan de
+   golpe documentos enormes.
+3. Al confirmar, esas páginas se dibujan en el panel **como las vería un
+   navegador**: mismo diseño, mismas imágenes, mismo color. No es una
+   conversión a texto plano.
+4. Sobre ese dibujo puedes seleccionar texto exactamente igual que antes:
+   aparece el mismo menú de "⚡ Crear elemento" / "🔗 Vincular a nodo", y al
+   generar el esquema completo, al hacer clic en un nodo del lienzo su cita
+   se resalta en amarillo sobre la página del PDF — igual que se resalta
+   hoy sobre el texto plano.
+
+Técnicamente, el PDF se dibuja en un `<canvas>` (la imagen) con una capa de
+texto invisible pero seleccionable encima (igual a como lo hace Firefox
+cuando abres un PDF directo en el navegador). Esa capa de texto es la que
+permite seleccionar, vincular y resaltar — nunca se reescribe la página,
+solo se envuelven fragmentos de texto en marcas, para no romper el dibujo
+de abajo. Toda la funcionalidad que ya existía en el Panel Lector (generar
+esquema, crear nodos desde una selección, vincular, resaltar al hacer clic
+en un nodo, auto-scroll al nodo activo) se reutiliza sin duplicar lógica:
+simplemente ahora puede apuntar al PDF en vez de al texto plano, y nunca a
+los dos a la vez.
+
+**Esto no toca nada de lo que ya funcionaba.** Si nunca subes un PDF, el
+Panel Lector se comporta exactamente igual que antes (texto plano, pegar,
+arrastrar, etc.). El modo PDF solo se activa si el usuario sube uno, y
+"🧹 Limpiar" lo cierra y vuelve al modo de texto normal.
+
+### c) Limitaciones honestas de esta primera versión
+
+- **PDFs escaneados (solo imagen, sin texto real detrás):** si el PDF no
+  tiene una capa de texto (por ejemplo, es solo fotos de páginas escaneadas
+  sin OCR), no hay nada que seleccionar ni resaltar — se ve la página pero
+  no se puede marcar texto sobre ella. Esto es una limitación del PDF en
+  sí, no de la app.
+- **Documentos muy largos:** por diseño, se pide un rango de páginas antes
+  de dibujar nada, en vez de intentar renderizar un PDF de 300 páginas de
+  una sola vez (sería lento y pesado). Si necesitas otro rango después,
+  puedes volver a importar el mismo PDF y elegir otro.
+- **Guardado del proyecto:** al guardar un proyecto, se guarda el *texto*
+  que se extrajo de las páginas elegidas (reutilizando el campo que ya
+  guarda el texto del Panel Lector), pero no el archivo PDF original ni su
+  apariencia visual. Si vuelves a abrir ese proyecto más tarde, el texto
+  del documento está ahí (y los nodos siguen vinculados a sus citas), pero
+  el Panel Lector se ve como texto plano, no como las páginas dibujadas del
+  PDF. Si quieres volver a ver el PDF con su formato, tendrías que
+  importarlo de nuevo desde el archivo.
+
+### Archivos tocados
+
+- `index.html`: ancho fijo en `#actionMenu` y submenús (en vez de
+  `min-w`); botón 📄 "Importar PDF", input de archivo oculto, barra de
+  rango de páginas, y el contenedor `#readerPdfView` dentro del Panel
+  Lector; CSS para las páginas del PDF y su capa de texto.
+- `app.js`: carga y dibujo del PDF con `pdf.js` (`renderPdfPageRange`),
+  construcción del índice de texto a partir de lo ya dibujado
+  (`rebuildPdfSpanIndex`), resaltado por envoltura de rangos de texto
+  (`wrapPdfTextRange`, `applyCoverageMarksToPdfView`,
+  `unwrapPdfCoverageMarks`), salida del modo PDF (`exitPdfMode`), y los
+  ajustes necesarios para que el resto de funciones del Panel Lector (buscar
+  dónde quedó un nodo, resaltar al hacer scroll, generar el esquema, limpiar,
+  paneles extra) sigan funcionando igual sin importar si el panel está
+  mostrando texto plano o un PDF.

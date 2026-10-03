@@ -27,6 +27,13 @@ const json = (statusCode, obj, extraHeaders) => ({
 // nombre de evento distinto por cada typo del cliente.
 const EVENT_NAME_RE = /^[a-z0-9_:]{1,60}$/;
 const MAX_METADATA_JSON_LENGTH = 2000;
+// Nombre legible (correo si hay sesión, o un nombre aleatorio tipo "Cometa-482"
+// generado por el cliente para invitados — ver getDisplayName en app.js). Es
+// solo para que las personas que leen la tabla `events` no tengan que mirar
+// actor_id (un id larguísimo) para saber de quién se trata. Nunca se confía
+// en él para nada de seguridad/facturación — eso sigue siendo actorId, que
+// aquí abajo lo calcula el servidor a partir de la sesión real, no del body.
+const MAX_DISPLAY_NAME_LENGTH = 120;
 
 exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -42,6 +49,14 @@ exports.handler = async (event, context) => {
     // usuario logueado a mitad de sesión. Lo genera y guarda el cliente
     // (localStorage), no es sensible — no es una cookie de sesión.
     const anonId = typeof body.anonId === 'string' ? body.anonId.slice(0, 64) : null;
+
+    // Se limpia de caracteres de control (saltos de línea, etc.) y se recorta
+    // — es solo una etiqueta para leer en una tabla, no debe poder usarse
+    // para inyectar nada raro ni para inflar el tamaño de la fila.
+    let displayName = typeof body.displayName === 'string'
+        ? body.displayName.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, MAX_DISPLAY_NAME_LENGTH)
+        : null;
+    if (!displayName) displayName = null;
 
     let metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
     if (JSON.stringify(metadata).length > MAX_METADATA_JSON_LENGTH) metadata = { truncated: true };
@@ -61,7 +76,7 @@ exports.handler = async (event, context) => {
     }
 
     try {
-        await store.logEvent(actorId, actorKind, anonId, eventName, metadata);
+        await store.logEvent(actorId, actorKind, anonId, eventName, metadata, displayName);
     } catch (err) {
         // No dejamos que un problema de base de datos se note en la app: solo
         // se registra en los logs del servidor para poder revisarlo luego.

@@ -162,12 +162,47 @@ create index if not exists events_name_time  on public.events (event_name, creat
 create index if not exists events_anon_time  on public.events (anon_id, created_at desc);
 alter table public.events enable row level security;
 
-create or replace function public.log_event(p_actor text, p_kind text, p_anon text, p_event text, p_metadata jsonb)
+-- actor_label: una etiqueta LEGIBLE para humanos (el correo si hay sesión, o
+-- un nombre aleatorio tipo "Cometa-482" generado una sola vez por navegador
+-- para invitados — ver getDisplayName en app.js). Antes, para saber "quién"
+-- hizo algo en esta tabla había que leer actor_id (un id larguísimo de
+-- Netlify Identity, o "guest:<uuid>") y cruzarlo a mano con `profiles`. Con
+-- esta columna ya no hace falta: se puede filtrar/leer directamente por
+-- nombre. Nunca se usa para nada de seguridad ni de saldo — eso sigue
+-- siendo exclusivamente actor_id, que el servidor calcula de la sesión real.
+-- "if not exists" para que este script se pueda volver a correr sobre una
+-- base de datos que ya tenía la tabla `events` de antes de este cambio.
+alter table public.events add column if not exists actor_label text;
+create index if not exists events_label_time on public.events (actor_label, created_at desc);
+
+-- Se reemplaza la función anterior (de 5 parámetros, sin p_label) por esta de
+-- 6: en Postgres, agregar un parámetro nuevo crea una función DISTINTA en
+-- vez de reemplazar la vieja (la sobrecarga queda por nombre+tipos de
+-- parámetros), así que primero se borra esa versión vieja para no dejar dos
+-- funciones log_event sueltas — una usada y otra huérfana.
+drop function if exists public.log_event(text, text, text, text, jsonb);
+
+create or replace function public.log_event(p_actor text, p_kind text, p_anon text, p_event text, p_metadata jsonb, p_label text default null)
 returns void language plpgsql as $$
 begin
-  insert into public.events(actor_id, actor_kind, anon_id, event_name, metadata)
-  values (p_actor, p_kind, p_anon, p_event, coalesce(p_metadata, '{}'::jsonb));
+  insert into public.events(actor_id, actor_kind, anon_id, event_name, metadata, actor_label)
+  values (p_actor, p_kind, p_anon, p_event, coalesce(p_metadata, '{}'::jsonb), p_label);
 end $$;
+
+-- Vista de conveniencia para leer la tabla a mano desde el SQL Editor de
+-- Supabase sin tener que escribir el coalesce cada vez: "who" ya prioriza el
+-- nombre legible y solo cae al id crudo para eventos viejos (de antes de
+-- este cambio) que no tienen actor_label. Ejemplos de uso en
+-- LEEME_ETAPA_2.md, sección correspondiente a esta ronda de cambios.
+create or replace view public.events_friendly as
+  select
+    created_at,
+    coalesce(actor_label, actor_id) as who,
+    actor_kind,
+    event_name,
+    metadata
+  from public.events
+  order by created_at desc;
 
 revoke all on function public.ensure_profile(text,text,integer)             from public, anon, authenticated;
 revoke all on function public.spend_nodes(text,integer,text)                from public, anon, authenticated;
@@ -175,4 +210,4 @@ revoke all on function public.credit_nodes(text,integer,text,numeric)       from
 revoke all on function public.ensure_guest(text,text,integer,integer,integer) from public, anon, authenticated;
 revoke all on function public.spend_guest_nodes(text,integer,text)          from public, anon, authenticated;
 revoke all on function public.usage_last_hour(text)                         from public, anon, authenticated;
-revoke all on function public.log_event(text,text,text,text,jsonb)          from public, anon, authenticated;
+revoke all on function public.log_event(text,text,text,text,jsonb,text)     from public, anon, authenticated;

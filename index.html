@@ -25,6 +25,44 @@
             border-radius: 0.75rem;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
+
+        /* ===== Vista de PDF real dentro del Modo Lector (ver #readerPdfView,
+           renderPdfPageRange en app.js) =====
+           Cada página es un <canvas> (la imagen real de la página, como la
+           dibujaría cualquier lector de PDF) con una ".textLayer" superpuesta:
+           texto real pero invisible, un <span> por fragmento, posicionado
+           pixel a pixel sobre su equivalente dibujado en el canvas — el mismo
+           truco que usa cualquier visor de PDF de navegador para que se pueda
+           seleccionar/subrayar texto sobre la imagen de la página. */
+        .gk-pdf-page {
+            position: relative;
+            margin: 0 auto 14px auto;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+            background: #fff;
+        }
+        .gk-pdf-page canvas { display: block; }
+        .textLayer {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            line-height: 1;
+            opacity: 1;
+        }
+        .textLayer span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
+        .textLayer mark.gk-coverage-mark {
+            /* El <mark> vive DENTRO del span invisible: solo se ve su fondo de
+               color (el texto en sí sigue transparente, como el resto de la
+               capa), que es justo lo que se quiere — un subrayado de color
+               sobre la página real, no texto negro tapando el dibujo. */
+            color: transparent;
+        }
+        .textLayer ::selection { background: rgba(37, 99, 235, 0.35); }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
@@ -468,10 +506,28 @@
                 <div class="flex items-center justify-between gap-2">
                     <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
                     <div class="flex items-center gap-1.5">
+                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se ve como PDF real, con sus páginas; podés elegir cuáles esquematizar)" class="bg-slate-800 hover:bg-rose-500/20 hover:text-rose-300 border border-slate-700 hover:border-rose-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">📄</button>
                         <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">➕</button>
                         <button id="btnClearReader" data-role="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">🧹</button>
                         <button id="btnCloseReader" data-role="btnClose" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all">✕</button>
                     </div>
+                </div>
+                <!-- Input de archivo oculto para "Importar PDF" — ver btnImportPdf en app.js. -->
+                <input type="file" id="pdfFileInput" data-role="pdfFileInput" accept="application/pdf" class="hidden">
+                <!-- Barra de rango de páginas: aparece solo después de elegir un PDF,
+                     antes de mostrarlo — así se decide QUÉ páginas esquematizar (y
+                     renderizar) antes de cargar nada pesado. Ver app.js. -->
+                <div id="pdfRangeBar" data-role="pdfRangeBar" class="hidden items-center gap-1.5 bg-[#0f1428] border border-[#2c3458] rounded-lg px-2 py-1.5 text-[11px] text-slate-300 flex-wrap">
+                    <span class="truncate" id="pdfRangeFileName">documento.pdf</span>
+                    <span class="text-slate-500">·</span>
+                    <span>Páginas</span>
+                    <input type="number" id="pdfRangeFrom" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-rose-400">
+                    <span>a</span>
+                    <input type="number" id="pdfRangeTo" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-rose-400">
+                    <span class="text-slate-500">de <span id="pdfRangeTotal">1</span></span>
+                    <div class="flex-1"></div>
+                    <button id="btnPdfRangeLoad" class="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-md font-bold transition-colors">Cargar</button>
+                    <button id="btnPdfRangeCancel" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md transition-colors">✕</button>
                 </div>
                 <button id="btnParseReaderText" data-role="btnGenerate" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
                     <span>🌐 Generar Esquema</span>
@@ -501,6 +557,13 @@
                         Pega aquí un texto o <span class="text-indigo-600 font-semibold">un enlace</span>
                     </p>
                 </div>
+                <!-- Vista de PDF real: cada página se dibuja en un <canvas> (fidelidad
+                     visual, igual que un visor normal) con una capa de texto invisible
+                     encima (para poder seleccionar/subrayar igual que en texto plano).
+                     Se llena en app.js (ver renderPdfPageRange). Mientras está visible,
+                     #readerTextMode y #readerEmptyHint se ocultan — el panel muestra UNO
+                     de los dos modos a la vez, nunca ambos. -->
+                <div id="readerPdfView" data-role="pdfView" class="hidden w-full h-full overflow-auto select-text"></div>
             </div>
         </div>
     </div>
@@ -542,22 +605,29 @@
     </div>
 
     <!-- Menú Contextual (Nodos). Sin transformaciones CSS para facilitar cálculo dinámico de posición. -->
-    <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col min-w-[220px] shadow-xl">
-        <div class="py-1">
-            <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors">
+    <!-- Tamaños reducidos a propósito (antes px-3.5 py-2 text-xs, ~34px por
+         fila): el texto de cada opción es corto, no necesitaba tanto aire.
+         Ahora px-2.5 py-1 text-[11px], ~22px por fila. El ANCHO también se
+         fijó a un valor chico (antes no tenía max-w, así que el renglón más
+         largo — "Generar esquema completo a partir de aquí" — estiraba todo
+         el menú de lado a lado); con un ancho fijo angosto, ese renglón
+         simplemente pasa a 2-3 líneas en vez de ensanchar el menú entero. -->
+    <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col w-[130px] shadow-xl">
+        <div class="py-0.5">
+            <button id="btnMenuOpenPanel" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-[11px] text-left transition-colors">
                 Ver definición
             </button>
-            <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2 hover:bg-[#1c2a1a] text-lime-300 font-medium text-xs text-left transition-colors">
+            <button id="btnMenuSimpleExplain" class="w-full px-2.5 py-1 hover:bg-[#1c2a1a] text-lime-300 font-medium text-[11px] text-left transition-colors">
                 Explicación sencilla
             </button>
 
             <!-- Botón y Campo de Petición Personalizada -->
-            <button id="btnMenuCustom" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuCustom" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                 Prompt personalizado
             </button>
-            <div id="customPromptBox" class="hidden px-3 py-2.5 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-2">
-                <textarea id="customPromptInput" rows="2" placeholder="" class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg p-2 text-xs text-[#eef1fb] placeholder-[#5b6388] focus:outline-none focus:border-[#8b7cf6] resize-none font-sans"></textarea>
-                <button id="btnSendCustomPrompt" class="w-full bg-[#8b7cf6] hover:bg-[#9d90f9] text-[#0a0e1a] font-bold py-1.5 rounded-lg text-xs transition-all">
+            <div id="customPromptBox" class="hidden px-2.5 py-2 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-1.5">
+                <textarea id="customPromptInput" rows="2" placeholder="" class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg p-1.5 text-[11px] text-[#eef1fb] placeholder-[#5b6388] focus:outline-none focus:border-[#8b7cf6] resize-none font-sans"></textarea>
+                <button id="btnSendCustomPrompt" class="w-full bg-[#8b7cf6] hover:bg-[#9d90f9] text-[#0a0e1a] font-bold py-1 rounded-lg text-[11px] transition-all">
                     Explorar
                 </button>
             </div>
@@ -566,15 +636,15 @@
                  la cabecera, y dispara exactamente la misma generación de esquema completo
                  (mismo generateFullSchemaFromTopic, mismo costo, mismo diálogo de "¿limpiar
                  el lienzo?" si ya hay algo ahí) — ver btnMenuFullSchema en app.js. -->
-            <button id="btnMenuFullSchema" class="w-full px-3.5 py-2 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuFullSchema" class="w-full px-2.5 py-1 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                 Generar esquema completo a partir de aquí
             </button>
 
-            <button id="btnMenuEditText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuEditText" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                 Editar
             </button>
 
-            <button id="btnMenuExpandSub" class="hidden w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuExpandSub" class="hidden w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                 Expandir subesquema
             </button>
 
@@ -583,18 +653,18 @@
                  en el texto. Las acciones (btnMenuConnect/Synergy/LocateText) son las
                  mismas de siempre, solo que agrupadas — ver wireMenuGroup en app.js. -->
             <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuLink">
-                <button type="button" id="btnMenuLinkGroup" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <button type="button" id="btnMenuLinkGroup" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-[11px] text-left flex items-center justify-between transition-colors">
                     <span>Enlazar</span>
-                    <span class="text-[#5b6388] text-[11px]">›</span>
+                    <span class="text-[#5b6388] text-[10px]">›</span>
                 </button>
-                <div id="submenuLink" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden min-w-[200px] shadow-xl z-50">
-                    <button id="btnMenuConnect" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors">
+                <div id="submenuLink" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden w-[120px] shadow-xl z-50">
+                    <button id="btnMenuConnect" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-[11px] text-left transition-colors">
                         Vincular con...
                     </button>
-                    <button id="btnMenuSynergy" class="w-full px-3.5 py-2 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuSynergy" class="w-full px-2.5 py-1 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                         Generar Sinergia con...
                     </button>
-                    <button id="btnMenuLocateText" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuLocateText" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                         Ver en el texto
                     </button>
                 </div>
@@ -602,29 +672,29 @@
 
             <!-- Grupo "Generar": acciones que crean nodos nuevos a partir de este. -->
             <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuGenerate">
-                <button type="button" id="btnMenuGenerateGroup" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left flex items-center justify-between transition-colors">
+                <button type="button" id="btnMenuGenerateGroup" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-[11px] text-left flex items-center justify-between transition-colors">
                     <span>Generar</span>
-                    <span class="text-[#5b6388] text-[11px]">›</span>
+                    <span class="text-[#5b6388] text-[10px]">›</span>
                 </button>
-                <div id="submenuGenerate" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden min-w-[200px] shadow-xl z-50">
-                    <button id="btnMenuExpand" class="w-full px-3.5 py-2 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-xs text-left transition-colors">
+                <div id="submenuGenerate" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden w-[120px] shadow-xl z-50">
+                    <button id="btnMenuExpand" class="w-full px-2.5 py-1 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-[11px] text-left transition-colors">
                         Conceptos Relacionados
                     </button>
-                    <button id="btnMenuAntithesis" class="w-full px-3.5 py-2 hover:bg-[#2a1620] text-rose-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuAntithesis" class="w-full px-2.5 py-1 hover:bg-[#2a1620] text-rose-300 font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                         Cuestionar / Antítesis
                     </button>
-                    <button id="btnMenuChallenge" class="w-full px-3.5 py-2 hover:bg-[#122a22] text-emerald-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuChallenge" class="w-full px-2.5 py-1 hover:bg-[#122a22] text-emerald-300 font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                         Ponme a prueba
                     </button>
-                    <button id="btnMenuExamples" class="w-full px-3.5 py-2 hover:bg-[#2a2314] text-amber-300 font-medium text-xs text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuExamples" class="w-full px-2.5 py-1 hover:bg-[#2a2314] text-amber-300 font-medium text-[11px] text-left transition-colors border-t border-[#2c3458]">
                         Ejemplos Prácticos
                     </button>
                 </div>
             </div>
         </div>
 
-       <div class="border-t border-[#2c3458] p-1">
-            <button id="btnMenuDelete" class="w-full px-3 py-1.5 hover:bg-[#2a1620] text-rose-400 font-medium text-[11px] rounded text-left transition-colors">
+       <div class="border-t border-[#2c3458] p-0.5">
+            <button id="btnMenuDelete" class="w-full px-2 py-1 hover:bg-[#2a1620] text-rose-400 font-medium text-[10px] rounded text-left transition-colors">
                 Eliminar
             </button>
         </div>
