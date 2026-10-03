@@ -1609,7 +1609,7 @@ network.on('click', async function (params) {
         if (awaitingLinkTargetClick && pendingLinkSelection) {
             awaitingLinkTargetClick = false;
             document.body.classList.remove('gk-picking-link-target');
-            const { text: topic, range: rangeToHighlight } = pendingLinkSelection;
+            const { text: topic, panelId, offsetHint } = pendingLinkSelection;
             pendingLinkSelection = null;
             if (!checkBalance(1)) return;
 
@@ -1619,15 +1619,23 @@ network.on('click', async function (params) {
             const nodeId = topic;
 
             if (!nodes.get(nodeId)) {
+                // Mismo color "de cita" y mismo resaltado permanente (gk-coverage-mark)
+                // que ya usan los nodos generados por IA — ver appearanceForManualQuote
+                // y el comentario junto a highlightCoverageForPanel. Antes este nodo no
+                // guardaba sourceQuote/originPanelId y se resaltaba con un envoltorio
+                // aparte que, sobre la vista de PDF, rompía el posicionamiento de los
+                // <span> de la capa de texto (el bug del traslape reportado).
+                const appearance = appearanceForManualQuote(panelId);
                 nodes.add({
-                    id: nodeId, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(),
-                    x: spot.x, y: spot.y, fixed: { x: false, y: false }
+                    id: nodeId, label: `*${topic}*`, baseTitle: topic, color: appearance.color,
+                    x: spot.x, y: spot.y, fixed: { x: false, y: false },
+                    sourceQuote: topic, originPanelId: panelId,
+                    highlightColorIdx: appearance.highlightColorIdx, sourceQuoteOffset: offsetHint
                 });
                 trackNodeUsage(topic); consumeNodes(1);
             }
             edges.add({ from: clickedNodeId, to: nodeId, label: 'del texto' });
-            activeSelectionRange = rangeToHighlight;
-            highlightSelectedTextAndLink(nodeId);
+            highlightCoverageForPanel(panelId);
             selectedNodeId = nodeId;
             setTimeout(() => flashNewNode(nodeId), 50);
             return;
@@ -2080,6 +2088,24 @@ function nextHighlightColor() {
     return { idx, mark: highlightColorPalette[idx].mark, node: highlightColorPalette[idx].node };
 }
 
+// Mismo criterio de color que usan los nodos generados por IA a partir de un
+// documento (ver appearanceFor dentro de renderThreeLevelTree): el nodo se
+// colorea a juego con el resaltado que va a tener su cita en el lector, y si
+// hay más de un panel de lectura abierto, el borde respeta el acento de ESE
+// panel. Se usa para los nodos creados A MANO desde una selección (⚡ Crear
+// elemento / 🔗 Vincular a nodo), que antes no participaban de este esquema
+// de colores ni del resaltado permanente — ver el comentario junto a
+// highlightCoverageForPanel sobre por qué eso rompía la navegación texto↔nodo.
+function appearanceForManualQuote(panelId) {
+    const hc = nextHighlightColor();
+    const multiPanelMode = readerPanelRegistry.size > 1;
+    const originAccent = panelId ? readerPanelRegistry.get(panelId)?.accent : null;
+    return {
+        color: { background: hc.node.background, border: (multiPanelMode && originAccent) ? originAccent : hc.node.border },
+        highlightColorIdx: hc.idx
+    };
+}
+
 function applyPanelAccent(root, accent) {
     if (!root) return;
     const headerEl = root.querySelector('[data-role="header"]');
@@ -2126,6 +2152,30 @@ function escapeHtmlForMark(s) {
 // la vista de PDF (applyCoverageMarksToPdfView, que en cambio envuelve spans
 // ya existentes de la capa de texto — no puede reescribir HTML porque ahí
 // adentro vive también el <canvas> con el dibujo real de la página).
+// Si el mismo texto aparece más de una vez en el documento (un título que se
+// repite, una palabra común, dos párrafos parecidos...), buscar solo "la
+// primera aparición" puede marcar un lugar que no tiene nada que ver con el
+// que el usuario de verdad señaló — este era el origen del bug reportado
+// como "a veces sí marca, pero en zonas erróneas, hay un traslape
+// inconsistente". Cuando se conoce dónde cayó la selección real al crear el
+// nodo (offsetHint — ver sourceQuoteOffset, calculado en
+// computeOffsetHintForSelection), se usa esa posición para elegir la
+// aparición más CERCANA en vez de siempre la primera. Sin esa pista (p. ej.
+// nodos generados por IA, que nunca tuvieron una selección real de por
+// medio) se mantiene el comportamiento de siempre.
+function findBestQuoteOccurrence(baseText, quote, offsetHint) {
+    const first = baseText.indexOf(quote);
+    if (first === -1 || offsetHint == null) return first;
+    let best = first, bestDist = Math.abs(first - offsetHint);
+    let next = baseText.indexOf(quote, first + 1);
+    while (next !== -1) {
+        const dist = Math.abs(next - offsetHint);
+        if (dist < bestDist) { best = next; bestDist = dist; }
+        next = baseText.indexOf(quote, next + 1);
+    }
+    return best;
+}
+
 function resolveQuoteSegments(baseText, quotes) {
     const seen = new Set();
     const uniqueQuotes = [];
@@ -2137,8 +2187,8 @@ function resolveQuoteSegments(baseText, quotes) {
     // Ubicamos cada cita en el texto base (en el mismo dominio ya escapado si
     // aplica, para que las posiciones calcen exactamente con ese texto).
     const matches = [];
-    uniqueQuotes.forEach(({ quote, nodeId, colorIdx }) => {
-        const idx = baseText.indexOf(quote);
+    uniqueQuotes.forEach(({ quote, nodeId, colorIdx, offsetHint }) => {
+        const idx = findBestQuoteOccurrence(baseText, quote, offsetHint);
         if (idx === -1) return;
         matches.push({ start: idx, end: idx + quote.length, nodeId, colorIdx, length: quote.length });
     });
@@ -2216,7 +2266,7 @@ function highlightCoverageForPanel(panelId) {
     const quotes = [];
     nodes.getIds().forEach(id => {
         const n = nodes.get(id);
-        if (n && n.originPanelId === panelId && n.sourceQuote) quotes.push({ quote: n.sourceQuote, nodeId: id, colorIdx: n.highlightColorIdx });
+        if (n && n.originPanelId === panelId && n.sourceQuote) quotes.push({ quote: n.sourceQuote, nodeId: id, colorIdx: n.highlightColorIdx, offsetHint: n.sourceQuoteOffset });
     });
     if (quotes.length === 0) return;
 
@@ -2556,7 +2606,7 @@ function flashMark(mark) {
 
 // --- "🔗 Vincular a nodo..." desde el tooltip de selección (Idea 5) --------
 let awaitingLinkTargetClick = false;
-let pendingLinkSelection = null; // { text, range }
+let pendingLinkSelection = null; // { text, panelId, offsetHint }
 
 const floatingPanelsLayer = document.getElementById('floatingPanelsLayer');
 const nodeSelectionTooltip = document.getElementById('nodeSelectionTooltip');
@@ -2805,6 +2855,15 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
 let globalDocumentContext = "";
 let activeSelectedText = "";
 let activeSelectionRange = null;
+// De qué panel de lectura viene la selección activa ('main' o 'panel-N' —
+// ver readerPanelRegistry) y, cuando se pudo calcular (solo para la vista de
+// PDF, ver computeOffsetHintForSelection), en qué posición GLOBAL del texto
+// cayó esa selección real — necesario para que un nodo creado a mano (⚡
+// Crear elemento / 🔗 Vincular a nodo) quede de verdad vinculado a esa cita
+// (antes no se guardaba nada de esto, así que esos nodos no tenían forma de
+// participar del resaltado permanente ni de "Ver en el texto").
+let activeSelectionPanelId = null;
+let activeSelectionOffsetHint = null;
 let activeNodeDetailId = null;
 let activeNodeSelectionRange = null;
 let activeNodeSelectedText = "";
@@ -2912,6 +2971,8 @@ readerTextMode?.addEventListener('mouseup', (e) => {
     if (text.length > 2) {
         activeSelectedText = text;
         activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        activeSelectionPanelId = 'main';
+        activeSelectionOffsetHint = null; // texto plano: se sigue resolviendo por primera aparición, como siempre
         document.getElementById('tooltipSelectedTextPreview').innerText = `"${text.substring(0, 25)}..."`;
         selectionTooltip.style.left = `${e.pageX - 60}px`;
         selectionTooltip.style.top = `${e.pageY - 70}px`;
@@ -2967,6 +3028,11 @@ const pdfZoomControls = document.getElementById('pdfZoomControls');
 const pdfZoomLabel = document.getElementById('pdfZoomLabel');
 const btnPdfZoomIn = document.getElementById('btnPdfZoomIn');
 const btnPdfZoomOut = document.getElementById('btnPdfZoomOut');
+const pdfPageNavControls = document.getElementById('pdfPageNavControls');
+const pdfPageNavInput = document.getElementById('pdfPageNavInput');
+const pdfPageNavTotal = document.getElementById('pdfPageNavTotal');
+const btnPdfPagePrev = document.getElementById('btnPdfPagePrev');
+const btnPdfPageNext = document.getElementById('btnPdfPageNext');
 
 // Zoom del visor de PDF: cambia solo cómo se VE la página ya dibujada (vía
 // transform CSS sobre cada .gk-pdf-page, dentro de un .gk-pdf-page-outer que
@@ -2995,6 +3061,67 @@ function applyPdfZoom(newScale) {
 }
 btnPdfZoomIn?.addEventListener('click', () => applyPdfZoom(pdfZoomScale + PDF_ZOOM_STEP));
 btnPdfZoomOut?.addEventListener('click', () => applyPdfZoom(pdfZoomScale - PDF_ZOOM_STEP));
+
+// --- Navegador de páginas del PDF (como un lector normal) -----------------
+// Salta a una página concreta DENTRO del rango que ya se cargó (no de todo
+// el documento: solo esas páginas existen como elementos en el DOM). Cada
+// .gk-pdf-page-outer se marca con data-page-num = el número REAL de página
+// del PDF (no su posición dentro del rango), así que "ir a la página 45"
+// funciona tal cual aunque el rango cargado haya sido, por ejemplo, 40–60.
+let pdfPageNavSuppressScroll = false;
+let pdfPageNavSuppressTimer = null;
+let pdfPageNavScrollScheduled = false;
+
+function goToPdfPage(pageNum) {
+    if (!readerPdfView || !pdfPageNavInput) return;
+    const min = parseInt(pdfPageNavInput.min, 10) || 1;
+    const max = parseInt(pdfPageNavInput.max, 10) || min;
+    pageNum = Math.max(min, Math.min(max, Math.round(pageNum) || min));
+    const target = readerPdfView.querySelector(`.gk-pdf-page-outer[data-page-num="${pageNum}"]`);
+    if (!target) return;
+    // Mientras dura la animación del scroll, el listener de 'scroll' de abajo
+    // dejaría el input "peleando" contra el número que el usuario acaba de
+    // escribir (porque el scroll real todavía no llegó) — se silencia un
+    // instante y se reactiva solo cuando el salto ya terminó.
+    pdfPageNavSuppressScroll = true;
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    pdfPageNavInput.value = String(pageNum);
+    clearTimeout(pdfPageNavSuppressTimer);
+    pdfPageNavSuppressTimer = setTimeout(() => { pdfPageNavSuppressScroll = false; }, 700);
+}
+
+// Actualiza el número de página mostrado según qué página quedó arriba del
+// todo del contenedor visible — el mismo criterio que usa cualquier lector
+// de PDF normal al hacer scroll manual (sin tocar los botones/el input).
+function updatePdfPageNavFromScroll() {
+    if (pdfPageNavSuppressScroll || !readerPdfView || !pdfPageNavInput) return;
+    if (document.activeElement === pdfPageNavInput) return; // no pisar lo que el usuario está escribiendo
+    const pages = Array.from(readerPdfView.querySelectorAll('.gk-pdf-page-outer'));
+    if (pages.length === 0) return;
+    const scrollTop = readerPdfView.scrollTop;
+    let current = pages[0];
+    for (const p of pages) {
+        if (p.offsetTop - 4 <= scrollTop) current = p; else break;
+    }
+    const pageNum = current.dataset.pageNum;
+    if (pageNum) pdfPageNavInput.value = pageNum;
+}
+
+readerPdfView?.addEventListener('scroll', () => {
+    if (pdfPageNavScrollScheduled) return;
+    pdfPageNavScrollScheduled = true;
+    requestAnimationFrame(() => { pdfPageNavScrollScheduled = false; updatePdfPageNavFromScroll(); });
+});
+
+btnPdfPagePrev?.addEventListener('click', () => goToPdfPage((parseInt(pdfPageNavInput?.value, 10) || 1) - 1));
+btnPdfPageNext?.addEventListener('click', () => goToPdfPage((parseInt(pdfPageNavInput?.value, 10) || 1) + 1));
+pdfPageNavInput?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    goToPdfPage(parseInt(pdfPageNavInput.value, 10) || 1);
+    pdfPageNavInput.blur();
+});
+pdfPageNavInput?.addEventListener('blur', () => goToPdfPage(parseInt(pdfPageNavInput.value, 10) || 1));
 
 // Tope del rango que se ofrece por default al elegir un PDF (el usuario
 // puede ampliarlo a mano antes de darle "Cargar") — páginas de más no se
@@ -3108,6 +3235,7 @@ async function renderPdfPageRange(fromPage, toPage) {
             pageOuter.className = 'gk-pdf-page-outer';
             pageOuter.dataset.baseWidth = String(Math.floor(viewport.width));
             pageOuter.dataset.baseHeight = String(Math.floor(viewport.height));
+            pageOuter.dataset.pageNum = String(pageNum); // usado por el navegador de páginas (ir a la página N)
             pageOuter.style.width = `${Math.floor(viewport.width)}px`;
             pageOuter.style.height = `${Math.floor(viewport.height)}px`;
 
@@ -3160,6 +3288,15 @@ async function renderPdfPageRange(fromPage, toPage) {
         pdfZoomControls?.classList.remove('hidden');
         pdfZoomControls?.classList.add('flex');
         if (pdfZoomLabel) pdfZoomLabel.textContent = '100%';
+
+        // Navegador de páginas: el input se limita a fromPage..toPage porque
+        // son las únicas páginas que de verdad existen en el DOM ahora mismo
+        // (el resto del documento no se renderizó) — "/ total" sigue
+        // mostrando el total real del PDF para que quede claro que hay más.
+        if (pdfPageNavInput) { pdfPageNavInput.min = String(fromPage); pdfPageNavInput.max = String(toPage); pdfPageNavInput.value = String(fromPage); }
+        if (pdfPageNavTotal) pdfPageNavTotal.textContent = String(activePdfDoc.numPages);
+        pdfPageNavControls?.classList.remove('hidden');
+        pdfPageNavControls?.classList.add('flex');
         const mainEntry = readerPanelRegistry.get('main');
         if (mainEntry) { mainEntry.textEl = readerPdfView; mainEntry.isPdf = true; }
 
@@ -3200,6 +3337,8 @@ function exitPdfMode() {
     pdfZoomControls?.classList.add('hidden');
     pdfZoomControls?.classList.remove('flex');
     pdfZoomScale = 1;
+    pdfPageNavControls?.classList.add('hidden');
+    pdfPageNavControls?.classList.remove('flex');
     readerTextMode.classList.remove('hidden');
     activePdfDoc = null;
     pdfFullText = '';
@@ -3272,6 +3411,30 @@ function applyCoverageMarksToPdfView(entry, quotes) {
     placed.forEach(seg => wrapPdfTextRange(seg));
 }
 
+// Calcula en qué posición GLOBAL de pdfFullText cayó el INICIO de una
+// selección real hecha a mano sobre la vista de PDF — se guarda como
+// sourceQuoteOffset en el nodo (ver tipBtnCreateNode/tipBtnLinkToNode) para
+// que, si ese mismo texto aparece más de una vez en el documento,
+// resolveQuoteSegments pueda elegir la aparición más cercana a donde el
+// usuario de verdad seleccionó, en vez de siempre la primera del documento
+// entero (ese era el bug: "a veces sí marca, pero en zonas erróneas").
+// Se reconstruye pdfPageSpanIndex primero para que coincida exactamente con
+// el DOM actual (funciona igual haya o no marcas ya puestas: span.textContent
+// incluye el texto de cualquier <mark> que ya envuelva parte del span).
+function computeOffsetHintForSelection(range) {
+    if (!range) return null;
+    rebuildPdfSpanIndex();
+    const container = range.startContainer;
+    const spanEntry = pdfPageSpanIndex.find(e => e.span.contains(container));
+    if (!spanEntry) return null;
+    try {
+        const preRange = document.createRange();
+        preRange.selectNodeContents(spanEntry.span);
+        preRange.setEnd(container, range.startOffset);
+        return spanEntry.start + preRange.toString().length;
+    } catch { return null; }
+}
+
 // La misma selección→tooltip ("⚡ Crear elemento"/"🔗 Vincular a nodo") que
 // ya existe para el texto plano (ver el listener 'mouseup' de readerTextMode
 // más abajo), pero sobre la vista de PDF — la selección del navegador
@@ -3284,6 +3447,8 @@ readerPdfView.addEventListener('mouseup', (e) => {
     if (text.length > 2) {
         activeSelectedText = text;
         activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        activeSelectionPanelId = 'main';
+        activeSelectionOffsetHint = computeOffsetHintForSelection(activeSelectionRange);
         document.getElementById('tooltipSelectedTextPreview').innerText = `"${text.substring(0, 25)}..."`;
         selectionTooltip.style.left = `${e.pageX - 60}px`;
         selectionTooltip.style.top = `${e.pageY - 70}px`;
@@ -3321,28 +3486,33 @@ container.addEventListener('drop', (e) => {
     track('node_created_via_drag');
 });
 
-function highlightSelectedTextAndLink(nodeId) {
-    if (!activeSelectionRange) return;
-    try {
-        const span = document.createElement('span');
-        span.className = "bg-indigo-100 hover:bg-indigo-200 text-indigo-900 rounded px-1 transition-colors cursor-pointer border-b-2 border-indigo-300";
-        span.appendChild(activeSelectionRange.extractContents());
-        activeSelectionRange.insertNode(span);
-        span.addEventListener('click', () => {
-            if (nodes.get(nodeId)) {
-                network.selectNodes([nodeId]);
-                focusNodeAvoidingOverlays(nodeId, { scale: 1.2, duration: 600 });
-            }
-        });
-    } catch (err) {}
-}
-
 // ÚNICO BOTÓN AL SUBRAYAR EN EL LECTOR
+//
+// Antes, crear un nodo desde una selección (⚡ Crear elemento) envolvía el
+// fragmento con un <span> aparte (extractContents + insertNode) y nunca
+// guardaba sourceQuote/originPanelId en el nodo. Eso tenía dos problemas
+// reportados por el usuario: (1) ese nodo quedaba fuera del sistema de
+// resaltado permanente — "Ver en el texto" y el resaltado nodo↔texto nunca
+// funcionaban para él, en ningún modo; y (2) sobre la vista de PDF,
+// extractContents() podía PARTIR uno de los <span> de la capa de texto (que
+// están posicionados de forma absoluta, carácter por carácter) justo en el
+// borde de la selección — la mitad resultante heredaba el mismo estilo de
+// posición que el span original, así que terminaba dibujada exactamente
+// encima de otro texto (el bug de "se traslapa con otra frase").
+//
+// Ahora se resuelve igual que un nodo generado por IA a partir de un
+// documento: se guarda sourceQuote/originPanelId/highlightColorIdx (más
+// sourceQuoteOffset si se pudo calcular, ver computeOffsetHintForSelection)
+// y se llama a highlightCoverageForPanel, que para la vista de PDF usa
+// wrapPdfTextRange — la misma función ya probada que envuelve el texto
+// DENTRO de cada span existente sin moverlo ni partirlo de esa forma.
 document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
     if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
-    const topic = activeSelectedText; const rangeToHighlight = activeSelectionRange;
-    activeSelectedText = ""; activeSelectionRange = null;
+    const topic = activeSelectedText;
+    const panelId = activeSelectionPanelId || 'main';
+    const offsetHint = activeSelectionOffsetHint;
+    activeSelectedText = ""; activeSelectionRange = null; activeSelectionPanelId = null; activeSelectionOffsetHint = null;
 
     if (!checkBalance(1)) return;
 
@@ -3350,27 +3520,30 @@ document.getElementById('tipBtnCreateNode')?.addEventListener('click', () => {
     const nodeId = topic;
 
     if (!nodes.get(nodeId)) {
+        const appearance = appearanceForManualQuote(panelId);
         nodes.add({
-            id: nodeId, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(),
+            id: nodeId, label: `*${topic}*`, baseTitle: topic, color: appearance.color,
             x: viewCenter.x + (Math.random() * 100 - 50), y: viewCenter.y + (Math.random() * 100 - 50),
-            fixed: { x: false, y: false }
+            fixed: { x: false, y: false },
+            sourceQuote: topic, originPanelId: panelId,
+            highlightColorIdx: appearance.highlightColorIdx, sourceQuoteOffset: offsetHint
         });
         trackNodeUsage(topic); consumeNodes(1);
     }
-    activeSelectionRange = rangeToHighlight;
-    highlightSelectedTextAndLink(nodeId);
+    highlightCoverageForPanel(panelId);
     selectedNodeId = nodeId;
 });
 
 // "🔗 Vincular a nodo...": en vez de crear el nodo suelto de una vez, guarda la
-// selección y entra en modo "esperando clic en el nodo destino" — el próximo
-// clic sobre un nodo (interceptado al inicio de network.on('click', ...))
-// crea el nodo nuevo YA conectado como hijo de ese nodo elegido.
+// selección (con su panel y offsetHint — ver arriba) y entra en modo
+// "esperando clic en el nodo destino" — el próximo clic sobre un nodo
+// (interceptado al inicio de network.on('click', ...)) crea el nodo nuevo YA
+// conectado como hijo de ese nodo elegido, con el mismo resaltado permanente.
 document.getElementById('tipBtnLinkToNode')?.addEventListener('click', () => {
     if (!activeSelectedText) return;
     selectionTooltip.classList.add('hidden');
-    pendingLinkSelection = { text: activeSelectedText, range: activeSelectionRange };
-    activeSelectedText = ""; activeSelectionRange = null;
+    pendingLinkSelection = { text: activeSelectedText, panelId: activeSelectionPanelId || 'main', offsetHint: activeSelectionOffsetHint };
+    activeSelectedText = ""; activeSelectionRange = null; activeSelectionPanelId = null; activeSelectionOffsetHint = null;
     awaitingLinkTargetClick = true;
     document.body.classList.add('gk-picking-link-target');
     appAlert('Ahora haz clic en el nodo del esquema al que quieres vincular este fragmento como hijo.');
@@ -3449,6 +3622,8 @@ function wireReaderPanelClone(root, panelId) {
         if (text.length > 2) {
             activeSelectedText = text;
             activeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+            activeSelectionPanelId = panelId;
+            activeSelectionOffsetHint = null; // texto plano: se sigue resolviendo por primera aparición, como siempre
             const preview = document.getElementById('tooltipSelectedTextPreview');
             if (preview) preview.innerText = `"${text.substring(0, 25)}..."`;
             selectionTooltip.style.left = `${e.pageX - 60}px`;
@@ -3528,7 +3703,7 @@ function createExtraReaderPanel() {
     // controles del clon en vez de dejar un botón que se vería igual pero no
     // haría nada (nunca se le conecta ningún listener, porque ese cableado
     // se hizo una sola vez contra el #btnImportPdf original antes de clonar).
-    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"], [data-role="pdfView"], [data-role="pdfZoomControls"]').forEach(el => el.remove());
+    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"], [data-role="pdfView"], [data-role="pdfZoomControls"], [data-role="pdfPageNavControls"]').forEach(el => el.remove());
 
     const cloneText = clone.querySelector('[data-role="textMode"]');
     if (cloneText) cloneText.innerText = '';
@@ -4730,15 +4905,6 @@ function renderProjectsList() {
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5">
-                    <!-- Abre /juego (ver juego/juego.js) en una pestaña nueva, ya con este
-                         proyecto elegido vía ?id=... — ese módulo lee el mismo snapshot que
-                         ya guarda saveCurrentProjectToBin (gk_proj_snapshot_<id>), así que no
-                         hace falta ninguna llamada ni dato nuevo para esto. -->
-                    <a href="/juego/?id=${encodeURIComponent(proj.id)}" target="_blank" rel="noopener"
-                       title="Explorar este esquema en 3D, en primera persona"
-                       class="text-xs bg-fuchsia-50 text-fuchsia-600 hover:bg-fuchsia-600 hover:text-white px-2.5 py-1.5 rounded-lg font-bold transition-colors">
-                        🌌 3D
-                    </a>
                     <button class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors btn-load-proj" data-id="${proj.id}">
                         Abrir
                     </button>

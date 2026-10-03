@@ -2181,103 +2181,129 @@ igual que siempre para cualquier cuenta, admin o no.
 - `netlify/functions/send-feedback.js`: misma exclusión, pero solo para el
   registro del evento — el correo se sigue mandando igual.
 
-## 38. `/juego` — vuelo en primera persona (3D) por tus propios esquemas
 
-Se pidió algo "3D e inmersivo". En vez de un juego genérico, se construyó
-algo que usa lo que ya existe en la app: cada esquema guardado se puede
-recorrer en primera persona, como si volaras dentro de tu propio mapa de
-ideas. Es una sección nueva y totalmente separada (`/juego/`), pensada
-para abrirse en una pestaña aparte sin arriesgar nada del editor principal.
+## 38. `/juego` (vuelo 3D por los esquemas) — se quitó
 
-### Cómo se entra
+Se había construido una sección `/juego/` con un vuelo en primera persona
+por los esquemas guardados (three.js, nodos como esferas brillantes,
+flechas como líneas, nebulosas y bloom). Se decidió quitarla: se eliminó
+la carpeta `juego/` por completo y el botón "🌌 3D" que se había agregado
+en `renderProjectsList()` (`app.js`), junto a "Abrir" en cada proyecto
+guardado. No queda ningún rastro de la funcionalidad — ni archivos, ni
+referencias, ni variables de entorno (no había agregado ninguna).
 
-- Desde "Mis Proyectos", cada esquema guardado ahora tiene un botón
-  **"🌌 3D"** al lado de "Abrir" que abre `/juego/?id=<id-del-proyecto>`
-  en una pestaña nueva, ya con ese esquema cargado directamente.
-- También se puede entrar directo a `/juego/` y elegir ahí cuál esquema
-  volar, desde una pantalla con la lista de todo lo guardado en ese
-  navegador (lee las mismas claves que ya usa el editor — ver abajo).
+## 39. Navegador de páginas dentro del PDF ya cargado
 
-### Qué datos usa (nada nuevo que guardar)
+Ahora, mientras estás viendo un PDF en el Modo Lector, aparece una barrita
+flotante abajo al centro con "‹ [número] / total ›" — igual que cualquier
+lector de PDF normal: las flechas saltan a la página anterior/siguiente, y
+también podés escribir directamente el número de página y presionar Enter
+(o simplemente hacer click afuera) para saltar ahí. El número también se
+actualiza solo mientras haces scroll a mano, para que siempre refleje dónde
+estás.
 
-No hay backend nuevo ni variable de entorno nueva para esto. `/juego/juego.js`
-lee exactamente lo mismo que el editor ya escribe en `localStorage` con
-`saveCurrentProjectToBin` (en `app.js`):
-- `gk_projects_<userKey>` → catálogo (título, fecha, cantidad de nodos).
-- `gk_proj_snapshot_<id>` → el esquema completo (`nodes`, `edges`, etc.).
+**Límite importante:** el salto es dentro del RANGO de páginas que ya
+elegiste cargar (ver el selector "de página X a Y" al importar el PDF), no
+de todo el documento — solo esas páginas existen de verdad en pantalla. El
+"/ total" de la derecha sí muestra el total real de páginas del PDF, para
+que sea obvio si hay más páginas del documento que no se cargaron (en ese
+caso, habría que "Subir PDF" de nuevo con un rango distinto). Dentro del
+rango cargado, el número de página que usa el navegador es el número REAL
+de esa página en el PDF (no su posición dentro del rango) — así que si
+cargaste de la página 40 a la 60, escribir "45" te lleva a la página 45
+tal cual, no a la 45ª página del rango.
 
-Como `/juego` no inicia sesión de Netlify Identity por su cuenta, en vez de
-calcular `userKey` recorre TODAS las claves `gk_projects_*` que existan en
-ese navegador — así aparece lo mismo sin importar con qué cuenta se guardó
-cada esquema, igual que ya conviven todas en el mismo navegador hoy.
+### Archivos tocados
 
-### Qué se ve
+- `index.html`: barra nueva `#pdfPageNavControls` (botones `‹`/`›`, input
+  de número de página, total), flotando sobre `#readerContentContainer`,
+  junto a los controles de zoom existentes.
+- `app.js`: cada página renderizada ahora se marca con
+  `data-page-num="<n>"` (el número real de esa página, ver
+  `renderPdfPageRange`); `goToPdfPage(n)` hace `scrollIntoView` a la página
+  pedida y actualiza el input; un listener de scroll en `#readerPdfView`
+  mantiene el número sincronizado mientras se navega a mano; se oculta
+  junto con el resto de los controles de PDF al salir del modo PDF
+  (`exitPdfMode`) y se excluye de los paneles de lectura adicionales
+  (`createExtraReaderPanel`), ya que es una funcionalidad solo del panel
+  "main" (el único con un PDF activo).
 
-- **Nodos** → esferas que brillan (su color viene del mismo borde pastel
-  que ya tiene cada nodo en el editor — `elegantPalette`), con su nombre
-  flotando al lado como una placa de texto que siempre mira a la cámara.
-- **Flechas** → líneas de color entre los nodos conectados.
-- **Profundidad = qué tan "adentro" del tema estás**: se recorre el grafo
-  con BFS desde el primer nodo (la raíz, mismo criterio que ya usa el
-  editor para el título del proyecto) y cada nivel de distancia se ubica
-  más atrás en el eje Z — volar hacia adelante se siente como ir "más
-  adentro" del esquema. Dentro de un mismo nivel, los nodos se reparten en
-  un anillo (con algo de variación al azar) para que no queden todos
-  apilados en el mismo punto.
-- **Ambiente**: un fondo de estrellas, nebulosas de color (sprites con
-  gradiente, sin imágenes descargadas — se dibujan con `<canvas>`), niebla
-  a distancia y un efecto de resplandor (bloom) sobre los nodos, para que
-  se sientan como puntos de luz en el espacio y no como figuras planas.
-- **Descubrimiento**: al acercarte a un nodo (dentro de un radio chico)
-  aparece un panel abajo con su nombre y su definición guardada (si tiene),
-  y un contador arriba (`X / Y nodos`) muestra cuántos ya visitaste.
+## 40. Arreglo: resaltar/vincular texto del lector no funcionaba bien en el PDF
 
-### Controles
+Se reportaron dos problemas relacionados, ambos con la misma causa de fondo:
 
-Mouse para mirar (con *pointer lock*, como un juego en primera persona),
-WASD para moverse, Espacio/Shift para subir/bajar, Shift mientras te movés
-da un impulso extra (boost). Esc libera el mouse; un botón "✕ Salir" en la
-esquina vuelve al selector de esquemas en cualquier momento.
+1. Un nodo creado a mano desde una selección del lector (⚡ "Crear elemento
+   en esquema", o 🔗 "Vincular a nodo...") nunca quedaba de verdad
+   conectado con su cita: "Ver en el texto" no lo encontraba, y no
+   participaba del resaltado permanente que sí tienen los nodos que vienen
+   de un esquema generado por IA.
+2. Sobre la vista de PDF específicamente: al seleccionar un fragmento,
+   a veces el resaltado terminaba superpuesto con otro texto distinto, como
+   si una selección "se traslapara" con otra — y en otros casos sí marcaba
+   algo, pero en una zona del documento que no tenía nada que ver con lo
+   seleccionado.
 
-### Decisiones de alcance (prototipo pulido, no un juego completo)
+### Causa
 
-Se eligió la opción de **volar por los propios esquemas del usuario** (en
-vez de un juego genérico aparte) y un nivel de **prototipo pulido ahora**
-(gráficos cuidados — bloom, niebla, nebulosas, etiquetas — pero sin
-mecánicas de juego como puntaje, enemigos o niveles), según lo que se
-confirmó explícitamente. Cosas que quedan fuera de este alcance, por si se
-quiere ampliar después:
-- Sonido/música ambiente.
-- Guardar el progreso de "descubrimiento" (hoy se reinicia cada vez que
-  entrás a volar).
-- Mini-mapa o brújula hacia el nodo más cercano sin descubrir.
-- Una versión táctil/para mobile de los controles (hoy requiere mouse +
-  teclado, como cualquier juego en primera persona con *pointer lock*).
+Ese botón nunca guardaba `sourceQuote`/`originPanelId` en el nodo (los
+campos que SÍ usan los nodos de IA para el sistema de resaltado) — en vez
+de eso, envolvía el fragmento seleccionado con su propio `<span>` suelto
+(`Range.extractContents()` + `insertNode()`). Sobre texto plano eso no se
+notaba mucho, pero sobre la vista de PDF es un problema serio: cada
+fragmento de texto ahí vive en un `<span>` posicionado de forma ABSOLUTA
+(carácter por carácter, para calzar exacto sobre el dibujo de la página).
+Si la selección empezaba o terminaba a mitad de uno de esos `<span>`,
+`extractContents()` lo PARTE en dos — y la mitad nueva hereda el mismo
+estilo de posición absoluta que el `<span>` original, así que las dos
+mitades terminan dibujadas exactamente en el mismo lugar: de ahí el
+"traslape".
 
-### Nota honesta sobre verificación visual
+Aparte, la función que busca dónde cae una cita dentro del texto
+(`resolveQuoteSegments`, usada tanto para texto plano como para PDF) se
+quedaba siempre con la PRIMERA aparición de ese texto en todo el
+documento. Si la misma palabra o frase aparece más de una vez (algo muy
+común), un nodo podía terminar marcado en un lugar del documento que no
+tiene nada que ver con lo que el usuario señaló — el segundo síntoma
+reportado ("a veces sí marca, pero en zonas erróneas").
 
-Este sandbox no pudo cargar three.js desde el CDN para probarlo con
-Playwright (el proxy de este entorno bloquea algunos dominios de CDN para
-las pruebas automatizadas de este chat — no es una restricción del sitio
-ya publicado en Netlify, que no tiene ese límite). Se validó que ambos
-archivos no tienen errores de sintaxis (`node --check` en `juego.js`,
-chequeo de balance de etiquetas en `index.html`), y la lógica de datos
-(lectura de localStorage, BFS por profundidad, armado de nodos/flechas) se
-razonó contra la misma estructura de datos que ya usa el editor — pero la
-escena 3D en sí (colores, iluminación, que el *pointer lock* funcione bien
-en tu navegador, etc.) conviene mirarla una vez publicado, por si algún
-detalle visual necesita un ajuste fino.
+### Arreglo
 
-### Archivos nuevos
+- Crear un nodo desde una selección (en cualquiera de los dos botones)
+  ahora guarda `sourceQuote`, `originPanelId` y un color de la misma
+  paleta que ya usan los nodos de IA (`appearanceForManualQuote`), y llama
+  a `highlightCoverageForPanel` — la misma función ya probada que, sobre
+  PDF, envuelve el texto DENTRO de los `<span>` existentes sin partirlos
+  (`wrapPdfTextRange`), en vez del envoltorio aparte de antes.
+- Para desambiguar texto repetido, se guarda además `sourceQuoteOffset`: la
+  posición exacta donde cayó la selección real al crear el nodo (solo se
+  puede calcular con precisión sobre la vista de PDF, mapeando la
+  selección a los mismos `<span>` que ya se usan para indexar el texto —
+  ver `computeOffsetHintForSelection`). `resolveQuoteSegments` ahora, si
+  tiene esa pista, elige la aparición de ese texto más CERCANA a donde en
+  realidad se seleccionó, en vez de siempre la primera del documento.
+- Como consecuencia, estos nodos ahora sí funcionan con "Ver en el texto",
+  el resaltado permanente, el clic-para-enfocar-nodo y el seguimiento del
+  esquema por scroll — todo lo que ya tenían los nodos generados por IA.
 
-- `juego/index.html`: pantallas de selección de esquema, instrucciones,
-  HUD de vuelo y panel de nodo descubierto — sin Tailwind, CSS propio para
-  no depender de ningún CDN externo salvo three.js.
-- `juego/juego.js`: módulo ES que carga el esquema elegido desde
-  `localStorage`, construye la escena three.js (nodos, flechas, estrellas,
-  nebulosas, niebla, bloom) y maneja el vuelo en primera persona.
+### Límite que sigue igual
 
-### Archivo tocado
+Para texto PLANO (no PDF) se sigue usando el criterio de siempre (primera
+aparición) — no se reportó como un problema ahí, y no hay una forma tan
+directa de calcular una posición exacta dentro de un `<div
+contenteditable>` sin arriesgar romper algo que ya funciona bien. Si en el
+futuro aparece el mismo síntoma con texto plano, se puede extender el
+mismo mecanismo de `sourceQuoteOffset` para ese caso.
 
-- `app.js`: botón **"🌌 3D"** agregado en `renderProjectsList()`, junto al
-  botón "Abrir" de cada proyecto guardado.
+### Archivos tocados
+
+- `app.js`: `appearanceForManualQuote` (color consistente para nodos
+  manuales), `findBestQuoteOccurrence` (elige la aparición más cercana a
+  un offset conocido), `resolveQuoteSegments`/`highlightCoverageForPanel`
+  (ahora usan y propagan ese offset), `computeOffsetHintForSelection`
+  (calcula el offset real de una selección sobre la vista de PDF), los
+  tres listeners de `mouseup` que arman una selección (texto principal,
+  PDF, paneles de lectura adicionales), y los handlers de "⚡ Crear
+  elemento"/"🔗 Vincular a nodo..." (ahora guardan sourceQuote/
+  originPanelId/sourceQuoteOffset y usan highlightCoverageForPanel). Se
+  eliminó `highlightSelectedTextAndLink` (la función con el envoltorio
+  manual que causaba el traslape), que ya no se usa en ningún lado.

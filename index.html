@@ -593,6 +593,18 @@
                     <span id="pdfZoomLabel" class="text-slate-300 text-[11px] w-11 text-center select-none">100%</span>
                     <button id="btnPdfZoomIn" title="Acercar" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">＋</button>
                 </div>
+                <!-- Navegador de páginas del PDF (como cualquier lector normal): salta
+                     a una página concreta dentro del RANGO ya cargado, con flechas
+                     anterior/siguiente o escribiendo el número directamente. Vive junto
+                     a pdfZoomControls, también fuera de #readerPdfView por la misma
+                     razón (no perderse al volver a renderizar) — ver renderPdfPageRange/
+                     exitPdfMode y el bloque "Navegador de páginas del PDF" en app.js. -->
+                <div id="pdfPageNavControls" data-role="pdfPageNavControls" class="hidden absolute bottom-2 left-1/2 -translate-x-1/2 z-10 items-center gap-1.5 bg-slate-900/90 border border-slate-700 rounded-lg px-2 py-1 shadow-lg">
+                    <button id="btnPdfPagePrev" title="Página anterior" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">‹</button>
+                    <input id="pdfPageNavInput" type="number" min="1" value="1" class="w-12 bg-slate-800 border border-slate-600 rounded text-center text-[11px] text-white py-0.5 focus:outline-none focus:border-indigo-500" />
+                    <span class="text-slate-400 text-[11px] select-none">/ <span id="pdfPageNavTotal">1</span></span>
+                    <button id="btnPdfPageNext" title="Página siguiente" class="text-slate-300 hover:text-white w-6 h-6 flex items-center justify-center rounded hover:bg-slate-700 text-sm font-bold transition-colors">›</button>
+                </div>
             </div>
         </div>
     </div>
