@@ -161,13 +161,22 @@
     position: relative;
     clip-path: polygon(0% 10px, 4% 0%, 8% 10px, 12% 0%, 16% 10px, 20% 0%, 24% 10px, 28% 0%, 32% 10px, 36% 0%, 40% 10px, 44% 0%, 48% 10px, 52% 0%, 56% 10px, 60% 0%, 64% 10px, 68% 0%, 72% 10px, 76% 0%, 80% 10px, 84% 0%, 88% 10px, 92% 0%, 96% 10px, 100% 0%, 100% 100%, 0% 100%);
   }
-  .paywall-label{ font-family:'Fraunces', serif; font-size: 1.15rem; line-height: 1.35; font-weight:500; text-align:center; margin: 6px 0 10px; }
+  /* Ancla de compromiso: deliberadamente discreta (no es el gancho, es el
+     contexto antes del gancho) — letra chica, en mayúsculas espaciadas como
+     una "credencial" ganada, no como un titular. */
+  .paywall-commitment{ text-align:center; color: #c9a08f; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px; opacity: 0.85; }
+  .paywall-label{ font-family:'Fraunces', serif; font-size: 1.15rem; line-height: 1.35; font-weight:500; text-align:center; margin: 0 0 10px; }
   .paywall-price{ text-align:center; color: #e9c9ba; font-size: 0.92rem; margin-bottom: 20px; }
   .paywall-price b{ color:#fff; font-size: 1.15rem; }
   #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
   .paywall-note{ text-align:center; color: #d8a79d; font-size: 0.74rem; margin-bottom: 4px; }
-  .paywall-skip{ text-align:center; margin-top: 14px; }
-  .paywall-skip button{ background:none; border:none; color: #e9c9ba; font-size: 0.82rem; text-decoration:underline; cursor:pointer; opacity: 0.8; }
+  /* Botón de "seguir sin pagar": sigue ahí, siempre disponible y legible
+     (no es un patrón oscuro ocultarlo), pero con más distancia del bloque
+     de pago y menos peso visual, para que no compita al mismo nivel que el
+     botón de PayPal — ver conversación sobre "pain of paying" del
+     2026-10-04. */
+  .paywall-skip{ text-align:center; margin-top: 30px; }
+  .paywall-skip button{ background:none; border:none; color: #e9c9ba; font-size: 0.74rem; text-decoration:underline; cursor:pointer; opacity: 0.55; }
 
   #fullContainer.is-hidden{ display:none; }
   #fullContainer{ animation: fadeUp 0.6s ease; }
@@ -272,6 +281,12 @@
            gancho específico que generó Gemini para ESTA persona (campo
            lockedHook, ver qer-generate-reading.js), con "Tu lectura continúa"
            solo como respaldo si por lo que sea no llegó ese campo. -->
+      <!-- Ancla de compromiso (principio de consistencia): recordar lo que
+           la persona YA invirtió (16 respuestas personales) en vez de
+           suavizar o anunciar el cobro — ver conversación sobre "pain of
+           paying" del 2026-10-04. Se llena vía JS (renderReveal) con el
+           número real de preguntas, no queda fijo en el HTML. -->
+      <p id="paywallCommitment" class="paywall-commitment"></p>
       <p id="paywallHook" class="paywall-label display">Tu lectura continúa</p>
       <p class="paywall-price">Desbloqueá el resto por <b id="priceLabel">$2.99</b></p>
       <div id="paypal-button-container"></div>

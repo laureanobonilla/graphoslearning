@@ -391,6 +391,12 @@ function renderReveal(data, { skipPaywall } = {}) {
   document.getElementById('hookLine').textContent = data.hookLine || '';
   const teaserEl = document.getElementById('teaserText');
   teaserEl.innerHTML = (data.teaser || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+  // Ancla de compromiso (principio de consistencia de Cialdini): recordarle
+  // a la persona lo que YA invirtió (sus propias respuestas) en vez de
+  // suavizar o anunciar el cobro que viene — ver conversación del
+  // 2026-10-04 sobre "pain of paying". Va ANTES del gancho específico.
+  document.getElementById('paywallCommitment').textContent = `Ya respondiste ${QUESTIONS.length} preguntas sobre vos mismo`;
+
   // Gancho específico junto al botón de pago (ver lockedHook en
   // qer-generate-reading.js) — "Tu lectura continúa" se deja como respaldo
   // por si esta lectura se generó antes de este cambio, o si por lo que sea
