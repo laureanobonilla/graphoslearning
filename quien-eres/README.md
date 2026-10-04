@@ -125,6 +125,14 @@ group by last_question_answered
 order by last_question_answered;
 ```
 
+**Cuántos abren el link pero ni siquiera tocan "Empezar"** (rebote en la
+portada — útil para saber si el problema es la portada o el cuestionario):
+```sql
+select count(*) as entran_pero_no_empiezan
+from public.quien_eres_funnel
+where questions_answered = 0;
+```
+
 ## Variable de entorno nueva (solo para esta app)
 
 Una sola variable nueva, opcional, se agrega a las que ya tiene el sitio:

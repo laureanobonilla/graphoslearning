@@ -176,6 +176,24 @@ function track(eventName, metadata) {
   } catch { /* no crítico */ }
 }
 
+// Se manda apenas carga la página, ANTES de que la persona toque nada —
+// así quien_eres_funnel (y la tabla events en general) también incluye a
+// quien abre el link y se va sin llegar a tocar "Empezar". Sin esto, no
+// había forma de distinguir "nadie entra al link" de "entran pero la
+// portada no los convence" — dos problemas muy distintos con soluciones
+// muy distintas.
+//
+// referrer + un indicio simple de "robot": cuando alguien comparte este
+// link en Facebook/WhatsApp/Slack, esas plataformas mandan un robot a
+// "pre-visitar" la página para armar la vista previa (imagen + texto) antes
+// de que una persona real haga clic — eso también generaría un
+// landing_viewed sin que haya nadie del otro lado. Guardar esto ayuda a
+// distinguir, en una consulta SQL, cuáles de las visitas fueron de verdad.
+track('landing_viewed', {
+  referrer: document.referrer ? document.referrer.slice(0, 200) : null,
+  likelyBot: /bot|crawl|spider|facebookexternalhit|whatsapp|preview|slackbot|embedly|discordbot/i.test(navigator.userAgent)
+});
+
 // --- Recordar la lectura pendiente de pago (sin necesitar cuenta) --------
 // No hay login, así que lo único que vincula a la persona con SU lectura es
 // el readingId — y antes ese id solo vivía en una variable de JavaScript:
