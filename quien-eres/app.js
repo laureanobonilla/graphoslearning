@@ -366,13 +366,27 @@ function showError(title, detail, retryFn) {
 }
 
 // --- Revelación + paywall ---------------------------------------------------
-function renderReveal(data) {
+function renderReveal(data, { skipPaywall } = {}) {
   readingId = data.readingId;
   archetypeNameForShare = data.archetypeName || '';
   document.getElementById('archetypeName').textContent = data.archetypeName || '';
   document.getElementById('hookLine').textContent = data.hookLine || '';
   const teaserEl = document.getElementById('teaserText');
   teaserEl.innerHTML = (data.teaser || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+
+  document.getElementById('skippedNote').classList.add('is-hidden');
+  document.getElementById('fullContainer').classList.add('is-hidden');
+  showScreen('reveal');
+
+  // skipPaywall: ya sabemos (porque el servidor lo confirmó) que esta
+  // lectura está pagada — se va a mostrar el texto completo enseguida
+  // (ver resumePendingReadingIfAny), así que no tiene sentido guardarla
+  // como "pendiente de pago", ni cargar el SDK de PayPal, ni registrar
+  // "paywall_shown" (nunca llegó a verlo, ya había pagado).
+  if (skipPaywall) {
+    document.getElementById('paywall').classList.add('is-hidden');
+    return;
+  }
 
   savePendingReading({
     readingId: data.readingId,
@@ -382,12 +396,7 @@ function renderReveal(data) {
   });
 
   document.getElementById('paywall').classList.remove('is-hidden');
-  document.getElementById('skippedNote').classList.add('is-hidden');
-  document.getElementById('fullContainer').classList.add('is-hidden');
-
   track('paywall_shown', { archetypeName: data.archetypeName || '' });
-
-  showScreen('reveal');
   initPaywall(readingId);
 }
 
@@ -498,11 +507,41 @@ document.getElementById('btnRestartFromSkip').addEventListener('click', restartQ
 // que todavía no se pagó, se salta directo a la pantalla de revelación con
 // esos mismos datos (sin repetir el cuestionario) en vez de mostrar la
 // portada desde cero.
-(function resumePendingReadingIfAny() {
+//
+// El caso que esto resuelve de verdad: alguien PAGA, pero pierde la
+// conexión o recarga la página justo después de pagar, antes de que el
+// navegador llegue a mostrar el texto completo (unlockFull nunca se
+// alcanza a ejecutar en ese caso, así que localStorage se queda con la
+// lectura marcada como "sin pagar" aunque el cargo sí se haya hecho). Por
+// eso, antes de mostrar la pantalla de pago de nuevo, se le pregunta al
+// SERVIDOR (nunca a localStorage) si esta lectura ya está pagada — si lo
+// está, se entrega el texto completo directo, sin volver a pedirle que
+// pague ni mostrarle el botón de PayPal.
+async function resumePendingReadingIfAny() {
   const pending = loadPendingReading();
   if (!pending) return;
+
+  try {
+    const res = await fetch('/.netlify/functions/qer-get-reading', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ readingId: pending.readingId })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.paid) {
+      renderReveal(pending, { skipPaywall: true });
+      unlockFull({ full: data.full, closingLine: data.closingLine });
+      return;
+    }
+  } catch {
+    // Sin conexión justo al abrir la página — no es grave: se muestra la
+    // pantalla de pago normal (abajo) y, si de verdad ya pagó, al volver a
+    // intentar esta misma función se confirma en cuanto haya conexión.
+  }
+
   renderReveal(pending);
-})();
+}
+resumePendingReadingIfAny();
 
 document.getElementById('btnShare').addEventListener('click', async () => {
   const shareText = archetypeNameForShare

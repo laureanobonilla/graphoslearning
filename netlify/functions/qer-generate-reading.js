@@ -115,7 +115,7 @@ exports.handler = async (event) => {
     const schema = {
         type: 'OBJECT',
         properties: {
-            archetypeName: { type: 'STRING', description: 'Nombre del arquetipo revelado: 2 a 4 palabras, evocador y específico (nunca genérico tipo "persona reflexiva"). En español.' },
+            archetypeName: { type: 'STRING', description: 'Nombre del arquetipo revelado: 2 a 4 palabras, evocador y específico (nunca genérico tipo "persona reflexiva"), pero con PALABRAS SENCILLAS Y COTIDIANAS — nunca términos académicos, técnicos o rebuscados (nada de "cartografía defensiva", "arquitectura emocional" ni construcciones similares de ensayo). En español.' },
             hookLine: { type: 'STRING', description: 'Una sola frase, intrigante, que abre la lectura — el "gancho" antes de los párrafos.' },
             teaser: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Exactamente 2 párrafos (strings), cada uno de 70 a 120 palabras, que abren la interpretación con detalles concretos tomados de las respuestas reales de la persona — no genéricos ni de horóscopo.' },
             full: { type: 'ARRAY', items: { type: 'STRING' }, description: 'Entre 4 y 6 párrafos más (strings) que continúan y profundizan la interpretación, cada uno de 70 a 130 palabras, siguiendo revelando cosas específicas basadas en las respuestas.' },
@@ -129,7 +129,9 @@ exports.handler = async (event) => {
 Respuestas de la persona:
 ${transcript}
 
-Escribe su lectura en español, en segunda persona ("tú"), con un tono íntimo, perceptivo y un poco teatral — como alguien que de verdad prestó atención a cada respuesta y conecta detalles entre ellas, no como un horóscopo genérico que le quedaría bien a cualquiera. Usa detalles CONCRETOS de sus respuestas reales (cita o parafrasea algo que dijo) en al menos la mitad de los párrafos. Está permitido señalar una contradicción o un punto incómodo si las respuestas lo sugieren — una lectura que solo halaga no se siente real. Nunca inventes datos personales que la persona no dio (edad, nombre, relaciones, etc.) ni hagas diagnósticos o etiquetas clínicas (nada de "trastorno", "patología" ni similares): esto es una interpretación de personalidad con fines de entretenimiento/reflexión, no una evaluación psicológica real.`;
+Escribe su lectura en español, en segunda persona ("tú"), con un tono íntimo, perceptivo y un poco teatral — como alguien que de verdad prestó atención a cada respuesta y conecta detalles entre ellas, no como un horóscopo genérico que le quedaría bien a cualquiera. Usa detalles CONCRETOS de sus respuestas reales (cita o parafrasea algo que dijo) en al menos la mitad de los párrafos. Está permitido señalar una contradicción o un punto incómodo si las respuestas lo sugieren — una lectura que solo halaga no se siente real. Nunca inventes datos personales que la persona no dio (edad, nombre, relaciones, etc.) ni hagas diagnósticos o etiquetas clínicas (nada de "trastorno", "patología" ni similares): esto es una interpretación de personalidad con fines de entretenimiento/reflexión, no una evaluación psicológica real.
+
+MUY IMPORTANTE sobre el lenguaje: quien lee esto no es un público académico — usa palabras sencillas, cotidianas, las que usarías hablando con un amigo. "Teatral" significa dramatismo emocional (el peso de lo que dice, las pausas, la intriga), NUNCA vocabulario rebuscado. Evita por completo construcciones de ensayo o tesis — nada de frases tipo "cartografía defensiva", "arquitectura emocional", "dialéctica de...", "la dicotomía entre...", ni sustantivos abstractos encadenados con "de" ("la geometría de tu silencio"). Si una frase necesitaría que alguien pare a pensar qué significa, está mal — tiene que entenderse al vuelo, en una sola lectura rápida desde el celular.`;
 
     try {
         const reading = await generateReadingWithRetries(prompt, schema);
