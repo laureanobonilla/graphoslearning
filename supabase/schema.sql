@@ -175,28 +175,67 @@ alter table public.events enable row level security;
 alter table public.events add column if not exists actor_label text;
 create index if not exists events_label_time on public.events (actor_label, created_at desc);
 
--- Se reemplaza la función anterior (de 5 parámetros, sin p_label) por esta de
--- 6: en Postgres, agregar un parámetro nuevo crea una función DISTINTA en
--- vez de reemplazar la vieja (la sobrecarga queda por nombre+tipos de
--- parámetros), así que primero se borra esa versión vieja para no dejar dos
--- funciones log_event sueltas — una usada y otra huérfana.
-drop function if exists public.log_event(text, text, text, text, jsonb);
+-- ==========================================
+-- TABLA DE EVENTOS COMPARTIDA ENTRE TODAS LAS APPS DE LA COLECCIÓN
+-- ==========================================
+-- La misma tabla `events` de arriba (ya usada por Graphikosmos) ahora sirve
+-- para CUALQUIER app nueva del mismo sitio ("¿Quién eres en realidad?" y las
+-- que sigan) sin tener que crear una tabla ni unas variables de entorno
+-- nuevas por app — todas comparten el mismo proyecto de Supabase.
+--
+-- IMPORTANTE: este bloque va ANTES de crear la vista `events_friendly` (más
+-- abajo) porque esa vista lee la columna `app` — si se intentara crear la
+-- vista antes de que la columna exista, Supabase la rechaza con
+-- "column app does not exist", aunque el "create table" de arriba sí se
+-- haya corrido bien. El orden de los `alter table` importa.
+--
+-- Dos cambios para que una app SIN cuentas ni invitados con saldo (como
+-- "¿Quién eres en realidad?") pueda registrar eventos igual:
+--
+-- 1. Columna `app`: de qué app de la colección viene el evento. Por defecto
+--    'graphikosmos', para no afectar ninguna fila ni llamada existente.
+alter table public.events add column if not exists app text not null default 'graphikosmos';
+create index if not exists events_app_time       on public.events (app, created_at desc);
+create index if not exists events_app_event_time on public.events (app, event_name, created_at desc);
 
-create or replace function public.log_event(p_actor text, p_kind text, p_anon text, p_event text, p_metadata jsonb, p_label text default null)
+-- 2. actor_kind ahora también acepta 'anon': para una app sin login ni
+--    sistema de invitados con saldo, no hay un actor_id "real" — solo el id
+--    por navegador (anon_id), que aquí se usa también como actor_id. Se
+--    busca el nombre exacto que Postgres le puso al check (el que crea por
+--    defecto `create table` al no nombrarlo) para poder reemplazarlo sin
+--    duplicar uno nuevo con otro nombre.
+alter table public.events drop constraint if exists events_actor_kind_check;
+alter table public.events add constraint events_actor_kind_check
+  check (actor_kind in ('user', 'guest', 'anon'));
+
+-- Se reemplaza la función anterior (de 5 parámetros, sin p_label/p_app) por
+-- esta de 7: en Postgres, agregar un parámetro nuevo crea una función
+-- DISTINTA en vez de reemplazar la vieja (la sobrecarga queda por
+-- nombre+tipos de parámetros), así que primero se borran las versiones
+-- viejas (de 5 y de 6 parámetros) para no dejar funciones log_event
+-- huérfanas sueltas.
+drop function if exists public.log_event(text, text, text, text, jsonb);
+drop function if exists public.log_event(text, text, text, text, jsonb, text);
+
+create or replace function public.log_event(
+  p_actor text, p_kind text, p_anon text, p_event text, p_metadata jsonb,
+  p_label text default null, p_app text default 'graphikosmos'
+)
 returns void language plpgsql as $$
 begin
-  insert into public.events(actor_id, actor_kind, anon_id, event_name, metadata, actor_label)
-  values (p_actor, p_kind, p_anon, p_event, coalesce(p_metadata, '{}'::jsonb), p_label);
+  insert into public.events(actor_id, actor_kind, anon_id, event_name, metadata, actor_label, app)
+  values (p_actor, p_kind, p_anon, p_event, coalesce(p_metadata, '{}'::jsonb), p_label, coalesce(p_app, 'graphikosmos'));
 end $$;
 
 -- Vista de conveniencia para leer la tabla a mano desde el SQL Editor de
 -- Supabase sin tener que escribir el coalesce cada vez: "who" ya prioriza el
 -- nombre legible y solo cae al id crudo para eventos viejos (de antes de
--- este cambio) que no tienen actor_label. Ejemplos de uso en
+-- ese cambio) que no tienen actor_label. Ejemplos de uso en
 -- LEEME_ETAPA_2.md, sección correspondiente a esta ronda de cambios.
 create or replace view public.events_friendly as
   select
     created_at,
+    app,
     coalesce(actor_label, actor_id) as who,
     actor_kind,
     event_name,
@@ -204,10 +243,30 @@ create or replace view public.events_friendly as
   from public.events
   order by created_at desc;
 
+-- Vista propia del embudo de "¿Quién eres en realidad?": qué tan lejos
+-- llegó cada visitante (hasta qué número de pregunta, de 1 a 16) y si llegó
+-- a pagar. Un visitante que nunca generó la lectura ni pagó simplemente no
+-- tiene fila en last_question_answered más allá de donde se quedó.
+create or replace view public.quien_eres_funnel as
+  select
+    anon_id,
+    max((metadata->>'questionIndex')::int) filter (where event_name = 'question_answered') as last_question_answered,
+    count(*) filter (where event_name = 'question_answered') as questions_answered,
+    bool_or(event_name = 'reading_generated_success') as generated_reading,
+    bool_or(event_name = 'paywall_shown') as saw_paywall,
+    bool_or(event_name in ('payment_order_create_failed', 'payment_captured_failed')) as had_payment_problem,
+    bool_or(event_name = 'payment_captured_success') as paid,
+    min(created_at) as first_event_at,
+    max(created_at) as last_event_at
+  from public.events
+  where app = 'quien-eres'
+  group by anon_id
+  order by max(created_at) desc;
+
 revoke all on function public.ensure_profile(text,text,integer)             from public, anon, authenticated;
 revoke all on function public.spend_nodes(text,integer,text)                from public, anon, authenticated;
 revoke all on function public.credit_nodes(text,integer,text,numeric)       from public, anon, authenticated;
 revoke all on function public.ensure_guest(text,text,integer,integer,integer) from public, anon, authenticated;
 revoke all on function public.spend_guest_nodes(text,integer,text)          from public, anon, authenticated;
 revoke all on function public.usage_last_hour(text)                         from public, anon, authenticated;
-revoke all on function public.log_event(text,text,text,text,jsonb,text)     from public, anon, authenticated;
+revoke all on function public.log_event(text,text,text,text,jsonb,text,text) from public, anon, authenticated;

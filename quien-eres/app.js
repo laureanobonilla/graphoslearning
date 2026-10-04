@@ -15,36 +15,54 @@
 // variada y no como un formulario largo y repetitivo. Las preguntas buscan
 // un ángulo concreto (qué haces sin que nadie mire, qué proteges, cómo te
 // ven vs. cómo te ves) en vez de rasgos de personalidad genéricos.
+// Cada blot se dibuja como UNA sola mitad (de x=80 hacia la izquierda, cerrando
+// con una línea recta sobre el eje central) y luego esa misma mitad se refleja
+// con "scale(-1,1)" para formar el lado derecho — así cada figura es un blot
+// de Rorschach genuino (mitad irregular + su espejo), no la misma silueta ya
+// simétrica repetida dos veces. Las cuatro mitades son deliberadamente
+// distintas en carácter (redondeada / angulosa-filosa / alargada-afilada /
+// agrupada en racimo), no solo en color, para que de verdad se vean como
+// cuatro formas diferentes y no como la misma mancha repintada.
 const BLOT_A = `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
   <g>
-    <path d="M80 12 C100 10 112 28 108 44 C124 48 130 68 118 80 C132 90 128 112 110 116 C112 134 92 146 80 136 C68 146 48 134 50 116 C32 112 28 90 42 80 C30 68 36 48 52 44 C48 28 60 10 80 12Z" fill="#c6a358" opacity="0.9"/>
+    <path d="M80 14 C64 10 50 20 54 34 C34 36 24 52 34 64 C18 70 16 90 32 98 C20 108 24 128 42 130 C40 142 58 152 70 142 C76 146 80 144 80 138 Z" fill="#c6a358" opacity="0.9"/>
   </g>
   <g transform="translate(160,0) scale(-1,1)">
-    <path d="M80 12 C100 10 112 28 108 44 C124 48 130 68 118 80 C132 90 128 112 110 116 C112 134 92 146 80 136 C68 146 48 134 50 116 C32 112 28 90 42 80 C30 68 36 48 52 44 C48 28 60 10 80 12Z" fill="#c6a358" opacity="0.9"/>
+    <path d="M80 14 C64 10 50 20 54 34 C34 36 24 52 34 64 C18 70 16 90 32 98 C20 108 24 128 42 130 C40 142 58 152 70 142 C76 146 80 144 80 138 Z" fill="#c6a358" opacity="0.9"/>
   </g>
 </svg>`;
 const BLOT_B = `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
   <g>
-    <path d="M78 8 C94 20 88 38 100 46 C118 50 122 72 104 82 C120 94 112 118 92 114 C96 132 74 142 64 126 C48 136 30 122 38 104 C20 100 20 76 38 70 C28 56 40 38 58 42 C56 24 64 6 78 8Z" fill="#9c3b47" opacity="0.88"/>
+    <path d="M80 10 L62 18 L66 32 L40 30 L48 50 L22 54 L36 72 L14 84 L34 94 L20 114 L44 112 L38 134 L62 122 L66 144 L80 136 Z" fill="#7c2d37" opacity="0.88"/>
   </g>
   <g transform="translate(160,0) scale(-1,1)">
-    <path d="M78 8 C94 20 88 38 100 46 C118 50 122 72 104 82 C120 94 112 118 92 114 C96 132 74 142 64 126 C48 136 30 122 38 104 C20 100 20 76 38 70 C28 56 40 38 58 42 C56 24 64 6 78 8Z" fill="#9c3b47" opacity="0.88"/>
+    <path d="M80 10 L62 18 L66 32 L40 30 L48 50 L22 54 L36 72 L14 84 L34 94 L20 114 L44 112 L38 134 L62 122 L66 144 L80 136 Z" fill="#7c2d37" opacity="0.88"/>
   </g>
 </svg>`;
 const BLOT_C = `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
   <g>
-    <path d="M80 14 C96 8 114 18 114 36 C128 40 134 58 122 70 C136 78 134 100 116 106 C120 122 104 138 88 130 C84 144 64 144 60 130 C44 136 30 122 36 106 C20 100 20 78 34 70 C24 58 30 40 44 36 C44 18 64 8 80 14Z" fill="#7fae9b" opacity="0.85"/>
+    <path d="M80 6 C68 10 62 24 70 34 C48 36 38 54 50 66 C30 70 24 92 42 100 C28 110 30 130 50 132 C46 144 60 154 72 144 C76 148 80 146 80 140 Z" fill="#7fae9b" opacity="0.85"/>
   </g>
   <g transform="translate(160,0) scale(-1,1)">
-    <path d="M80 14 C96 8 114 18 114 36 C128 40 134 58 122 70 C136 78 134 100 116 106 C120 122 104 138 88 130 C84 144 64 144 60 130 C44 136 30 122 36 106 C20 100 20 78 34 70 C24 58 30 40 44 36 C44 18 64 8 80 14Z" fill="#7fae9b" opacity="0.85"/>
+    <path d="M80 6 C68 10 62 24 70 34 C48 36 38 54 50 66 C30 70 24 92 42 100 C28 110 30 130 50 132 C46 144 60 154 72 144 C76 148 80 146 80 140 Z" fill="#7fae9b" opacity="0.85"/>
   </g>
 </svg>`;
 const BLOT_D = `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <g>
-    <path d="M76 10 C92 14 92 32 104 38 C122 38 130 58 116 70 C130 82 124 104 106 108 C108 126 88 140 74 128 C62 140 42 130 44 112 C28 110 24 88 38 78 C26 68 32 48 50 46 C50 28 62 8 76 10Z" fill="#c6a358" opacity="0.8"/>
+  <g fill="#8c6a9e">
+    <circle cx="58" cy="38" r="24" opacity="0.88"/>
+    <circle cx="32" cy="66" r="17" opacity="0.88"/>
+    <circle cx="62" cy="88" r="20" opacity="0.88"/>
+    <circle cx="36" cy="118" r="15" opacity="0.88"/>
+    <circle cx="64" cy="138" r="12" opacity="0.88"/>
+    <circle cx="16" cy="96" r="7" opacity="0.8"/>
   </g>
-  <g transform="translate(160,0) scale(-1,1)">
-    <path d="M76 10 C92 14 92 32 104 38 C122 38 130 58 116 70 C130 82 124 104 106 108 C108 126 88 140 74 128 C62 140 42 130 44 112 C28 110 24 88 38 78 C26 68 32 48 50 46 C50 28 62 8 76 10Z" fill="#c6a358" opacity="0.8"/>
+  <g transform="translate(160,0) scale(-1,1)" fill="#8c6a9e">
+    <circle cx="58" cy="38" r="24" opacity="0.88"/>
+    <circle cx="32" cy="66" r="17" opacity="0.88"/>
+    <circle cx="62" cy="88" r="20" opacity="0.88"/>
+    <circle cx="36" cy="118" r="15" opacity="0.88"/>
+    <circle cx="64" cy="138" r="12" opacity="0.88"/>
+    <circle cx="16" cy="96" r="7" opacity="0.8"/>
   </g>
 </svg>`;
 
@@ -67,31 +85,31 @@ const QUESTIONS = [
     placeholder: 'Escribe lo primero que pienses' },
   { id: 'q3', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_A,
     placeholder: 'Una palabra' },
-  { id: 'q4', type: 'choice', prompt: '¿Cuál de estas versiones se parece más a ti cuando nadie te está midiendo?',
+  { id: 'q4', type: 'choice', prompt: '¿Cuál de estas versiones de ti se parece más a cómo eres cuando nadie te está viendo?',
     options: [
-      'La que de verdad descansa, sin culpa',
-      'La que sigue trabajando aunque ya nadie lo note',
-      'La que es más honesta de lo que es en público',
-      'La que piensa en otros antes que en sí misma'
+      'La que de verdad descansa, sin sentirse culpable',
+      'La que sigue trabajando aunque ya nadie se dé cuenta',
+      'La que es más sincera que la que muestras en público',
+      'La que siempre piensa primero en los demás'
     ] },
   { id: 'q5', type: 'short', prompt: '¿Qué harías si supieras que nadie se va a enterar nunca?',
-    placeholder: 'Sé honesto' },
-  { id: 'q6', type: 'choice', prompt: 'Si tu círculo más cercano tuviera que contar tu peor momento, dirían que fue cuando...',
+    placeholder: 'Así, sin filtro' },
+  { id: 'q6', type: 'choice', prompt: 'Si tus amigos más cercanos tuvieran que contar tu peor momento, dirían que fue cuando...',
     options: [
       'te cerraste y no dejaste que nadie te ayudara',
       'explotaste con quien menos lo merecía',
-      'desapareciste sin explicación',
+      'desapareciste sin dar explicaciones',
       'fingiste que todo estaba bien hasta que ya no pudiste más'
     ] },
   { id: 'q7', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_B,
     placeholder: 'Una palabra' },
-  { id: 'q8', type: 'short', prompt: '¿Cuál es la mentira que te repites más seguido a ti mismo?',
-    placeholder: 'La que casi nunca te dices en voz alta' },
-  { id: 'q9', type: 'choice', prompt: 'Cuando hay un conflicto con alguien cercano, tu primer instinto es...',
+  { id: 'q8', type: 'short', prompt: '¿Cuál es la mentira que más te repites a ti?',
+    placeholder: 'La que casi nunca dices en voz alta' },
+  { id: 'q9', type: 'choice', prompt: 'Cuando discutes con alguien cercano, lo primero que haces es...',
     options: [
-      'Confrontarlo directamente, cuanto antes',
+      'Hablarlo de frente, lo antes posible',
       'Evitarlo y esperar a que se resuelva solo',
-      'Usar el humor para bajarle peso',
+      'Usar el humor para quitarle peso',
       'Escribir lo que siento antes de hablarlo'
     ] },
   { id: 'q10', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_C,
@@ -103,7 +121,7 @@ const QUESTIONS = [
       'El que sigue a una pregunta que no supiste responder',
       'El de alguien enojado contigo',
       'El de una habitación vacía',
-      'El que tú mismo creas para no decir algo que piensas'
+      'El que creas tú para no decir algo que piensas'
     ] },
   { id: 'q13', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_D,
     placeholder: 'Una palabra' },
@@ -120,6 +138,79 @@ let currentIndex = 0;
 const answers = new Array(QUESTIONS.length).fill(null);
 let readingId = null;
 let archetypeNameForShare = '';
+
+// --- Registro de uso: hasta dónde llega cada visitante, y con qué respuestas ---
+// Se guarda en la misma tabla `events` de Supabase que ya usa Graphikosmos
+// (ver supabase/schema.sql y netlify/functions/qer-track-event.js) — mismas
+// variables de entorno, sin configurar nada nuevo. anonId identifica solo
+// el NAVEGADOR (no a la persona), se genera una vez y se reutiliza siempre
+// que vuelva desde el mismo navegador.
+const ANON_ID_KEY = 'qer_anon_id';
+function ensureAnonId() {
+  try {
+    let id = localStorage.getItem(ANON_ID_KEY);
+    if (!id) {
+      id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      localStorage.setItem(ANON_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    // localStorage no disponible (modo privado, etc.) — un id de un solo
+    // uso para esta carga de página; no se podrá "seguir el hilo" si
+    // recarga, pero el evento de todos modos queda registrado.
+    return `volatile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+const anonId = ensureAnonId();
+
+// "Dispara y olvida" a propósito: nunca debe frenar ni poder romper la
+// experiencia del cuestionario — si falla (red, Supabase caído), no se
+// reintenta ni se le avisa a la persona.
+function track(eventName, metadata) {
+  try {
+    fetch('/.netlify/functions/qer-track-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: eventName, anonId, metadata: metadata || {} })
+    }).catch(() => {});
+  } catch { /* no crítico */ }
+}
+
+// --- Recordar la lectura pendiente de pago (sin necesitar cuenta) --------
+// No hay login, así que lo único que vincula a la persona con SU lectura es
+// el readingId — y antes ese id solo vivía en una variable de JavaScript:
+// si cerrabas la pestaña o se refrescaba la página antes de pagar, se
+// perdía para siempre y no había forma de "pagar después" aunque la
+// lectura siguiera guardada en el servidor (24h, ver _lib/qer-readings-
+// store.js). Ahora se guarda también en localStorage de este navegador,
+// así que si vuelves dentro de esas 24h, retomas justo donde quedaste —
+// viendo el inicio gratis y con el botón de pago listo — sin repetir las
+// 16 preguntas.
+const PENDING_KEY = 'qer_pending_reading';
+const PENDING_MAX_AGE_MS = 23 * 60 * 60 * 1000; // un poco menos que el TTL del servidor (24h)
+
+function savePendingReading(data) {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ ...data, savedAt: Date.now() }));
+  } catch { /* localStorage puede fallar (modo privado, cuota llena) — no es crítico */ }
+}
+
+function loadPendingReading() {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data?.readingId || Date.now() - (data.savedAt || 0) > PENDING_MAX_AGE_MS) {
+      localStorage.removeItem(PENDING_KEY);
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+
+function clearPendingReading() {
+  try { localStorage.removeItem(PENDING_KEY); } catch { /* no crítico */ }
+}
 
 // --- Navegación entre pantallas -------------------------------------------
 function showScreen(name) {
@@ -210,6 +301,17 @@ btnNext.addEventListener('click', () => {
   const value = collectAnswer(currentIndex);
   if (!value) return;
   answers[currentIndex] = value;
+
+  // questionIndex en base 1 (1 a 16), para que "hasta dónde llegó" se lea
+  // directo en una consulta SQL sin tener que sumarle 1 a mano.
+  track('question_answered', {
+    questionIndex: currentIndex + 1,
+    questionId: QUESTIONS[currentIndex].id,
+    questionType: QUESTIONS[currentIndex].type,
+    question: QUESTIONS[currentIndex].prompt,
+    answer: value.slice(0, 500)
+  });
+
   if (currentIndex < QUESTIONS.length - 1) {
     currentIndex++;
     renderQuestion(currentIndex);
@@ -227,6 +329,7 @@ btnBack.addEventListener('click', () => {
 });
 
 document.getElementById('btnStart').addEventListener('click', () => {
+  track('quiz_started', {});
   currentIndex = 0;
   renderQuestion(0);
   showScreen('quiz');
@@ -246,8 +349,10 @@ async function submitQuiz() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'No se pudo generar tu lectura.');
+    track('reading_generated_success', {});
     renderReveal(data);
   } catch (err) {
+    track('reading_generated_error', { reason: err.message });
     showError('Tu lectura no pudo terminar de armarse.', err.message, submitQuiz);
   }
 }
@@ -269,9 +374,18 @@ function renderReveal(data) {
   const teaserEl = document.getElementById('teaserText');
   teaserEl.innerHTML = (data.teaser || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
 
+  savePendingReading({
+    readingId: data.readingId,
+    archetypeName: data.archetypeName,
+    hookLine: data.hookLine,
+    teaser: data.teaser
+  });
+
   document.getElementById('paywall').classList.remove('is-hidden');
   document.getElementById('skippedNote').classList.add('is-hidden');
   document.getElementById('fullContainer').classList.add('is-hidden');
+
+  track('paywall_shown', { archetypeName: data.archetypeName || '' });
 
   showScreen('reveal');
   initPaywall(readingId);
@@ -322,7 +436,11 @@ async function initPaywall(forReadingId) {
         body: JSON.stringify({ readingId: forReadingId })
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'No se pudo iniciar el pago.');
+      if (!res.ok) {
+        track('payment_order_create_failed', { reason: data.error || `HTTP ${res.status}` });
+        throw new Error(data.error || 'No se pudo iniciar el pago.');
+      }
+      track('payment_order_created', {});
       return data.orderID;
     },
     onApprove: async (data) => {
@@ -333,16 +451,23 @@ async function initPaywall(forReadingId) {
       });
       const result = await res.json().catch(() => ({}));
       if (!res.ok) {
+        track('payment_captured_failed', { reason: result.error || `HTTP ${res.status}` });
         alert(result.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos.');
         return;
       }
+      track('payment_captured_success', {});
       unlockFull(result);
     },
-    onError: (err) => console.error('[paypal]', err)
+    onError: (err) => {
+      track('payment_captured_failed', { reason: String(err?.message || err).slice(0, 300) });
+      console.error('[paypal]', err);
+    },
+    onCancel: () => track('payment_cancelled', {})
   }).render('#paypal-button-container');
 }
 
 function unlockFull({ full, closingLine }) {
+  clearPendingReading(); // ya pagó — no hace falta poder "retomar" un pago que ya pasó
   document.getElementById('paywall').classList.add('is-hidden');
   const fullEl = document.getElementById('fullText');
   fullEl.innerHTML = (full || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
@@ -361,11 +486,23 @@ function restartQuiz() {
   currentIndex = 0;
   answers.fill(null);
   readingId = null;
+  clearPendingReading();
   renderQuestion(0);
   showScreen('quiz');
 }
 document.getElementById('btnRestart').addEventListener('click', restartQuiz);
 document.getElementById('btnRestartFromSkip').addEventListener('click', restartQuiz);
+
+// --- Retomar una lectura pendiente de pago (si volvió antes de que expire) ---
+// Se revisa al cargar la página: si hay una lectura guardada en este navegador
+// que todavía no se pagó, se salta directo a la pantalla de revelación con
+// esos mismos datos (sin repetir el cuestionario) en vez de mostrar la
+// portada desde cero.
+(function resumePendingReadingIfAny() {
+  const pending = loadPendingReading();
+  if (!pending) return;
+  renderReveal(pending);
+})();
 
 document.getElementById('btnShare').addEventListener('click', async () => {
   const shareText = archetypeNameForShare

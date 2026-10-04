@@ -43,12 +43,80 @@ agregar una app nueva es tan simple como agregar una carpeta con su propio
   para poder convivir en la misma carpeta `netlify/functions/` que las
   funciones de Graphikosmos sin pisarse los nombres.
 - **Lo que NO se reutilizó, a propósito**: el login con Netlify Identity y
-  el saldo de nodos en Supabase de Graphikosmos. Aquí no hace falta
-  cuenta — el "producto" es una sola lectura, identificada por un id
-  (`readingId`), no un saldo permanente — así que se usa **Netlify Blobs**
-  (`@netlify/blobs`, ya agregado a `package.json` del sitio) en vez de una
-  base de datos: no requiere ninguna configuración aparte, funciona solo
-  con desplegar.
+  el saldo de nodos de Graphikosmos. Aquí no hace falta cuenta — el
+  "producto" es una sola lectura, identificada por un id (`readingId`), no
+  un saldo permanente — así que la lectura en sí se guarda con **Netlify
+  Blobs** (`@netlify/blobs`, ya agregado a `package.json` del sitio) en vez
+  de una base de datos: no requiere ninguna configuración aparte, funciona
+  solo con desplegar.
+- **Sí se reutiliza Supabase, pero solo para el registro de uso** (ver
+  siguiente sección) — la base de datos de Graphikosmos, no una nueva.
+
+## Registro de uso: hasta dónde llega cada visitante, y los pagos fallidos
+
+Cada visitante (sin necesidad de cuenta) queda registrado en la misma tabla
+`events` de Supabase que ya usa Graphikosmos — mismas variables de entorno
+(`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`), ya configuradas en este sitio, sin
+nada nuevo que agregar. Lo único que hace falta es volver a correr
+`supabase/schema.sql` completo en el SQL Editor de Supabase (es seguro de
+repetir — usa `if not exists`/`create or replace` en todo, no borra ni
+duplica nada existente): agrega una columna `app` a la tabla para poder
+separar los eventos de esta app de los de Graphikosmos en la misma consulta.
+
+**Importante — a diferencia del registro de Graphikosmos (que a propósito
+nunca guarda el texto que escribe la persona, por privacidad)**: aquí sí se
+guarda la respuesta completa de cada pregunta, porque fue justo lo que se
+pidió ("quiero saber todas sus respuestas"). Es una decisión consciente:
+si en algún momento prefieres no guardar el texto literal de las respuestas
+abiertas, se puede quitar con un solo cambio en `app.js` (la llamada
+`track('question_answered', ...)`) sin afectar el resto del embudo.
+
+Eventos que quedan registrados (todos con `app = 'quien-eres'`):
+
+| Evento | Cuándo |
+|---|---|
+| `quiz_started` | Toca "Empezar" en la portada |
+| `question_answered` | Cada vez que responde una pregunta y pasa a la siguiente — incluye `questionIndex` (1 a 16), la pregunta y su respuesta completa |
+| `reading_generated_success` / `_error` | Se generó la lectura, o falló (con el motivo exacto en `reason` — esto es lo que antes era invisible cuando daba el error 502) |
+| `paywall_shown` | Ve la pantalla de "lectura parcial + botón de pago" |
+| `payment_order_created` / `_create_failed` | Se creó (o falló crear) la orden de PayPal |
+| `payment_cancelled` | Cerró la ventana de PayPal sin terminar |
+| `payment_captured_success` / `_failed` | El pago se confirmó, o falló la confirmación (con el motivo) |
+
+### Consultas de ejemplo (SQL Editor de Supabase)
+
+**¿Hasta qué pregunta llegó cada visitante, y si pagó?** (ya armada como
+vista, por comodidad):
+```sql
+select * from public.quien_eres_funnel order by last_event_at desc limit 50;
+```
+
+**Todas las respuestas de una sesión específica** (reemplaza el anon_id):
+```sql
+select metadata->>'questionIndex' as pregunta, metadata->>'question' as texto, metadata->>'answer' as respuesta
+from public.events
+where app = 'quien-eres' and anon_id = 'PEGA-AQUÍ-EL-ANON-ID' and event_name = 'question_answered'
+order by (metadata->>'questionIndex')::int;
+```
+
+**Quién intentó pagar y no pudo, y por qué (últimos 7 días):**
+```sql
+select created_at, anon_id, event_name, metadata->>'reason' as motivo
+from public.events
+where app = 'quien-eres'
+  and event_name in ('payment_order_create_failed', 'payment_captured_failed')
+  and created_at > now() - interval '7 days'
+order by created_at desc;
+```
+
+**Dónde se atasca más la gente (en qué pregunta abandona más seguido):**
+```sql
+select last_question_answered, count(*) as cuántos
+from public.quien_eres_funnel
+where not paid
+group by last_question_answered
+order by last_question_answered;
+```
 
 ## Variable de entorno nueva (solo para esta app)
 

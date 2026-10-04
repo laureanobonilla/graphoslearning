@@ -19,20 +19,67 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
 
-async function generateWithFallback(payload) {
+// Esta lectura es un JSON mucho más largo (archetypeName + hookLine + hasta
+// 8 párrafos) que cualquier otra llamada a Gemini de este proyecto, y se
+// pidió con temperature alta (0.95) para que no suene genérica — pero esa
+// combinación (salida larga + mucha "creatividad") es justo la que más
+// fácil rompe el formato JSON pedido, o se corta a medio párrafo si el
+// modelo gasta de más generando. Una versión anterior solo reintentaba si
+// la LLAMADA a Gemini fallaba (503/429/etc.) — si Gemini respondía "bien"
+// pero el JSON quedaba roto o incompleto, eso nunca se reintentaba, y la
+// persona veía "no se pudo armar la lectura" a la primera mala suerte (esto
+// es lo que pasaba: el error 502 era justo esto). generateReadingWithRetries()
+// envuelve todo el
+// intento (llamada + parseo + validación de forma) y, si el JSON sale
+// roto o incompleto, lo vuelve a intentar con el siguiente modelo de la
+// lista en vez de rendirse de una.
+async function generateReadingWithRetries(prompt, schema) {
     let lastError = null;
-    for (let i = 0; i < FALLBACK_MODELS.length; i++) {
+    for (let attempt = 0; attempt < FALLBACK_MODELS.length; attempt++) {
+        let response;
         try {
-            return await ai.models.generateContent({ ...payload, model: FALLBACK_MODELS[i] });
+            response = await ai.models.generateContent({
+                contents: prompt,
+                model: FALLBACK_MODELS[attempt],
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.85,
+                    maxOutputTokens: 4096
+                }
+            });
         } catch (err) {
             lastError = err;
             const msg = (err.message || '').toLowerCase();
             const retryable = ['503', 'unavailable', '429', 'high demand', 'overloaded', 'internal'].some(s => msg.includes(s));
+            console.error(`[generate-reading] intento ${attempt + 1}: la llamada a ${FALLBACK_MODELS[attempt]} falló (${retryable ? 'reintentable' : 'NO reintentable'}): ${err.message}`);
             if (!retryable) throw err;
-            if (i < FALLBACK_MODELS.length - 1) await new Promise(r => setTimeout(r, 800));
+            if (attempt < FALLBACK_MODELS.length - 1) await new Promise(r => setTimeout(r, 800));
+            continue;
         }
+
+        const finishReason = response?.candidates?.[0]?.finishReason;
+        let reading;
+        try {
+            reading = JSON.parse(response.text);
+        } catch {
+            lastError = new Error(`JSON inválido (finishReason: ${finishReason || 'desconocido'})`);
+            console.error(`[generate-reading] intento ${attempt + 1}: ${lastError.message}. Primeros 200 caracteres de la respuesta: ${String(response.text || '').slice(0, 200)}`);
+            if (attempt < FALLBACK_MODELS.length - 1) await new Promise(r => setTimeout(r, 400));
+            continue;
+        }
+
+        if (!reading.archetypeName || !Array.isArray(reading.teaser) || reading.teaser.length < 1 ||
+            !Array.isArray(reading.full) || reading.full.length < 1) {
+            lastError = new Error(`Lectura incompleta (finishReason: ${finishReason || 'desconocido'})`);
+            console.error(`[generate-reading] intento ${attempt + 1}: ${lastError.message}.`);
+            if (attempt < FALLBACK_MODELS.length - 1) await new Promise(r => setTimeout(r, 400));
+            continue;
+        }
+
+        return reading;
     }
-    throw lastError;
+    throw lastError || new Error('No se pudo generar la lectura tras varios intentos.');
 }
 
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
@@ -85,17 +132,7 @@ ${transcript}
 Escribe su lectura en español, en segunda persona ("tú"), con un tono íntimo, perceptivo y un poco teatral — como alguien que de verdad prestó atención a cada respuesta y conecta detalles entre ellas, no como un horóscopo genérico que le quedaría bien a cualquiera. Usa detalles CONCRETOS de sus respuestas reales (cita o parafrasea algo que dijo) en al menos la mitad de los párrafos. Está permitido señalar una contradicción o un punto incómodo si las respuestas lo sugieren — una lectura que solo halaga no se siente real. Nunca inventes datos personales que la persona no dio (edad, nombre, relaciones, etc.) ni hagas diagnósticos o etiquetas clínicas (nada de "trastorno", "patología" ni similares): esto es una interpretación de personalidad con fines de entretenimiento/reflexión, no una evaluación psicológica real.`;
 
     try {
-        const response = await generateWithFallback({
-            contents: prompt,
-            config: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.95 }
-        });
-
-        let reading;
-        try { reading = JSON.parse(response.text); } catch { throw new Error('La IA devolvió un formato inesperado.'); }
-
-        if (!reading.archetypeName || !Array.isArray(reading.teaser) || !Array.isArray(reading.full)) {
-            throw new Error('La lectura generada quedó incompleta.');
-        }
+        const reading = await generateReadingWithRetries(prompt, schema);
 
         const readingId = crypto.randomUUID();
         await saveReading(readingId, reading);
@@ -108,6 +145,11 @@ Escribe su lectura en español, en segunda persona ("tú"), con un tono íntimo,
         });
     } catch (err) {
         console.error('[generate-reading]', err.message);
-        return json(502, { error: 'No se pudo generar tu lectura en este momento. Intenta de nuevo en un momento.' });
+        // TEMPORAL mientras se diagnostica el error 502 reportado: se manda el
+        // motivo técnico real (truncado) en vez de un mensaje genérico, para
+        // poder ver la causa exacta directo en la pantalla de error de la app
+        // sin tener que entrar al panel de Netlify a buscar los logs. Una vez
+        // confirmado qué lo causa, esto se puede volver a dejar genérico.
+        return json(502, { error: `No se pudo generar tu lectura. Detalle técnico: ${String(err.message || err).slice(0, 300)}` });
     }
 };
