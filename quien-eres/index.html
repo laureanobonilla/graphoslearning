@@ -161,7 +161,7 @@
     position: relative;
     clip-path: polygon(0% 10px, 4% 0%, 8% 10px, 12% 0%, 16% 10px, 20% 0%, 24% 10px, 28% 0%, 32% 10px, 36% 0%, 40% 10px, 44% 0%, 48% 10px, 52% 0%, 56% 10px, 60% 0%, 64% 10px, 68% 0%, 72% 10px, 76% 0%, 80% 10px, 84% 0%, 88% 10px, 92% 0%, 96% 10px, 100% 0%, 100% 100%, 0% 100%);
   }
-  .paywall-label{ font-family:'Fraunces', serif; font-size: 1.28rem; font-weight:500; text-align:center; margin: 6px 0 6px; }
+  .paywall-label{ font-family:'Fraunces', serif; font-size: 1.15rem; line-height: 1.35; font-weight:500; text-align:center; margin: 6px 0 10px; }
   .paywall-price{ text-align:center; color: #e9c9ba; font-size: 0.92rem; margin-bottom: 20px; }
   .paywall-price b{ color:#fff; font-size: 1.15rem; }
   #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
@@ -200,7 +200,13 @@
       </svg>
     </div>
     <h1 class="display">¿Quién eres en realidad?</h1>
-    <p class="sub">¿Quieres saber quién se esconde detrás de tu máscara?</p>
+    <!-- Antes decía "¿Quieres saber quién se esconde detrás de tu máscara?"
+         — genérico comparado con el reto del anuncio de Facebook ("16
+         preguntas que casi nadie se atreve a hacerte"). Se cambió para
+         repetir ESE mismo reto casi textual: si el anuncio ya generó el
+         impulso, la landing no debe bajarle el tono justo antes del botón
+         "Empezar". -->
+    <p class="sub">No es un test cualquiera. Son 16 preguntas que casi nadie se atreve a responder de verdad.</p>
     <!-- Antes decía "16 preguntas · 5 minutos" acá — se quitó a propósito:
          anunciar cuánto esfuerzo vas a pedir ANTES de generar curiosidad es
          justo lo que hace que alguien calcule "no tengo tiempo" y se vaya
@@ -262,7 +268,11 @@
     </div>
 
     <div id="paywall" class="paywall">
-      <p class="paywall-label display">Tu lectura continúa</p>
+      <!-- Antes decía siempre "Tu lectura continúa" (genérico) — ahora es el
+           gancho específico que generó Gemini para ESTA persona (campo
+           lockedHook, ver qer-generate-reading.js), con "Tu lectura continúa"
+           solo como respaldo si por lo que sea no llegó ese campo. -->
+      <p id="paywallHook" class="paywall-label display">Tu lectura continúa</p>
       <p class="paywall-price">Desbloqueá el resto por <b id="priceLabel">$2.99</b></p>
       <div id="paypal-button-container"></div>
       <p class="paywall-note">Pago seguro con PayPal · sin crear cuenta</p>

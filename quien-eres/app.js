@@ -391,6 +391,11 @@ function renderReveal(data, { skipPaywall } = {}) {
   document.getElementById('hookLine').textContent = data.hookLine || '';
   const teaserEl = document.getElementById('teaserText');
   teaserEl.innerHTML = (data.teaser || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+  // Gancho específico junto al botón de pago (ver lockedHook en
+  // qer-generate-reading.js) — "Tu lectura continúa" se deja como respaldo
+  // por si esta lectura se generó antes de este cambio, o si por lo que sea
+  // no llegó el campo.
+  document.getElementById('paywallHook').textContent = data.lockedHook || 'Tu lectura continúa';
 
   document.getElementById('skippedNote').classList.add('is-hidden');
   document.getElementById('fullContainer').classList.add('is-hidden');
@@ -410,7 +415,8 @@ function renderReveal(data, { skipPaywall } = {}) {
     readingId: data.readingId,
     archetypeName: data.archetypeName,
     hookLine: data.hookLine,
-    teaser: data.teaser
+    teaser: data.teaser,
+    lockedHook: data.lockedHook
   });
 
   document.getElementById('paywall').classList.remove('is-hidden');

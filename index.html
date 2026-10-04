@@ -666,13 +666,6 @@
             <!-- Área de Lectura (Fondo Blanco Limpio) -->
             <div id="readerContentContainer" data-role="contentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
                 <div id="readerTextMode" data-role="textMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none select-text" contenteditable="true" data-placeholder="Pega aquí un texto o un enlace"></div>
-                <!-- Visor de PDF: páginas dibujadas en <canvas> (ver renderPdfRangeAsViewer
-                     en app.js), sin texto seleccionable — a propósito, para no confundir
-                     con el flujo de "seleccionar fragmento → usarlo en el esquema", que
-                     sigue existiendo solo para texto pegado o traído de un enlace. Oculto
-                     mientras no se haya importado un PDF; cuando se muestra, oculta a
-                     readerTextMode (son mutuamente excluyentes). -->
-                <div id="readerPdfView" data-role="pdfView" class="hidden select-none" style="user-select:none;"></div>
                 <!-- Pista de inicio, sobrepuesta mientras el lector está vacío: funciona
                      como un placeholder normal ("Pega aquí un texto o un enlace"), solo
                      que "un enlace" va en un color distinto para que se note, de un
