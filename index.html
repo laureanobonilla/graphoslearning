@@ -652,12 +652,27 @@
                     </select>
                     <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
                     <button type="button" data-cmd="removeFormat" title="Quitar formato" class="text-slate-400 hover:text-red-300 hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors">⌫</button>
+                    <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
+                    <!-- Zoom de TODO el texto del lector (a diferencia del selector "Tamaño de
+                         letra" de arriba, que solo afecta la selección activa vía
+                         execCommand): cambia el font-size base de #readerTextMode completo.
+                         Ver wireRtfToolbar en app.js. -->
+                    <button type="button" data-role="btnZoomOut" title="Reducir el tamaño de todo el texto del lector" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors">A-</button>
+                    <span data-role="zoomLabel" class="text-[10px] text-slate-400 w-9 text-center select-none">100%</span>
+                    <button type="button" data-role="btnZoomIn" title="Aumentar el tamaño de todo el texto del lector" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors">A+</button>
                 </div>
             </div>
 
             <!-- Área de Lectura (Fondo Blanco Limpio) -->
             <div id="readerContentContainer" data-role="contentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
                 <div id="readerTextMode" data-role="textMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none select-text" contenteditable="true" data-placeholder="Pega aquí un texto o un enlace"></div>
+                <!-- Visor de PDF: páginas dibujadas en <canvas> (ver renderPdfRangeAsViewer
+                     en app.js), sin texto seleccionable — a propósito, para no confundir
+                     con el flujo de "seleccionar fragmento → usarlo en el esquema", que
+                     sigue existiendo solo para texto pegado o traído de un enlace. Oculto
+                     mientras no se haya importado un PDF; cuando se muestra, oculta a
+                     readerTextMode (son mutuamente excluyentes). -->
+                <div id="readerPdfView" data-role="pdfView" class="hidden select-none" style="user-select:none;"></div>
                 <!-- Pista de inicio, sobrepuesta mientras el lector está vacío: funciona
                      como un placeholder normal ("Pega aquí un texto o un enlace"), solo
                      que "un enlace" va en un color distinto para que se note, de un

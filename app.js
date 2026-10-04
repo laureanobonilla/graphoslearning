@@ -1331,7 +1331,7 @@ async function runTextAnalysis(analysisType, customType) {
     closeAnalyzeMenu();
     if (!context) return;
 
-    let textContent = context.textEl ? context.textEl.innerText.trim() : "";
+    let textContent = getReaderPlainText(context.textEl);
     if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
 
     textContent = await resolveTextOrWebLink(textContent, { targetTextEl: context.textEl, onTitle: context.onTitle });
@@ -2198,6 +2198,7 @@ const btnToggleReader = document.getElementById('btnToggleReader');
 const readerPanel = document.getElementById('readerPanel');
 const readerPanelHeader = document.getElementById('readerPanelHeader');
 const readerTextMode = document.getElementById('readerTextMode');
+const readerPdfView = document.getElementById('readerPdfView');
 const selectionTooltip = document.getElementById('selectionTooltip');
 const docContextInput = document.getElementById('docContextInput');
 const docContextChip = document.getElementById('docContextChip');
@@ -2465,11 +2466,15 @@ function resolveQuoteSegments(baseText, quotes) {
 // para que cualquier función que necesite "todo el texto de este panel"
 // (resaltado de cobertura, sugerencia de vínculos por cercanía, generar un
 // esquema...) lo pida siempre igual. Un PDF importado (ver "IMPORTAR PDF"
-// más abajo) ya NO es un modo aparte: su texto se extrae una sola vez al
-// importarlo y queda viviendo aquí mismo, en el mismo <div contenteditable>
-// que el texto pegado a mano — por eso basta con un solo camino para todos.
+// más abajo) SÍ es un modo aparte (el visor de páginas, sin texto en el
+// DOM) — por eso el caso especial de abajo.
 function getPanelRawText(entry) {
-    if (!entry || !entry.textEl) return '';
+    if (!entry) return '';
+    // Panel principal mostrando el visor de PDF: no hay nada que leer del
+    // DOM de texto (está vacío/oculto) — el texto real es el que se
+    // extrajo en segundo plano al cargar el PDF (ver renderPdfRangeAsViewer).
+    if (readerIsPdfView && entry.textEl === readerTextMode) return currentDocumentText;
+    if (!entry.textEl) return '';
     return buildEditableTextIndex(entry.textEl).text;
 }
 
@@ -2481,6 +2486,10 @@ function getPanelRawText(entry) {
 function highlightCoverageForPanel(panelId) {
     const entry = readerPanelRegistry.get(panelId);
     if (!entry || !entry.textEl) return;
+    // En el visor de PDF no hay texto en el DOM que resaltar (ver
+    // getPanelRawText) — la "ubicación" de cada cita se resuelve por página,
+    // no por <mark>.
+    if (readerIsPdfView && entry.textEl === readerTextMode) return;
     const quotes = [];
     nodes.getIds().forEach(id => {
         const n = nodes.get(id);
@@ -2673,6 +2682,13 @@ function wireScrollFocus(panelId, contentContainer, textEl) {
 }
 
 function updateScrollFocus(panelId, contentContainer, textEl) {
+    // Visor de PDF: no hay <mark> que mirar (ver getPanelRawText más
+    // arriba) — "qué se está leyendo ahora" se decide por qué PÁGINA está
+    // visible, no por texto subrayado. Ver updatePdfScrollFocus.
+    if (readerIsPdfView && textEl === readerTextMode) {
+        updatePdfScrollFocus(panelId, contentContainer);
+        return;
+    }
     const marks = textEl.querySelectorAll('mark.gk-coverage-mark');
     if (!marks.length) return;
     const containerRect = contentContainer.getBoundingClientRect();
@@ -2684,6 +2700,39 @@ function updateScrollFocus(panelId, contentContainer, textEl) {
             if (id) visibleIds.add(id);
         }
     });
+    applyScrollFocusVisibility(panelId, visibleIds);
+}
+
+// Igual que updateScrollFocus, pero para el visor de PDF: "visible" se
+// decide por qué páginas (pdfPagesMeta) caen dentro del área visible del
+// panel, y un nodo "está ahí" si su cita (sourceQuote) aparece en el texto
+// de alguna de esas páginas — así el esquema sigue la lectura del PDF aun
+// cuando, a diferencia del Modo Lector normal, no hay nada subrayado.
+function updatePdfScrollFocus(panelId, contentContainer) {
+    if (!pdfPagesMeta.length) return;
+    const containerRect = contentContainer.getBoundingClientRect();
+    const visiblePageTexts = [];
+    pdfPagesMeta.forEach(p => {
+        const r = p.wrapper.getBoundingClientRect();
+        if (r.bottom > containerRect.top && r.top < containerRect.bottom) visiblePageTexts.push(p.text);
+    });
+    const visibleIds = new Set();
+    if (visiblePageTexts.length) {
+        nodes.getIds().forEach(id => {
+            const n = nodes.get(id);
+            if (!n || n.originPanelId !== panelId || !n.sourceQuote) return;
+            const needle = n.sourceQuote.trim();
+            if (needle && visiblePageTexts.some(t => t.includes(needle))) visibleIds.add(id);
+        });
+    }
+    applyScrollFocusVisibility(panelId, visibleIds);
+}
+
+// Atenúa (o restaura) la opacidad de los nodos de un panel según cuáles
+// "están siendo leídos" ahora mismo, y trae la cámara hacia ellos si quedaron
+// fuera de vista — lógica compartida entre el Modo Lector normal
+// (updateScrollFocus) y el visor de PDF (updatePdfScrollFocus).
+function applyScrollFocusVisibility(panelId, visibleIds) {
     const allIds = nodes.getIds();
     const updates = [];
     allIds.forEach(id => {
@@ -2781,6 +2830,22 @@ function locateNodeInText(nodeId) {
     if (entry.root.classList.contains('hidden')) openReaderPanel();
     entry.root.style.zIndex = String(500 + (++floatingPanelCount));
     entry.root.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+
+    // Nodo que viene del visor de PDF (ver renderPdfRangeAsViewer): no hay
+    // ningún <mark> que buscar — se ubica y destella la página donde cayó
+    // la cita en vez del fragmento de texto exacto.
+    if (readerIsPdfView && entry.textEl === readerTextMode) {
+        const needle = node.sourceQuote.trim();
+        const pageMeta = needle ? pdfPagesMeta.find(p => p.text.includes(needle)) : null;
+        if (!pageMeta) {
+            appAlert('No se pudo ubicar en qué página del PDF quedó esta cita (puede que el texto no calzara exactamente).');
+            return;
+        }
+        pageMeta.wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        flashPdfPage(pageMeta.wrapper);
+        if (nodes.get(nodeId)) nodes.update({ id: nodeId, opacity: 1 });
+        return;
+    }
 
     let mark = entry.textEl?.querySelector(`mark[data-node-id="${nodeId}"]`);
     if (!mark) {
@@ -3164,7 +3229,12 @@ wireResizeRedraw(readerPanel);
 const readerEmptyHint = document.getElementById('readerEmptyHint');
 function updateReaderEmptyHint() {
     if (!readerEmptyHint || !readerTextMode) return;
-    readerEmptyHint.classList.toggle('hidden', readerTextMode.innerText.trim() !== "");
+    // Con el visor de PDF abierto siempre hay "algo" que mostrar (las
+    // páginas), así que la pista de inicio ("Pegá un texto o un enlace") no
+    // aplica — se oculta aparte, sin mirar readerTextMode (que en ese modo
+    // está vacío a propósito).
+    const hasContent = readerIsPdfView || readerTextMode.innerText.trim() !== "";
+    readerEmptyHint.classList.toggle('hidden', hasContent);
 }
 
 readerTextMode?.addEventListener('input', () => {
@@ -3219,25 +3289,33 @@ function wireDragToCanvas(textEl) {
 }
 wireDragToCanvas(readerTextMode);
 wireRichPaste(readerTextMode);
+
+// Tamaño de TODO el texto del lector (zoom) — ver wireRtfToolbar más abajo.
+// Declarado aquí (antes de la primera llamada a wireRtfToolbar) porque un
+// `const` no se "adelanta" como una función: si se dejaran junto a la
+// definición de wireRtfToolbar (que está más abajo en el archivo), esta
+// primera llamada fallaría con "Cannot access before initialization".
+const READER_ZOOM_KEY = 'gk_reader_zoom';
+const READER_ZOOM_BASE_REM = 0.875; // equivalente al "text-sm" original
+const READER_ZOOM_MIN = 70, READER_ZOOM_MAX = 200, READER_ZOOM_STEP = 10;
+
 wireRtfToolbar(readerPanel?.querySelector('[data-role="rtfToolbar"]'), readerTextMode);
 
 // ==========================================
-// IMPORTAR PDF: se EXTRAE el texto del PDF (con su formato aproximado —
-// párrafos, encabezados, negrita/cursiva cuando se puede detectar) y se
-// inserta en el mismo editor de texto plano del Modo Lector (readerTextMode).
-// A partir de ahí, para el resto de la app, un PDF importado es
-// indistinguible de texto pegado a mano: misma selección, mismo resaltado
-// permanente, mismo camino de generación de esquema.
+// IMPORTAR PDF: se MUESTRA el PDF (páginas dibujadas en <canvas>, sin texto
+// seleccionable — ver renderPdfRangeAsViewer más abajo), no se convierte en
+// texto editable. Es un modo ADICIONAL y OPCIONAL: mientras el usuario no
+// suba un PDF, el Modo Lector funciona exactamente igual que siempre (texto
+// pegado a mano o traído de un enlace, con selección y resaltado normales).
 //
-// Antes se intentó "dibujar" el PDF (un <canvas> por página + una capa de
-// texto invisible encima para poder seleccionar, como cualquier lector de
-// PDF). Se abandonó ese enfoque: el orden interno en que un PDF guarda sus
-// fragmentos de texto no siempre coincide con el orden de lectura visual, y
-// eso rompía tanto la selección nativa del navegador (que sigue el orden del
-// DOM, no la posición en pantalla) como el texto usado para generar el
-// esquema — produciendo selecciones y resaltados en el lugar equivocado. Es
-// un modo ADICIONAL y OPCIONAL: mientras el usuario no suba un PDF, el Modo
-// Lector funciona exactamente igual que siempre.
+// Se había intentado antes extraer el texto del PDF y reconstruirlo como
+// HTML editable (párrafos/encabezados adivinados por posición) para que un
+// PDF se comportara EXACTAMENTE igual que texto pegado a mano. Se volvió
+// atrás: no se veía como un PDF de verdad y la reconstrucción nunca es
+// perfecta. Ahora el texto se sigue extrayendo, pero solo en segundo plano
+// (ver pdfPagesMeta) para generar esquemas y para que un nodo pueda
+// ubicarse por página (ver locateNodeInText/updatePdfScrollFocus) — nunca
+// se muestra ni se deja seleccionar.
 // ==========================================
 const btnImportPdf = document.getElementById('btnImportPdf');
 const pdfFileInput = document.getElementById('pdfFileInput');
@@ -3308,153 +3386,95 @@ btnPdfRangeCancel?.addEventListener('click', () => {
     activePdfDoc = null;
 });
 
-// Agrupa los items de page.getTextContent() (fragmentos de texto con su
-// posición x/y) en líneas visuales, ordenadas de arriba hacia abajo y, dentro
-// de cada línea, de izquierda a derecha. item.transform es la matriz de
-// transformación de pdf.js: transform[4]/transform[5] son x/y (el eje Y
-// crece hacia arriba), y Math.hypot(transform[2], transform[3]) es la
-// altura aproximada de la fuente — se usa como referencia de tamaño para
-// agrupar líneas y, más abajo, para detectar encabezados.
-function groupPdfItemsIntoLines(items) {
-    const withPos = (items || [])
-        .filter(it => typeof it.str === 'string')
-        .map(it => ({
-            item: it,
-            x: it.transform[4],
-            y: it.transform[5],
-            height: Math.hypot(it.transform[2], it.transform[3]) || 1
-        }));
-    if (withPos.length === 0) return [];
-    withPos.sort((a, b) => b.y - a.y);
-    const lines = [];
-    withPos.forEach(entry => {
-        let line = lines[lines.length - 1];
-        const tolerance = Math.max(2, entry.height * 0.4);
-        if (!line || Math.abs(entry.y - line.y) > tolerance) {
-            line = { y: entry.y, items: [] };
-            lines.push(line);
-        }
-        line.items.push(entry);
-    });
-    lines.forEach(line => line.items.sort((a, b) => a.x - b.x));
-    return lines;
+// ==========================================
+// VISOR DE PDF (páginas dibujadas, NO texto editable)
+// ==========================================
+// Antes se intentó extraer el texto del PDF y reconstruirlo como HTML
+// editable dentro de readerTextMode (párrafos/encabezados/negrita
+// adivinados por posición). Se volvió a lo que el usuario recuerda de antes:
+// un lector de PDF de verdad, página por página, dibujada tal cual con
+// <canvas> (ver renderPdfRangeAsViewer) — sin texto seleccionable dentro,
+// porque aquí no se necesita: "seleccionar un fragmento → usarlo en el
+// esquema" sigue existiendo, pero solo para texto pegado o traído de un
+// enlace (readerTextMode), nunca para un PDF.
+//
+// El texto SÍ se sigue extrayendo, pero solo en segundo plano, página por
+// página (pdfPagesMeta), para tres cosas que necesitan seguir funcionando
+// sin que haya nada "subrayado": (1) generar esquema/analizar texto sobre
+// todo el documento, (2) "📍 Ver en el texto" — en este modo, en vez de
+// buscar un <mark>, ubica y destella la PÁGINA donde cayó la cita del nodo
+// (ver locateNodeInText), y (3) seguir la lectura — mientras se hace scroll
+// por el PDF, se enfocan en el lienzo los nodos cuya cita cae en las
+// páginas actualmente visibles (ver updatePdfScrollFocus).
+let readerIsPdfView = false;
+let pdfPagesMeta = []; // [{ pageNum, text, wrapper }] — páginas cargadas en el visor actual
+
+// Texto "real" de un panel de lector, sea que esté en modo texto normal o
+// mostrando el visor de PDF (ver renderPdfRangeAsViewer) — en ese segundo
+// caso el <div> de texto está vacío a propósito, así que leer su innerText
+// directamente devolvería "" en vez del texto del documento.
+function getReaderPlainText(textEl) {
+    if (readerIsPdfView && textEl === readerTextMode) return currentDocumentText;
+    return textEl ? textEl.innerText.trim() : '';
 }
 
-// Intenta adivinar si un fragmento de texto va en negrita/cursiva a partir
-// del nombre interno de su fuente. Es un indicio débil: muchos PDFs no
-// incluyen "Bold"/"Italic" en el nombre de la fuente, y page.commonObjs
-// normalmente solo se termina de llenar durante un render() real — que esta
-// extracción ya no hace — así que puede no detectar nada en varios
-// documentos. Nunca lanza error: en el peor caso simplemente no marca
-// negrita/cursiva donde sí la había en el PDF original.
-function guessPdfItemStyle(page, item) {
+function exitPdfView() {
+    readerIsPdfView = false;
+    pdfPagesMeta = [];
+    if (readerPdfView) { readerPdfView.classList.add('hidden'); readerPdfView.innerHTML = ''; }
+    readerTextMode?.classList.remove('hidden');
+    readerPanel?.querySelector('[data-role="rtfToolbar"]')?.classList.remove('hidden');
+}
+
+async function renderPdfRangeAsViewer(fromPage, toPage) {
+    if (!activePdfDoc || !readerPdfView) return;
+    showLoader(`Preparando las páginas ${fromPage}–${toPage}...`);
     try {
-        const fontObj = page.commonObjs.get(item.fontName);
-        const name = String(fontObj?.name || item.fontName || '').toLowerCase();
-        return {
-            bold: /bold|black|heavy|semibold/.test(name),
-            italic: /italic|oblique/.test(name)
-        };
-    } catch {
-        return { bold: false, italic: false };
-    }
-}
-
-function medianOfNumbers(numbers) {
-    if (!numbers || numbers.length === 0) return 0;
-    const sorted = [...numbers].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-// Extrae el texto (NO lo dibuja) de fromPage..toPage y lo inserta como HTML
-// dentro de readerTextMode, reconstruyendo párrafos/encabezados/negrita de
-// forma aproximada a partir de la posición y el tamaño de cada fragmento de
-// texto. Desde este momento, para el resto de la app, el PDF importado es
-// exactamente lo mismo que texto pegado a mano en el Modo Lector: mismo
-// editor, misma selección, mismo sistema de resaltado permanente y de
-// generación de esquema (ver highlightCoverageForPanel/getPanelRawText).
-async function extractPdfRangeIntoReader(fromPage, toPage) {
-    if (!activePdfDoc) return;
-    showLoader(`Extrayendo texto de las páginas ${fromPage}–${toPage}...`);
-    try {
-        const pagesData = [];
+        readerPdfView.innerHTML = '';
+        const newPagesMeta = [];
         for (let pageNum = fromPage; pageNum <= toPage; pageNum++) {
             const page = await activePdfDoc.getPage(pageNum);
             const content = await page.getTextContent();
-            pagesData.push({ page, lines: groupPdfItemsIntoLines(content.items) });
+            const pageText = (content.items || []).map(it => it.str || '').join(' ').replace(/\s+/g, ' ').trim();
+
+            // Se renderiza a mayor resolución (scale 2) que la que ocupará en
+            // pantalla (el canvas luego se escala con CSS al ancho del
+            // panel) para que no se vea borroso al hacer zoom o agrandar el
+            // panel.
+            const viewport = page.getViewport({ scale: 2 });
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            canvas.className = 'block mx-auto shadow select-none pointer-events-none';
+            canvas.style.width = '100%';
+            canvas.style.height = 'auto';
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pdf-page-wrapper px-4 pt-4 select-none transition-shadow duration-300';
+            wrapper.dataset.pageNum = String(pageNum);
+            const label = document.createElement('p');
+            label.className = 'text-center text-[11px] text-slate-400 mb-1 select-none';
+            label.textContent = `Página ${pageNum}`;
+            wrapper.appendChild(label);
+            wrapper.appendChild(canvas);
+            readerPdfView.appendChild(wrapper);
+
+            newPagesMeta.push({ pageNum, text: pageText, wrapper });
         }
 
-        // Altura "normal" de línea de cuerpo de texto, para distinguir
-        // encabezados (fragmentos notablemente más grandes) del resto.
-        const allHeights = [];
-        pagesData.forEach(({ lines }) => lines.forEach(line => line.items.forEach(it => allHeights.push(it.height))));
-        const bodyHeight = medianOfNumbers(allHeights) || 10;
-
-        const htmlParts = [];
-        pagesData.forEach(({ page, lines }, pageIdx) => {
-            if (pagesData.length > 1) {
-                htmlParts.push(`<p style="color:#9ca3af;font-size:0.85em;margin:0.6em 0;">— página ${fromPage + pageIdx} —</p>`);
-            }
-            let paragraphLines = [];
-            let prevLine = null;
-
-            const flushParagraph = () => {
-                if (paragraphLines.length === 0) return;
-                const isHeading = paragraphLines.length === 1 && paragraphLines[0].maxHeight > bodyHeight * 1.18;
-                const innerHtml = paragraphLines.map(l => l.html).join(' ');
-                if (isHeading) {
-                    const tag = paragraphLines[0].maxHeight > bodyHeight * 1.6 ? 'h2' : 'h3';
-                    htmlParts.push(`<${tag}>${innerHtml}</${tag}>`);
-                } else {
-                    htmlParts.push(`<p>${innerHtml}</p>`);
-                }
-                paragraphLines = [];
-            };
-
-            lines.forEach(line => {
-                // Une las "palabras" (fragmentos) de la línea, insertando un
-                // espacio cuando hay un salto horizontal notable entre uno y
-                // el siguiente — pdf.js no siempre guarda el espacio como su
-                // propio fragmento de texto.
-                let lineHtml = '';
-                let maxHeight = 0;
-                let prevItemEnd = null;
-                line.items.forEach(entry => {
-                    const { item } = entry;
-                    maxHeight = Math.max(maxHeight, entry.height);
-                    const text = item.str || '';
-                    if (!text) { prevItemEnd = entry.x + (item.width || 0); return; }
-                    let piece = escapeHtml(text);
-                    const style = guessPdfItemStyle(page, item);
-                    if (style.bold) piece = `<strong>${piece}</strong>`;
-                    if (style.italic) piece = `<em>${piece}</em>`;
-                    if (prevItemEnd != null) {
-                        const gap = entry.x - prevItemEnd;
-                        if (gap > entry.height * 0.22 && !/^\s/.test(text) && !lineHtml.endsWith(' ')) lineHtml += ' ';
-                    }
-                    lineHtml += piece;
-                    prevItemEnd = entry.x + (item.width || 0);
-                });
-                if (!lineHtml.trim()) { prevLine = line; return; }
-
-                // Un hueco vertical notable respecto a la línea anterior se
-                // interpreta como salto de párrafo.
-                if (prevLine && (prevLine.y - line.y) > bodyHeight * 1.6) flushParagraph();
-                paragraphLines.push({ html: lineHtml, maxHeight });
-                prevLine = line;
-            });
-            flushParagraph();
-        });
-
-        const extractedHtml = htmlParts.join('\n');
-        if (!extractedHtml.trim()) {
-            appAlert('No se encontró texto en esas páginas (puede ser un PDF escaneado, sin texto real dentro del archivo).');
+        const extractedText = newPagesMeta.map(p => p.text).join('\n\n').trim();
+        if (!extractedText) {
+            appAlert('No se encontró texto en esas páginas (puede ser un PDF escaneado, sin texto real dentro del archivo) — se muestran igual, pero no podrán usarse para generar un esquema.');
             track('pdf_import_error', { stage: 'extract', message: 'empty' });
-            return;
         }
 
-        readerTextMode.innerHTML = extractedHtml;
+        pdfPagesMeta = newPagesMeta;
+        currentDocumentText = extractedText;
+        readerIsPdfView = true;
+        readerTextMode?.classList.add('hidden');
+        readerPanel?.querySelector('[data-role="rtfToolbar"]')?.classList.add('hidden');
+        readerPdfView.classList.remove('hidden');
         updateReaderEmptyHint();
 
         globalDocumentContext = `${pdfCurrentFileName || 'PDF'} (pág. ${fromPage}–${toPage})`;
@@ -3467,7 +3487,7 @@ async function extractPdfRangeIntoReader(fromPage, toPage) {
         track('pdf_import_success', { pages: (toPage - fromPage + 1) });
     } catch (err) {
         console.error(err);
-        appAlert('No se pudo extraer el texto de esas páginas del PDF.');
+        appAlert('No se pudieron preparar esas páginas del PDF.');
         track('pdf_import_error', { stage: 'extract', message: String(err?.message || '').slice(0, 120) });
     } finally {
         hideLoader();
@@ -3480,8 +3500,16 @@ btnPdfRangeLoad?.addEventListener('click', () => {
     let from = Math.max(1, Math.min(total, parseInt(pdfRangeFrom?.value, 10) || 1));
     let to = Math.max(1, Math.min(total, parseInt(pdfRangeTo?.value, 10) || total));
     if (from > to) { const t = from; from = to; to = t; }
-    extractPdfRangeIntoReader(from, to);
+    renderPdfRangeAsViewer(from, to);
 });
+
+// Destella el marco de una página del visor de PDF un instante (equivalente,
+// para este modo, a flashMark sobre un <mark> de texto normal).
+function flashPdfPage(wrapper) {
+    if (!wrapper) return;
+    wrapper.classList.add('ring-4', 'ring-yellow-400', 'rounded-lg');
+    setTimeout(() => wrapper.classList.remove('ring-4', 'ring-yellow-400', 'rounded-lg'), 1600);
+}
 
 container.addEventListener('dragover', (e) => { e.preventDefault(); });
 container.addEventListener('drop', (e) => {
@@ -4178,8 +4206,34 @@ function sanitizeImportedHtml(html) {
 // mousedown nativo para poder desplegarse, así que en vez de prevenirlo se
 // guarda la selección actual (con un Range real) y se restaura justo antes
 // de ejecutar el comando en su 'change'.
+// Tamaño de TODO el texto del lector (zoom), distinto del selector "Tamaño de
+// letra" de arriba: ese usa execCommand y solo afecta la selección activa;
+// esto cambia el font-size base de todo #readerTextMode. El valor se guarda
+// en localStorage para que el próximo panel (o el mismo, recargando la
+// página) arranque con el último tamaño elegido.
 function wireRtfToolbar(toolbarEl, textEl) {
     if (!toolbarEl || !textEl) return;
+
+    let zoomPct = Number(localStorage.getItem(READER_ZOOM_KEY)) || 100;
+    const zoomOutBtn = toolbarEl.querySelector('[data-role="btnZoomOut"]');
+    const zoomInBtn = toolbarEl.querySelector('[data-role="btnZoomIn"]');
+    const zoomLabel = toolbarEl.querySelector('[data-role="zoomLabel"]');
+    const applyReaderZoom = () => {
+        textEl.style.fontSize = (READER_ZOOM_BASE_REM * zoomPct / 100).toFixed(3) + 'rem';
+        if (zoomLabel) zoomLabel.textContent = zoomPct + '%';
+    };
+    applyReaderZoom();
+    zoomOutBtn?.addEventListener('click', () => {
+        zoomPct = Math.max(READER_ZOOM_MIN, zoomPct - READER_ZOOM_STEP);
+        applyReaderZoom();
+        localStorage.setItem(READER_ZOOM_KEY, String(zoomPct));
+    });
+    zoomInBtn?.addEventListener('click', () => {
+        zoomPct = Math.min(READER_ZOOM_MAX, zoomPct + READER_ZOOM_STEP);
+        applyReaderZoom();
+        localStorage.setItem(READER_ZOOM_KEY, String(zoomPct));
+    });
+
     let savedRange = null;
     const saveSelection = () => {
         const sel = window.getSelection();
@@ -4323,7 +4377,7 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
 }
 
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
-    let textContent = readerTextMode.innerText.trim();
+    let textContent = getReaderPlainText(readerTextMode);
     if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
 
     textContent = await resolveTextOrWebLink(textContent, {
@@ -5142,7 +5196,7 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
     // El Modo Lector NO se toca: si el usuario ya tenía un texto/enlace pegado
     // ahí, sigue intacto después de limpiar. Por eso currentDocumentText se
     // vuelve a sincronizar con lo que haya en el lector en vez de vaciarse.
-    currentDocumentText = readerTextMode ? readerTextMode.innerText.trim() : "";
+    currentDocumentText = getReaderPlainText(readerTextMode);
     // Limpiar el lienzo también debe cerrar los paneles flotantes de
     // definición/explicación/reto (quedaban "huérfanos", apuntando a nodos que
     // ya no existen) — pero sin tocar el panel del Modo Lector, que es aparte.
@@ -5161,7 +5215,7 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
 
 // 2. Limpiar SOLO el panel del Lector (Botón nuevo a la par de Generar Esquema)
 document.getElementById('btnClearReader')?.addEventListener('click', async () => {
-    const hasText = !!(readerTextMode && readerTextMode.innerText.trim() !== "");
+    const hasText = readerIsPdfView || !!(readerTextMode && readerTextMode.innerText.trim() !== "");
     const hasContext = !!globalDocumentContext;
 
     if (!hasText && !hasContext) return;
@@ -5169,6 +5223,7 @@ document.getElementById('btnClearReader')?.addEventListener('click', async () =>
     if (await appConfirm("¿Deseas limpiar el texto y el contexto del panel de lectura?")) {
         currentDocumentText = "";
         globalDocumentContext = "";
+        if (readerIsPdfView) exitPdfView();
         if (readerTextMode) readerTextMode.innerText = "";
         updateReaderEmptyHint();
         if (docContextInput) docContextInput.value = "";
@@ -5323,7 +5378,12 @@ async function saveCurrentProjectToBin() {
     // junto con el esquema — antes solo se guardaban nodos/flechas, así que
     // al reabrir un proyecto el lienzo volvía pero el texto original no (ver
     // applyLoadedProject). Con tope de tamaño — ver MAX_SAVED_READER_TEXT_LENGTH.
-    const readerTextToSave = readerTextMode ? readerTextMode.innerText.slice(0, MAX_SAVED_READER_TEXT_LENGTH) : '';
+    // Si el panel estaba mostrando un PDF (visor de páginas, no texto
+    // editable), no hay nada que guardar del DOM — se usa el texto que se
+    // extrajo en segundo plano. Al reabrir el proyecto, ese texto vuelve
+    // como texto normal del lector (no se puede "re-renderizar" el PDF
+    // original porque no se guardó el archivo): ver applyLoadedProject.
+    const readerTextToSave = getReaderPlainText(readerTextMode).slice(0, MAX_SAVED_READER_TEXT_LENGTH);
     const projectData = {
         owner: currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : 'Invitado',
         email: currentUser ? currentUser.email : 'local',
@@ -5504,6 +5564,11 @@ async function loadProjectById(projectId) {
 
 function applyLoadedProject(projectId, record) {
     isClearingCanvas = true;
+    // Un PDF solo se guarda como texto plano (ver saveCurrentProjectToBin:
+    // no se guarda el archivo), así que al cargar cualquier proyecto se
+    // vuelve al Modo Lector normal — no queda un visor de PDF "fantasma" de
+    // la sesión anterior.
+    if (readerIsPdfView) exitPdfView();
     schemeStack = [];
     updateSchemeBreadcrumb();
     nodes.clear();
