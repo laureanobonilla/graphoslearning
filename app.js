@@ -5242,8 +5242,8 @@ function quizShowQuestionPhase(node) {
     const title = node.baseTitle || node.id;
     inner.innerHTML = `
         <p class="text-[#4fd1c5] font-bold uppercase tracking-wider text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">Pregunta ${quizState.index + 1} de ${quizState.order.length}</p>
-        <h1 class="font-heading font-bold text-[#eef1fb] leading-[1.1] text-center" style="font-size: clamp(2rem, 6vw, 4.5rem);">¿Qué sabés sobre esto?</h1>
-        <p class="text-slate-300 text-center" style="font-size: clamp(1.3rem, 2.8vw, 2rem);">${escapeHtml(title)}</p>
+        <h1 class="font-heading font-bold text-[#eef1fb] leading-[1.15] text-center" style="font-size: clamp(1.8rem, 5vw, 3.6rem);">¿Qué es “${escapeHtml(title)}”?</h1>
+        <p class="text-slate-400 text-center" style="font-size: clamp(0.95rem, 1.6vw, 1.15rem);">Pensá tu respuesta antes de revelarla.</p>
         <button id="quizBtnReveal" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">Mostrar respuesta</button>
     `;
     document.getElementById('quizBtnReveal')?.addEventListener('click', quizReveal);
