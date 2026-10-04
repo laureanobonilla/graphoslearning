@@ -232,7 +232,16 @@ end $$;
 -- nombre legible y solo cae al id crudo para eventos viejos (de antes de
 -- ese cambio) que no tienen actor_label. Ejemplos de uso en
 -- LEEME_ETAPA_2.md, sección correspondiente a esta ronda de cambios.
-create or replace view public.events_friendly as
+--
+-- "drop + create" en vez de "create or replace": Postgres no deja que
+-- "create or replace view" cambie el ORDEN o el NOMBRE de columnas que la
+-- vista ya tenía (solo deja agregar columnas nuevas al final) — y agregar
+-- `app` justo después de `created_at` corre a `who` de lugar, lo cual
+-- Postgres interpreta como "renombrar" la columna 2 y lo rechaza (error
+-- 42P16). Una vista no guarda datos propios, así que borrarla y
+-- recrearla es seguro y no pierde nada.
+drop view if exists public.events_friendly;
+create view public.events_friendly as
   select
     created_at,
     app,
@@ -247,7 +256,8 @@ create or replace view public.events_friendly as
 -- llegó cada visitante (hasta qué número de pregunta, de 1 a 16) y si llegó
 -- a pagar. Un visitante que nunca generó la lectura ni pagó simplemente no
 -- tiene fila en last_question_answered más allá de donde se quedó.
-create or replace view public.quien_eres_funnel as
+drop view if exists public.quien_eres_funnel;
+create view public.quien_eres_funnel as
   select
     anon_id,
     max((metadata->>'questionIndex')::int) filter (where event_name = 'question_answered') as last_question_answered,
@@ -262,6 +272,42 @@ create or replace view public.quien_eres_funnel as
   where app = 'quien-eres'
   group by anon_id
   order by max(created_at) desc;
+
+-- ==========================================
+-- LECTURAS DE "¿QUIÉN ERES EN REALIDAD?" (reemplaza a Netlify Blobs)
+-- ==========================================
+-- La primera versión guardaba esto en Netlify Blobs, justamente para no
+-- depender de Supabase en esta app. En producción, Netlify Blobs falló con
+-- "The environment has not been configured to use Netlify Blobs" (un
+-- problema de aprovisionamiento de Netlify, no de la app — ver el comentario
+-- al inicio de netlify/functions/_lib/qer-readings-store.js). Como Supabase
+-- ya está funcionando en este mismo sitio, se movió aquí: dos tablas chicas,
+-- sin relación con las de Graphikosmos.
+--
+-- `id`/`order_id` son texto (no bigserial) porque los genera el código
+-- (un UUID para la lectura, el orderID real de PayPal para la orden), no la
+-- base de datos.
+create table if not exists public.qer_readings (
+  id         text primary key,
+  reading    jsonb not null,
+  paid       boolean not null default false,
+  created_at timestamptz not null default now()
+);
+alter table public.qer_readings enable row level security;
+
+create table if not exists public.qer_orders (
+  order_id   text primary key,
+  reading_id text not null,
+  created_at timestamptz not null default now()
+);
+alter table public.qer_orders enable row level security;
+
+-- Ambas sin TTL automático en la base (el código ya ignora cualquier fila de
+-- más de 24h, ver TTL_MS en _lib/qer-readings-store.js) — si en algún
+-- momento se quiere borrar de verdad las filas viejas para no acumular
+-- basura, esta consulta se puede correr a mano o programar:
+--   delete from public.qer_readings where created_at < now() - interval '2 days';
+--   delete from public.qer_orders   where created_at < now() - interval '2 days';
 
 revoke all on function public.ensure_profile(text,text,integer)             from public, anon, authenticated;
 revoke all on function public.spend_nodes(text,integer,text)                from public, anon, authenticated;

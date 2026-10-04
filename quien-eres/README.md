@@ -45,12 +45,19 @@ agregar una app nueva es tan simple como agregar una carpeta con su propio
 - **Lo que NO se reutilizó, a propósito**: el login con Netlify Identity y
   el saldo de nodos de Graphikosmos. Aquí no hace falta cuenta — el
   "producto" es una sola lectura, identificada por un id (`readingId`), no
-  un saldo permanente — así que la lectura en sí se guarda con **Netlify
-  Blobs** (`@netlify/blobs`, ya agregado a `package.json` del sitio) en vez
-  de una base de datos: no requiere ninguna configuración aparte, funciona
-  solo con desplegar.
-- **Sí se reutiliza Supabase, pero solo para el registro de uso** (ver
-  siguiente sección) — la base de datos de Graphikosmos, no una nueva.
+  un saldo permanente.
+- **La lectura se guarda en Supabase** (tablas `qer_readings` y
+  `qer_orders`, ver `supabase/schema.sql`) — la misma base de datos que ya
+  usa Graphikosmos en este sitio, mismas variables de entorno
+  (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`), nada nuevo que configurar.
+  **Antes esto usaba Netlify Blobs** (a propósito, para no tocar Supabase
+  para nada en esta app) pero en producción falló con "The environment has
+  not been configured to use Netlify Blobs" — un problema de
+  aprovisionamiento del lado de Netlify, no de este código (ver el
+  comentario al inicio de `_lib/qer-readings-store.js`). Moverlo a Supabase,
+  que ya está funcionando en este sitio, fue más rápido y confiable que
+  seguir depurando a ciegas un servicio de terceros que no respondía como
+  documenta.
 
 ## Registro de uso: hasta dónde llega cada visitante, y los pagos fallidos
 
@@ -147,7 +154,7 @@ funciones `qer-*` queden dentro del mismo despliegue.
   navegador) — se construyó con cuidado pero sin verificación visual.
   Antes de compartirla, ábrela en tu teléfono y hacé el cuestionario
   completo al menos una vez, incluyendo un pago de prueba en sandbox.
-- `@netlify/blobs` guarda cada lectura por 24 horas (ver `TTL_MS` en
+- Cada lectura se considera válida por 24 horas (ver `TTL_MS` en
   `_lib/qer-readings-store.js`) — si alguien hace el cuestionario y tarda
   más de un día en decidir pagar, tendría que hacerlo de nuevo. Se puede
   alargar ese número si hace falta.
@@ -184,4 +191,4 @@ funciones `qer-*` queden dentro del mismo despliegue.
 Ver la sección correspondiente en `LEEME_ETAPA_2.md` (en la raíz del
 proyecto) para un listado de otras apps de cuestionario/revelación que
 podrían reutilizar exactamente esta misma plataforma (PayPal + Gemini +
-Netlify Blobs) con el mismo patrón de pago único sin cuenta.
+Supabase) con el mismo patrón de pago único sin cuenta.

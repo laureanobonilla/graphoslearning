@@ -2615,21 +2615,27 @@ Para que convivan sin pisarse, todas las funciones y archivos nuevos de
 esta app llevan el prefijo `qer-` (`netlify/functions/qer-*.js`,
 `netlify/functions/_lib/qer-pricing.js`,
 `netlify/functions/_lib/qer-readings-store.js`). Reutiliza de verdad (sin
-copiar) `netlify/functions/_lib/paypal.js`, que ya usa Graphikosmos. Se
-agregó `@netlify/blobs` a `package.json` (única dependencia nueva) para
-guardar cada lectura temporalmente sin necesitar base de datos.
+copiar) `netlify/functions/_lib/paypal.js`, que ya usa Graphikosmos. La
+lectura generada se guarda en **Supabase** (tablas `qer_readings` y
+`qer_orders`) — la primera versión usaba Netlify Blobs para no tocar
+Supabase en esta app, pero falló en producción con un error de
+aprovisionamiento del lado de Netlify (ver `quien-eres/README.md`), así
+que se movió a Supabase, que ya está probado y funcionando en este mismo
+sitio. No se agregó ninguna dependencia nueva a `package.json` por esto
+(se quitó `@netlify/blobs`, que ya no se usa).
 
 Variable de entorno nueva y opcional: `READING_PRICE_USD` (si no se
 pone, usa `2.99`). El resto de variables (`GEMINI_API_KEY`,
-`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`) ya existen en
-este sitio para Graphikosmos y esta app nueva las reutiliza directo, sin
-configurar nada aparte.
+`PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `PAYPAL_ENV`,
+`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`) ya existen en este sitio para
+Graphikosmos y esta app nueva las reutiliza directo, sin configurar nada
+aparte.
 
 ### Ideas para una colección de apps parecidas
 
 La misma plataforma que soporta "¿Quién eres en realidad?" (PayPal de
 pago único sin cuenta + Gemini generando contenido personalizado +
-Netlify Blobs guardando el resultado temporalmente) sirve, sin cambiar la
+Supabase guardando el resultado temporalmente) sirve, sin cambiar la
 arquitectura, para cualquier app con esta forma: **cuestionario o input
 corto de la persona → IA genera algo personalizado y con "gancho" → se
 muestra una probada gratis → se cobra un monto pequeño para ver el
