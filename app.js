@@ -941,6 +941,12 @@ async function renderThreeLevelTree(data, opts = {}) {
     const root = data.root;
     const branches = data.branches || [];
     const subBranches = data.subBranches || [];
+    // DETECCIÓN DE HUECOS: conceptos que el propio Gemini señaló como
+    // mencionados-pero-no-desarrollados en este esquema (ver "gaps" en
+    // gemini.js, action parse_text). Puede no venir (p. ej. analyze_text no
+    // lo genera) — en ese caso ningún nodo queda marcado, ver gapsForNode.
+    const allGaps = Array.isArray(data.gaps) ? data.gaps : [];
+    const gapsForNode = (nodeId) => allGaps.filter(g => g.relatedNodeId === nodeId);
 
     // Estos cálculos solo dependen de los datos del esquema nuevo (no del
     // lienzo), así que se adelantan: los necesitamos YA para saber qué tan
@@ -1065,13 +1071,16 @@ async function renderThreeLevelTree(data, opts = {}) {
     // ya es la raíz, no se crea uno nuevo aparte ni se toca su texto.
     if (!attachToNodeId) {
         const rootAppearance = appearanceFor(!!(root.sourceQuote && root.sourceQuote.trim()));
+        const rootGaps = gapsForNode(root.id);
         nodes.add({
             id: root.id, label: `*${root.label}*`, baseTitle: root.label,
             color: rootAppearance.color, definition: root.definition || null,
             x: rootX, y: rootY, fixed: { x: false, y: false },
             widthConstraint: { minimum: 140, maximum: 220 },
             sourceQuote: root.sourceQuote || '', originPanelId: originPanelId,
-            highlightColorIdx: rootAppearance.highlightColorIdx, depthLevel: 0
+            highlightColorIdx: rootAppearance.highlightColorIdx, depthLevel: 0,
+            gaps: rootGaps,
+            ...(rootGaps.length ? { shapeProperties: { borderDashes: [7, 4] } } : {})
         });
         trackNodeUsage(root.label);
         newNodeIds.push(root.id);
@@ -1099,13 +1108,16 @@ async function renderThreeLevelTree(data, opts = {}) {
         }
 
         const branchAppearance = appearanceFor(!!(branch.sourceQuote && branch.sourceQuote.trim()));
+        const branchGaps = gapsForNode(branch.id);
         nodes.add({
             id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label,
             color: branchAppearance.color, definition: branch.definition || null,
             x: branchX, y: branchY, fixed: { x: false, y: false },
             widthConstraint: { minimum: 130, maximum: 200 },
             sourceQuote: branch.sourceQuote || '', originPanelId: originPanelId,
-            highlightColorIdx: branchAppearance.highlightColorIdx, depthLevel: 1
+            highlightColorIdx: branchAppearance.highlightColorIdx, depthLevel: 1,
+            gaps: branchGaps,
+            ...(branchGaps.length ? { shapeProperties: { borderDashes: [7, 4] } } : {})
         });
         edges.add({ from: rootId, to: branch.id, label: branch.relationship });
         trackNodeUsage(branch.label);
@@ -1135,13 +1147,16 @@ async function renderThreeLevelTree(data, opts = {}) {
             }
 
             const subAppearance = appearanceFor(!!(sub.sourceQuote && sub.sourceQuote.trim()));
+            const subGaps = gapsForNode(sub.id);
             nodes.add({
                 id: sub.id, label: `*${sub.label}*`, baseTitle: sub.label,
                 color: subAppearance.color, definition: sub.definition || null,
                 x: subX, y: subY, fixed: { x: false, y: false },
                 widthConstraint: { minimum: 120, maximum: 185 },
                 sourceQuote: sub.sourceQuote || '', originPanelId: originPanelId,
-                highlightColorIdx: subAppearance.highlightColorIdx, depthLevel: 2
+                highlightColorIdx: subAppearance.highlightColorIdx, depthLevel: 2,
+                gaps: subGaps,
+                ...(subGaps.length ? { shapeProperties: { borderDashes: [7, 4] } } : {})
             });
             edges.add({ from: branch.id, to: sub.id, label: sub.relationship });
             trackNodeUsage(sub.label);
@@ -1906,6 +1921,15 @@ network.on('click', async function (params) {
         if (typeof btnMenuExpandSub !== 'undefined' && btnMenuExpandSub) {
             const clickedNodeData = nodes.get(clickedNodeId);
             btnMenuExpandSub.classList.toggle('hidden', !(clickedNodeData && clickedNodeData.isSubscheme));
+        }
+        // DETECCIÓN DE HUECOS: mostrar el botón solo si este nodo tiene
+        // huecos detectados, y siempre cerrar/vaciar la caja de huecos del
+        // nodo anterior (igual que ya se hace con customPromptBox más abajo).
+        if (typeof btnMenuShowGaps !== 'undefined' && btnMenuShowGaps) {
+            const clickedNodeData2 = nodes.get(clickedNodeId);
+            const hasGaps = !!(clickedNodeData2 && Array.isArray(clickedNodeData2.gaps) && clickedNodeData2.gaps.length);
+            btnMenuShowGaps.classList.toggle('hidden', !hasGaps);
+            gapsBox?.classList.add('hidden'); gapsBox?.classList.remove('flex');
         }
         const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
         const DOMCoords = network.canvasToDOM(nodePosition);
@@ -4379,6 +4403,98 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
     await generateFullSchemaFromTopic(textContent, { originPanelId: 'main' });
 });
 
+// ==========================================
+// MODO MÓVIL — pantalla simplificada para celulares (ver el CSS y el HTML de
+// #mobileShell en index.html). NO es una app distinta: reutiliza exactamente
+// las mismas funciones de backend/generación que ya usa la de escritorio
+// (generateFullSchemaFromTopic, resolveTextOrWebLink, handlePdfFileSelected,
+// extractPdfRangeIntoReader) — la única diferencia es que en vez de mostrar
+// el resultado en el lienzo (invisible en una pantalla chica), lo muestra con
+// el Recorrido Guiado a pantalla completa (startTour con skipMapPhase:true).
+// readerTextMode sigue existiendo en el DOM aunque esté oculto por CSS en
+// escritorio-no-aplica-aquí; aquí se usa igual, como "buffer" de trabajo,
+// exactamente como ya lo usa btnParseReaderText arriba.
+const mobilePasteInput = document.getElementById('mobilePasteInput');
+const mobilePdfInput = document.getElementById('mobilePdfInput');
+const btnMobilePdf = document.getElementById('btnMobilePdf');
+const mobilePdfLabel = document.getElementById('mobilePdfLabel');
+const btnMobileGenerate = document.getElementById('btnMobileGenerate');
+
+// Nombre del PDF ya cargado en espera de generarse (si el usuario elige PDF
+// en vez de pegar texto). null mientras no haya ningún PDF elegido.
+let mobilePdfPendingFile = null;
+
+btnMobilePdf?.addEventListener('click', () => mobilePdfInput?.click());
+mobilePdfInput?.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    mobilePdfPendingFile = file;
+    if (mobilePdfLabel) mobilePdfLabel.textContent = file.name;
+    // Elegir un PDF y pegar texto son alternativas — si había texto pegado,
+    // se descarta visualmente para que quede claro cuál de los dos se va a
+    // usar al tocar "Crear mi esquema".
+    if (mobilePasteInput) mobilePasteInput.value = '';
+    e.target.value = '';
+});
+
+async function runMobileGeneration() {
+    const pastedRaw = (mobilePasteInput?.value || '').trim();
+
+    if (!pastedRaw && !mobilePdfPendingFile) {
+        appAlert('Pegá un texto, un tema, un enlace, o subí un PDF para empezar.');
+        return;
+    }
+
+    let textContent = null;
+
+    if (mobilePdfPendingFile) {
+        // 1) Carga el PDF (misma función que usa el botón de escritorio) —
+        //    esto deja el archivo listo en activePdfDoc.
+        await handlePdfFileSelected(mobilePdfPendingFile);
+        if (!activePdfDoc) return; // handlePdfFileSelected ya mostró el error si lo hubo
+
+        // 2) En escritorio el usuario elige el rango de páginas a mano; en
+        //    móvil, para no pedirle una decisión más, se toman directo las
+        //    primeras páginas (hasta MAX_PDF_DEFAULT_PAGES) — igual que el
+        //    valor que el propio selector de escritorio deja puesto por
+        //    defecto.
+        const totalPages = activePdfDoc.numPages;
+        const toPage = Math.min(totalPages, MAX_PDF_DEFAULT_PAGES);
+        await extractPdfRangeIntoReader(1, toPage);
+        if (!readerTextMode.innerText.trim()) return; // ya se mostró el error si lo hubo
+
+        textContent = readerTextMode.innerText.trim();
+    } else {
+        // Mismo camino que btnParseReaderText: si "pastedRaw" es un enlace,
+        // resolveTextOrWebLink lo descarga y deja su texto listo; si no, lo
+        // devuelve tal cual.
+        textContent = await resolveTextOrWebLink(pastedRaw, {
+            targetTextEl: readerTextMode,
+            onTitle: (title) => {
+                if (!globalDocumentContext) {
+                    globalDocumentContext = title;
+                    if (docContextInput) docContextInput.value = title;
+                    updateDocContextChip();
+                }
+            }
+        });
+        if (textContent === null) return; // resolveTextOrWebLink ya mostró el error
+    }
+
+    currentDocumentText = textContent;
+    mobilePdfPendingFile = null;
+    if (mobilePdfLabel) mobilePdfLabel.textContent = 'Subir un PDF';
+
+    await generateFullSchemaFromTopic(textContent, { originPanelId: 'main' });
+
+    // Con el esquema ya armado, se muestra de inmediato en modo Recorrido —
+    // en móvil no hay lienzo visible donde "verlo" de otra forma.
+    const rootIds = getCanvasRootIds();
+    if (rootIds.length) startTour(rootIds, { skipMapPhase: true });
+}
+
+btnMobileGenerate?.addEventListener('click', runMobileGeneration);
+
 wireMarkClickToFocusNode(readerTextMode);
 wireScrollFocus('main', document.getElementById('readerContentContainer'), readerTextMode);
 
@@ -4411,39 +4527,151 @@ function dismissWelcomeScreen() {
 }
 
 welcomeScreen?.addEventListener('click', (e) => { if (e.target === welcomeScreen) dismissWelcomeScreen(); });
+// El campo de tema de la cabecera queda por encima del asistente (z-30 vs
+// z-20): si alguien lo usa directamente en vez de seguir el asistente, se
+// respeta esa salida rápida igual que antes.
 topicInput?.addEventListener('focus', dismissWelcomeScreen);
-document.getElementById('btnWelcomeReader')?.addEventListener('click', () => {
-    dismissWelcomeScreen();
-    openReaderPanel();
-});
 nodes.on('*', () => { if (nodes.length > 0 && !hasDismissedWelcomeScreen) dismissWelcomeScreen(); });
 
-// Temas precargados para la sorpresa
+// Temas precargados para las sugerencias del paso 1 y para "probar al azar"
 const hookTopics = [
     "La Paradoja de Fermi", "El Mito de la Caverna", "Computación Cuántica",
     "Filosofía Estoica", "Neuroplasticidad", "Inteligencia Artificial General",
     "Economía Conductual", "La Teoría de Cuerdas", "Imperio Romano"
 ];
 
-// Generar los 3 botones de sugerencias al azar
-const chipsContainer = document.getElementById('suggestionChips');
-if (chipsContainer) {
-    const shuffled = [...hookTopics].sort(() => 0.5 - Math.random());
-    shuffled.slice(0, 3).forEach(topic => {
-        const chip = document.createElement('button');
-        chip.className = "bg-white border border-slate-200 text-slate-600 px-4 py-2 rounded-full text-xs font-bold hover:border-slate-400 hover:text-slate-900 transition-colors shadow-sm";
-        chip.innerText = topic;
-        chip.onclick = () => generateFullSchemaFromTopic(topic);
-        chipsContainer.appendChild(chip);
+// ==========================================
+// ASISTENTE DE BIENVENIDA (3 preguntas, solo primera vez)
+// ==========================================
+// En vez de soltar al usuario frente a un lienzo vacío en su primerísima
+// visita, le preguntamos 1) qué quiere entender, 2) qué tan a fondo, y
+// 3) si ya tiene algo que esté leyendo (opcional) — y con esas respuestas
+// armamos el esquema Y dejamos el texto correspondiente en el Modo Lector,
+// para que al cerrarse este asistente la app ya esté con todo construido,
+// en vez de un lienzo en blanco esperando que el usuario sepa qué hacer.
+// Reutiliza exactamente las mismas funciones que ya usa el flujo normal de
+// escritorio (generateFullSchemaFromTopic, resolveTextOrWebLink,
+// handlePdfFileSelected, extractPdfRangeIntoReader) — no hay backend nuevo.
+const onbStep1 = document.getElementById('onbStep1');
+const onbStep2 = document.getElementById('onbStep2');
+const onbStep3 = document.getElementById('onbStep3');
+const onbTopicInput = document.getElementById('onbTopicInput');
+const onbNext1 = document.getElementById('onbNext1');
+const onbNext2 = document.getElementById('onbNext2');
+const onbSourceInput = document.getElementById('onbSourceInput');
+const onbPdfInput = document.getElementById('onbPdfInput');
+const btnOnbPdf = document.getElementById('btnOnbPdf');
+const onbPdfLabel = document.getElementById('onbPdfLabel');
+
+const DEPTH_HINTS = {
+    essential: 'Quiero solo lo esencial: un resumen claro y breve de lo más importante, sin entrar en demasiado detalle.',
+    exam: 'Necesito dominarlo a fondo, como para un examen o un trabajo importante: con buen nivel de detalle y precisión.',
+    explore: 'Quiero explorarlo ampliamente: con muchas ramificaciones y conexiones distintas entre sí.'
+};
+
+let onbDepth = null;
+let onbPdfPendingFile = null;
+
+function setOnbStep(n) {
+    [onbStep1, onbStep2, onbStep3].forEach((el, idx) => el?.classList.toggle('hidden', idx !== n - 1));
+    document.querySelectorAll('#onbProgressDots [data-dot]').forEach((dot) => {
+        const active = parseInt(dot.dataset.dot, 10) <= n;
+        dot.classList.toggle('bg-slate-900', active);
+        dot.classList.toggle('bg-slate-200', !active);
     });
 }
 
-// Botón de Sorpréndeme
-document.getElementById('btnSurprise')?.addEventListener('click', () => {
-    const randomTopic = hookTopics[Math.floor(Math.random() * hookTopics.length)];
-    // Enviaremos el tema al azar directamente al generador principal
-    generateFullSchemaFromTopic(randomTopic);
+// Paso 1: tema + sugerencias al azar
+const onbChipsContainer = document.getElementById('onbSuggestionChips');
+if (onbChipsContainer) {
+    const shuffled = [...hookTopics].sort(() => 0.5 - Math.random());
+    shuffled.slice(0, 3).forEach(topic => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = "bg-white border border-slate-200 text-slate-600 px-3.5 py-1.5 rounded-full text-xs font-bold hover:border-slate-400 hover:text-slate-900 transition-colors shadow-sm";
+        chip.innerText = topic;
+        chip.onclick = () => {
+            if (onbTopicInput) { onbTopicInput.value = topic; onbTopicInput.dispatchEvent(new Event('input')); }
+        };
+        onbChipsContainer.appendChild(chip);
+    });
+}
+onbTopicInput?.addEventListener('input', () => {
+    if (onbNext1) onbNext1.disabled = !onbTopicInput.value.trim();
 });
+onbNext1?.addEventListener('click', () => { if (onbTopicInput?.value.trim()) setOnbStep(2); });
+
+// Escape rápido: probar con un tema al azar sin contestar nada
+document.getElementById('onbSkipToRandom')?.addEventListener('click', () => {
+    const randomTopic = hookTopics[Math.floor(Math.random() * hookTopics.length)];
+    dismissWelcomeScreen();
+    generateFullSchemaFromTopic(randomTopic, { originPanelId: 'main' });
+});
+
+// Paso 2: profundidad deseada
+document.querySelectorAll('.onb-depth-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+        onbDepth = btn.dataset.depth;
+        document.querySelectorAll('.onb-depth-option').forEach(b => b.classList.toggle('is-selected', b === btn));
+        if (onbNext2) onbNext2.disabled = false;
+    });
+});
+document.getElementById('onbBack2')?.addEventListener('click', () => setOnbStep(1));
+onbNext2?.addEventListener('click', () => { if (onbDepth) setOnbStep(3); });
+
+// Paso 3: fuente opcional (texto/enlace/PDF)
+document.getElementById('onbBack3')?.addEventListener('click', () => setOnbStep(2));
+btnOnbPdf?.addEventListener('click', () => onbPdfInput?.click());
+onbPdfInput?.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    onbPdfPendingFile = file;
+    if (onbPdfLabel) onbPdfLabel.textContent = file.name;
+    if (onbSourceInput) onbSourceInput.value = ''; // alternativas, no se combinan
+    e.target.value = '';
+});
+
+async function runOnboardingGeneration() {
+    const topic = (onbTopicInput?.value || '').trim();
+    const sourceRaw = (onbSourceInput?.value || '').trim();
+    let textContent = null;
+
+    if (onbPdfPendingFile) {
+        await handlePdfFileSelected(onbPdfPendingFile);
+        if (!activePdfDoc) return;
+        const toPage = Math.min(activePdfDoc.numPages, MAX_PDF_DEFAULT_PAGES);
+        await extractPdfRangeIntoReader(1, toPage);
+        if (!readerTextMode.innerText.trim()) return;
+        textContent = readerTextMode.innerText.trim();
+    } else if (sourceRaw) {
+        textContent = await resolveTextOrWebLink(sourceRaw, {
+            targetTextEl: readerTextMode,
+            onTitle: (title) => {
+                if (!globalDocumentContext) {
+                    globalDocumentContext = title;
+                    if (docContextInput) docContextInput.value = title;
+                    updateDocContextChip();
+                }
+            }
+        });
+        if (textContent === null) return;
+    } else {
+        textContent = topic;
+    }
+
+    currentDocumentText = textContent;
+    dismissWelcomeScreen();
+
+    const depthHint = DEPTH_HINTS[onbDepth] || '';
+    const combinedText = depthHint ? `${depthHint}\n\n${textContent}` : textContent;
+    await generateFullSchemaFromTopic(combinedText, { originPanelId: 'main' });
+
+    // Mostramos el Modo Lector con el texto usado (si lo hubo) para que, al
+    // "entrar" a la app, ya se vea tanto el esquema como su fuente.
+    if (onbPdfPendingFile || sourceRaw) openReaderPanel();
+}
+
+document.getElementById('btnOnbFinish')?.addEventListener('click', runOnboardingGeneration);
 
 // Función auxiliar para encontrar todos los descendientes (hijos, nietos, etc.) de un nodo
 function getAllDescendants(parentNodeId) {
@@ -4882,9 +5110,15 @@ async function tourRunNode(index) {
     // contenido en vez de mostrar una tarjeta en blanco mientras carga.
     const contentPromise = ensureNodeContent(nodeId);
 
-    tourShowMapPhase(nodeId);
-    await tourWait(tourState.mapDurationMs);
-    if (!tourState || tourState.index !== index) return;
+    // skipMapPhase: el recorrido iniciado desde el Modo Móvil (ver esa
+    // sección más abajo) nunca muestra el lienzo (#network-container está
+    // oculto por CSS en pantallas chicas), así que la fase de "zoom hacia
+    // el nodo" no tiene nada que mostrar — se salta directo al título.
+    if (!tourState.skipMapPhase) {
+        tourShowMapPhase(nodeId);
+        await tourWait(tourState.mapDurationMs);
+        if (!tourState || tourState.index !== index) return;
+    }
 
     tourShowTitlePhase(node);
     await tourWait(tourReadingDurationMs(node.baseTitle || nodeId, { min: 1800, max: 4200, perWordMs: 420 }));
@@ -4912,14 +5146,18 @@ function tourPrev() {
     tourRunNode(Math.max(tourState.index - 1, 0));
 }
 
-function startTour(nodeIds) {
+function startTour(nodeIds, opts = {}) {
     const order = buildTourOrder(nodeIds);
     if (!order.length) { appAlert('No hay nada que recorrer todavía — genera un esquema primero.'); return; }
 
     tourState = {
         order, index: -1, playing: true, cancelCurrentWait: false,
         mapDurationMs: 2200, lastHighlightedId: null,
-        enabledPresentationMode: !presentationModeActive
+        enabledPresentationMode: !presentationModeActive,
+        // skipMapPhase: el recorrido iniciado desde el Modo Móvil pasa esto
+        // en true porque #network-container está oculto por CSS — no hay
+        // lienzo que mostrar en la fase de "mapa" (ver tourRunNode).
+        skipMapPhase: !!opts.skipMapPhase
     };
 
     document.getElementById('tourOverlay')?.classList.remove('hidden');
@@ -4980,6 +5218,137 @@ document.addEventListener('keydown', (e) => {
     if (e.key === ' ') { e.preventDefault(); document.getElementById('tourBtnPlayPause')?.click(); return; }
     if (e.key === 'ArrowRight') { tourNext(); return; }
     if (e.key === 'ArrowLeft') { tourPrev(); return; }
+});
+
+// ==========================================
+// MODO QUIZ: autoevaluación nodo por nodo, independiente del Recorrido
+// Guiado (no comparte tourState/startTour — ver comentario en el botón
+// #btnStartQuiz en index.html). Reutiliza buildTourOrder/getCanvasRootIds/
+// ensureNodeContent/stripTourMarkup porque esas son independientes de
+// tourState: solo calculan el orden de nodos y traen/cachean su contenido,
+// no tocan ni dependen del estado del recorrido.
+// ==========================================
+let quizState = null; // { order, index, correctCount, answeredCount, revealed }
+
+function quizUpdateProgress() {
+    const el = document.getElementById('quizProgress');
+    if (!el || !quizState) return;
+    el.textContent = `${Math.min(quizState.index + 1, quizState.order.length)} / ${quizState.order.length}`;
+}
+
+function quizShowQuestionPhase(node) {
+    const inner = document.getElementById('quizCardInner');
+    if (!inner) return;
+    const title = node.baseTitle || node.id;
+    inner.innerHTML = `
+        <p class="text-[#4fd1c5] font-bold uppercase tracking-wider text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">Pregunta ${quizState.index + 1} de ${quizState.order.length}</p>
+        <h1 class="font-heading font-bold text-[#eef1fb] leading-[1.1] text-center" style="font-size: clamp(2rem, 6vw, 4.5rem);">¿Qué sabés sobre esto?</h1>
+        <p class="text-slate-300 text-center" style="font-size: clamp(1.3rem, 2.8vw, 2rem);">${escapeHtml(title)}</p>
+        <button id="quizBtnReveal" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">Mostrar respuesta</button>
+    `;
+    document.getElementById('quizBtnReveal')?.addEventListener('click', quizReveal);
+}
+
+function quizShowAnswerPhase(node, content) {
+    const inner = document.getElementById('quizCardInner');
+    if (!inner) return;
+    const title = node.baseTitle || node.id;
+    const def = stripTourMarkup(content?.definition) || 'No se pudo obtener una definición para este nodo.';
+    const simple = content?.simple;
+    inner.innerHTML = `
+        <p class="text-[#4fd1c5] font-bold uppercase tracking-wider text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">${escapeHtml(title)}</p>
+        <p class="text-[#eef1fb] leading-snug font-medium text-center" style="font-size: clamp(1.3rem, 2.8vw, 2.2rem);">${escapeHtml(def)}</p>
+        ${simple ? `
+        <div class="w-full bg-lime-500/10 border border-lime-500/25 rounded-2xl px-6 py-5 mt-1">
+            <p class="text-lime-400 font-bold uppercase tracking-wider mb-2 text-center" style="font-size: clamp(0.75rem, 1.2vw, 0.9rem);">En palabras simples</p>
+            <p class="text-slate-100 leading-snug text-center" style="font-size: clamp(1.05rem, 2vw, 1.4rem);">${escapeHtml(simple.definition || '')}</p>
+        </div>` : ''}
+        <div class="flex flex-col sm:flex-row gap-2.5 mt-4 w-full max-w-md">
+            <button id="quizBtnKnew" class="flex-1 bg-lime-500/15 border border-lime-500/40 hover:bg-lime-500/25 text-lime-300 px-5 py-3 rounded-xl font-bold text-sm transition-colors active:scale-95">✓ Lo sabía</button>
+            <button id="quizBtnDidntKnow" class="flex-1 bg-rose-500/15 border border-rose-500/40 hover:bg-rose-500/25 text-rose-300 px-5 py-3 rounded-xl font-bold text-sm transition-colors active:scale-95">✗ No lo sabía</button>
+        </div>
+    `;
+    document.getElementById('quizBtnKnew')?.addEventListener('click', () => quizAnswer(true));
+    document.getElementById('quizBtnDidntKnow')?.addEventListener('click', () => quizAnswer(false));
+}
+
+function quizShowEndCard() {
+    const inner = document.getElementById('quizCardInner');
+    if (!inner || !quizState) return;
+    const { correctCount, answeredCount } = quizState;
+    const pct = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0;
+    inner.innerHTML = `
+        <p style="font-size: clamp(2.5rem, 6vw, 4rem);">${pct >= 70 ? '🎉' : '📚'}</p>
+        <h1 class="font-heading text-3xl md:text-5xl font-bold text-[#eef1fb] text-center">Quiz terminado</h1>
+        <p class="text-slate-300 text-center" style="font-size: clamp(1.1rem, 2vw, 1.4rem);">Sabías ${correctCount} de ${answeredCount} (${pct}%)</p>
+        <button id="quizBtnRetry" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">Reintentar</button>
+    `;
+    document.getElementById('quizBtnRetry')?.addEventListener('click', () => startQuiz(quizState.order, { isRetry: true }));
+    quizState.index = quizState.order.length;
+    quizUpdateProgress();
+    track('quiz_finished', { correctCount, answeredCount, pct });
+}
+
+function quizRunNode(index) {
+    if (!quizState || index >= quizState.order.length) { quizShowEndCard(); return; }
+    quizState.index = index;
+    quizState.revealed = false;
+    const nodeId = quizState.order[index];
+    const node = nodes.get(nodeId);
+    if (!node) { quizRunNode(index + 1); return; } // nodo borrado mientras tanto: se salta
+
+    quizUpdateProgress();
+    quizState.contentPromise = ensureNodeContent(nodeId); // se pide ya mismo, en paralelo a que piense la respuesta
+    quizShowQuestionPhase(node);
+}
+
+async function quizReveal() {
+    if (!quizState || quizState.revealed) return;
+    quizState.revealed = true;
+    const nodeId = quizState.order[quizState.index];
+    const node = nodes.get(nodeId);
+    if (!node) return;
+    const content = await quizState.contentPromise;
+    if (!quizState || quizState.order[quizState.index] !== nodeId) return; // se salió/avanzó mientras cargaba
+    quizShowAnswerPhase(node, content);
+}
+
+function quizAnswer(knewIt) {
+    if (!quizState) return;
+    quizState.answeredCount++;
+    if (knewIt) quizState.correctCount++;
+    quizRunNode(quizState.index + 1);
+}
+
+function startQuiz(nodeIds, opts = {}) {
+    const order = opts.isRetry ? nodeIds : buildTourOrder(nodeIds);
+    if (!order.length) { appAlert('No hay nada para el quiz todavía — genera un esquema primero.'); return; }
+
+    quizState = { order, index: -1, correctCount: 0, answeredCount: 0, revealed: false };
+    document.getElementById('quizOverlay')?.classList.remove('hidden');
+    document.getElementById('quizOverlay')?.classList.add('flex');
+    track('quiz_started', { nodeCount: order.length });
+    quizRunNode(0);
+}
+
+function exitQuiz() {
+    if (!quizState) return;
+    document.getElementById('quizOverlay')?.classList.add('hidden');
+    document.getElementById('quizOverlay')?.classList.remove('flex');
+    quizState = null;
+}
+
+document.getElementById('btnStartQuiz')?.addEventListener('click', () => startQuiz(getCanvasRootIds()));
+document.getElementById('btnMenuStartQuiz')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    startQuiz([selectedNodeId]);
+});
+document.getElementById('quizBtnExit')?.addEventListener('click', exitQuiz);
+document.addEventListener('keydown', (e) => {
+    if (!quizState) return;
+    if (e.key === 'Escape') { exitQuiz(); return; }
 });
 
 // --- Minimapa: vista reducida de todo el lienzo con clic-para-navegar ---
@@ -5688,6 +6057,56 @@ async function loadPaypalSdk() {
         }
     }).render('#paypal-button-container');
 })();
+
+// ==========================================
+// DETECCIÓN DE HUECOS
+// ==========================================
+// Cada nodo puede traer node.gaps (ver gapsForNode en renderThreeLevelTree):
+// conceptos que el propio Gemini señaló como mencionados-pero-no-
+// desarrollados al armar el esquema. El botón del menú contextual
+// (#btnMenuShowGaps) solo se muestra si el nodo tiene huecos (ver el click
+// sobre nodos, sección "MOSTRAR MENÚ CONTEXTUAL"); al abrirlo, se listan
+// aquí con un botón por hueco para expandirlo directo como sub-nodo nuevo
+// (reutiliza generateFullSchemaFromTopic con attachToNodeId, igual que
+// "Generar esquema completo a partir de aquí").
+const btnMenuShowGaps = document.getElementById('btnMenuShowGaps');
+const gapsBox = document.getElementById('gapsBox');
+
+btnMenuShowGaps?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isHidden = gapsBox.classList.contains('hidden');
+    if (isHidden && selectedNodeId) {
+        const node = nodes.get(selectedNodeId);
+        const gaps = (node?.gaps) || [];
+        gapsBox.innerHTML = gaps.map((gap, idx) => `
+            <div class="border border-amber-500/25 bg-amber-500/5 rounded-lg px-2.5 py-2">
+                <p class="text-amber-200 font-bold text-xs mb-0.5">${escapeHtml(gap.term)}</p>
+                <p class="text-[#9aa3c7] text-[11px] leading-snug mb-1.5">${escapeHtml(gap.note)}</p>
+                <button data-gap-idx="${idx}" class="btnFillGap w-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-[11px] font-semibold py-1.5 rounded-md transition-colors">Generar esquema para esto →</button>
+            </div>
+        `).join('') || `<p class="text-[#5b6388] text-xs px-1">No hay huecos para mostrar.</p>`;
+
+        gapsBox.querySelectorAll('.btnFillGap').forEach((btn) => {
+            btn.addEventListener('click', async () => {
+                const gapIdx = parseInt(btn.dataset.gapIdx, 10);
+                const gap = gaps[gapIdx];
+                if (!gap) return;
+                const parentNodeId = selectedNodeId;
+                actionMenu.style.visibility = 'hidden';
+                actionMenu.classList.add('hidden');
+                gapsBox.classList.add('hidden'); gapsBox.classList.remove('flex');
+                await generateFullSchemaFromTopic(gap.term, { attachToNodeId: parentNodeId });
+            });
+        });
+    }
+    gapsBox.classList.toggle('hidden');
+    gapsBox.classList.toggle('flex');
+});
+
+// Ocultar la caja de huecos cuando se cierre o abra el menú en otro nodo
+network.on('click', () => {
+    if (gapsBox) { gapsBox.classList.add('hidden'); gapsBox.classList.remove('flex'); }
+});
 
 // ==========================================
 // 17. PETICIÓN PERSONALIZADA POR NODO

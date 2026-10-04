@@ -314,6 +314,28 @@
                 display: flex !important;
             }
         }
+
+        /* --- MODO MÓVIL (pantalla chica, cualquier orientación) ---
+           Ver #mobileShell más abajo en el body y la sección "MODO MÓVIL" en
+           app.js. Esto NO toca nada de la app de escritorio: solo oculta la
+           cabecera/el lienzo y muestra la pantalla simplificada cuando el
+           ancho de la ventana es chico — por encima de este ancho, ninguna
+           de estas reglas aplica y todo se ve exactamente como antes. */
+        #mobileShell { display: none; }
+        @media (max-width: 780px) {
+            #mainHeader, #network-container { display: none !important; }
+            #mobileShell { display: flex !important; }
+        }
+
+        /* --- ASISTENTE DE BIENVENIDA (3 preguntas, solo primera vez) ---
+           Ver #welcomeScreen en el body y la sección "ASISTENTE DE
+           BIENVENIDA" en app.js. .onb-depth-option.is-selected marca
+           visualmente cuál profundidad eligió en el paso 2. */
+        .onb-depth-option.is-selected {
+            border-color: #0f172a;
+            background: #f8fafc;
+            box-shadow: 0 0 0 1px #0f172a inset;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
@@ -475,6 +497,14 @@
             <button id="btnStartTour" title="Recorrido guiado: recorre el esquema nodo por nodo, mostrando título, definición y explicación sencilla en pantalla completa" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🎬</span> <span class="hidden md:inline">Recorrido</span>
             </button>
+            <!-- Modo Quiz: autoevaluación nodo por nodo (ver sección "MODO QUIZ"
+                 en app.js). Reutiliza el mismo orden de recorrido que el Tour
+                 (buildTourOrder/getCanvasRootIds) pero es un flujo propio e
+                 independiente — no comparte estado con startTour/tourState,
+                 para no arriesgar esa función ya en uso. -->
+            <button id="btnStartQuiz" title="Modo quiz: intenta recordar cada nodo antes de ver la respuesta, y marca qué tan bien te fue" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span>🧠</span> <span class="hidden md:inline">Quiz</span>
+            </button>
             <button id="btnSoundToggle" title="Sonido al crear nodos: apagado" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span id="soundToggleIcon">🔇</span>
             </button>
@@ -524,6 +554,25 @@
             <span id="tourProgress" class="text-xs text-slate-400 font-semibold px-2 tabular-nums">1 / 1</span>
             <span class="w-px h-5 bg-slate-700 mx-1"></span>
             <button id="tourBtnExit" title="Salir del recorrido (Esc)" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+    </div>
+
+    <!-- ===================== MODO QUIZ (pantalla completa) =====================
+         Autoevaluación nodo por nodo (ver sección "MODO QUIZ" en app.js):
+         se muestra solo el título del nodo como pregunta ("¿Qué sabés
+         sobre...?"), el usuario intenta recordarlo, pulsa "Mostrar
+         respuesta" para ver la definición + explicación sencilla, y se
+         autocalifica ("Lo sabía" / "No lo sabía") antes de pasar al
+         siguiente. Al final se muestra un resultado (X de Y) y se puede
+         reintentar. Es un flujo propio, independiente del Recorrido guiado
+         (no comparte tourState/startTour). -->
+    <div id="quizOverlay" class="hidden fixed inset-0 z-[400] bg-[#0a0e1a] flex-col items-center justify-center text-center select-none px-8 md:px-24 py-16 overflow-y-auto">
+        <div id="quizCardInner" class="w-full max-w-3xl mx-auto flex flex-col items-center justify-center gap-6 my-auto"></div>
+
+        <div id="quizControls" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[410] flex items-center gap-1 bg-slate-950/90 border border-slate-700 rounded-full shadow-2xl px-2 py-1.5">
+            <span id="quizProgress" class="text-xs text-slate-400 font-semibold px-3 tabular-nums">1 / 1</span>
+            <span class="w-px h-5 bg-slate-700 mx-1"></span>
+            <button id="quizBtnExit" title="Salir del quiz (Esc)" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors">✕</button>
         </div>
     </div>
 
@@ -694,24 +743,114 @@
 
     <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
 
-    <!-- Pantalla de Bienvenida -->
-        <div id="welcomeScreen" class="hidden absolute inset-0 z-20 flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 bg-slate-900/5 backdrop-blur-[2px] transition-opacity duration-500 overflow-y-auto">        <div class="glass-dock p-5 md:p-10 rounded-3xl max-w-2xl w-full text-center shadow-2xl border border-slate-200/80 my-auto">
+    <!-- ===================== MODO MÓVIL ===================== -->
+    <!-- Pantalla alterna para ancho de ventana chico (ver @media más arriba):
+         en vez del lienzo interactivo (ilegible con gestos de mapa en un
+         teléfono), se pide el texto/enlace/PDF y, al generarse el esquema,
+         se muestra automático en pantalla completa con el Recorrido guiado
+         (ver sección "RECORRIDO GUIADO" / "MODO MÓVIL" en app.js) — una
+         tarjeta grande a la vez, pensado para leer con el pulgar, no para
+         hacer zoom con dos dedos. No es una versión reducida de la app de
+         escritorio: es un camino aparte que reutiliza el mismo backend. -->
+    <div id="mobileShell" class="fixed inset-0 z-[60] flex-col items-center px-6 pt-10 pb-8 overflow-y-auto" style="background:var(--void);">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[#4fd1c5] to-[#8b7cf6] text-[#0a0e1a] flex items-center justify-center font-bold font-heading text-base shadow-[0_0_18px_rgba(79,209,197,0.35)] mb-4 shrink-0">Γ</div>
+        <h1 class="text-2xl font-heading font-extrabold text-[#eef1fb] text-center mb-1.5">Graphikosmos</h1>
+        <p class="text-[#9aa3c7] text-sm text-center max-w-[32ch] mb-7 leading-relaxed">Pegá un texto, un enlace, o subí un PDF — armamos tu esquema y te lo mostramos paso a paso, una idea a la vez.</p>
+
+        <textarea id="mobilePasteInput" rows="5" placeholder="Pegá aquí un texto, un tema, o el enlace de una página web..." class="w-full max-w-md bg-[#161c35] border border-[#2c3458] rounded-xl px-4 py-3.5 text-[15px] text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans resize-none mb-3"></textarea>
+
+        <div class="w-full max-w-md flex items-center gap-3 text-[#4b5578] text-xs mb-3">
+            <div class="flex-1 h-px bg-[#2c3458]"></div>
+            <span>o</span>
+            <div class="flex-1 h-px bg-[#2c3458]"></div>
+        </div>
+
+        <input type="file" id="mobilePdfInput" accept="application/pdf" class="hidden">
+        <button id="btnMobilePdf" type="button" class="w-full max-w-md bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#eef1fb] px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 mb-1.5">
+            📄 <span id="mobilePdfLabel">Subir un PDF</span>
+        </button>
+        <!-- Simplificación deliberada frente al selector de rango de páginas
+             de escritorio (pdfRangeBar): en el teléfono se toman directo las
+             primeras páginas (hasta MAX_PDF_DEFAULT_PAGES, el mismo tope que
+             ya usa escritorio por default) sin pedir que elijan el rango —
+             un control de dos campos numéricos no vale la pena acá. -->
+        <p class="text-[#4b5578] text-[11px] text-center mb-6">Se usan las primeras páginas del PDF.</p>
+
+        <button id="btnMobileGenerate" class="w-full max-w-md bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">Crear mi esquema</button>
+
+        <p class="text-[#4b5578] text-[11px] text-center mt-6 max-w-[30ch] leading-relaxed">Graphikosmos está pensado para usarse en computadora — esta es una vista simplificada para explorar desde el teléfono.</p>
+    </div>
+
+    <!-- Pantalla de Bienvenida: ahora un asistente de 3 preguntas (SOLO
+         primera vez, ver gk_has_visited/isFirstTimeUser en app.js). En vez
+         de dejar al usuario frente a un lienzo vacío, le preguntamos qué
+         quiere aprender, qué tan a fondo, y si ya tiene algo que esté
+         leyendo — y con eso armamos de una vez el esquema + el texto en el
+         Modo Lector, para que al "entrar" a la app ya esté todo construido.
+         "Probar con un tema al azar" (abajo del paso 1) es el escape rápido
+         para quien solo quiere ver la magia sin responder nada. -->
+        <div id="welcomeScreen" class="hidden absolute inset-0 z-20 flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 bg-slate-900/5 backdrop-blur-[2px] transition-opacity duration-500 overflow-y-auto">        <div class="glass-dock p-5 md:p-10 rounded-3xl max-w-md w-full text-center shadow-2xl border border-slate-200/80 my-auto">
             <div class="w-14 h-14 md:w-16 md:h-16 mx-auto bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-5 shadow-lg shadow-slate-900/20">Γ</div>
-            <h2 class="text-xl md:text-3xl font-heading font-extrabold text-slate-900 mb-2 md:mb-3 tracking-tight">¿Qué vamos a explorar hoy?</h2>
-            <p class="text-xs md:text-sm text-slate-500 mb-6 md:mb-8 max-w-md mx-auto px-2">Construye tu segundo cerebro. Escribe un concepto, pega un documento o explora una idea al azar.</p>
-            
-            <div class="flex flex-col sm:flex-row gap-3 justify-center mb-6 md:mb-8">
-                <button id="btnWelcomeReader" class="bg-indigo-50 border border-indigo-200 text-indigo-900 px-6 py-3 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-all shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto">
-                    <span>📖</span> Abrir Lector Activo
-                </button>                    
-                <button id="btnSurprise" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 w-full sm:w-auto text-sm">
-                    <span class="text-base md:text-lg">🎲</span> Generar esquema de prueba
-                </button>
+
+            <!-- Puntos de progreso (1 de 3 / 2 de 3 / 3 de 3) -->
+            <div class="flex items-center justify-center gap-1.5 mb-5" id="onbProgressDots">
+                <span class="w-6 h-1.5 rounded-full bg-slate-900 transition-colors" data-dot="1"></span>
+                <span class="w-6 h-1.5 rounded-full bg-slate-200 transition-colors" data-dot="2"></span>
+                <span class="w-6 h-1.5 rounded-full bg-slate-200 transition-colors" data-dot="3"></span>
             </div>
-        
-            <div class="border-t border-slate-100 pt-5 md:pt-6">
-                <p class="text-[10px] md:text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Temas sugeridos</p>
-                <div class="flex flex-wrap gap-2 justify-center" id="suggestionChips"></div>
+
+            <!-- PASO 1: el tema -->
+            <div id="onbStep1" class="onb-step">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué querés entender mejor?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Un tema de la universidad, algo del trabajo, o pura curiosidad — con eso armamos tu primer esquema.</p>
+                <input id="onbTopicInput" type="text" placeholder="Ej: La Revolución Francesa, Computación Cuántica..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10 transition-shadow mb-3">
+                <div class="flex flex-wrap gap-2 justify-center mb-5" id="onbSuggestionChips"></div>
+                <button id="onbNext1" class="w-full bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Siguiente →</button>
+                <button id="onbSkipToRandom" class="mt-3 text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors">Probar con un tema al azar, sin preguntas</button>
+            </div>
+
+            <!-- PASO 2: qué tan a fondo -->
+            <div id="onbStep2" class="onb-step hidden">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué tan a fondo lo querés?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Esto decide qué tan denso armamos tu esquema.</p>
+                <div class="flex flex-col gap-2 mb-5" id="onbDepthOptions">
+                    <button type="button" data-depth="essential" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors">
+                        <span class="block text-sm font-bold text-slate-800">Solo lo esencial</span>
+                        <span class="block text-xs text-slate-500">Un resumen claro de lo más importante</span>
+                    </button>
+                    <button type="button" data-depth="exam" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors">
+                        <span class="block text-sm font-bold text-slate-800">Dominarlo a fondo</span>
+                        <span class="block text-xs text-slate-500">Para un examen o un trabajo importante</span>
+                    </button>
+                    <button type="button" data-depth="explore" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors">
+                        <span class="block text-sm font-bold text-slate-800">Explorarlo ampliamente</span>
+                        <span class="block text-xs text-slate-500">Muchas ramas y conexiones distintas</span>
+                    </button>
+                </div>
+                <div class="flex gap-2">
+                    <button id="onbBack2" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
+                    <button id="onbNext2" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Siguiente →</button>
+                </div>
+            </div>
+
+            <!-- PASO 3: fuente opcional (texto/enlace/PDF) -->
+            <div id="onbStep3" class="onb-step hidden">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Ya tenés algo que estés leyendo?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Opcional — si pegás un texto, un enlace o subís un PDF, armamos el esquema a partir de eso en vez de investigar el tema desde cero.</p>
+                <textarea id="onbSourceInput" rows="4" placeholder="Pegá aquí un texto o el enlace de una página (opcional)..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10 transition-shadow resize-none mb-3"></textarea>
+                <div class="flex items-center gap-3 text-slate-400 text-xs mb-3">
+                    <div class="flex-1 h-px bg-slate-200"></div>
+                    <span>o</span>
+                    <div class="flex-1 h-px bg-slate-200"></div>
+                </div>
+                <input type="file" id="onbPdfInput" accept="application/pdf" class="hidden">
+                <button id="btnOnbPdf" type="button" class="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 mb-5">
+                    📄 <span id="onbPdfLabel">Subir un PDF</span>
+                </button>
+                <div class="flex gap-2">
+                    <button id="onbBack3" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
+                    <button id="btnOnbFinish" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Crear mi esquema →</button>
+                </div>
             </div>
         </div>
     </div>
@@ -775,6 +914,20 @@
             <button id="btnMenuStartTour" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
                 🎬 Recorrido desde aquí
             </button>
+            <button id="btnMenuStartQuiz" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors">
+                🧠 Autoevaluarme desde aquí
+            </button>
+
+            <!-- DETECCIÓN DE HUECOS: solo visible si el nodo tiene node.gaps
+                 no vacío (ver toggle en app.js, sección "DETECCIÓN DE
+                 HUECOS" y el listener de click sobre nodos). El borde
+                 punteado del nodo en el lienzo ya es la primera señal
+                 visual; este botón abre el detalle y permite expandir cada
+                 hueco directo en un nuevo sub-nodo. -->
+            <button id="btnMenuShowGaps" class="hidden w-full px-3.5 py-2.5 hover:bg-[#2a1f10] text-amber-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                ⚠️ Huecos detectados
+            </button>
+            <div id="gapsBox" class="hidden px-3.5 py-2.5 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-2.5"></div>
 
             <!-- Botón y Campo de Petición Personalizada -->
             <button id="btnMenuCustom" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">

@@ -426,9 +426,22 @@ async function rawHandler(event, context) {
                             },
                             required: ["id", "label", "parentId", "relationship"]
                         }
+                    },
+                    gaps: {
+                        type: 'ARRAY',
+                        description: 'DETECCIÓN DE HUECOS: lista (máximo 5) de conceptos que el texto/tema MENCIONA de paso pero no desarrolla a fondo dentro de este esquema — cosas que quedaron fuera porque no alcanzaron a tener su propio nodo, pero que alguien que quiera entender el tema a fondo debería investigar después. Si no detectas ninguno genuino, devuelve un array vacío — nunca inventes huecos artificiales solo para llenar la lista.',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                term: { type: 'STRING', description: 'El concepto mencionado pero no desarrollado, en pocas palabras.' },
+                                relatedNodeId: { type: 'STRING', description: 'El "id" exacto (de root, branches o subBranches de este mismo esquema) del nodo donde se menciona este hueco o con el que está más relacionado.' },
+                                note: { type: 'STRING', description: 'Una sola oración breve explicando qué le falta cubrir a este concepto.' }
+                            },
+                            required: ["term", "relatedNodeId", "note"]
+                        }
                     }
                 },
-                required: ["root", "branches", "subBranches"]
+                required: ["root", "branches", "subBranches", "gaps"]
             };
 
             const response = await generateWithFallback({
@@ -439,7 +452,8 @@ async function rawHandler(event, context) {
                 2. CERO NODOS DE EJEMPLO: Está PROHIBIDO incluir nodos de "Ejemplo:" en este esquema inicial. Todos los nodos deben ser conceptos, fases, componentes o categorías teóricas/fácticas del tema.
                 3. PROHIBICIÓN DE PLACEHOLDERS: Nunca uses textos genéricos como "Subconcepto 1" o "Fase A". Usa los nombres reales.
                 4. "relationship": Usa conectores precisos de 1 a 3 palabras.
-                5. "sourceQuote":${sourceQuoteNote}${focusHint}`,
+                5. "sourceQuote":${sourceQuoteNote}
+                6. "gaps": revisa el texto/tema una vez armado el esquema y detecta qué conceptos se mencionan de paso (una referencia, un nombre, un término técnico) pero NO llegaron a tener su propio nodo — esos son los huecos. Máximo 5, y solo los genuinamente relevantes para entender el tema a fondo. Si no hay ninguno real, "gaps" debe ser un array vacío.${focusHint}`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
