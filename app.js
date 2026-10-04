@@ -1228,6 +1228,154 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     }
 }
 
+// --- Analizar Texto (distinto de "Generar Esquema"): en vez de estructurar
+// lo que el texto DICE, lo analiza desde una lente elegida por el usuario
+// (ver ANALYSIS_TYPE_LABELS y analyzeTypeMenu en index.html). Reutiliza
+// deliberadamente el mismo renderThreeLevelTree/checkBalance/billing que
+// generateFullSchemaFromTopic — el backend (gemini.js, action
+// 'analyze_text') devuelve la misma forma de árbol de 3 niveles, solo que
+// con contenido analítico en vez de expositivo.
+const ANALYSIS_TYPE_LABELS = {
+    critico: 'Argumentativo / crítico',
+    academico: 'Académico / de investigación',
+    literario: 'Literario',
+    retorico: 'Retórico / persuasivo',
+    comparativo: 'Comparativo de posturas',
+    custom: 'Personalizado'
+};
+
+async function generateTextAnalysis(textContent, analysisType, customType, opts = {}) {
+    if (!textContent) return;
+    if (!checkBalance(1)) return;
+
+    const { originPanelId = null, attachToNodeId = null } = opts;
+    const analysisLabel = ANALYSIS_TYPE_LABELS[analysisType] || 'Personalizado';
+    // Mismo principio de privacidad que generateFullSchemaFromTopic: nunca se
+    // manda el texto en sí a la tabla de eventos, solo el contexto corto que
+    // la app ya detecta sola (o, si no hay, el tipo de análisis elegido).
+    const topicPreview = globalDocumentContext || (analysisType === 'custom' ? (customType || '').slice(0, 60) : analysisLabel);
+    track('schema_analyze_attempt', {
+        analysisType, customType: analysisType === 'custom' ? (customType || '').slice(0, 80) : null,
+        length: textContent.length, layoutMode: schemaLayoutMode, topicPreview
+    });
+
+    showLoader(`Analizando texto (${analysisLabel})...`);
+
+    try {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'analyze_text', text: textContent, analysisType, customType: customType || '' })
+        });
+        if (!ok) {
+            if (!handleBillingError(status, data)) appAlert(data?.error || 'Intenta de nuevo en unos segundos.');
+            track('schema_analyze_error', { analysisType, message: String(data?.error || status).slice(0, 120), topicPreview });
+            return;
+        }
+
+        const totalNodes = (attachToNodeId ? 0 : 1) + (data.branches?.length || 0) + (data.subBranches?.length || 0);
+
+        await renderThreeLevelTree(data, { originPanelId, attachToNodeId });
+        applyServerBalance(data); consumeNodes(totalNodes);
+        track('schema_analyze_success', { analysisType, nodes: totalNodes, topicPreview });
+    } catch (err) {
+        console.error(err);
+        track('schema_analyze_error', { analysisType, message: String(err?.message || '').slice(0, 120), topicPreview });
+        appAlert('Intenta de nuevo en unos segundos.');
+    } finally {
+        hideLoader();
+    }
+}
+
+// --- Menú de "🔎 Analizar Texto": un solo menú compartido (ver
+// analyzeTypeMenu en index.html) reposicionado junto al botón que lo abrió,
+// sea el del lector principal o el de cualquier lector clonado. Guarda en
+// analyzeMenuContext de qué lector (textEl/panelId/onTitle) salió el pedido,
+// para que runTextAnalysis sepa qué texto leer cuando se elige una opción.
+let analyzeMenuContext = null;
+
+function openAnalyzeMenu(anchorBtn, context) {
+    const menu = document.getElementById('analyzeTypeMenu');
+    if (!menu || !anchorBtn) return;
+    analyzeMenuContext = context;
+    const customInput = menu.querySelector('[data-role="analyzeCustomInput"]');
+    if (customInput) customInput.value = '';
+    menu.classList.remove('hidden');
+    menu.classList.add('flex');
+
+    const rect = anchorBtn.getBoundingClientRect();
+    const menuWidth = menu.offsetWidth || 288;
+    const menuHeight = menu.offsetHeight || 280;
+    let left = Math.min(rect.left, window.innerWidth - menuWidth - 8);
+    let top = rect.bottom + 6;
+    if (top + menuHeight > window.innerHeight - 8) top = rect.top - menuHeight - 6; // no cabe abajo: se abre hacia arriba
+    menu.style.left = `${Math.max(8, left)}px`;
+    menu.style.top = `${Math.max(8, top)}px`;
+}
+
+function closeAnalyzeMenu() {
+    const menu = document.getElementById('analyzeTypeMenu');
+    menu?.classList.add('hidden');
+    menu?.classList.remove('flex');
+    analyzeMenuContext = null;
+}
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('analyzeTypeMenu');
+    if (!menu || menu.classList.contains('hidden')) return;
+    if (e.target.closest('#analyzeTypeMenu') || e.target.closest('[data-role="btnAnalyzeText"]')) return;
+    closeAnalyzeMenu();
+});
+
+async function runTextAnalysis(analysisType, customType) {
+    const context = analyzeMenuContext;
+    closeAnalyzeMenu();
+    if (!context) return;
+
+    let textContent = context.textEl ? context.textEl.innerText.trim() : "";
+    if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
+
+    textContent = await resolveTextOrWebLink(textContent, { targetTextEl: context.textEl, onTitle: context.onTitle });
+    if (textContent === null) return;
+
+    if (context.panelId === 'main') { currentDocumentText = textContent; updateReaderEmptyHint(); }
+    await generateTextAnalysis(textContent, analysisType, customType, { originPanelId: context.panelId });
+}
+
+document.querySelectorAll('#analyzeTypeMenu .analyze-option').forEach(btn => {
+    btn.addEventListener('click', () => runTextAnalysis(btn.dataset.analysisType, null));
+});
+(() => {
+    const menu = document.getElementById('analyzeTypeMenu');
+    const customInput = menu?.querySelector('[data-role="analyzeCustomInput"]');
+    const goBtn = menu?.querySelector('[data-role="btnAnalyzeCustomGo"]');
+    const submitCustom = () => {
+        const customType = customInput?.value.trim();
+        if (!customType) { customInput?.focus(); return; }
+        runTextAnalysis('custom', customType);
+    };
+    goBtn?.addEventListener('click', submitCustom);
+    customInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitCustom(); });
+    customInput?.addEventListener('click', (e) => e.stopPropagation());
+})();
+
+document.getElementById('btnAnalyzeReaderText')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('analyzeTypeMenu');
+    const alreadyOpenForMain = analyzeMenuContext?.panelId === 'main' && menu && !menu.classList.contains('hidden');
+    if (alreadyOpenForMain) { closeAnalyzeMenu(); return; }
+    openAnalyzeMenu(e.currentTarget, {
+        textEl: readerTextMode,
+        panelId: 'main',
+        onTitle: (title) => {
+            if (!globalDocumentContext) {
+                globalDocumentContext = title;
+                if (docContextInput) docContextInput.value = title;
+                updateDocContextChip();
+            }
+        }
+    });
+});
+
 // Busca un punto cerca de (centerX, centerY) que no quede encima de ningún
 // nodo existente, probando en espiral hacia afuera. Sin esto, un nodo nuevo
 // podía caer justo sobre otro ya puesto ahí y el usuario no veía que se había
@@ -3431,6 +3579,7 @@ function wireReaderPanelClone(root, panelId) {
     const btnClear = q('btnClearReader');
     const btnClose = q('btnClose');
     const btnGenerate = q('btnGenerate');
+    const btnAnalyze = q('btnAnalyzeText');
     const textEl = q('textMode');
     const emptyHint = q('emptyHint');
     const chip = q('docContextChip');
@@ -3527,6 +3676,21 @@ function wireReaderPanelClone(root, panelId) {
     });
 
     btnAdd?.addEventListener('click', () => createExtraReaderPanel());
+
+    // Mismo menú compartido #analyzeTypeMenu que usa el lector principal
+    // (ver openAnalyzeMenu/runTextAnalysis más arriba en este archivo) — cada
+    // lector clonado solo le pasa SU PROPIO textEl/onTitle como contexto.
+    btnAnalyze?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const menu = document.getElementById('analyzeTypeMenu');
+        const alreadyOpenForThis = analyzeMenuContext?.panelId === panelId && menu && !menu.classList.contains('hidden');
+        if (alreadyOpenForThis) { closeAnalyzeMenu(); return; }
+        openAnalyzeMenu(e.currentTarget, {
+            textEl,
+            panelId,
+            onTitle: (t) => { if (!localContext) { localContext = t; if (contextInput) contextInput.value = t; updateChip(); } }
+        });
+    });
 
     btnGenerate?.addEventListener('click', async () => {
         let textContent = textEl ? textEl.innerText.trim() : "";
@@ -4426,6 +4590,360 @@ document.getElementById('btnPresentationMode')?.addEventListener('click', () => 
 document.getElementById('btnExitPresentation')?.addEventListener('click', () => togglePresentationMode(true));
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && presentationModeActive) togglePresentationMode(true);
+});
+
+// ==========================================
+// RECORRIDO GUIADO: presentación de pantalla completa que va nodo por nodo,
+// solo (como pidió el usuario), raíz → cada rama completa → la siguiente
+// rama (no "por niveles"). Cada nodo pasa por 3 fases en ciclo:
+//   1. MAPA: se ve el lienzo real completo (network.fit) con el nodo
+//      siguiente resaltado con un pulso — para no perder la orientación de
+//      "a dónde voy" antes de "entrar".
+//   2. TÍTULO: tarjeta opaca de pantalla completa, solo el título, lo más
+//      grande posible.
+//   3. CONTENIDO: misma tarjeta, con la definición y la explicación sencilla
+//      del nodo (reutiliza exactamente los mismos endpoints/caché que
+//      "Ver definición"/"Explicación sencilla" — ver ensureNodeContent).
+// Cada fase dura unos segundos calculados según cuánto hay que leer (ver
+// tourReadingDurationMs), con pausa/avance/retroceso manual disponibles en
+// todo momento (barra de abajo, o Espacio/flechas/Esc).
+// ==========================================
+let tourState = null; // { order, index, playing, cancelCurrentWait, mapDurationMs, lastHighlightedId, enabledPresentationMode }
+
+// Construye el orden de visita a partir de uno o más nodos de partida:
+// profundidad primero, rama completa antes de pasar a la siguiente — igual
+// que leer un índice de arriba hacia abajo. Usa las mismas `edges` del
+// lienzo (from = padre, to = hijo) que ya arma renderThreeLevelTree.
+function buildTourOrder(startIds) {
+    const allEdges = edges.get();
+    const childrenOf = new Map();
+    allEdges.forEach(e => {
+        if (!childrenOf.has(e.from)) childrenOf.set(e.from, []);
+        childrenOf.get(e.from).push(e.to);
+    });
+    const order = [];
+    const seen = new Set();
+    function dfs(id) {
+        if (seen.has(id) || !nodes.get(id)) return;
+        seen.add(id);
+        order.push(id);
+        (childrenOf.get(id) || []).forEach(dfs);
+    }
+    (startIds || []).forEach(dfs);
+    return order;
+}
+
+// Para el recorrido de TODO el lienzo (botón de la cabecera): las raíces son
+// los nodos sin ningún padre — cada esquema generado por separado es una
+// raíz distinta, y un nodo suelto sin conexiones es su propia "rama" de un
+// solo lugar. Se recorren en el orden en que se crearon.
+function getCanvasRootIds() {
+    const allIds = nodes.getIds();
+    const hasParent = new Set(edges.get().map(e => e.to));
+    return allIds.filter(id => !hasParent.has(id));
+}
+
+// Quita las marcas "[[término]]" de pistas interactivas (ver define() en
+// gemini.js) que puedan venir de una definición ya cacheada de antes del
+// recorrido — en la tarjeta de pantalla completa no hay nada que clickear,
+// así que se muestran solo como texto plano.
+function stripTourMarkup(text) {
+    return String(text || '').replace(/\[\[(.*?)\]\]/g, '$1');
+}
+
+// Tiempo de lectura cómodo según cuánto texto hay, con un piso y un techo
+// para que ni un nodo casi vacío pase en un parpadeo ni uno muy largo se
+// quede pegado demasiado tiempo.
+function tourReadingDurationMs(text, { min = 3500, max = 16000, perWordMs = 340 } = {}) {
+    const words = String(text || '').trim().split(/\s+/).filter(Boolean).length;
+    return Math.max(min, Math.min(max, words * perWordMs));
+}
+
+// Trae (o reutiliza) la definición y la explicación sencilla de un nodo —
+// mismos dos endpoints y la misma caché en el propio nodo (node.definition/
+// node.simpleExplanation) que usan showDefinitionInFloatingPanel/
+// showSimpleExplanationInFloatingPanel, así que si la persona ya las había
+// abierto antes a mano, el recorrido no vuelve a gastar una llamada. Pide la
+// definición SIN marcas interactivas (interactive:false) porque aquí no hay
+// nada que clickear — ver stripTourMarkup para el caso en que ya estaba
+// cacheada CON marcas de antes.
+async function ensureNodeContent(nodeId) {
+    const node = nodes.get(nodeId);
+    if (!node) return null;
+    const title = node.baseTitle || nodeId;
+    const tasks = [];
+
+    let definitionText = node.definition;
+    const defSource = node.definitionSource || 'gemini';
+    const defCacheUsable = !!definitionText;
+    if (!defCacheUsable) {
+        tasks.push((async () => {
+            try {
+                const { ok, data } = await apiFetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'define', topic: title, interactive: false,
+                        contextPath: getContextPath(nodeId),
+                        documentContext: globalDocumentContext || currentDocumentText
+                    })
+                });
+                if (ok) {
+                    applyServerBalance(data);
+                    definitionText = data.definition;
+                    nodes.update({ id: nodeId, baseTitle: title, definition: definitionText, definitionSource: data.source || 'gemini' });
+                }
+            } catch (err) { console.error('[recorrido] no se pudo traer la definición:', err.message); }
+        })());
+    }
+
+    let simple = node.simpleExplanation;
+    if (!simple) {
+        tasks.push((async () => {
+            try {
+                const { ok, data } = await apiFetch('/.netlify/functions/gemini', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'simple_explanation', topic: title,
+                        contextPath: getContextPath(nodeId),
+                        documentContext: globalDocumentContext || currentDocumentText
+                    })
+                });
+                if (ok) {
+                    applyServerBalance(data);
+                    simple = { definition: data.definition, analogy: data.analogy, example: data.example };
+                    nodes.update({ id: nodeId, simpleExplanation: simple });
+                }
+            } catch (err) { console.error('[recorrido] no se pudo traer la explicación sencilla:', err.message); }
+        })());
+    }
+
+    if (tasks.length) await Promise.all(tasks);
+    return { title, definition: definitionText, defSource, simple };
+}
+
+// Espera cancelable y pausable: mientras tourState.playing sea false no
+// descuenta tiempo (se queda "congelada" hasta reanudar), y si se pide saltar
+// a otro nodo a mano (Siguiente/Anterior) se resuelve de inmediato con
+// tourState.cancelCurrentWait, sin esperar el resto del tiempo.
+function tourWait(ms) {
+    return new Promise(resolve => {
+        let remaining = ms;
+        let lastTick = Date.now();
+        (function tick() {
+            if (!tourState) return; // se salió del recorrido mientras esperaba
+            if (tourState.cancelCurrentWait) { tourState.cancelCurrentWait = false; resolve(); return; }
+            const now = Date.now();
+            if (tourState.playing) remaining -= (now - lastTick);
+            lastTick = now;
+            if (remaining <= 0) { resolve(); return; }
+            tourState.waitTimeoutId = setTimeout(tick, 100);
+        })();
+    });
+}
+
+function tourUpdateProgress() {
+    const el = document.getElementById('tourProgress');
+    if (!el || !tourState) return;
+    const total = tourState.order.length;
+    el.textContent = `${Math.min(tourState.index + 1, total)} / ${total}`;
+}
+
+let tourHighlightTimer = null;
+function highlightTourTargetNode(nodeId) {
+    if (tourHighlightTimer) { clearInterval(tourHighlightTimer); tourHighlightTimer = null; }
+    if (tourState?.lastHighlightedId && nodes.get(tourState.lastHighlightedId)) {
+        nodes.update({ id: tourState.lastHighlightedId, borderWidth: 2, shadow: { enabled: false } });
+    }
+    if (!nodeId || !tourState) return;
+    tourState.lastHighlightedId = nodeId;
+    let tick = 0;
+    tourHighlightTimer = setInterval(() => {
+        if (!nodes.get(nodeId)) { clearInterval(tourHighlightTimer); return; }
+        const on = tick % 2 === 0;
+        nodes.update({
+            id: nodeId, borderWidth: on ? 6 : 3,
+            shadow: on ? { enabled: true, color: 'rgba(79, 209, 197, 0.65)', size: 22 } : { enabled: false }
+        });
+        tick++;
+    }, 420);
+}
+
+function tourShowMapPhase(nodeId) {
+    const node = nodes.get(nodeId);
+    document.getElementById('tourCard')?.classList.add('hidden');
+    document.getElementById('tourCard')?.classList.remove('flex');
+    const captionTitle = document.getElementById('tourMapCaptionTitle');
+    if (captionTitle) captionTitle.textContent = node?.baseTitle || nodeId;
+    document.getElementById('tourMapCaption')?.classList.remove('hidden');
+
+    network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+    setTimeout(() => highlightTourTargetNode(nodeId), 520);
+}
+
+function tourShowTitlePhase(node) {
+    document.getElementById('tourMapCaption')?.classList.add('hidden');
+    const card = document.getElementById('tourCard');
+    const inner = document.getElementById('tourCardInner');
+    card.classList.remove('hidden'); card.classList.add('flex');
+    inner.innerHTML = `
+        <h1 class="font-heading font-bold text-[#eef1fb] leading-[1.05] text-center" style="font-size: clamp(2.4rem, 7.5vw, 6.5rem);">
+            ${escapeHtml(node.baseTitle || node.id)}
+        </h1>
+    `;
+}
+
+function tourShowContentPhase(node, content) {
+    document.getElementById('tourMapCaption')?.classList.add('hidden');
+    const card = document.getElementById('tourCard');
+    const inner = document.getElementById('tourCardInner');
+    card.classList.remove('hidden'); card.classList.add('flex');
+
+    const title = node.baseTitle || node.id;
+    const def = stripTourMarkup(content?.definition) || 'No se pudo obtener una definición para este nodo.';
+    const simple = content?.simple;
+
+    inner.innerHTML = `
+        <p class="text-[#4fd1c5] font-bold uppercase tracking-wider text-center" style="font-size: clamp(0.85rem, 1.6vw, 1.1rem);">${escapeHtml(title)}</p>
+        <p class="text-[#eef1fb] leading-snug font-medium text-center" style="font-size: clamp(1.6rem, 3.6vw, 2.8rem);">${escapeHtml(def)}</p>
+        ${simple ? `
+        <div class="w-full bg-lime-500/10 border border-lime-500/25 rounded-2xl px-6 py-5 md:px-10 md:py-7 mt-2">
+            <p class="text-lime-400 font-bold uppercase tracking-wider mb-2 text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">En palabras simples</p>
+            <p class="text-slate-100 leading-snug text-center" style="font-size: clamp(1.3rem, 2.8vw, 2rem);">${escapeHtml(simple.definition || '')}</p>
+            ${simple.analogy ? `<p class="text-slate-300 italic mt-3 text-center" style="font-size: clamp(1.05rem, 2.1vw, 1.5rem);">Como ${escapeHtml(simple.analogy)}</p>` : ''}
+        </div>` : ''}
+    `;
+}
+
+function tourShowEndCard() {
+    highlightTourTargetNode(null);
+    document.getElementById('tourMapCaption')?.classList.add('hidden');
+    const card = document.getElementById('tourCard');
+    const inner = document.getElementById('tourCardInner');
+    card.classList.remove('hidden'); card.classList.add('flex');
+    inner.innerHTML = `
+        <p style="font-size: clamp(2.5rem, 6vw, 4rem);">🏁</p>
+        <h1 class="font-heading text-3xl md:text-5xl font-bold text-[#eef1fb] text-center">Fin del recorrido</h1>
+        <p class="text-slate-400 text-center" style="font-size: clamp(1rem, 1.6vw, 1.25rem);">Recorriste ${tourState.order.length} ${tourState.order.length === 1 ? 'lugar' : 'lugares'} del esquema.</p>
+    `;
+    const playBtn = document.getElementById('tourBtnPlayPause');
+    if (playBtn) playBtn.textContent = '↺';
+    tourState.playing = false;
+    tourState.index = tourState.order.length;
+    tourUpdateProgress();
+}
+
+async function tourRunNode(index) {
+    if (!tourState || index >= tourState.order.length) { tourShowEndCard(); return; }
+    tourState.index = index;
+    const nodeId = tourState.order[index];
+    const node = nodes.get(nodeId);
+    if (!node) { tourRunNode(index + 1); return; } // nodo borrado mientras tanto: se salta
+
+    tourUpdateProgress();
+
+    // Dispara el fetch de contenido ya mismo, en paralelo a la fase de mapa
+    // y título, para que esté listo (o casi) cuando llegue la fase de
+    // contenido en vez de mostrar una tarjeta en blanco mientras carga.
+    const contentPromise = ensureNodeContent(nodeId);
+
+    tourShowMapPhase(nodeId);
+    await tourWait(tourState.mapDurationMs);
+    if (!tourState || tourState.index !== index) return;
+
+    tourShowTitlePhase(node);
+    await tourWait(tourReadingDurationMs(node.baseTitle || nodeId, { min: 1800, max: 4200, perWordMs: 420 }));
+    if (!tourState || tourState.index !== index) return;
+
+    const content = await contentPromise;
+    if (!tourState || tourState.index !== index) return;
+    tourShowContentPhase(node, content);
+    const contentPreview = `${content?.definition || ''} ${content?.simple?.definition || ''} ${content?.simple?.analogy || ''}`;
+    await tourWait(tourReadingDurationMs(contentPreview, { min: 5000, max: 20000, perWordMs: 330 }));
+    if (!tourState || tourState.index !== index) return;
+
+    tourRunNode(index + 1);
+}
+
+function tourNext() {
+    if (!tourState) return;
+    if (tourState.index >= tourState.order.length) return; // ya está en la tarjeta final
+    tourState.cancelCurrentWait = true;
+    tourRunNode(Math.min(tourState.index + 1, tourState.order.length));
+}
+function tourPrev() {
+    if (!tourState) return;
+    tourState.cancelCurrentWait = true;
+    tourRunNode(Math.max(tourState.index - 1, 0));
+}
+
+function startTour(nodeIds) {
+    const order = buildTourOrder(nodeIds);
+    if (!order.length) { appAlert('No hay nada que recorrer todavía — genera un esquema primero.'); return; }
+
+    tourState = {
+        order, index: -1, playing: true, cancelCurrentWait: false,
+        mapDurationMs: 2200, lastHighlightedId: null,
+        enabledPresentationMode: !presentationModeActive
+    };
+
+    document.getElementById('tourOverlay')?.classList.remove('hidden');
+    const playBtn = document.getElementById('tourBtnPlayPause');
+    if (playBtn) playBtn.textContent = '⏸';
+
+    // Mismo modo visual que "Presentación" (oculta cabecera y paneles
+    // flotantes) para que no compitan con el recorrido — solo se activa si
+    // no estaba ya encendido, y solo el recorrido lo vuelve a apagar al salir.
+    if (tourState.enabledPresentationMode) togglePresentationMode();
+
+    track('tour_started', { nodeCount: order.length });
+    tourRunNode(0);
+}
+
+function exitTour() {
+    if (!tourState) return;
+    tourState.cancelCurrentWait = true;
+    const wasPresentationFromTour = tourState.enabledPresentationMode;
+    highlightTourTargetNode(null);
+
+    document.getElementById('tourOverlay')?.classList.add('hidden');
+    document.getElementById('tourMapCaption')?.classList.add('hidden');
+    const card = document.getElementById('tourCard');
+    card?.classList.add('hidden'); card?.classList.remove('flex');
+
+    tourState = null;
+    if (wasPresentationFromTour) togglePresentationMode(true);
+}
+
+document.getElementById('btnStartTour')?.addEventListener('click', () => startTour(getCanvasRootIds()));
+document.getElementById('btnMenuStartTour')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    startTour([selectedNodeId]);
+});
+
+document.getElementById('tourBtnExit')?.addEventListener('click', exitTour);
+document.getElementById('tourBtnNext')?.addEventListener('click', tourNext);
+document.getElementById('tourBtnPrev')?.addEventListener('click', tourPrev);
+document.getElementById('tourBtnPlayPause')?.addEventListener('click', () => {
+    if (!tourState) return;
+    const playBtn = document.getElementById('tourBtnPlayPause');
+    if (tourState.index >= tourState.order.length) { // terminó: reinicia desde el principio
+        tourState.index = -1; tourState.playing = true;
+        if (playBtn) playBtn.textContent = '⏸';
+        tourRunNode(0);
+        return;
+    }
+    tourState.playing = !tourState.playing;
+    if (playBtn) playBtn.textContent = tourState.playing ? '⏸' : '▶️';
+});
+
+document.addEventListener('keydown', (e) => {
+    if (!tourState) return;
+    if (e.key === 'Escape') { exitTour(); return; }
+    if (e.key === ' ') { e.preventDefault(); document.getElementById('tourBtnPlayPause')?.click(); return; }
+    if (e.key === 'ArrowRight') { tourNext(); return; }
+    if (e.key === 'ArrowLeft') { tourPrev(); return; }
 });
 
 // --- Minimapa: vista reducida de todo el lienzo con clic-para-navegar ---

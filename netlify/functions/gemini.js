@@ -450,7 +450,97 @@ async function rawHandler(event, context) {
         }
 
         // ==========================================
-        // 5b. EXTRAER TÉRMINOS CLAVE DE UN TEXTO
+        // 5b. ANALIZAR UN TEXTO (distinto de parse_text: no estructura lo que
+        // el texto DICE, sino que lo analiza desde una lente específica —
+        // argumentativa, académica, literaria, etc. Cada nodo es una
+        // observación analítica, no un tema citado. Reutiliza el mismo
+        // schema de 3 niveles que parse_text a propósito, para que el
+        // frontend pueda renderizar el resultado con el mismo
+        // renderThreeLevelTree sin ningún cambio.
+        // ==========================================
+        if (action === 'analyze_text') {
+            const { analysisType, customType } = JSON.parse(event.body);
+
+            const ANALYSIS_LENSES = {
+                critico: `ANÁLISIS ARGUMENTATIVO/CRÍTICO: identifica la tesis central del texto, los argumentos principales que la sostienen, la evidencia o datos que usa el autor para respaldar cada argumento, los supuestos no declarados o posibles sesgos del autor, y las objeciones o puntos débiles que un lector crítico podría señalar. Usa estas categorías (o las que de verdad apliquen a este texto) como ramas de Nivel 2: Tesis, Argumentos clave, Evidencia, Supuestos/Sesgos, Objeciones o puntos débiles.`,
+                academico: `ANÁLISIS ACADÉMICO/DE INVESTIGACIÓN: identifica la pregunta o problema de investigación que aborda el texto, la metodología que emplea (si aplica), los principales hallazgos o resultados, las limitaciones que el propio texto reconoce o que se puedan inferir razonablemente, y las conclusiones o implicaciones que plantea. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Pregunta/Problema, Metodología, Hallazgos, Limitaciones, Conclusiones.`,
+                literario: `ANÁLISIS LITERARIO: identifica el tema central del texto, su estructura narrativa (planteamiento, desarrollo, desenlace, u otra que corresponda), el estilo y los recursos literarios o retóricos que usa el autor, la voz y perspectiva narrativa, y los símbolos o motivos recurrentes si los hay. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Tema central, Estructura, Estilo y recursos, Voz/Perspectiva, Símbolos/Motivos.`,
+                retorico: `ANÁLISIS RETÓRICO/PERSUASIVO: identifica el propósito comunicativo del texto, la audiencia a la que parece dirigirse, las estrategias retóricas que usa (apelación a la razón, a la emoción, a la credibilidad del autor, u otras), el tono y registro del texto, y las técnicas persuasivas específicas que emplea. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Propósito, Audiencia, Estrategias retóricas, Tono/Registro, Técnicas persuasivas.`,
+                comparativo: `ANÁLISIS COMPARATIVO DE POSTURAS: identifica las distintas posturas o posiciones que el texto presenta en tensión, los fundamentos o argumentos que sostienen a cada una, los puntos en que esas posturas coinciden, los puntos en que están en desacuerdo, y la tensión o pregunta que queda sin resolver. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Posturas identificadas, Fundamentos de cada postura, Puntos de acuerdo, Puntos de desacuerdo, Tensión sin resolver.`,
+                custom: `ANÁLISIS SEGÚN LO QUE PIDIÓ EL USUARIO: analiza el texto específicamente desde este ángulo, en sus propias palabras: "${String(customType || '').slice(0, 200)}". Deriva las categorías de Nivel 2 que mejor respondan a ese pedido, usando el texto como única fuente — nunca inventes categorías que el usuario no pidió.`
+            };
+            const lens = ANALYSIS_LENSES[analysisType] || ANALYSIS_LENSES.custom;
+
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    root: {
+                        type: 'OBJECT',
+                        description: 'Nivel 1: título del análisis (ej. "Análisis crítico de..." seguido de una referencia breve al texto o su tema).',
+                        properties: {
+                            id: { type: 'STRING' },
+                            label: { type: 'STRING' },
+                            sourceQuote: { type: 'STRING', description: 'Cadena vacía — no aplica al nodo raíz.' }
+                        },
+                        required: ["id", "label"]
+                    },
+                    branches: {
+                        type: 'ARRAY',
+                        description: 'Nivel 2: las categorías de análisis (ver instrucciones de la lente de análisis más abajo).',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' },
+                                sourceQuote: { type: 'STRING', description: 'Cita literal breve del texto que mejor representa esta categoría, o cadena vacía.' }
+                            },
+                            required: ["id", "label", "relationship"]
+                        }
+                    },
+                    subBranches: {
+                        type: 'ARRAY',
+                        description: 'Nivel 3: observaciones u elementos específicos encontrados en el texto para cada categoría de Nivel 2.',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING' },
+                                parentId: { type: 'STRING', description: 'ID exacto del nodo en "branches" (Nivel 2) al que pertenece.' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' },
+                                sourceQuote: { type: 'STRING', description: 'Cita literal breve del texto, evidencia de este elemento específico, o cadena vacía.' }
+                            },
+                            required: ["id", "label", "parentId", "relationship"]
+                        }
+                    }
+                },
+                required: ["root", "branches", "subBranches"]
+            };
+
+            const response = await generateWithFallback({
+                contents: `Analiza minuciosamente el siguiente texto y estructura ESE ANÁLISIS (no un resumen ni una extracción de sus temas) en un mapa conceptual de 3 niveles:
+                """${text}"""
+
+                ${lens}
+
+                REGLAS ESTRICTAS:
+                1. Esto NO es extraer los temas que el texto menciona — es analizarlo desde la lente indicada arriba. Cada nodo debe ser una observación analítica (qué hace o cómo funciona el texto), no solo un tema citado de él.
+                2. ESTRUCTURA DE 3 NIVELES: nodo raíz (Nivel 1, el título del análisis), categorías de análisis (Nivel 2), y observaciones específicas encontradas en el texto para cada categoría (Nivel 3).
+                3. FIDELIDAD AL TEXTO: toda observación debe estar fundamentada en lo que el texto realmente dice o hace — nunca inventes argumentos, posturas o recursos que no estén ahí. Si el texto es corto o simple, no fuerces una estructura más compleja de lo que da el material.
+                4. Si alguna categoría de la lente no aplica a este texto en particular (ej. "Metodología" en un texto que no es un estudio), omítela en vez de forzarla con contenido vacío.
+                5. "relationship": conectores precisos de 1 a 3 palabras.
+                6. "sourceQuote": cita literal y breve (máx. 15 palabras), copiada EXACTAMENTE tal como aparece en el texto original, como evidencia de cada nodo. Nunca inventes ni parafrasees la cita.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema,
+                    temperature: 0.2
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
+        // ==========================================
+        // 5c. EXTRAER TÉRMINOS CLAVE DE UN TEXTO
         // ==========================================
         if (action === 'extract_key_terms') {
             const schema = {

@@ -6,16 +6,19 @@
 const KNOWN = new Set([
     'parse_text', 'expand', 'examples', 'synergy', 'connect', 'define',
     'simple_explanation', 'custom_prompt', 'antithesis', 'socratic_question', 'socratic_evaluate',
-    'extract_key_terms'
+    'extract_key_terms', 'analyze_text'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
 const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
-const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2 };
+// analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
+// niveles igual de completo, solo que analítico en vez de expositivo.
+const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2, analyze_text: 5 };
 
 const LIMITS = { topic: 500, topicB: 500, contextPath: 2000, customRequest: 1500,
-                 question: 1500, userAnswer: 4000, text: 60000, documentContext: 12000 };
+                 question: 1500, userAnswer: 4000, text: 60000, documentContext: 12000,
+                 analysisType: 30, customType: 200 };
 
 const len = a => (Array.isArray(a) ? a.length : 0);
 
@@ -30,6 +33,7 @@ function computeCost(action, d) {
         case 'antithesis':        return len(d.critiques);
         case 'socratic_evaluate': return 1;
         case 'extract_key_terms': return len(d.terms);
+        case 'analyze_text':      return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         default:                  return 0;
     }
 }

@@ -466,6 +466,15 @@
             <button id="btnPresentationMode" title="Modo presentación: oculta toda la interfaz y deja solo el lienzo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🖥️</span> <span class="hidden md:inline">Presentación</span>
             </button>
+            <!-- Recorrido guiado de pantalla completa: va nodo por nodo (ver
+                 startTour/ANALYSIS... en app.js, sección "RECORRIDO GUIADO").
+                 Antes de entrar a cada nodo muestra el mapa completo con ese
+                 nodo resaltado (para no perder la orientación), luego su
+                 título en grande, y luego su definición + explicación
+                 sencilla en grande, unos segundos cada una. -->
+            <button id="btnStartTour" title="Recorrido guiado: recorre el esquema nodo por nodo, mostrando título, definición y explicación sencilla en pantalla completa" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span>🎬</span> <span class="hidden md:inline">Recorrido</span>
+            </button>
             <button id="btnSoundToggle" title="Sonido al crear nodos: apagado" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span id="soundToggleIcon">🔇</span>
             </button>
@@ -480,6 +489,43 @@
     <button id="btnExitPresentation" class="hidden fixed top-4 right-4 z-[250] bg-slate-950/90 border border-slate-700 text-slate-200 hover:text-white hover:border-[#4fd1c5] text-xs font-semibold py-2 px-3.5 rounded-full shadow-xl transition-colors">
         ✕ Salir de presentación
     </button>
+
+    <!-- ===================== RECORRIDO GUIADO (pantalla completa) =====================
+         Tres fases por nodo, en ciclo (ver app.js, sección "RECORRIDO GUIADO"):
+         1. MAPA: #tourMapCaption se muestra SOBRE el lienzo real (no lo tapa —
+            así se ve el mapa completo de verdad) con el próximo nodo resaltado
+            en el propio lienzo (network.fit + pulso), para no perder la
+            orientación de "a dónde voy".
+         2. TÍTULO: #tourCard pasa a opaca, solo el título, en el tamaño más
+            grande posible.
+         3. CONTENIDO: #tourCard muestra definición + explicación sencilla,
+            también en grande. Cada fase dura unos segundos (calculado según
+            cuánto hay que leer) antes de pasar sola a la siguiente — o se
+            puede pausar/navegar a mano con la barra de abajo. -->
+    <div id="tourOverlay" class="hidden fixed inset-0 z-[400] flex flex-col items-center justify-center text-center select-none">
+        <!-- Fase MAPA: fondo transparente a propósito (deja ver el lienzo real
+             de vis-network detrás, que ya fue encuadrado con fit() + el nodo
+             siguiente resaltado) — solo agrega el letrero de abajo. -->
+        <div id="tourMapCaption" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-950/90 border border-[#4fd1c5]/50 rounded-2xl px-6 py-3 shadow-2xl">
+            <p class="text-[11px] text-[#8a92b2] uppercase tracking-wider mb-0.5">Siguiente lugar del recorrido</p>
+            <p id="tourMapCaptionTitle" class="text-lg font-bold text-[#eef1fb] font-heading"></p>
+        </div>
+
+        <!-- Fases TÍTULO/CONTENIDO: tarjeta opaca de pantalla completa. -->
+        <div id="tourCard" class="hidden fixed inset-0 bg-[#0a0e1a] flex-col items-center justify-center px-8 md:px-24 py-16 overflow-y-auto">
+            <div id="tourCardInner" class="w-full max-w-5xl mx-auto flex flex-col items-center justify-center gap-6 my-auto"></div>
+        </div>
+
+        <!-- Barra de control, siempre encima de cualquier fase. -->
+        <div id="tourControls" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[410] flex items-center gap-1 bg-slate-950/90 border border-slate-700 rounded-full shadow-2xl px-2 py-1.5">
+            <button id="tourBtnPrev" title="Nodo anterior" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">‹</button>
+            <button id="tourBtnPlayPause" title="Pausar / reanudar" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">⏸</button>
+            <button id="tourBtnNext" title="Siguiente nodo" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">›</button>
+            <span id="tourProgress" class="text-xs text-slate-400 font-semibold px-2 tabular-nums">1 / 1</span>
+            <span class="w-px h-5 bg-slate-700 mx-1"></span>
+            <button id="tourBtnExit" title="Salir del recorrido (Esc)" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors">✕</button>
+        </div>
+    </div>
 
     <!-- Paleta de búsqueda rápida (Ctrl/Cmd+K): escribe para filtrar nodos por
          texto y Enter/clic para enfocarlo en el lienzo. -->
@@ -553,9 +599,20 @@
                     <button id="btnPdfRangeLoad" class="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-md font-bold transition-colors">Cargar</button>
                     <button id="btnPdfRangeCancel" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md transition-colors">✕</button>
                 </div>
-                <button id="btnParseReaderText" data-role="btnGenerate" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-                    <span>🌐 Generar Esquema</span>
-                </button>
+                <!-- "Generar Esquema" estructura lo que el texto DICE (sus temas, fases,
+                     categorías). "Analizar Texto" es distinto a propósito: en vez de un
+                     paso intermedio que interrumpe el flujo, es un botón aparte a la par
+                     que abre un menú para elegir el tipo de análisis (ver analyzeTypeMenu,
+                     definido una sola vez más abajo y reusado por todos los lectores,
+                     incluidos los clonados con ➕ — ver runTextAnalysis en app.js). -->
+                <div class="flex items-center gap-2">
+                    <button id="btnParseReaderText" data-role="btnGenerate" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+                        <span>🌐 Generar Esquema</span>
+                    </button>
+                    <button id="btnAnalyzeReaderText" data-role="btnAnalyzeText" title="Analiza el texto (su argumentación, estructura, etc.) en vez de solo estructurar lo que dice" class="flex-1 bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+                        <span>🔎 Analizar Texto</span>
+                    </button>
+                </div>
                 <!-- El contexto (para desambiguar definiciones después) ya no es un campo
                      que el usuario tenga que llenar: se detecta solo del texto o del título
                      de la página leída. Solo aparece, muy discreto, cuando hay algo que mostrar. -->
@@ -651,6 +708,43 @@
         </div>
     </div>
 
+    <!-- Menú de tipos de análisis para "🔎 Analizar Texto". Es un SOLO menú
+         compartido por el lector principal y cualquier lector clonado (➕) —
+         vive aquí, fuera del panel del lector, con position:fixed, para que
+         no quede recortado por el overflow-hidden del panel ni se duplique
+         cuando el panel se clona (ver createExtraReaderPanel/cloneNode en
+         app.js). openAnalyzeMenu() en app.js lo reposiciona junto al botón
+         que lo abrió y recuerda, en analyzeMenuContext, de qué lector salió
+         el texto a analizar. -->
+    <div id="analyzeTypeMenu" class="hidden fixed bg-[#0f1428] border border-[#2c3458] rounded-lg shadow-2xl z-[300] p-1.5 flex-col gap-0.5 w-72">
+        <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="critico">
+            <span class="block text-xs font-bold text-slate-100">Argumentativo / crítico</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5">Tesis, argumentos, evidencia, supuestos, objeciones</span>
+        </button>
+        <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="academico">
+            <span class="block text-xs font-bold text-slate-100">Académico / de investigación</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5">Pregunta, metodología, hallazgos, limitaciones, conclusiones</span>
+        </button>
+        <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="literario">
+            <span class="block text-xs font-bold text-slate-100">Literario</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5">Tema, estructura narrativa, estilo, voz, símbolos</span>
+        </button>
+        <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="retorico">
+            <span class="block text-xs font-bold text-slate-100">Retórico / persuasivo</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5">Propósito, audiencia, estrategias, tono</span>
+        </button>
+        <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="comparativo">
+            <span class="block text-xs font-bold text-slate-100">Comparativo de posturas</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5">Posiciones en tensión, fundamentos, acuerdos/desacuerdos</span>
+        </button>
+        <div class="h-px bg-[#2c3458] my-1"></div>
+        <div class="flex items-center gap-1.5 px-1 py-1">
+            <input type="text" data-role="analyzeCustomInput" placeholder="Otro tipo de análisis..." maxlength="200"
+                   class="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500">
+            <button type="button" data-role="btnAnalyzeCustomGo" class="shrink-0 bg-violet-600 hover:bg-violet-500 text-white px-2.5 py-1.5 rounded text-xs font-bold transition-colors">Ir</button>
+        </div>
+    </div>
+
     <!-- Menú Contextual (Nodos). Sin transformaciones CSS para facilitar cálculo dinámico de posición. -->
     <!-- Historial de tamaño (para no repetir el mismo vaivén): primero
          px-3.5 py-2 text-xs sin ancho fijo (el renglón más largo —
@@ -669,6 +763,9 @@
             </button>
             <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2.5 hover:bg-[#1c2a1a] text-lime-300 font-medium text-sm text-left transition-colors">
                 Explicación sencilla
+            </button>
+            <button id="btnMenuStartTour" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                🎬 Recorrido desde aquí
             </button>
 
             <!-- Botón y Campo de Petición Personalizada -->
