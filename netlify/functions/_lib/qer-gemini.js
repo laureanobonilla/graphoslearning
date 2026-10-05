@@ -19,15 +19,27 @@ async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini
         const timeoutMs = deadline ? Math.max(3000, deadline - Date.now()) : undefined;
         let response;
         try {
-            response = await ai.models.generateContent({
+            const call = ai.models.generateContent({
                 contents: prompt,
                 model: FALLBACK_MODELS[attempt],
-                config: { responseMimeType: 'application/json', responseSchema: schema, temperature, maxOutputTokens, ...(timeoutMs ? { httpOptions: { timeout: timeoutMs } } : {}) }
+                config: { responseMimeType: 'application/json', responseSchema: schema, temperature, maxOutputTokens }
             });
+            // Límite propio (en vez de httpOptions.timeout, que la API de Gemini
+            // rechaza si es menor a 10 s): si la llamada se cuelga, nos rendimos
+            // antes de que Netlify corte la función con un 502 sin explicación.
+            if (timeoutMs) {
+                call.catch(() => {}); // si pierde la carrera, que su error tardío no quede sin atender
+                let timer;
+                try {
+                    response = await Promise.race([call, new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('NOREINTENTO: tiempo agotado esperando a Gemini')), timeoutMs); })]);
+                } finally { clearTimeout(timer); }
+            } else {
+                response = await call;
+            }
         } catch (err) {
             lastError = err;
             const msg = (err.message || '').toLowerCase();
-            const retryable = ['503', 'unavailable', '429', 'high demand', 'overloaded', 'internal'].some(s => msg.includes(s));
+            const retryable = !(err.message || '').startsWith('NOREINTENTO') && ['503', 'unavailable', '429', 'high demand', 'overloaded', 'internal'].some(s => msg.includes(s));
             console.error(`[${tag}] intento ${attempt + 1}: llamada falló (${retryable ? 'reintentable' : 'NO reintentable'}): ${err.message}`);
             if (!retryable) throw err;
             if (attempt < FALLBACK_MODELS.length - 1) await new Promise(r => setTimeout(r, 800));
