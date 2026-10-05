@@ -1,3 +1,6 @@
+// MODO PRUEBA: respuestas de ejemplo ya cargadas; al abrir la página se genera directo,
+// como lo vería una persona al terminar el cuestionario. No registra eventos.
+const TEST_MODE = true;
 // ==========================================
 // "¿QUIÉN ERES EN REALIDAD?" — cuestionario + lectura generada + paywall
 // ==========================================
@@ -160,6 +163,7 @@ const anonId = ensureAnonId();
 // experiencia del cuestionario — si falla (red, Supabase caído), no se
 // reintenta ni se le avisa a la persona.
 function track(eventName, metadata) {
+  if (TEST_MODE) { console.log('[prueba] evento no enviado:', eventName); return; }
   try {
     fetch('/.netlify/functions/qer-track-event', {
       method: 'POST',
@@ -197,7 +201,7 @@ track('landing_viewed', {
 // así que si vuelves dentro de esas 24h, retomas justo donde quedaste —
 // viendo el inicio gratis y con el botón de pago listo — sin repetir las
 // 16 preguntas.
-const PENDING_KEY = 'qer_pending_read'; // clave propia: no pisa la lectura pendiente de la versión de texto
+const PENDING_KEY = 'qer_pending_read_prueba'; // clave propia: no pisa la lectura pendiente de la versión de texto
 const PENDING_MAX_AGE_MS = 23 * 60 * 60 * 1000; // un poco menos que el TTL del servidor (24h)
 
 function savePendingReading(data) {
@@ -346,7 +350,7 @@ btnBack.addEventListener('click', () => {
 
 // --- Guardar el avance (son 50 preguntas: perder lo escrito por un cierre accidental
 // de la pestaña sería muy frustrante) ------------------------------------------
-const PROGRESS_KEY = 'qer_quiz_progress_v2';
+const PROGRESS_KEY = 'qer_quiz_progress_prueba';
 function saveQuizProgress() {
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, currentIndex: currentIndex + 1, savedAt: Date.now() })); } catch { /* no crítico */ }
 }
@@ -368,7 +372,7 @@ document.getElementById('btnStart').addEventListener('click', () => {
   showScreen('quiz');
 });
 const btnResume = document.getElementById('btnResume');
-const savedProgress = loadQuizProgress();
+const savedProgress = null;
 if (btnResume && savedProgress) {
   btnResume.textContent = `Continuar donde quedaste (pregunta ${Math.min(savedProgress.currentIndex + 1, QUESTIONS.length)} de ${QUESTIONS.length})`;
   btnResume.classList.remove('is-hidden');
@@ -646,7 +650,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'hidden') return;
   try {
     const payload = { event: 'page_hidden', anonId, metadata: { variant: 'reading', screen: currentScreenName, seconds: Math.round((Date.now() - pageStartedAt) / 1000), paywallSeen, scrollMaxPct, questionsAnswered: answers.filter(Boolean).length, unlocked: readUnlocked } };
-    navigator.sendBeacon('/.netlify/functions/qer-track-event', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+    if (!TEST_MODE) navigator.sendBeacon('/.netlify/functions/qer-track-event', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
   } catch { /* no crítico */ }
 });
 
@@ -685,7 +689,7 @@ async function resumePendingReadingIfAny() {
   } catch { /* sin conexión: se muestra el pago normal */ }
   renderReveal(pending);
 }
-resumePendingReadingIfAny();
+// (prueba) sin retomar lecturas guardadas: cada visita genera una nueva.
 
 document.getElementById('btnShare').addEventListener('click', async () => {
   const shareText = archetypeNameForShare
@@ -697,3 +701,59 @@ document.getElementById('btnShare').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(`${shareText} ${url}`); alert('Copiado — pégalo donde quieras compartirlo.'); }
   catch { alert(url); }
 });
+
+// --- Arranque automático de la prueba ---
+const DEFAULT_ANSWERS = [
+ "La gente cree que soy fuerte y tranquila, pero en realidad estoy cansada de aguantar todo sola.",
+ "Que estoy agotada y que me gustaría que alguien me preguntara dos veces.",
+ "Que todo está bien.",
+ "Lo cansada que estoy; me ven siempre lista y sonriendo.",
+ "Dije que sí a ayudar con algo de mi cuñada cuando lo único que quería era dormir.",
+ "Una sonrisa chiquita y rápida, como de cortesía. Esconde que me estoy quedando sin energía.",
+ "Que mi familia me pide demasiado y yo no sé decir que no.",
+ "La mamá de una serie que siempre resuelve todo para los demás y nadie nota que ella se rompe. Me incomoda que me guste ser así.",
+ "Sonrío, me acomodo el pelo y hablo bajito. Busco una cara conocida para no quedarme sola.",
+ "De mi matrimonio anterior: digo que ya pasó, pero todavía me duele.",
+ "La traición. Que me mientan en la cara después de todo lo que he dado.",
+ "Mi mejor amiga contó algo mío que le pedí que guardara. Lo que más me dolió fue que lo hizo riéndose.",
+ "Mi papá me dijo una vez 'tú no necesitas ayuda, tú eres la fuerte'. Lo recuerdo palabra por palabra.",
+ "A mi mamá. Le diría que me hubiera gustado que me abrazara más y me corrigiera menos.",
+ "Dejar de contestar mensajes de trabajo en la noche. Sigo haciéndolo.",
+ "Cuento que me fui de mi casa por 'oportunidades', pero en realidad me fui porque ya no aguantaba el ambiente.",
+ "Una amistad de la infancia. Nunca dije que me dolió que se alejara.",
+ "Me quedo quieta, respiro hondo y sigo con lo que hacía como si nada. Luego lloro en el baño.",
+ "Una maestra que me dijo que yo podía llegar lejos. No sabe lo que eso hizo en mí.",
+ "Que descubran que a veces no soy tan buena como parezco y que me da igual quedar bien o no.",
+ "Dejaría todo por un mes y me iría sola a una playa sin avisarle a nadie.",
+ "Me como un helado entero en la cocina a oscuras, viendo videos viejos de mi familia.",
+ "La canción 'Cielito lindo' en una fiesta: me lleva al funeral de mi abuela, que fue la única que me veía de verdad.",
+ "A las personas que se permiten descansar y decir que no sin culpa.",
+ "Borraría el día que dije algo hiriente a mi hermana. Perdería también lo que aprendí al pedirle perdón.",
+ "Salirme de una reunión de trabajo y no volver. Lo he imaginado muchas veces.",
+ "Una cajita con cartas de mi ex que no he podido tirar, aunque sé que ya no me hacen bien.",
+ "Me pongo callada y fría, pero por dentro me tiembla todo. Después me siento culpable por días.",
+ "Sueño que estoy en una casa con muchos cuartos y siempre hay uno cerrado al que no me animo a entrar.",
+ "Por la tarde, cuando termino todo lo de los demás y no queda nadie que me pregunte cómo estoy.",
+ "Cuando mi abuela me peinaba y me dijo 'ahí estás tú'. Sentí que me veían sin que yo hiciera nada.",
+ "Que está bien no poder con todo y que me quieren aunque no sirva para nada.",
+ "Los problemas de todos en mi familia. Nadie me los pidió pero si no los cargo yo, siento que se caen.",
+ "Que me abracen sin que yo lo pida y que me pregunten 'de verdad, ¿cómo estás?'.",
+ "Mi disponibilidad. Todos me admiran por estar siempre y a mí me cansa ser la que siempre está.",
+ "Que me quieran sin que yo tenga que hacer algo. No sé por qué, pero no me lo creo.",
+ "Me hago la difícil, me aíslo unos días y espero a ver si me buscan.",
+ "Con mi prima Ana. Con ella puedo decir tonterías y llorar sin explicar.",
+ "Dormiría hasta tarde, no cocinaría y le diría a todos que hoy no estoy disponible.",
+ "Un mensaje de alguien que dice 'pensé en ti' sin que yo haya hecho nada.",
+ "Que no tienes que ganarte el cariño de nadie. Que ya eras suficiente.",
+ "Que me perdones por haber esperado tanto para cuidarme. Y que descanses antes de que te obliguen a descansar.",
+ "Las cenas de domingo donde finjo que no me afecta lo que dicen.",
+ "Me iría a una ciudad con mar, me llevaría mis libros y dejaría la costumbre de ser la salvadora de todos.",
+ "A mi mamá. No sé cómo empezar, tal vez con una carta que no tenga que enviar.",
+ "Revisar mi teléfono esperando que alguien me necesite. Ese miedo a que no me busquen.",
+ "Que fui una persona que se dio cuenta de lo que otros no veían, y que cuidó sin pedir nada a cambio.",
+ "Que todo se cae y que me van a reclamar que no estuve. Lo creo aunque sé que es mentira.",
+ "Que a veces odio ser la que siempre está bien, y que tengo ganas de que alguien me cuide a mí.",
+ "Que no soy lo que hago por los demás. Que valgo igual sin ser útil."
+];
+DEFAULT_ANSWERS.forEach((a, i) => { answers[i] = a; });
+submitQuiz();

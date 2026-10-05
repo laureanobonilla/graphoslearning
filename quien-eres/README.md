@@ -201,10 +201,11 @@ proyecto) para un listado de otras apps de cuestionario/revelación que
 podrían reutilizar exactamente esta misma plataforma (PayPal + Gemini +
 Supabase) con el mismo patrón de pago único sin cuenta.
 
-## Actualización 2026-10-04: la página principal ahora es el mapa
+## Actualización 2026-10-04: estructura actual
 
-- `/quien-eres/` es el **mapa** (10 revelaciones simbólicas, 3 gratis, SVG): `index.html` + `app.js`, backend `qer-generate-map.js` (generación en 2 pasos: eje + 3 llamadas en paralelo) y `_lib/qer-gemini.js`.
-- `/quien-eres/texto/` es la versión anterior de lectura lineal (respaldo, sin los cambios de preguntas).
-- `/quien-eres/mapa/` solo redirige a `/quien-eres/`.
-- Precio por defecto: **$9.99** (si en Netlify existe la variable `READING_PRICE_USD`, esa manda).
-- Eventos nuevos: `paywall_in_view`, `page_hidden` (segundos, nodos tocados), `paywall_reopened`, `map_node_tapped`, `map_unlock_cta`; todos con `variant:'map'` y `paywallVersion:'map2'`.
+- `/quien-eres/` es la **lectura en capítulos** con **50 preguntas** (todas de texto, en 5 partes): `index.html` + `app.js`. 10 capítulos: los 5 primeros gratis y completos, los 5 últimos cerrados (se ve título, gancho y cuántas palabras tienen; lo cerrado es siempre más de la mitad del texto). Se retoma donde se quedó si cierra la pestaña (localStorage).
+- `/quien-eres/mapa/` es la variante **mapa** SVG (10 puntos, 3 gratis).
+- `/quien-eres/texto/` es la versión original de 16 preguntas (respaldo).
+- Generación (lectura y mapa) en 3 llamadas: `qer-generate-map` (eje; recibe `format:'reading'|'map'`), `qer-generate-map-part` x5 en paralelo y `qer-generate-map-finalize`; piezas compartidas en `_lib/qer-map-core.js` y `_lib/qer-gemini.js`.
+- Precio por defecto: **$9.99** (la variable `READING_PRICE_USD` de Netlify, si existe, manda).
+- Eventos nuevos: `paywall_in_view`, `page_hidden` (segundos, scroll máximo, preguntas respondidas), `paywall_reopened`, `quiz_resumed`; `variant:'reading'` y `paywallVersion:'read1'` (mapa: `variant:'map'`, `map2`).

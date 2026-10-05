@@ -83,8 +83,13 @@ const QUESTIONS = [
     ] },
   { id: 'q2', type: 'short', prompt: 'Completa sin pensarlo mucho: "Lo que más me cuesta perdonar en alguien es..."',
     placeholder: 'Escribe lo primero que pienses' },
-  { id: 'q3', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_A,
-    placeholder: 'Una palabra' },
+  { id: 'q3', type: 'choice', prompt: 'Cuando alguien te traiciona, lo que haces es...',
+    options: [
+      'Lo perdono por fuera, pero no lo olvido',
+      'Corto la relación sin avisar',
+      'Se lo digo de frente, aunque duela',
+      'Me convenzo de que no me importó'
+    ] },
   { id: 'q4', type: 'choice', prompt: '¿Cuál de estas versiones de ti se parece más a cómo eres cuando nadie te está viendo?',
     options: [
       'La que de verdad descansa, sin sentirse culpable',
@@ -92,8 +97,8 @@ const QUESTIONS = [
       'La que es más sincera que la que muestras en público',
       'La que siempre piensa primero en los demás'
     ] },
-  { id: 'q5', type: 'short', prompt: '¿Qué harías si supieras que nadie se va a enterar nunca?',
-    placeholder: 'Así, sin filtro' },
+  { id: 'q5', type: 'short', prompt: 'Termina la frase: "Si de verdad nadie fuera a enterarse, por fin me atrevería a..."',
+    placeholder: 'Lo que hoy no te permites' },
   { id: 'q6', type: 'choice', prompt: 'Si tus amigos más cercanos tuvieran que contar tu peor momento, dirían que fue cuando...',
     options: [
       'te cerraste y no dejaste que nadie te ayudara',
@@ -112,10 +117,10 @@ const QUESTIONS = [
       'Usar el humor para quitarle peso',
       'Escribir lo que siento antes de hablarlo'
     ] },
-  { id: 'q10', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_C,
-    placeholder: 'Una palabra' },
-  { id: 'q11', type: 'short', prompt: '¿Cómo te describiría alguien que apenas te conoce? ¿Y cómo te describes tú en esa misma situación?',
-    placeholder: 'Las dos versiones, aunque no calcen' },
+  { id: 'q10', type: 'short', prompt: 'Piensa en la última vez que alguien te falló de verdad. ¿Qué fue lo que más te dolió?',
+    placeholder: 'Lo que de verdad te dolió' },
+  { id: 'q11', type: 'short', prompt: 'Termina la frase: "La gente cree que soy..., pero en realidad soy..."',
+    placeholder: 'Las dos partes, aunque no calcen' },
   { id: 'q12', type: 'choice', prompt: '¿Qué tipo de silencio te incomoda más?',
     options: [
       'El que sigue a una pregunta que no supiste responder',
@@ -231,7 +236,9 @@ function clearPendingReading() {
 }
 
 // --- Navegación entre pantallas -------------------------------------------
+let currentScreenName = 'cover';
 function showScreen(name) {
+  currentScreenName = name;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('is-active'));
   document.getElementById(`screen-${name}`).classList.add('is-active');
   document.getElementById('progress').classList.toggle('is-hidden', name !== 'quiz');
@@ -361,33 +368,57 @@ document.getElementById('btnStart').addEventListener('click', () => {
 // (con texto); las demás llegan SOLO con etiqueta y un gancho corto — el
 // texto bloqueado nunca viaja al navegador hasta que el servidor confirma el
 // pago (ver netlify/functions/qer-generate-map.js y qer-paypal-capture-order.js).
-const PAYWALL_VERSION = 'map1';
+const PAYWALL_VERSION = 'map2'; // map2 = 10 puntos (3 gratis), lectura simbólica, $9.99, 'Continuar sin pagar' y '¿Qué te frena?' visibles
 let mapNodes = [];        // [{id,label,hook,free,text?}]
 let mapUnlocked = false;
 let lastFocusedNode = null;
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const MAP_CX = 170, MAP_CY = 172, MAP_R = 118, NODE_R = 29;
+// Órbita elíptica (vertical) para que 10 puntos con su etiqueta quepan en un celular.
+const MAP_CX = 170, MAP_CY = 214, MAP_RX = 122, MAP_RY = 164, NODE_R = 23;
 
 // --- Envío del cuestionario y generación del mapa --------------------------
+// La generación va en 3 pasos, cada uno una llamada propia al servidor (cada
+// una con su propio tiempo máximo; todo en una sola llamada se pasaba del
+// límite de Netlify): 1) el eje, 2) 5 partes de 2 rubros EN PARALELO, 3) ensamblar.
+async function postFn(name, payload) {
+  const res = await fetch(`/.netlify/functions/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || `Error ${res.status}`); e.status = res.status; e.data = data; throw e; }
+  return data;
+}
+
+async function postWithOneRetry(name, payload) {
+  try { return await postFn(name, payload); }
+  catch (err) {
+    if (err.status && err.status < 500 && err.status !== 409) throw err; // un 4xx no se arregla reintentando
+    return await postFn(name, payload);
+  }
+}
+
 async function submitQuiz() {
   showScreen('loading');
-  document.getElementById('loadingLabel').textContent = 'Trazando tu mapa…';
+  const label = document.getElementById('loadingLabel');
+  label.textContent = 'Leyendo lo que hay debajo de tus respuestas…';
   const payload = {
     answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' }))
   };
+  const t0 = Date.now();
   try {
-    const res = await fetch('/.netlify/functions/qer-generate-map', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'No se pudo armar tu mapa.');
-    track('reading_generated_success', {});
+    const axis = await postWithOneRetry('qer-generate-map', payload);
+    label.textContent = 'Trazando tu mapa…';
+    await Promise.all([0, 1, 2, 3, 4].map(part =>
+      postWithOneRetry('qer-generate-map-part', { readingId: axis.readingId, part, answers: payload.answers })));
+    label.textContent = 'Casi listo…';
+    const data = await postWithOneRetry('qer-generate-map-finalize', { readingId: axis.readingId });
+    track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000) });
     renderReveal(data);
   } catch (err) {
-    track('reading_generated_error', { reason: err.message });
+    track('reading_generated_error', { reason: String(err.message).slice(0, 200), seconds: Math.round((Date.now() - t0) / 1000) });
     showError('Tu mapa no pudo terminar de armarse.', err.message, submitQuiz);
   }
 }
@@ -414,7 +445,7 @@ function svgEl(name, attrs, parent) {
 // Etiqueta en una o dos líneas para que no se salga del celular.
 function splitLabel(label) {
   const words = String(label).split(/\s+/);
-  if (label.length <= 13 || words.length < 2) return [label];
+  if (label.length <= 12 || words.length < 2) return [label];
   let best = 1, bestDiff = Infinity;
   for (let i = 1; i < words.length; i++) {
     const a = words.slice(0, i).join(' ').length, b = words.slice(i).join(' ').length;
@@ -423,40 +454,57 @@ function splitLabel(label) {
   return [words.slice(0, best).join(' '), words.slice(best).join(' ')];
 }
 
-function nodePosition(i, n) {
-  const ang = (-90 + (360 / n) * i) * Math.PI / 180;
-  return { x: MAP_CX + MAP_R * Math.cos(ang), y: MAP_CY + MAP_R * Math.sin(ang) };
+// Reparte los puntos abiertos a intervalos parejos alrededor de la órbita (en vez
+// de todos juntos) para que los puntos bloqueados queden entre medio de los abiertos.
+function computeSlots() {
+  const n = mapNodes.length;
+  const free = mapNodes.filter(m => m.free);
+  const slotOf = new Map();
+  const used = new Set();
+  free.forEach((m, k) => { const sl = Math.floor(k * n / free.length); slotOf.set(m.id, sl); used.add(sl); });
+  let next = 0;
+  mapNodes.filter(m => !m.free).forEach(m => {
+    while (used.has(next)) next++;
+    slotOf.set(m.id, next); used.add(next);
+  });
+  return slotOf;
+}
+
+function slotPosition(slot, n) {
+  const ang = (-90 + (360 / n) * slot) * Math.PI / 180;
+  return { x: MAP_CX + MAP_RX * Math.cos(ang), y: MAP_CY + MAP_RY * Math.sin(ang) };
 }
 
 function drawMap() {
   const svg = document.getElementById('mapSvg');
   svg.innerHTML = '';
-  svgEl('circle', { class: 'map-orbit', cx: MAP_CX, cy: MAP_CY, r: MAP_R }, svg);
+  svgEl('ellipse', { class: 'map-orbit', cx: MAP_CX, cy: MAP_CY, rx: MAP_RX, ry: MAP_RY }, svg);
   const n = mapNodes.length;
+  const slots = computeSlots();
 
-  mapNodes.forEach((node, i) => {
-    const p = nodePosition(i, n);
+  mapNodes.forEach((node) => {
+    const p = slotPosition(slots.get(node.id), n);
     svgEl('line', { class: 'map-link' + (node.text ? '' : ' is-locked'), 'data-link': node.id, x1: MAP_CX, y1: MAP_CY, x2: p.x, y2: p.y }, svg);
   });
 
   // Centro: el arquetipo.
-  svgEl('circle', { class: 'map-core-ring', cx: MAP_CX, cy: MAP_CY, r: 56 }, svg);
-  svgEl('circle', { class: 'map-core', cx: MAP_CX, cy: MAP_CY, r: 44 }, svg);
-  const mask = svgEl('g', { transform: `translate(${MAP_CX - 24},${MAP_CY - 24}) scale(.48)`, fill: 'none', stroke: '#211a0c', 'stroke-width': 3.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
+  svgEl('circle', { class: 'map-core-ring', cx: MAP_CX, cy: MAP_CY, r: 48 }, svg);
+  svgEl('circle', { class: 'map-core', cx: MAP_CX, cy: MAP_CY, r: 38 }, svg);
+  const mask = svgEl('g', { transform: `translate(${MAP_CX - 20},${MAP_CY - 20}) scale(.4)`, fill: 'none', stroke: '#211a0c', 'stroke-width': 3.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
   svgEl('path', { d: 'M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z' }, mask);
   svgEl('path', { d: 'M50 10 L46 34 L54 42 L44 58 L56 70 L48 92' }, mask);
 
   mapNodes.forEach((node, i) => {
-    const p = nodePosition(i, n);
+    const p = slotPosition(slots.get(node.id), n);
     const g = svgEl('g', {
       class: 'map-node' + (node.text ? ' is-open' : ''),
       'data-id': node.id, role: 'button', tabindex: 0,
       'aria-label': `${node.label}${node.text ? '' : ' (bloqueado)'}`,
-      style: `animation-delay:${0.15 + i * 0.12}s`
+      style: `animation-delay:${0.15 + i * 0.08}s`
     }, svg);
-    svgEl('circle', { class: 'touch', cx: p.x, cy: p.y, r: 40 }, g);
+    svgEl('circle', { class: 'touch', cx: p.x, cy: p.y, r: 36 }, g);
     svgEl('circle', { class: 'body', cx: p.x, cy: p.y, r: NODE_R }, g);
-    const glyph = svgEl('g', { class: 'glyph', transform: `translate(${p.x},${p.y})` }, g);
+    const glyph = svgEl('g', { class: 'glyph', transform: `translate(${p.x},${p.y}) scale(.82)` }, g);
     if (node.text) {
       // Punto abierto: un destello de cuatro puntas.
       svgEl('path', { d: 'M0 -9 L2.4 -2.4 L9 0 L2.4 2.4 L0 9 L-2.4 2.4 L-9 0 L-2.4 -2.4 Z' }, glyph);
@@ -466,9 +514,9 @@ function drawMap() {
       svgEl('path', { d: 'M-4.5 -2 V-5 a4.5 4.5 0 0 1 9 0 V-2' }, glyph);
     }
     const lines = splitLabel(node.label);
-    const label = svgEl('text', { class: 'map-label', x: p.x, y: p.y + NODE_R + 14 }, g);
+    const label = svgEl('text', { class: 'map-label', x: p.x, y: p.y + NODE_R + 13 }, g);
     lines.forEach((ln, k) => {
-      const t = svgEl('tspan', { x: p.x, dy: k === 0 ? 0 : 13 }, label);
+      const t = svgEl('tspan', { x: p.x, dy: k === 0 ? 0 : 12 }, label);
       t.textContent = ln;
     });
     g.addEventListener('click', () => openSheet(node.id, g));
@@ -489,10 +537,12 @@ function updateCounter() {
 const sheetEl = document.getElementById('mapSheet');
 const backdropEl = document.getElementById('sheetBackdrop');
 
+const tappedIds = new Set();
 function openSheet(id, nodeEl) {
   const node = mapNodes.find(n => n.id === id);
   if (!node) return;
   lastFocusedNode = nodeEl || null;
+  tappedIds.add(id);
   track('map_node_tapped', { index: id, free: !!node.free, unlocked: !!node.text, paywallVersion: PAYWALL_VERSION });
   document.getElementById('sheetTitle').textContent = node.label;
   const textEl = document.getElementById('sheetText');
@@ -546,7 +596,9 @@ function renderReveal(data, { skipPaywall } = {}) {
   const locked = mapNodes.filter(n => !n.text).length;
   document.getElementById('paywallHook').textContent = locked ? `${locked} partes de ti siguen cerradas` : 'Hay más de ti en este mapa';
   document.getElementById('skippedNote').classList.add('is-hidden');
+  document.getElementById('payBlock').classList.remove('is-hidden');
   document.getElementById('fullContainer').classList.add('is-hidden');
+  tappedIds.clear();
   closeSheet();
   drawMap();
   showScreen('reveal');
@@ -561,6 +613,7 @@ function renderReveal(data, { skipPaywall } = {}) {
 
   document.getElementById('paywall').classList.remove('is-hidden');
   track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION });
+  watchPaywallInView();
   initPaywall(readingId);
 }
 
@@ -649,16 +702,50 @@ function unlockMap({ mapTexts, closingLine }) {
 
 document.getElementById('btnSkipPaywall').addEventListener('click', () => {
   track('paywall_skipped', { paywallVersion: PAYWALL_VERSION });
-  document.getElementById('paywall').classList.add('is-hidden');
+  document.getElementById('payBlock').classList.add('is-hidden');
   document.getElementById('skippedNote').classList.remove('is-hidden');
 });
+document.getElementById('btnShowPay').addEventListener('click', () => {
+  track('paywall_reopened', { paywallVersion: PAYWALL_VERSION });
+  document.getElementById('skippedNote').classList.add('is-hidden');
+  document.getElementById('payBlock').classList.remove('is-hidden');
+});
 
+// "¿Qué te frena?": siempre visible, un toque, se registra una sola vez.
 document.querySelectorAll('.skip-reason').forEach(btn => {
   btn.addEventListener('click', () => {
     track('paywall_skip_reason', { reason: btn.dataset.reason, paywallVersion: PAYWALL_VERSION });
     document.getElementById('skipReasonBox').classList.add('is-hidden');
     document.getElementById('skipReasonThanks').classList.remove('is-hidden');
   });
+});
+
+// --- Medición de lo que pasa DESPUÉS de mostrar el paywall ---------------------
+// Antes no había ningún evento entre "paywall_shown" y el cierre de la página,
+// así que no se sabía si la gente siquiera llegaba a ver el paywall.
+let paywallObserver = null;
+let paywallSeen = false;
+function watchPaywallInView() {
+  paywallSeen = false;
+  const el = document.getElementById('paywall');
+  if (paywallObserver) paywallObserver.disconnect();
+  if (!('IntersectionObserver' in window)) return;
+  paywallObserver = new IntersectionObserver((entries) => {
+    if (entries.some(e => e.isIntersecting) && !paywallSeen) {
+      paywallSeen = true;
+      track('paywall_in_view', { secondsSinceLoad: Math.round((Date.now() - pageStartedAt) / 1000), nodesTapped: tappedIds.size, paywallVersion: PAYWALL_VERSION });
+      paywallObserver.disconnect();
+    }
+  }, { threshold: 0.4 });
+  paywallObserver.observe(el);
+}
+const pageStartedAt = Date.now();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden') return;
+  try {
+    const payload = { event: 'page_hidden', anonId, metadata: { variant: 'map', screen: currentScreenName, seconds: Math.round((Date.now() - pageStartedAt) / 1000), paywallSeen, nodesTapped: tappedIds.size, unlocked: mapUnlocked } };
+    navigator.sendBeacon('/.netlify/functions/qer-track-event', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+  } catch { /* no crítico */ }
 });
 
 function restartQuiz() {
@@ -668,6 +755,7 @@ function restartQuiz() {
   mapNodes = [];
   clearPendingReading();
   closeSheet();
+  track('quiz_started', { restart: true });
   renderQuestion(0);
   showScreen('quiz');
 }

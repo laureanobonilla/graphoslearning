@@ -6,7 +6,7 @@
 //   3. qer-generate-map-finalize → ensambla y guarda; devuelve solo lo público
 // Antes todo iba en una sola llamada y se pasaba del tiempo máximo de Netlify.
 const FREE_COUNT = 3;
-const TIME_BUDGET_MS = 22000; // cada función tiene su propio presupuesto (Netlify corta a ~26 s)
+const TIME_BUDGET_MS = 24000; // cada función tiene su propio presupuesto (Netlify corta a ~26 s)
 const TOTAL_NODES = 10;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
@@ -105,11 +105,108 @@ Cada revelación debe poder leerse sola, usar un símbolo DISTINTO a las demás 
 }
 
 
+
+// ================== FORMATO "LECTURA" (texto en capítulos) ==================
+// Mismo andamiaje de 3 pasos que el mapa, pero cada "nodo" es un CAPÍTULO de una
+// lectura de texto: 10 capítulos, los 5 primeros gratis (con el texto completo)
+// y los 5 últimos cerrados — de los cerrados solo se ve título, gancho y cuántas
+// palabras tienen. Los capítulos cerrados son más largos, para que lo oculto
+// sea siempre más de la mitad del texto y nadie pague por "lo que faltaba poco".
+const READING_FREE_COUNT = 5;
+const READING_THEMES = [
+    'LO PRIMERO QUE SE NOTA: la contradicción central entre lo que la persona dice de sí misma y lo que sus otras respuestas dejan ver. Es el corazón de la lectura; abre con una imagen potente.',
+    'LA MÁSCARA: la versión de sí misma que muestra a los demás, a quién protege de verdad y cuánto cuesta sostenerla.',
+    'LO QUE CALLA: lo que no dice en voz alta y lo que ese silencio fue construyendo por dentro, como una habitación que se va llenando.',
+    'LA HERIDA DE FONDO: lo que más le duele o le cuesta perdonar (traición, mentira, abandono… según sus respuestas) leído como el símbolo de una herida más antigua que la que cree.',
+    'EL CUARTO CERRADO: lo que guarda aun de sí misma, lo que evita mirar. Este capítulo termina dejando claro que hay una puerta más adelante (sin revelar qué hay detrás).',
+    'CUANDO NADIE VE: cómo es de verdad a solas y qué dice eso de la persona que más se parece a ella misma.',
+    'LA SOMBRA: lo que desea y se prohíbe, y cómo ese deseo prohibido termina gobernando sus decisiones desde atrás.',
+    'LO QUE CARGA POR OTROS: lo que sostiene sin que nadie se lo pida y la factura silenciosa de hacerlo.',
+    'LO QUE NECESITA OÍR: lo que lleva años esperando que alguien le diga, y por qué no deja que se lo digan.',
+    'LA CARTA PENDIENTE: el cierre catártico. Qué puede soltar, qué se le permite por fin, y lo que le diría su versión más honesta. Termina con alivio.'
+];
+
+const READING_RULES = `Tono: íntimo, perceptivo y teatral, en segunda persona ("tú"), como alguien que leyó con atención cada una de sus respuestas y por fin las unió — jamás como un horóscopo que le quedaría bien a cualquiera.
+
+LA PERSONA RESPONDIÓ MUCHAS PREGUNTAS ABIERTAS. Úsalas: cita o parafrasea frases reales suyas (entre comillas cuando sirva) y conecta respuestas lejanas entre sí (la de la pregunta 4 con la de la 37…). Esas conexiones inesperadas son lo que la va a sorprender.
+
+CÓMO SE ESCRIBE CADA CAPÍTULO:
+1. Abre con una IMAGEN concreta y cotidiana (una puerta entreabierta, una casa con un cuarto sin luz, una deuda que nadie cobra, un espejo empañado, agua quieta, una maleta que nunca se desarma) que traduzca algo que la persona dijo.
+2. Tradúcelo como METÁFORA: lo que respondió es la sombra; tú describes el objeto que la proyecta, una realidad más honda, más oscura y más interesante que la que cree vivir.
+3. Da un GIRO que sorprenda: "lo que parece X en realidad es Y". Que haya al menos una frase que la persona querría subrayar y mandarle a alguien.
+4. Cierra con ALIVIO: una frase que libera, que le da permiso o nombra lo que por fin puede soltar. La lectura entera es una catarsis, no un regaño.
+
+MUY IMPORTANTE sobre el lenguaje: palabras sencillas y cotidianas, las de un amigo que habla en serio. La profundidad viene de las IMÁGENES y de los giros, nunca de vocabulario técnico ni de sustantivos abstractos encadenados ("arquitectura emocional", "dialéctica", "cartografía defensiva"). Frases cortas y medianas. Debe entenderse al vuelo desde el celular.
+
+MUY IMPORTANTE sobre la honestidad: habla de lo que SUS RESPUESTAS dejan ver, no de certezas absolutas. Nunca inventes hechos personales que no dio (edad, nombres, historia). Nada de diagnósticos ni etiquetas clínicas ("trastorno", "trauma", "depresión", "adicta", "narcisista"…): es una interpretación simbólica con fines de autoconocimiento y entretenimiento.
+
+MUY IMPORTANTE sobre lo delicado: si alguna respuesta menciona duelo, abuso, una adicción o daño, trátala con respeto: no la uses como golpe dramático ni la conviertas en etiqueta, y haz que la catarsis sea de alivio y de permiso, nunca de culpa.`;
+
+const READING_NODES_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        nodes: {
+            type: 'ARRAY',
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    label: { type: 'STRING', description: 'Título del capítulo: de 3 a 7 palabras sencillas, evocador y específico de esta persona (ej. "La puerta que dejas entornada"). Máx. 52 caracteres.' },
+                    hook: { type: 'STRING', description: 'De 12 a 20 palabras, en segunda persona. Es lo que se ve si el capítulo está cerrado: nombra un símbolo o un detalle concreto de SUS respuestas y deja claro que hay más detrás, SIN revelarlo ni resolverlo. Nunca genérico.' },
+                    text: { type: 'STRING', description: 'El capítulo completo, en 2 o 3 párrafos separados por una línea en blanco. Sigue la estructura indicada en el prompt (imagen, metáfora, giro, alivio).' }
+                },
+                required: ['label', 'hook', 'text']
+            }
+        }
+    },
+    required: ['nodes']
+};
+
+function readingAxisPrompt(transcript) {
+    return `Eres quien escribe "¿Quién eres en realidad?", una experiencia de autoconocimiento. La lectura es un texto largo en 10 capítulos, escrito a partir de 50 respuestas abiertas.
+
+Respuestas de la persona:
+${transcript}
+
+${READING_RULES}
+
+Ahora define SOLO el eje de la lectura. Busca UNA contradicción real entre lo que la persona dice de sí misma y lo que sus otras respuestas dejan ver, y detecta los dos o tres temas que se repiten a lo largo de sus respuestas (por ejemplo la traición, la mentira, el cansancio de sostenerlo todo). Nunca inventes un "secreto". El nombre del arquetipo debe nacer de ESA contradicción específica y evitar por completo el campo guardián/vigilante/centinela/vigía/protector/pilar. La frase final debe ser catártica.`;
+}
+
+function readingChunkPrompt(transcript, axis, indexes) {
+    const list = indexes.map((idx, k) => {
+        const words = idx < READING_FREE_COUNT ? '120 a 150 palabras' : '150 a 190 palabras';
+        return `${k + 1}. (${words}) ${READING_THEMES[idx]}`;
+    }).join('\n');
+    return `Eres quien escribe "¿Quién eres en realidad?", una experiencia de autoconocimiento. La lectura es un texto largo en 10 capítulos; tú escribes SOLO los capítulos que se te piden ahora.
+
+Respuestas de la persona:
+${transcript}
+
+EJE DE LA LECTURA (ya decidido; todos los capítulos deben ser coherentes con esto, sin contradecirlo ni repetirlo):
+${axis.axis}
+Arquetipo: ${axis.archetypeName}
+
+${READING_RULES}
+
+Escribe EXACTAMENTE ${indexes.length} capítulos, en este orden, uno por cada tema, respetando la extensión indicada entre paréntesis:
+${list}
+
+Cada capítulo debe poder leerse solo, usar imágenes DISTINTAS a las de los demás y apoyarse en respuestas concretas de la persona. El "hook" es lo que se ve cuando el capítulo está cerrado: tiene que intrigar nombrando algo concreto de sus respuestas o el símbolo, sin adelantar lo que dice el "text".`;
+}
+
+const FORMATS = {
+    map:     { freeCount: FREE_COUNT,         themes: THEMES,         chunkPrompt, axisPrompt,                   nodesSchema: NODES_SCHEMA,         minChars: () => 250 },
+    reading: { freeCount: READING_FREE_COUNT, themes: READING_THEMES, chunkPrompt: readingChunkPrompt, axisPrompt: readingAxisPrompt, nodesSchema: READING_NODES_SCHEMA, minChars: (idx) => (idx < READING_FREE_COUNT ? 500 : 650) }
+};
+const formatOf = (name) => FORMATS[name] || FORMATS.map;
+
+const wordCount = (t) => String(t || '').trim().split(/\s+/).filter(Boolean).length;
+
 // Lo único que puede viajar al navegador: texto SOLO en los nodos gratis.
 function publicNodes(nodes) {
     return nodes.map(n => n.free
-        ? { id: n.id, label: n.label, hook: n.hook, free: true, text: n.text }
-        : { id: n.id, label: n.label, hook: n.hook, free: false });
+        ? { id: n.id, label: n.label, hook: n.hook, free: true, words: wordCount(n.text), text: n.text }
+        : { id: n.id, label: n.label, hook: n.hook, free: false, words: wordCount(n.text) });
 }
 
-module.exports = { FREE_COUNT, TIME_BUDGET_MS, TOTAL_NODES, UUID_RE, json, THEMES, CHUNKS, transcriptOf, AXIS_SCHEMA, validAxis, axisPrompt, NODES_SCHEMA, chunkPrompt, publicNodes };
+module.exports = { formatOf, wordCount, READING_FREE_COUNT, FREE_COUNT, TIME_BUDGET_MS, TOTAL_NODES, UUID_RE, json, THEMES, CHUNKS, transcriptOf, AXIS_SCHEMA, validAxis, axisPrompt, NODES_SCHEMA, chunkPrompt, publicNodes };

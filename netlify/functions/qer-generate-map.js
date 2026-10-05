@@ -4,7 +4,7 @@
 const crypto = require('crypto');
 const { saveReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries, sanitizeAnswers } = require('./_lib/qer-gemini');
-const { json, TIME_BUDGET_MS, transcriptOf, AXIS_SCHEMA, validAxis, axisPrompt } = require('./_lib/qer-map-core');
+const { json, TIME_BUDGET_MS, transcriptOf, AXIS_SCHEMA, validAxis, formatOf } = require('./_lib/qer-map-core');
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -14,9 +14,11 @@ exports.handler = async (event) => {
     const answers = sanitizeAnswers(body.answers);
     if (!answers) return json(400, { error: 'Faltan las respuestas del cuestionario.' });
 
+    const format = body.format === 'reading' ? 'reading' : 'map';
+    const transcript = transcriptOf(answers);
     const t0 = Date.now();
     try {
-        const axis = await generateWithRetries(axisPrompt(transcriptOf(answers)), AXIS_SCHEMA, validAxis,
+        const axis = await generateWithRetries(formatOf(format).axisPrompt(transcript), AXIS_SCHEMA, validAxis,
             { tag: 'map-axis', maxOutputTokens: 1024, temperature: 0.85, deadline: t0 + TIME_BUDGET_MS });
         console.log(`[generate-map] eje listo en ${Date.now() - t0} ms`);
 
@@ -24,6 +26,8 @@ exports.handler = async (event) => {
         // Registro base ("etapa eje"): sin `map` todavía; finalize lo completa.
         await saveReading(readingId, {
             stage: 'axis',
+            format,
+            transcript, // las partes lo leen de aquí (no se reenvían las respuestas)
             archetypeName: axis.archetypeName,
             hookLine: axis.hookLine,
             closingLine: axis.closingLine,
@@ -33,6 +37,6 @@ exports.handler = async (event) => {
         return json(200, { readingId, archetypeName: axis.archetypeName, hookLine: axis.hookLine, axis: axis.axis });
     } catch (err) {
         console.error(`[generate-map] falló tras ${Date.now() - t0} ms:`, err.message);
-        return json(502, { error: `No se pudo armar tu mapa (paso 1). Detalle técnico: ${String(err.message || err).slice(0, 250)}` });
+        return json(502, { error: `No se pudo armar tu resultado (paso 1). Detalle técnico: ${String(err.message || err).slice(0, 250)}` });
     }
 };
