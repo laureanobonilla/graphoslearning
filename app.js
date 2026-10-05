@@ -1877,6 +1877,23 @@ network.on('click', async function (params) {
     if (params.nodes.length > 0) {
         const clickedNodeId = params.nodes[0];
 
+        // --- SUBESQUEMA: un clic navega DENTRO de él ---
+        // (antes abría el menú de acciones de nodo y había que usar doble clic).
+        // Se respeta Shift/Ctrl/Cmd (armar una selección) y los modos de espera
+        // de "vincular" para no romper esos flujos.
+        {
+            const clicked = nodes.get(clickedNodeId);
+            const ev = (params.event && params.event.srcEvent) || {};
+            const modifier = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+            if (clicked && clicked.isSubscheme && !modifier && !awaitingLinkTargetClick && !sourceNodeForConnection) {
+                actionMenu.style.visibility = 'hidden';
+                actionMenu.classList.add('hidden');
+                selectedNodeId = null;
+                enterSubscheme(clickedNodeId);
+                return;
+            }
+        }
+
         // --- 0. VINCULAR FRAGMENTO SUBRAYADO COMO HIJO DE UN NODO EXISTENTE ---
         // Si el usuario pulsó "🔗 Vincular a nodo..." en el tooltip de selección,
         // el próximo clic en un nodo (sea cual sea) se interpreta como el nodo

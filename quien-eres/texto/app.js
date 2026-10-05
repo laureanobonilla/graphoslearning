@@ -83,13 +83,8 @@ const QUESTIONS = [
     ] },
   { id: 'q2', type: 'short', prompt: 'Completa sin pensarlo mucho: "Lo que más me cuesta perdonar en alguien es..."',
     placeholder: 'Escribe lo primero que pienses' },
-  { id: 'q3', type: 'choice', prompt: 'Cuando alguien te traiciona, lo que haces es...',
-    options: [
-      'Lo perdono por fuera, pero no lo olvido',
-      'Corto la relación sin avisar',
-      'Se lo digo de frente, aunque duela',
-      'Me convenzo de que no me importó'
-    ] },
+  { id: 'q3', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_A,
+    placeholder: 'Una palabra' },
   { id: 'q4', type: 'choice', prompt: '¿Cuál de estas versiones de ti se parece más a cómo eres cuando nadie te está viendo?',
     options: [
       'La que de verdad descansa, sin sentirse culpable',
@@ -97,8 +92,8 @@ const QUESTIONS = [
       'La que es más sincera que la que muestras en público',
       'La que siempre piensa primero en los demás'
     ] },
-  { id: 'q5', type: 'short', prompt: 'Termina la frase: "Si de verdad nadie fuera a enterarse, por fin me atrevería a..."',
-    placeholder: 'Lo que hoy no te permites' },
+  { id: 'q5', type: 'short', prompt: '¿Qué harías si supieras que nadie se va a enterar nunca?',
+    placeholder: 'Así, sin filtro' },
   { id: 'q6', type: 'choice', prompt: 'Si tus amigos más cercanos tuvieran que contar tu peor momento, dirían que fue cuando...',
     options: [
       'te cerraste y no dejaste que nadie te ayudara',
@@ -117,10 +112,10 @@ const QUESTIONS = [
       'Usar el humor para quitarle peso',
       'Escribir lo que siento antes de hablarlo'
     ] },
-  { id: 'q10', type: 'short', prompt: 'Piensa en la última vez que alguien te falló de verdad. ¿Qué fue lo que más te dolió?',
-    placeholder: 'Lo que de verdad te dolió' },
-  { id: 'q11', type: 'short', prompt: 'Termina la frase: "La gente cree que soy..., pero en realidad soy..."',
-    placeholder: 'Las dos partes, aunque no calcen' },
+  { id: 'q10', type: 'image', prompt: '¿Qué es lo primero que ves?', blot: BLOT_C,
+    placeholder: 'Una palabra' },
+  { id: 'q11', type: 'short', prompt: '¿Cómo te describiría alguien que apenas te conoce? ¿Y cómo te describes tú en esa misma situación?',
+    placeholder: 'Las dos versiones, aunque no calcen' },
   { id: 'q12', type: 'choice', prompt: '¿Qué tipo de silencio te incomoda más?',
     options: [
       'El que sigue a una pregunta que no supiste responder',
@@ -176,7 +171,7 @@ function track(eventName, metadata) {
     fetch('/.netlify/functions/qer-track-event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: eventName, anonId, metadata: { ...(metadata || {}), variant: 'map' } })
+      body: JSON.stringify({ event: eventName, anonId, metadata: metadata || {} })
     }).catch(() => {});
   } catch { /* no crítico */ }
 }
@@ -209,7 +204,7 @@ track('landing_viewed', {
 // así que si vuelves dentro de esas 24h, retomas justo donde quedaste —
 // viendo el inicio gratis y con el botón de pago listo — sin repetir las
 // 16 preguntas.
-const PENDING_KEY = 'qer_pending_map'; // clave propia: no pisa la lectura pendiente de la versión de texto
+const PENDING_KEY = 'qer_pending_reading';
 const PENDING_MAX_AGE_MS = 23 * 60 * 60 * 1000; // un poco menos que el TTL del servidor (24h)
 
 function savePendingReading(data) {
@@ -236,9 +231,7 @@ function clearPendingReading() {
 }
 
 // --- Navegación entre pantallas -------------------------------------------
-let currentScreenName = 'cover';
 function showScreen(name) {
-  currentScreenName = name;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('is-active'));
   document.getElementById(`screen-${name}`).classList.add('is-active');
   document.getElementById('progress').classList.toggle('is-hidden', name !== 'quiz');
@@ -360,238 +353,88 @@ document.getElementById('btnStart').addEventListener('click', () => {
   showScreen('quiz');
 });
 
-// ==========================================
-// VARIANTE "MAPA"
-// ==========================================
-// En vez de un texto lineal, la lectura es un mapa solar en SVG: el centro es
-// el arquetipo y alrededor orbitan las "revelaciones". Dos vienen abiertas
-// (con texto); las demás llegan SOLO con etiqueta y un gancho corto — el
-// texto bloqueado nunca viaja al navegador hasta que el servidor confirma el
-// pago (ver netlify/functions/qer-generate-map.js y qer-paypal-capture-order.js).
-const PAYWALL_VERSION = 'map2'; // map2 = 10 puntos (3 gratis), lectura simbólica, $9.99, 'Continuar sin pagar' y '¿Qué te frena?' visibles
-let mapNodes = [];        // [{id,label,hook,free,text?}]
-let mapUnlocked = false;
-let lastFocusedNode = null;
-
-const SVG_NS = 'http://www.w3.org/2000/svg';
-// Órbita elíptica (vertical) para que 10 puntos con su etiqueta quepan en un celular.
-const MAP_CX = 170, MAP_CY = 214, MAP_RX = 122, MAP_RY = 164, NODE_R = 23;
-
-// --- Envío del cuestionario y generación del mapa --------------------------
+// --- Envío del cuestionario y generación de la lectura ---------------------
 async function submitQuiz() {
   showScreen('loading');
-  document.getElementById('loadingLabel').textContent = 'Leyendo lo que hay debajo de tus respuestas… (puede tardar un poco)';
   const payload = {
     answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' }))
   };
   try {
-    const res = await fetch('/.netlify/functions/qer-generate-map', {
+    const res = await fetch('/.netlify/functions/qer-generate-reading', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'No se pudo armar tu mapa.');
+    if (!res.ok) throw new Error(data.error || 'No se pudo generar tu lectura.');
     track('reading_generated_success', {});
     renderReveal(data);
   } catch (err) {
     track('reading_generated_error', { reason: err.message });
-    showError('Tu mapa no pudo terminar de armarse.', err.message, submitQuiz);
+    showError('Tu lectura no pudo terminar de armarse.', err.message, submitQuiz);
   }
 }
 
 function showError(title, detail, retryFn) {
   document.getElementById('errorMsg').textContent = title;
   document.getElementById('errorDetail').textContent = detail || 'Intenta de nuevo en un momento.';
-  document.getElementById('btnRetry').onclick = retryFn;
+  const btn = document.getElementById('btnRetry');
+  btn.onclick = retryFn;
   showScreen('error');
 }
 
-function escapeHtml(str) {
-  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// --- Dibujo del mapa -----------------------------------------------------------
-function svgEl(name, attrs, parent) {
-  const el = document.createElementNS(SVG_NS, name);
-  for (const k in (attrs || {})) el.setAttribute(k, attrs[k]);
-  if (parent) parent.appendChild(el);
-  return el;
-}
-
-// Etiqueta en una o dos líneas para que no se salga del celular.
-function splitLabel(label) {
-  const words = String(label).split(/\s+/);
-  if (label.length <= 12 || words.length < 2) return [label];
-  let best = 1, bestDiff = Infinity;
-  for (let i = 1; i < words.length; i++) {
-    const a = words.slice(0, i).join(' ').length, b = words.slice(i).join(' ').length;
-    if (Math.abs(a - b) < bestDiff) { bestDiff = Math.abs(a - b); best = i; }
-  }
-  return [words.slice(0, best).join(' '), words.slice(best).join(' ')];
-}
-
-// Reparte los puntos abiertos a intervalos parejos alrededor de la órbita (en vez
-// de todos juntos) para que los puntos bloqueados queden entre medio de los abiertos.
-function computeSlots() {
-  const n = mapNodes.length;
-  const free = mapNodes.filter(m => m.free);
-  const slotOf = new Map();
-  const used = new Set();
-  free.forEach((m, k) => { const sl = Math.floor(k * n / free.length); slotOf.set(m.id, sl); used.add(sl); });
-  let next = 0;
-  mapNodes.filter(m => !m.free).forEach(m => {
-    while (used.has(next)) next++;
-    slotOf.set(m.id, next); used.add(next);
-  });
-  return slotOf;
-}
-
-function slotPosition(slot, n) {
-  const ang = (-90 + (360 / n) * slot) * Math.PI / 180;
-  return { x: MAP_CX + MAP_RX * Math.cos(ang), y: MAP_CY + MAP_RY * Math.sin(ang) };
-}
-
-function drawMap() {
-  const svg = document.getElementById('mapSvg');
-  svg.innerHTML = '';
-  svgEl('ellipse', { class: 'map-orbit', cx: MAP_CX, cy: MAP_CY, rx: MAP_RX, ry: MAP_RY }, svg);
-  const n = mapNodes.length;
-  const slots = computeSlots();
-
-  mapNodes.forEach((node) => {
-    const p = slotPosition(slots.get(node.id), n);
-    svgEl('line', { class: 'map-link' + (node.text ? '' : ' is-locked'), 'data-link': node.id, x1: MAP_CX, y1: MAP_CY, x2: p.x, y2: p.y }, svg);
-  });
-
-  // Centro: el arquetipo.
-  svgEl('circle', { class: 'map-core-ring', cx: MAP_CX, cy: MAP_CY, r: 48 }, svg);
-  svgEl('circle', { class: 'map-core', cx: MAP_CX, cy: MAP_CY, r: 38 }, svg);
-  const mask = svgEl('g', { transform: `translate(${MAP_CX - 20},${MAP_CY - 20}) scale(.4)`, fill: 'none', stroke: '#211a0c', 'stroke-width': 3.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, svg);
-  svgEl('path', { d: 'M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z' }, mask);
-  svgEl('path', { d: 'M50 10 L46 34 L54 42 L44 58 L56 70 L48 92' }, mask);
-
-  mapNodes.forEach((node, i) => {
-    const p = slotPosition(slots.get(node.id), n);
-    const g = svgEl('g', {
-      class: 'map-node' + (node.text ? ' is-open' : ''),
-      'data-id': node.id, role: 'button', tabindex: 0,
-      'aria-label': `${node.label}${node.text ? '' : ' (bloqueado)'}`,
-      style: `animation-delay:${0.15 + i * 0.08}s`
-    }, svg);
-    svgEl('circle', { class: 'touch', cx: p.x, cy: p.y, r: 36 }, g);
-    svgEl('circle', { class: 'body', cx: p.x, cy: p.y, r: NODE_R }, g);
-    const glyph = svgEl('g', { class: 'glyph', transform: `translate(${p.x},${p.y}) scale(.82)` }, g);
-    if (node.text) {
-      // Punto abierto: un destello de cuatro puntas.
-      svgEl('path', { d: 'M0 -9 L2.4 -2.4 L9 0 L2.4 2.4 L0 9 L-2.4 2.4 L-9 0 L-2.4 -2.4 Z' }, glyph);
-    } else {
-      // Candado.
-      svgEl('rect', { x: -7, y: -2, width: 14, height: 10, rx: 2 }, glyph);
-      svgEl('path', { d: 'M-4.5 -2 V-5 a4.5 4.5 0 0 1 9 0 V-2' }, glyph);
-    }
-    const lines = splitLabel(node.label);
-    const label = svgEl('text', { class: 'map-label', x: p.x, y: p.y + NODE_R + 13 }, g);
-    lines.forEach((ln, k) => {
-      const t = svgEl('tspan', { x: p.x, dy: k === 0 ? 0 : 12 }, label);
-      t.textContent = ln;
-    });
-    g.addEventListener('click', () => openSheet(node.id, g));
-    g.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSheet(node.id, g); }
-    });
-  });
-  updateCounter();
-}
-
-function updateCounter() {
-  const open = mapNodes.filter(n => n.text).length;
-  document.getElementById('mapCounter').textContent = `${open} de ${mapNodes.length} revelaciones abiertas`;
-  document.getElementById('mapHint').textContent = open === mapNodes.length ? 'Toca cualquier punto para releerlo' : 'Toca cada punto';
-}
-
-// --- Hoja inferior ---------------------------------------------------------------
-const sheetEl = document.getElementById('mapSheet');
-const backdropEl = document.getElementById('sheetBackdrop');
-
-const tappedIds = new Set();
-function openSheet(id, nodeEl) {
-  const node = mapNodes.find(n => n.id === id);
-  if (!node) return;
-  lastFocusedNode = nodeEl || null;
-  tappedIds.add(id);
-  track('map_node_tapped', { index: id, free: !!node.free, unlocked: !!node.text, paywallVersion: PAYWALL_VERSION });
-  document.getElementById('sheetTitle').textContent = node.label;
-  const textEl = document.getElementById('sheetText');
-  const noteEl = document.getElementById('sheetLockedNote');
-  if (node.text) {
-    textEl.textContent = node.text;
-    noteEl.textContent = '';
-    noteEl.style.display = 'none';
-    document.getElementById('sheetUnlock').style.display = 'none';
-    if (nodeEl) nodeEl.classList.add('is-seen');
-  } else {
-    textEl.textContent = node.hook;
-    noteEl.textContent = 'Este punto sigue cerrado. Se abre con el resto del mapa.';
-    noteEl.style.display = '';
-    document.getElementById('sheetUnlock').style.display = '';
-  }
-  sheetEl.classList.add('is-open');
-  backdropEl.classList.add('is-open');
-  document.getElementById('sheetBack').focus();
-}
-
-function closeSheet() {
-  sheetEl.classList.remove('is-open');
-  backdropEl.classList.remove('is-open');
-  if (lastFocusedNode && lastFocusedNode.focus) { try { lastFocusedNode.focus({ preventScroll: true }); } catch { /* no crítico */ } }
-}
-
-document.getElementById('sheetBack').addEventListener('click', closeSheet);
-backdropEl.addEventListener('click', closeSheet);
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sheetEl.classList.contains('is-open')) closeSheet(); });
-document.getElementById('sheetUnlock').addEventListener('click', () => {
-  track('map_unlock_cta', { paywallVersion: PAYWALL_VERSION });
-  closeSheet();
-  const panel = document.getElementById('paywall');
-  if (panel.classList.contains('is-hidden')) return;
-  setTimeout(() => {
-    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    panel.classList.remove('is-flash'); void panel.offsetWidth; panel.classList.add('is-flash');
-  }, 120);
-});
-
-// --- Pantalla del mapa + pago -----------------------------------------------------
+// --- Revelación + paywall ---------------------------------------------------
 function renderReveal(data, { skipPaywall } = {}) {
   readingId = data.readingId;
   archetypeNameForShare = data.archetypeName || '';
-  mapNodes = (data.nodes || []).map(n => ({ id: n.id, label: n.label, hook: n.hook, free: !!n.free, text: n.text || null }));
-  mapUnlocked = false;
   document.getElementById('archetypeName').textContent = data.archetypeName || '';
   document.getElementById('hookLine').textContent = data.hookLine || '';
+  const teaserEl = document.getElementById('teaserText');
+  teaserEl.innerHTML = (data.teaser || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
+  // Ancla de compromiso (principio de consistencia de Cialdini): recordarle
+  // a la persona lo que YA invirtió (sus propias respuestas) en vez de
+  // suavizar o anunciar el cobro que viene — ver conversación del
+  // 2026-10-04 sobre "pain of paying". Va ANTES del gancho específico.
   document.getElementById('paywallCommitment').textContent = `Ya respondiste ${QUESTIONS.length} preguntas sobre vos mismo`;
-  const locked = mapNodes.filter(n => !n.text).length;
-  document.getElementById('paywallHook').textContent = locked ? `${locked} partes de ti siguen cerradas` : 'Hay más de ti en este mapa';
+
+  // Gancho específico junto al botón de pago (ver lockedHook en
+  // qer-generate-reading.js) — "Tu lectura continúa" se deja como respaldo
+  // por si esta lectura se generó antes de este cambio, o si por lo que sea
+  // no llegó el campo.
+  document.getElementById('paywallHook').textContent = data.lockedHook || 'Tu lectura continúa';
+
   document.getElementById('skippedNote').classList.add('is-hidden');
-  document.getElementById('payBlock').classList.remove('is-hidden');
   document.getElementById('fullContainer').classList.add('is-hidden');
-  tappedIds.clear();
-  closeSheet();
-  drawMap();
   showScreen('reveal');
 
+  // skipPaywall: ya sabemos (porque el servidor lo confirmó) que esta
+  // lectura está pagada — se va a mostrar el texto completo enseguida
+  // (ver resumePendingReadingIfAny), así que no tiene sentido guardarla
+  // como "pendiente de pago", ni cargar el SDK de PayPal, ni registrar
+  // "paywall_shown" (nunca llegó a verlo, ya había pagado).
   if (skipPaywall) {
     document.getElementById('paywall').classList.add('is-hidden');
     return;
   }
 
-  // Lo que se guarda para "retomar" NUNCA incluye texto bloqueado (esos nodos no lo traen).
-  savePendingReading({ readingId: data.readingId, archetypeName: data.archetypeName, hookLine: data.hookLine, nodes: mapNodes });
+  savePendingReading({
+    readingId: data.readingId,
+    archetypeName: data.archetypeName,
+    hookLine: data.hookLine,
+    teaser: data.teaser,
+    lockedHook: data.lockedHook
+  });
 
   document.getElementById('paywall').classList.remove('is-hidden');
-  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION });
-  watchPaywallInView();
+  // paywallVersion: etiqueta para separar los datos por versión del paywall
+  // sin depender de la hora del deploy. Subir el valor ("g2", ...) cada vez
+  // que cambie el paywall. g1 = ancla de compromiso + skip atenuado.
+  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: 'g1' });
   initPaywall(readingId);
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 async function loadPaypalSdk() {
@@ -600,7 +443,9 @@ async function loadPaypalSdk() {
     const res = await fetch('/.netlify/functions/qer-paypal-config');
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.clientId) return false;
-    if (data.priceUsd) document.getElementById('priceLabel').textContent = `$${data.priceUsd}`;
+    if (data.priceUsd) {
+      document.getElementById('priceLabel').textContent = `$${data.priceUsd}`;
+    }
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(data.clientId)}&currency=USD`;
@@ -623,6 +468,7 @@ async function initPaywall(forReadingId) {
     container.innerHTML = '<p style="color:#e9c9ba; font-size:0.85rem; text-align:center;">No se pudo cargar el pago. Revisa tu conexión y recargá la página.</p>';
     return;
   }
+
   window.paypal.Buttons({
     style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay' },
     createOrder: async () => {
@@ -651,8 +497,8 @@ async function initPaywall(forReadingId) {
         alert(result.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos.');
         return;
       }
-      track('payment_captured_success', { paywallVersion: PAYWALL_VERSION });
-      unlockMap(result);
+      track('payment_captured_success', {});
+      unlockFull(result);
     },
     onError: (err) => {
       track('payment_captured_failed', { reason: String(err?.message || err).slice(0, 300) });
@@ -662,89 +508,62 @@ async function initPaywall(forReadingId) {
   }).render('#paypal-button-container');
 }
 
-// Aplica los textos que el servidor entrega SOLO después de confirmar el pago.
-function unlockMap({ mapTexts, closingLine }) {
-  clearPendingReading();
-  mapUnlocked = true;
-  const byId = new Map((mapTexts || []).map(t => [t.id, t.text]));
-  mapNodes.forEach(n => { if (byId.has(n.id)) n.text = byId.get(n.id); });
+function unlockFull({ full, closingLine }) {
+  clearPendingReading(); // ya pagó — no hace falta poder "retomar" un pago que ya pasó
   document.getElementById('paywall').classList.add('is-hidden');
-  document.getElementById('skippedNote').classList.add('is-hidden');
-  drawMap();
+  const fullEl = document.getElementById('fullText');
+  fullEl.innerHTML = (full || []).map(p => `<p>${escapeHtml(p)}</p>`).join('');
   document.getElementById('closingLine').textContent = closingLine || '';
   const container = document.getElementById('fullContainer');
   container.classList.remove('is-hidden');
-  setTimeout(() => document.getElementById('mapSvg').scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  setTimeout(() => container.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
 }
 
 document.getElementById('btnSkipPaywall').addEventListener('click', () => {
-  track('paywall_skipped', { paywallVersion: PAYWALL_VERSION });
-  document.getElementById('payBlock').classList.add('is-hidden');
+  track('paywall_skipped', { paywallVersion: 'g1' });
+  document.getElementById('paywall').classList.add('is-hidden');
   document.getElementById('skippedNote').classList.remove('is-hidden');
 });
-document.getElementById('btnShowPay').addEventListener('click', () => {
-  track('paywall_reopened', { paywallVersion: PAYWALL_VERSION });
-  document.getElementById('skippedNote').classList.add('is-hidden');
-  document.getElementById('payBlock').classList.remove('is-hidden');
-});
 
-// "¿Qué te frena?": siempre visible, un toque, se registra una sola vez.
+// Pregunta "¿Qué te frenó?": un toque, se registra una sola vez por persona.
 document.querySelectorAll('.skip-reason').forEach(btn => {
   btn.addEventListener('click', () => {
-    track('paywall_skip_reason', { reason: btn.dataset.reason, paywallVersion: PAYWALL_VERSION });
+    track('paywall_skip_reason', { reason: btn.dataset.reason, paywallVersion: 'g1' });
     document.getElementById('skipReasonBox').classList.add('is-hidden');
     document.getElementById('skipReasonThanks').classList.remove('is-hidden');
   });
-});
-
-// --- Medición de lo que pasa DESPUÉS de mostrar el paywall ---------------------
-// Antes no había ningún evento entre "paywall_shown" y el cierre de la página,
-// así que no se sabía si la gente siquiera llegaba a ver el paywall.
-let paywallObserver = null;
-let paywallSeen = false;
-function watchPaywallInView() {
-  paywallSeen = false;
-  const el = document.getElementById('paywall');
-  if (paywallObserver) paywallObserver.disconnect();
-  if (!('IntersectionObserver' in window)) return;
-  paywallObserver = new IntersectionObserver((entries) => {
-    if (entries.some(e => e.isIntersecting) && !paywallSeen) {
-      paywallSeen = true;
-      track('paywall_in_view', { secondsSinceLoad: Math.round((Date.now() - pageStartedAt) / 1000), nodesTapped: tappedIds.size, paywallVersion: PAYWALL_VERSION });
-      paywallObserver.disconnect();
-    }
-  }, { threshold: 0.4 });
-  paywallObserver.observe(el);
-}
-const pageStartedAt = Date.now();
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'hidden') return;
-  try {
-    const payload = { event: 'page_hidden', anonId, metadata: { variant: 'map', screen: currentScreenName, seconds: Math.round((Date.now() - pageStartedAt) / 1000), paywallSeen, nodesTapped: tappedIds.size, unlocked: mapUnlocked } };
-    navigator.sendBeacon('/.netlify/functions/qer-track-event', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-  } catch { /* no crítico */ }
 });
 
 function restartQuiz() {
   currentIndex = 0;
   answers.fill(null);
   readingId = null;
-  mapNodes = [];
   clearPendingReading();
-  closeSheet();
-  track('quiz_started', { restart: true });
   renderQuestion(0);
   showScreen('quiz');
 }
 document.getElementById('btnRestart').addEventListener('click', restartQuiz);
 document.getElementById('btnRestartFromSkip').addEventListener('click', restartQuiz);
 
-// --- Retomar un mapa pendiente (o ya pagado) ------------------------------------
-// Igual que la versión de texto: antes de mostrar el pago se le pregunta al
-// SERVIDOR si ya está pagado (por si pagó y perdió la conexión justo después).
+// --- Retomar una lectura pendiente de pago (si volvió antes de que expire) ---
+// Se revisa al cargar la página: si hay una lectura guardada en este navegador
+// que todavía no se pagó, se salta directo a la pantalla de revelación con
+// esos mismos datos (sin repetir el cuestionario) en vez de mostrar la
+// portada desde cero.
+//
+// El caso que esto resuelve de verdad: alguien PAGA, pero pierde la
+// conexión o recarga la página justo después de pagar, antes de que el
+// navegador llegue a mostrar el texto completo (unlockFull nunca se
+// alcanza a ejecutar en ese caso, así que localStorage se queda con la
+// lectura marcada como "sin pagar" aunque el cargo sí se haya hecho). Por
+// eso, antes de mostrar la pantalla de pago de nuevo, se le pregunta al
+// SERVIDOR (nunca a localStorage) si esta lectura ya está pagada — si lo
+// está, se entrega el texto completo directo, sin volver a pedirle que
+// pague ni mostrarle el botón de PayPal.
 async function resumePendingReadingIfAny() {
   const pending = loadPendingReading();
-  if (!pending || !Array.isArray(pending.nodes)) return;
+  if (!pending) return;
+
   try {
     const res = await fetch('/.netlify/functions/qer-get-reading', {
       method: 'POST',
@@ -752,12 +571,17 @@ async function resumePendingReadingIfAny() {
       body: JSON.stringify({ readingId: pending.readingId })
     });
     const data = await res.json().catch(() => ({}));
-    if (res.ok && data.paid && data.mapTexts) {
+    if (res.ok && data.paid) {
       renderReveal(pending, { skipPaywall: true });
-      unlockMap({ mapTexts: data.mapTexts, closingLine: data.closingLine });
+      unlockFull({ full: data.full, closingLine: data.closingLine });
       return;
     }
-  } catch { /* sin conexión: se muestra el pago normal */ }
+  } catch {
+    // Sin conexión justo al abrir la página — no es grave: se muestra la
+    // pantalla de pago normal (abajo) y, si de verdad ya pagó, al volver a
+    // intentar esta misma función se confirma en cuanto haya conexión.
+  }
+
   renderReveal(pending);
 }
 resumePendingReadingIfAny();
@@ -766,9 +590,14 @@ document.getElementById('btnShare').addEventListener('click', async () => {
   const shareText = archetypeNameForShare
     ? `Según "¿Quién eres en realidad?", mi arquetipo es: ${archetypeNameForShare}. Descúbrelo tú también.`
     : '¿Quieres saber quién se esconde detrás de tu máscara? Hice este cuestionario y me sorprendió.';
-  const url = location.origin + '/quien-eres/';
-  const shareData = { title: '¿Quién eres en realidad?', text: shareText, url };
-  try { if (navigator.share) { await navigator.share(shareData); return; } } catch { /* canceló */ }
-  try { await navigator.clipboard.writeText(`${shareText} ${url}`); alert('Copiado — pégalo donde quieras compartirlo.'); }
-  catch { alert(url); }
+  const shareData = { title: '¿Quién eres en realidad?', text: shareText, url: location.href };
+  try {
+    if (navigator.share) { await navigator.share(shareData); return; }
+  } catch { /* el usuario canceló el share nativo — no hace falta avisar nada */ }
+  try {
+    await navigator.clipboard.writeText(`${shareText} ${location.href}`);
+    alert('Copiado — pégalo donde quieras compartirlo.');
+  } catch {
+    alert(location.href);
+  }
 });

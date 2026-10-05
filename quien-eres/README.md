@@ -4,7 +4,7 @@ Cuestionario de 16 preguntas (mezcla de opción única, respuesta corta y "una
 palabra a partir de una imagen") que termina en una lectura de personalidad
 generada con IA a partir de las respuestas reales de la persona. Se muestra
 gratis el inicio de la lectura; el resto se desbloquea con un pago único de
-$2.99 (ajustable) vía PayPal, sin necesidad de crear cuenta.
+$9.99 (ajustable) vía PayPal, sin necesidad de crear cuenta.
 
 **Esta app vive dentro del mismo sitio de Netlify que Graphikosmos.** No es
 un sitio aparte: es esta carpeta (`quien-eres/`), servida en la misma URL
@@ -139,7 +139,7 @@ Una sola variable nueva, opcional, se agrega a las que ya tiene el sitio:
 
 | Variable | Para qué | Si no se pone |
 |---|---|---|
-| `READING_PRICE_USD` | Precio de la lectura completa | Usa `2.99` por defecto |
+| `READING_PRICE_USD` | Precio de la lectura completa | Usa `9.99` por defecto |
 
 No hace falta tocar `GEMINI_API_KEY`, `PAYPAL_CLIENT_ID`,
 `PAYPAL_CLIENT_SECRET` ni `PAYPAL_ENV` — ya existen en el sitio para
@@ -200,3 +200,11 @@ Ver la sección correspondiente en `LEEME_ETAPA_2.md` (en la raíz del
 proyecto) para un listado de otras apps de cuestionario/revelación que
 podrían reutilizar exactamente esta misma plataforma (PayPal + Gemini +
 Supabase) con el mismo patrón de pago único sin cuenta.
+
+## Actualización 2026-10-04: la página principal ahora es el mapa
+
+- `/quien-eres/` es el **mapa** (10 revelaciones simbólicas, 3 gratis, SVG): `index.html` + `app.js`, backend `qer-generate-map.js` (generación en 2 pasos: eje + 3 llamadas en paralelo) y `_lib/qer-gemini.js`.
+- `/quien-eres/texto/` es la versión anterior de lectura lineal (respaldo, sin los cambios de preguntas).
+- `/quien-eres/mapa/` solo redirige a `/quien-eres/`.
+- Precio por defecto: **$9.99** (si en Netlify existe la variable `READING_PRICE_USD`, esa manda).
+- Eventos nuevos: `paywall_in_view`, `page_hidden` (segundos, nodos tocados), `paywall_reopened`, `map_node_tapped`, `map_unlock_cta`; todos con `variant:'map'` y `paywallVersion:'map2'`.
