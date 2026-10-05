@@ -7094,3 +7094,146 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
         buildSocraticPanel(`socratic_${originId}_${Date.now()}`, originId, topicName, data.question, null);
     } catch { appAlert("Error al iniciar el reto."); } finally { hideLoader(); }
 });
+
+// ==========================================
+// INFORME EN RTF
+// ==========================================
+// Un .rtf del esquema que haya en el lienzo en este momento (se vuelve a armar cada vez que se
+// pide, así que siempre refleja los cambios). Cada nodo es un subtítulo; el tamaño baja con la
+// profundidad (el nodo central es el más grande) y lleva el nivel de esquema de Word
+// (\outlinelevel) para que aparezca en el panel de navegación. Debajo de cada subtítulo:
+// definición, explicación sencilla, analogía y ejemplo práctico, tomados de la caché del propio
+// nodo (node.definition / node.simpleExplanation) o, si faltan, pedidos con ensureNodeContent
+// (los mismos endpoints que "Ver definición" y "Explicación sencilla").
+// Los nodos "*Ejemplo:*" creados con ⚡ no son subtítulos: se listan como ejemplos de su padre.
+
+function reportPlainText(t) {
+  return String(t || '')
+    .replace(/\[\[(.*?)\]\]/g, '$1')
+    .replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+    .replace(/\*\*?/g, '')
+    .replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function rtfEscape(text) {
+  let out = '';
+  for (const ch of String(text || '')) {
+    if (ch === '\\') out += '\\\\';
+    else if (ch === '{') out += '\\{';
+    else if (ch === '}') out += '\\}';
+    else if (ch === '\n') out += '\\line ';
+    else if (ch === '\r') continue;
+    else if (ch.codePointAt(0) < 128) out += ch;
+    else {
+      for (let i = 0; i < ch.length; i++) {          // unidades UTF-16, en 16 bits con signo
+        let u = ch.charCodeAt(i); if (u > 32767) u -= 65536;
+        out += `\\u${u}?`;
+      }
+    }
+  }
+  return out;
+}
+
+function isReportExampleNode(n) { return /^\*?Ejemplo:\*?/i.test(String(n?.label || '').trim()); }
+
+// Árbol del informe: [{id,title,depth,examples:[texto]}] en orden de lectura (raíz → rama completa).
+function collectReportNodes() {
+  const childrenOf = new Map();
+  edges.get().forEach(e => { if (!childrenOf.has(e.from)) childrenOf.set(e.from, []); childrenOf.get(e.from).push(e.to); });
+  const list = [], seen = new Set();
+  function walk(id, depth) {
+    const n = nodes.get(id);
+    if (!n || seen.has(id)) return;
+    seen.add(id);
+    const kids = (childrenOf.get(id) || []).filter(k => nodes.get(k));
+    const examples = kids.map(k => nodes.get(k)).filter(isReportExampleNode).map(k => reportPlainText(k.baseTitle || k.label));
+    list.push({ id, title: reportPlainText(n.baseTitle || n.label) || String(id), depth, examples });
+    kids.filter(k => !isReportExampleNode(nodes.get(k))).forEach(k => walk(k, depth + 1));
+  }
+  getCanvasRootIds().forEach(id => walk(id, 0));
+  return list;
+}
+
+// Tamaños (en medios puntos): el central es el más grande.
+const REPORT_HEADING_SIZES = [44, 34, 28, 24];
+
+function buildReportRtf(items, contentById) {
+  const rtf = [];
+  rtf.push('{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1{\\fonttbl{\\f0\\fswiss\\fcharset0 Calibri;}{\\f1\\froman\\fcharset0 Cambria;}}');
+  rtf.push('{\\colortbl;\\red27\\green42\\blue65;\\red15\\green118\\blue110;\\red100\\green116\\blue139;}');
+  const mainTitle = items.length ? items[0].title : 'Esquema';
+  rtf.push(`\\pard\\sa120\\f1\\cf3\\fs20 Informe generado con Graphikosmos \\u8226? ${rtfEscape(new Date().toLocaleDateString('es'))}\\par`);
+  items.forEach(it => {
+    const c = contentById.get(it.id) || {};
+    const size = REPORT_HEADING_SIZES[Math.min(it.depth, REPORT_HEADING_SIZES.length - 1)];
+    const level = Math.min(it.depth, 8);
+    rtf.push(`\\pard\\keepn\\sb${it.depth === 0 ? 360 : 280}\\sa100\\outlinelevel${level}\\f1\\b\\cf1\\fs${size} ${rtfEscape(it.title)}\\b0\\par`);
+    const label = (t) => `\\pard\\sb80\\sa40\\f0\\b\\cf2\\fs22 ${rtfEscape(t)}\\b0\\par`;
+    const body = (t) => `\\pard\\sa100\\qj\\f0\\cf1\\fs22 ${rtfEscape(t)}\\par`;
+    const def = reportPlainText(c.definition);
+    const s = c.simple || {};
+    if (def) { rtf.push(label('Definición')); rtf.push(body(def)); }
+    if (s.definition) { rtf.push(label('Explicación sencilla')); rtf.push(body(reportPlainText(s.definition))); }
+    if (s.analogy) { rtf.push(label('Analogía')); rtf.push(body(reportPlainText(s.analogy))); }
+    if (s.example || it.examples.length) {
+      rtf.push(label('Ejemplos prácticos'));
+      if (s.example) rtf.push(`\\pard\\li360\\fi-240\\sa60\\f0\\cf1\\fs22 \\u8226? ${rtfEscape(reportPlainText(s.example))}\\par`);
+      it.examples.forEach(e => rtf.push(`\\pard\\li360\\fi-240\\sa60\\f0\\cf1\\fs22 \\u8226? ${rtfEscape(e)}\\par`));
+    }
+    if (!def && !s.definition) rtf.push(`\\pard\\sa100\\f0\\i\\cf3\\fs20 Sin definición generada todavía.\\i0\\par`);
+  });
+  rtf.push('}');
+  return { text: rtf.join('\n'), mainTitle };
+}
+
+let reportBusy = false;
+async function exportReportRtf() {
+  if (reportBusy) return;
+  const items = collectReportNodes();
+  if (!items.length) { appAlert('Todavía no hay un esquema para hacer el informe.'); return; }
+  const missing = items.filter(it => { const n = nodes.get(it.id); return !n.definition || !n.simpleExplanation; });
+  let generate = false;
+  if (missing.length) {
+    generate = await appConfirm(
+      `${missing.length} de ${items.length} nodos todavía no tienen definición o explicación sencilla. ` +
+      `Si las generas, se usan los mismos servicios (y el mismo saldo) que al abrirlas una por una desde cada nodo. ` +
+      `Si no, el informe incluye solo lo que ya existe.`,
+      { title: 'Armar el informe', okText: `Generar lo que falta (${missing.length})`, cancelText: 'Solo lo que ya existe' });
+  }
+  reportBusy = true;
+  const contentById = new Map();
+  try {
+    if (generate) {
+      let done = 0;
+      showLoader(`Preparando el contenido del informe (0 de ${missing.length})…`);
+      const queue = missing.slice();
+      const worker = async () => {
+        while (queue.length) {
+          const it = queue.shift();
+          try { await ensureNodeContent(it.id); } catch (e) { console.error('[informe]', e.message); }
+          done++; if (loaderText) loaderText.innerText = `Preparando el contenido del informe (${done} de ${missing.length})…`;
+        }
+      };
+      // Dos a la vez: cada nodo hace 2 llamadas; más que eso arriesga topes de uso de la IA.
+      await Promise.all([worker(), worker()]);
+      clearInterval(loaderInterval); // el texto de progreso no debe rotar por los mensajes del cargador
+    }
+    items.forEach(it => {
+      const n = nodes.get(it.id);
+      contentById.set(it.id, { definition: n.definition, simple: n.simpleExplanation });
+    });
+    const { text, mainTitle } = buildReportRtf(items, contentById);
+    const safeName = mainTitle.replace(/[\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || 'Esquema';
+    const blob = new Blob([text], { type: 'application/rtf' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `Informe - ${safeName}.rtf`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    try { track('report_exported', { nodes: items.length, generated: generate ? missing.length : 0 }); } catch { /* no crítico */ }
+  } finally {
+    hideLoader(); reportBusy = false;
+  }
+}
+document.getElementById('btnExportReport')?.addEventListener('click', exportReportRtf);

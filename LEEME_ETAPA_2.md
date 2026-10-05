@@ -2704,3 +2704,6 @@ usaba párrafos propios y sigue igual.
 
 ## 46. Nueva app: "Vestirte" (`vestirte/`)
 10 preguntas + 5 fotos con ropa puesta → perfil de estilo → 10 ocasiones (2 gratis, 8 de pago; cada una con opción cara, intermedia y barata). Reutiliza la generación en 3 pasos, el almacén y el pago de quien-eres. Fotos privadas en Cloudinary, panel en `/vestirte/admin/`, borrado por la persona y limpieza automática. Instrucciones completas: `vestirte/LEEME.md`; SQL: `supabase/vestirte.sql`.
+
+## 47. Graphikosmos: botón "Informe" (.rtf)
+Cabecera → 📄 Informe. Descarga un .rtf del esquema actual (se rearma cada vez): un subtítulo por nodo (el central es el más grande, y Word los muestra en su panel de navegación), con definición, explicación sencilla, analogía y ejemplos prácticos (el ejemplo de la explicación sencilla más los nodos "Ejemplo:" hijos). Si faltan definiciones, pregunta si generarlas (mismos servicios y saldo que al abrirlas a mano) o usar solo lo existente.
