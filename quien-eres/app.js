@@ -378,24 +378,47 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAP_CX = 170, MAP_CY = 214, MAP_RX = 122, MAP_RY = 164, NODE_R = 23;
 
 // --- Envío del cuestionario y generación del mapa --------------------------
+// La generación va en 3 pasos, cada uno una llamada propia al servidor (cada
+// una con su propio tiempo máximo; todo en una sola llamada se pasaba del
+// límite de Netlify): 1) el eje, 2) 5 partes de 2 rubros EN PARALELO, 3) ensamblar.
+async function postFn(name, payload) {
+  const res = await fetch(`/.netlify/functions/${name}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const e = new Error(data.error || `Error ${res.status}`); e.status = res.status; e.data = data; throw e; }
+  return data;
+}
+
+async function postWithOneRetry(name, payload) {
+  try { return await postFn(name, payload); }
+  catch (err) {
+    if (err.status && err.status < 500 && err.status !== 409) throw err; // un 4xx no se arregla reintentando
+    return await postFn(name, payload);
+  }
+}
+
 async function submitQuiz() {
   showScreen('loading');
-  document.getElementById('loadingLabel').textContent = 'Leyendo lo que hay debajo de tus respuestas… (puede tardar un poco)';
+  const label = document.getElementById('loadingLabel');
+  label.textContent = 'Leyendo lo que hay debajo de tus respuestas…';
   const payload = {
     answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' }))
   };
+  const t0 = Date.now();
   try {
-    const res = await fetch('/.netlify/functions/qer-generate-map', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'No se pudo armar tu mapa.');
-    track('reading_generated_success', {});
+    const axis = await postWithOneRetry('qer-generate-map', payload);
+    label.textContent = 'Trazando tu mapa…';
+    await Promise.all([0, 1, 2, 3, 4].map(part =>
+      postWithOneRetry('qer-generate-map-part', { readingId: axis.readingId, part, answers: payload.answers })));
+    label.textContent = 'Casi listo…';
+    const data = await postWithOneRetry('qer-generate-map-finalize', { readingId: axis.readingId });
+    track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000) });
     renderReveal(data);
   } catch (err) {
-    track('reading_generated_error', { reason: err.message });
+    track('reading_generated_error', { reason: String(err.message).slice(0, 200), seconds: Math.round((Date.now() - t0) / 1000) });
     showError('Tu mapa no pudo terminar de armarse.', err.message, submitQuiz);
   }
 }
