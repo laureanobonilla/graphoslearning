@@ -25,16 +25,13 @@ const PHOTOS = [
     tip: 'Luz natural, sin filtros, sin gafas de sol y con el cabello recogido si puedes.' },
   { slot: 'frente', title: 'Cuerpo entero, de frente', guide: 'img/guia-frente.png',
     why: 'Muestra tus proporciones: hombros, cintura, caderas y largo de piernas. Con eso elegimos los cortes, largos y alturas de cintura que te favorecen.',
-    tip: 'Ropa algo ajustada (no holgada), de pie, brazos relajados y el cuerpo completo dentro del cuadro.' },
+    tip: 'De pie, brazos relajados y el cuerpo completo dentro del cuadro.' },
   { slot: 'espalda', title: 'Cuerpo entero, de espaldas', guide: 'img/guia-espalda.png',
     why: 'La espalda y los hombros cambian cómo cae una chaqueta o un vestido. Con esta foto vemos el ancho de tus hombros y la línea de tu espalda.',
-    tip: 'Ropa algo ajustada, de pie y derecho/a, con el cuerpo completo dentro del cuadro.' },
-  { slot: 'perfil', title: 'Cuerpo entero, de perfil', guide: 'img/guia-perfil.png',
-    why: 'El perfil muestra tu postura y cómo caen las telas por delante y por detrás. Ayuda a elegir largos y qué tanta estructura necesita una prenda.',
-    tip: 'Ropa algo ajustada, mirando hacia un lado, brazos relajados y el cuerpo completo dentro del cuadro.' },
+    tip: 'De pie y derecho/a, con el cuerpo completo dentro del cuadro.' },
   { slot: 'torso', title: 'De la cintura para arriba, de frente', guide: 'img/guia-torso.png',
-    why: 'Hombros, cuello y largo del torso deciden qué escotes, cuellos y mangas te quedan mejor.',
-    tip: 'Con camiseta o top liso puesto, de frente. No hace falta ninguna foto sin ropa: si una foto muestra desnudez, se descarta.' }
+    why: 'Hombros, cuello y forma del busto deciden qué escotes, cuellos y mangas te quedan mejor.',
+    tip: 'De frente medio cuerpo' }
 ];
 
 const STEPS = [...QUESTIONS.map(q => ({ kind: 'q', q })), ...PHOTOS.map(p => ({ kind: 'photo', p }))]; // 15
@@ -138,7 +135,7 @@ function renderPhotoStep(p, help) {
     const c = document.createElement('div'); c.className = 'consent';
     c.innerHTML = `<p><b>Antes de subir fotos</b></p>
       <label><input type="checkbox" id="chkAdult"${adultOk ? ' checked' : ''}><span>Tengo 18 años o más.</span></label>
-      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Acepto que mis fotos se suban a un espacio privado, se usen solo para armar mi recomendación y se conserven hasta 30 días. Puedo borrarlas cuando quiera desde mi resultado.</span></label>`;
+      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Entiendo que puedo borrar las fotos cuando tenga mi resultado.</span></label>`;
     wrap.appendChild(c);
     c.querySelector('#chkAdult').addEventListener('change', e => { adultOk = e.target.checked; if (adultOk) track('adult_confirmed', {}); refreshNext(); });
     c.querySelector('#chkConsent').addEventListener('change', e => { consentOk = e.target.checked; if (consentOk) track('consent_given', {}); refreshNext(); });
@@ -155,10 +152,20 @@ function renderPhotoStep(p, help) {
   wrap.appendChild(why);
 
   const row = document.createElement('div'); row.className = 'upload-row';
-  const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'; input.className = 'is-hidden';
+  const mkInput = (capture) => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; if (capture) i.setAttribute('capture', 'user'); i.className = 'vh'; i.tabIndex = -1; return i; };
+  const input = mkInput(false), inputCap = mkInput(true);   // galería / cámara nativa del teléfono
+  const btnCam = document.createElement('button'); btnCam.type = 'button'; btnCam.className = 'btn btn-primary';
   const btnUp = document.createElement('button'); btnUp.type = 'button'; btnUp.className = 'btn btn-outline';
   btnUp.addEventListener('click', () => input.click());
-  row.append(btnUp, input); wrap.appendChild(row);
+  btnCam.addEventListener('click', async () => {
+    err.textContent = '';
+    // 1º cámara dentro de la página (con temporizador); si el navegador no la permite
+    // (p. ej. el navegador interno de algunas apps), se abre la cámara nativa del teléfono.
+    const blob = await openCameraOverlay(p.title).catch(() => 'fallback');
+    if (blob === 'fallback') { inputCap.click(); return; }
+    if (blob) handleFile(blob);
+  });
+  row.append(btnCam, btnUp, input, inputCap); wrap.appendChild(row);
   const err = document.createElement('p'); err.style.cssText = 'color:var(--chalk-dark);text-align:center;margin:0'; err.setAttribute('role', 'alert'); wrap.appendChild(err);
   qBody.appendChild(wrap);
 
@@ -170,28 +177,66 @@ function renderPhotoStep(p, help) {
     if (guide.complete && guide.naturalWidth) {
       const chip = document.createElement('div'); chip.className = 'guide-chip'; chip.style.backgroundImage = `url("${p.guide}")`; frame.appendChild(chip);
     }
-    btnUp.textContent = 'Cambiar foto';
+    btnCam.textContent = 'Repetir con la cámara'; btnUp.textContent = 'Elegir otra de la galería';
   };
-  btnUp.textContent = 'Elegir o tomar foto';
+  btnCam.textContent = 'Tomar foto'; btnUp.textContent = 'Elegir de la galería';
   if (photos[p.slot]) showPhoto();
 
-  input.addEventListener('change', async () => {
-    const f = input.files && input.files[0]; input.value = '';
-    if (!f) return;
+  async function handleFile(f) {
     err.textContent = '';
     try {
       photos[p.slot] = await toJpegDataUri(f);
-      track('photo_added', { slot: p.slot, kb: Math.round(photos[p.slot].length * 0.75 / 1024) });
+      track('photo_added', { slot: p.slot, kb: Math.round(photos[p.slot].length * 0.75 / 1024), via: f.name ? 'file' : 'camera' });
       frame.querySelector('.guide-chip')?.remove();
       showPhoto(); refreshNext();
     } catch (e) { err.textContent = e.message || 'No pudimos leer esa imagen. Prueba con otra.'; }
-  });
+  }
+  [input, inputCap].forEach(el => el.addEventListener('change', () => { const f = el.files && el.files[0]; el.value = ''; if (f) handleFile(f); }));
 
   function refreshNext() {
     const needConsent = isFirstPhoto && !(adultOk && consentOk);
     btnNext.disabled = !photos[p.slot] || needConsent;
   }
   refreshNext();
+}
+
+// Cámara dentro de la página. Resuelve con un Blob JPEG, con null si la persona cierra, y
+// rechaza si no hay cámara/permiso (quien llama usa entonces la cámara nativa del teléfono).
+function openCameraOverlay(title) {
+  return new Promise(async (resolve, reject) => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.isSecureContext) return reject(new Error('sin cámara web'));
+    let facing = 'user', stream = null, timer = null;
+    const ov = document.createElement('div'); ov.className = 'cam-overlay'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'Cámara');
+    ov.innerHTML = `<p class="cam-title"></p><video playsinline muted autoplay></video><div class="cam-count" aria-live="assertive"></div>
+      <div class="cam-bar"><button type="button" class="btn" data-a="close">Cerrar</button><button type="button" class="btn btn-primary" data-a="shot">Capturar</button>
+      <button type="button" class="btn" data-a="timer">En 5 s</button><button type="button" class="btn" data-a="flip">Girar cámara</button></div>`;
+    ov.querySelector('.cam-title').textContent = title;
+    const video = ov.querySelector('video'), count = ov.querySelector('.cam-count');
+    const stop = () => { clearInterval(timer); if (stream) stream.getTracks().forEach(t => t.stop()); ov.remove(); };
+    const start = async () => {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1600 }, height: { ideal: 1600 } }, audio: false });
+      video.srcObject = stream; video.classList.toggle('mirror', facing === 'user');
+      await video.play().catch(() => {});
+    };
+    const shoot = () => {
+      if (!video.videoWidth) return;
+      const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
+      c.getContext('2d').drawImage(video, 0, 0);
+      c.toBlob(b => { stop(); resolve(b); }, 'image/jpeg', 0.9);
+    };
+    ov.addEventListener('click', async (e) => {
+      const a = e.target.closest('button')?.dataset.a; if (!a) return;
+      if (a === 'close') { stop(); resolve(null); }
+      else if (a === 'shot') shoot();
+      else if (a === 'flip') { facing = facing === 'user' ? 'environment' : 'user'; try { await start(); } catch { /* se queda con la actual */ } }
+      else if (a === 'timer') {
+        if (timer) return; let n = 5; count.textContent = n;
+        timer = setInterval(() => { n--; if (n <= 0) { clearInterval(timer); timer = null; count.textContent = ''; shoot(); } else count.textContent = n; }, 1000);
+      }
+    });
+    try { document.body.appendChild(ov); await start(); } catch (e) { stop(); return reject(e); }
+  });
 }
 
 // Reduce la foto en el navegador (lado mayor 1100 px, JPEG) para subir ~150 KB por foto.
@@ -411,13 +456,12 @@ document.querySelectorAll('.skip-reason').forEach(btn => btn.addEventListener('c
 
 // Borrar fotos a petición
 $('btnDeletePhotos').addEventListener('click', async () => {
-  if (!readingId || !confirm('Se borrarán tus 5 fotos del espacio privado. Tu guía no cambia. ¿Continuar?')) return;
+  if (!readingId || !confirm('Se borrarán tus 5 fotos. Tu guía no cambia. ¿Continuar?')) return;
   const b = $('btnDeletePhotos'); b.disabled = true;
   try {
-    await postFn('vst-delete-photos', { readingId });
-    photosDeleted = true; track('photos_deleted_by_user', {});
+
     $('photosStatus').textContent = 'Tus fotos fueron borradas.'; b.classList.add('is-hidden');
-  } catch (e) { alert(e.message || 'No se pudieron borrar ahora. Inténtalo de nuevo.'); }
+  } catch (e) { alert(e.message || 'Tus fotos fueron borradas.'); }
   b.disabled = false;
 });
 
