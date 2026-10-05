@@ -138,7 +138,7 @@ function renderPhotoStep(p, help) {
     const c = document.createElement('div'); c.className = 'consent';
     c.innerHTML = `<p><b>Antes de subir fotos</b></p>
       <label><input type="checkbox" id="chkAdult"${adultOk ? ' checked' : ''}><span>Tengo 18 años o más.</span></label>
-      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Acepto que mis fotos se suban a un espacio privado, se usen solo para armar mi recomendación y se conserven hasta 30 días. Puedo borrarlas cuando quiera desde mi resultado.</span></label>`;
+      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Acepto que mis fotos se suban a un espacio privado, se usen solo para armar mi recomendación. Puedo borrarlas cuando obtenga resultado.</span></label>`;
     wrap.appendChild(c);
     c.querySelector('#chkAdult').addEventListener('change', e => { adultOk = e.target.checked; if (adultOk) track('adult_confirmed', {}); refreshNext(); });
     c.querySelector('#chkConsent').addEventListener('change', e => { consentOk = e.target.checked; if (consentOk) track('consent_given', {}); refreshNext(); });
