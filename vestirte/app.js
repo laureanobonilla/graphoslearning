@@ -142,22 +142,19 @@ const elegantPalette = [
     { background: '#fff1f2', border: '#fda4af' }  // Rosa
 ];
 
-function getRandomColor() {
-    return elegantPalette[Math.floor(Math.random() * elegantPalette.length)];
-}
-
-// Color por NIVEL (2026-10-04): cada nivel del esquema tiene su propio tono,
-// y un nodo nuevo nunca hereda el tono de su padre. El color se decide UNA
-// vez, al crear el nodo — nunca se recolorea después (ni al agregar niveles
-// nuevos ni al reabrir un proyecto), así lo que la persona cambie a mano se
-// queda como lo dejó.
-const LEVEL_PALETTE = [
-    { background: '#ccfbf1', border: '#14b8a6' }, // 0 raíz: turquesa
-    { background: '#e0e7ff', border: '#6366f1' }, // 1: índigo
-    { background: '#fef3c7', border: '#f59e0b' }, // 2: ámbar
-    { background: '#fce7f3', border: '#ec4899' }, // 3: rosa
-    { background: '#dcfce7', border: '#22c55e' }, // 4: verde
-    { background: '#ffedd5', border: '#f97316' }  // 5: naranja (luego vuelve a empezar)
+const PHOTOS = [
+  { slot: 'rostro', title: 'Tu rostro de cerca', guide: 'img/guia-rostro.png',
+    why: 'De cerca vemos el color de tus ojos, la forma de tu rostro y tu tono de piel. De ahí salen tus colores: cuáles te iluminan y cuáles te apagan.',
+    tip: 'Luz natural, sin filtros, sin gafas de sol y con el cabello recogido si puedes.' },
+  { slot: 'frente', title: 'Cuerpo entero, de frente', guide: 'img/guia-frente.png',
+    why: 'Muestra tus proporciones: hombros, cintura, caderas y largo de piernas. Con eso elegimos los cortes, largos y alturas de cintura que te favorecen.',
+    tip: 'De pie, brazos relajados y el cuerpo completo dentro del cuadro.' },
+  { slot: 'espalda', title: 'Cuerpo entero, de espaldas', guide: 'img/guia-espalda.png',
+    why: 'La espalda y los hombros cambian cómo cae una chaqueta o un vestido. Con esta foto vemos el ancho de tus hombros y la línea de tu espalda.',
+    tip: 'Ropa algo ajustada, de pie y derecho/a, con el cuerpo completo dentro del cuadro.' },
+  { slot: 'torso', title: 'De la cintura para arriba, de frente', guide: 'img/guia-torso.png',
+    why: 'Hombros, cuello y forma de los pechos deciden qué escotes, cuellos y mangas te quedan mejor.',
+    tip: 'Viendo hacia el frente' }
 ];
 function colorForDepth(depth, parentColor) {
     const n = LEVEL_PALETTE.length;
