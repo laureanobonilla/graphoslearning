@@ -2707,3 +2707,25 @@ usaba párrafos propios y sigue igual.
 
 ## 47. Graphikosmos: botón "Informe" (.rtf)
 Cabecera → 📄 Informe. Descarga un .rtf del esquema actual (se rearma cada vez): un subtítulo por nodo (el central es el más grande, y Word los muestra en su panel de navegación), con definición, explicación sencilla, analogía y ejemplos prácticos (el ejemplo de la explicación sencilla más los nodos "Ejemplo:" hijos). Si faltan definiciones, pregunta si generarlas (mismos servicios y saldo que al abrirlas a mano) o usar solo lo existente.
+
+## 48. Versión en inglés (Graphikosmos) — una sola app, dos idiomas
+
+**Qué hay:** `https://…/en/` abre la MISMA app (mismo `index.html`, mismo `app.js`) en inglés. No hay carpeta `en/` con código copiado: `_redirects` hace que `/en`, `/en/` y `/en/*` sirvan `/index.html` (status 200, la URL no cambia).
+
+**Cómo decide el idioma** (`i18n/core.js`): `?lang=en|es` > ruta que empieza por `/en` > español. Pone `<html lang>`, expone `tr('clave', {param})` y aplica los atributos del HTML.
+
+**Dónde están los textos**
+- `i18n/es.js` e `i18n/en.js`: mismas claves (459). Si falta una en inglés se muestra el español.
+- HTML: `data-i18n="clave"` (contenido), `data-i18n-title|placeholder|aria-label|alt="clave"`. El texto español sigue escrito en el HTML como respaldo; el catálogo manda.
+- JS: `tr('js.algo')` / `tr('quiz.score', {ok, total, pct})`; los `{param}` se reemplazan.
+- Prefijos: `ui.` y `meta.` (HTML), `js.` (mensajes de app.js), el resto agrupado por zona (`def.`, `quiz.`, `tour.`, `soc.`, `proj.`, `rpt.`…).
+
+**Backend:** el cliente añade `lang` a toda llamada a `gemini.js` (en el interceptor de `fetch`). `gemini.js` antepone UNA instrucción "responde en inglés" (`LANG_DIRECTIVES`) a cada prompt; los prompts siguen escritos en español y no se duplican. Los errores del servidor son códigos que el cliente traduce. Los eventos de `track-event` llevan `metadata.lang` para separar el tráfico EN/ES.
+
+**Informe .rtf:** las etiquetas y la fecha salen en el idioma activo; los nodos "Ejemplo:" / "Example:" se detectan en ambos.
+
+**Añadir un idioma:** crear `i18n/xx.js` (copiar es.js y traducir), agregar `'xx'` a `SUPPORTED` en `core.js`, `LANG_DIRECTIVES.xx` en `gemini.js`, un `<script>` en `index.html` y la regla en `_redirects`.
+
+**Al añadir un texto nuevo:** poner la clave en AMBOS catálogos. Prueba rápida: abrir `/?lang=en` y buscar español.
+
+**Subir a GitHub:** `_redirects` y la carpeta `i18n/` en la RAÍZ del repo (junto a `index.html`), más `index.html`, `app.js` y `netlify/functions/gemini.js` actualizados.

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Graphikosmos</title>
+    <title data-i18n="meta.graphikosmos">Graphikosmos</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -359,11 +359,11 @@
     </div>
     <!-- Banner Modo Sinergia -->
     <div id="synergyBanner" class="absolute top-24 md:top-20 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white backdrop-blur-md px-4 md:px-5 py-2 rounded-full shadow-2xl font-medium text-[10px] md:text-xs tracking-wide z-40 hidden flex items-center gap-2 cursor-pointer border border-fuchsia-700/60 transition-transform active:scale-95 whitespace-nowrap">
-        <span class="flex items-center gap-1.5 text-fuchsia-300">
+        <span class="flex items-center gap-1.5 text-fuchsia-300" data-i18n="ui.selecciona_el_concepto_a_fusionar">
             <span class="w-1.5 h-1.5 rounded-full bg-fuchsia-400 animate-pulse"></span>
             Selecciona el concepto a fusionar
         </span>
-        <span class="text-slate-400 hover:text-white ml-1 md:ml-2 uppercase font-bold tracking-wider">Cancelar</span>
+        <span class="text-slate-400 hover:text-white ml-1 md:ml-2 uppercase font-bold tracking-wider" data-i18n="ui.cancelar">Cancelar</span>
     </div>
     <!-- Nuevo Loader Inmersivo Pantalla Completa -->
     <div id="loaderOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex flex-col items-center justify-center">
@@ -374,17 +374,17 @@
                 <div class="absolute inset-0 border-4 border-indigo-600 rounded-full border-t-transparent animate-spin"></div>
                 <div class="w-3 h-3 bg-indigo-500 rounded-full animate-pulse"></div>
             </div>
-            <span id="loaderText" class="text-sm md:text-base font-bold text-slate-700 tracking-tight">Procesando información...</span>
+            <span id="loaderText" class="text-sm md:text-base font-bold text-slate-700 tracking-tight" data-i18n="ui.procesando_informacion">Procesando información...</span>
         </div>
     </div>
 
     <!-- Banner Modo Conexión -->
     <div id="connectionBanner" class="absolute top-24 md:top-20 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white backdrop-blur-md px-4 md:px-5 py-2 rounded-full shadow-2xl font-medium text-[10px] md:text-xs tracking-wide z-40 hidden flex items-center gap-2 cursor-pointer border border-slate-700/60 transition-transform active:scale-95 whitespace-nowrap">
-        <span class="flex items-center gap-1.5 text-amber-300">
+        <span class="flex items-center gap-1.5 text-amber-300" data-i18n="ui.toca_el_nodo_destino">
             <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
             Toca el nodo destino
         </span>
-        <span class="text-slate-400 hover:text-white ml-1 md:ml-2 uppercase font-bold tracking-wider">Cancelar</span>
+        <span class="text-slate-400 hover:text-white ml-1 md:ml-2 uppercase font-bold tracking-wider" data-i18n="ui.cancelar">Cancelar</span>
     </div>
 
     <!-- Botón flotante exclusivo para salir del modo Landscape -->
@@ -394,13 +394,13 @@
 
     <!-- Barra: aparece cuando hay 2+ nodos seleccionados, para agruparlos en un subesquema -->
     <div id="subschemeActionBar" class="absolute top-24 md:top-20 left-1/2 transform -translate-x-1/2 bg-slate-900/90 text-white backdrop-blur-md px-4 md:px-5 py-2 rounded-full shadow-2xl font-medium text-[10px] md:text-xs tracking-wide z-40 hidden flex items-center gap-2 whitespace-nowrap">
-        <span id="subschemeSelectionCount" class="text-indigo-300">2 nodos seleccionados</span>
-        <button id="btnMakeSubscheme" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors ml-1">📦 Convertir en subesquema</button>
+        <span id="subschemeSelectionCount" class="text-indigo-300" data-i18n="ui.2_nodos_seleccionados">2 nodos seleccionados</span>
+        <button id="btnMakeSubscheme" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors ml-1" data-i18n="ui.convertir_en_subesquema">📦 Convertir en subesquema</button>
     </div>
 
     <!-- Migas de pan: aparecen al entrar a un subesquema, para volver al nivel anterior -->
     <div id="schemeBreadcrumb" class="absolute top-24 md:top-20 left-4 bg-slate-900/90 text-white backdrop-blur-md pl-2 pr-4 py-2 rounded-full shadow-2xl font-medium text-[10px] md:text-xs tracking-wide z-40 hidden flex items-center gap-2 whitespace-nowrap">
-        <button id="btnExitSubscheme" class="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-full font-semibold transition-colors flex items-center gap-1">← Volver</button>
+        <button id="btnExitSubscheme" class="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-full font-semibold transition-colors flex items-center gap-1" data-i18n="ui.volver">← Volver</button>
         <span id="schemeBreadcrumbLabel" class="text-slate-300 italic max-w-[220px] truncate"></span>
     </div>
 
@@ -410,13 +410,13 @@
         <div class="flex items-center gap-3 w-full">
             <div class="flex items-center gap-2 shrink-0">
                 <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[#4fd1c5] to-[#8b7cf6] text-[#0a0e1a] flex items-center justify-center font-bold font-heading text-base shadow-[0_0_18px_rgba(79,209,197,0.35)]">Γ</div>
-                <h1 class="text-base md:text-lg font-bold font-heading text-white tracking-tight hidden sm:block">Graphikosmos</h1>
+                <h1 class="text-base md:text-lg font-bold font-heading text-white tracking-tight hidden sm:block" data-i18n="ui.graphikosmos">Graphikosmos</h1>
             </div>
 
             <!-- Buscador: el momento protagonista de la barra -->
             <div class="flex gap-2 flex-1 min-w-0">
-                <input type="text" id="topicInput" placeholder="Escribe algo y crea un nodo nuevo con eso..." title="Crea un solo nodo en el lienzo con exactamente lo que escribas aquí. Para generar un esquema completo a partir de un tema, un texto largo o un enlace a una página web, usa el Modo Lector." class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg pl-3.5 pr-2 py-2.5 md:py-2 text-sm text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans flex-1">
-                <button id="btnGenerate" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0">
+                <input type="text" id="topicInput" placeholder="Escribe algo y crea un nodo nuevo con eso..." title="Crea un solo nodo en el lienzo con exactamente lo que escribas aquí. Para generar un esquema completo a partir de un tema, un texto largo o un enlace a una página web, usa el Modo Lector." class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg pl-3.5 pr-2 py-2.5 md:py-2 text-sm text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans flex-1" data-i18n-placeholder="ui.escribe_algo_y_crea_un" data-i18n-title="ui.crea_un_solo_nodo_en">
+                <button id="btnGenerate" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0" data-i18n="ui.generar">
                     Generar
                 </button>
             </div>
@@ -425,19 +425,20 @@
             <div class="flex items-center gap-1.5 shrink-0">
                 <button id="btnLogin" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#eef1fb] p-2 md:px-3 md:py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-[#4a5178]" id="userStatusDot"></span>
-                    <span id="loginText" class="hidden lg:inline">Iniciar Sesión</span>
+                    <span id="loginText" class="hidden lg:inline" data-i18n="ui.iniciar_sesion">Iniciar Sesión</span>
                 </button>
-                <button id="btnProjects" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#eef1fb] bg-[#161c35] hover:bg-[#1d2442] hover:text-[#4fd1c5] transition-colors border border-[#2c3458]" title="Ver mis esquemas guardados automáticamente">
+                <button id="btnProjects" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#eef1fb] bg-[#161c35] hover:bg-[#1d2442] hover:text-[#4fd1c5] transition-colors border border-[#2c3458]" title="Ver mis esquemas guardados automáticamente" data-i18n-title="ui.ver_mis_esquemas_guardados_automaticamente">
                     <span id="saveStatusIcon">📁</span>
-                    <span class="hidden xl:inline" id="saveStatusText">Mis Proyectos</span>
+                    <span class="hidden xl:inline" id="saveStatusText" data-i18n="ui.mis_proyectos">Mis Proyectos</span>
                 </button>
-                <button id="btnCapture" title="Descargar esquema" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#eef1fb] p-2 md:px-2.5 md:py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                <button id="btnCapture" title="Descargar esquema" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#eef1fb] p-2 md:px-2.5 md:py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5" data-i18n-title="ui.descargar_esquema">
                     <svg class="w-4 h-4 text-[#8a92b2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                    <span class="hidden xl:inline">Capturar</span>
+                    <span class="hidden xl:inline" data-i18n="ui.capturar">Capturar</span>
                 </button>
                 <button id="btnHelp" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#8a92b2] hover:text-[#eef1fb] w-8 h-8 md:w-auto md:px-3 rounded-lg font-medium transition-colors">?</button>
-                <button id="btnFeedback" title="Enviar un comentario o sugerencia" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#8a92b2] hover:text-[#4fd1c5] p-2 md:px-2.5 md:py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
-                    <span>💬</span><span class="hidden xl:inline">Sugerencias</span>
+                <a id="langSwitch" href="/en/" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#8a92b2] hover:text-[#eef1fb] h-8 px-2.5 rounded-lg text-xs font-semibold transition-colors flex items-center no-underline">EN</a>
+                <button id="btnFeedback" title="Enviar un comentario o sugerencia" class="bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#8a92b2] hover:text-[#4fd1c5] p-2 md:px-2.5 md:py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5" data-i18n-title="ui.enviar_un_comentario_o_sugerencia">
+                    <span>💬</span><span class="hidden xl:inline" data-i18n="ui.sugerencias">Sugerencias</span>
                 </button>
 
                 <!-- Lectura de telemetría: balance de nodos -->
@@ -450,53 +451,53 @@
 
         <!-- Fila 2: Controles secundarios, discretos -->
         <div class="flex items-center gap-2 w-full">
-            <button id="btnToggleReader" class="text-[#c9b37a] hover:text-[#e4cf96] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+            <button id="btnToggleReader" class="text-[#c9b37a] hover:text-[#e4cf96] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n="ui.ocultar_modo_lector">
                 <span>📖</span> Ocultar Modo Lector
             </button>
-            <span class="text-[10px] text-[#5b6388] hidden lg:inline truncate">💡 "Generar" crea un nodo suelto · Para un esquema completo (tema, texto largo o enlace), usa el Modo Lector</span>
+            <span class="text-[10px] text-[#5b6388] hidden lg:inline truncate" data-i18n="ui.generar_crea_un_nodo_suelto">💡 "Generar" crea un nodo suelto · Para un esquema completo (tema, texto largo o enlace), usa el Modo Lector</span>
             <div class="flex-1"></div>
 
             <!-- Modo de acomodo del esquema: cómo se ubican ramas/sub-ramas al generar
                  uno nuevo. "Árbol" (de arriba hacia abajo) es el de siempre y queda
                  como default; "Sistema solar" es el acomodo radial en prueba. -->
-            <div class="flex items-center gap-1.5" title="Cómo se acomodan las ramas al generar un esquema nuevo">
-                <span class="text-[10px] text-[#5b6388] hidden lg:inline">Modo:</span>
+            <div class="flex items-center gap-1.5" title="Cómo se acomodan las ramas al generar un esquema nuevo" data-i18n-title="ui.como_se_acomodan_las_ramas">
+                <span class="text-[10px] text-[#5b6388] hidden lg:inline" data-i18n="ui.modo">Modo:</span>
                 <select id="schemaLayoutMode" class="bg-[#0f1428] border border-[#2c3458] rounded-md px-2 py-1 text-xs font-semibold text-[#eef1fb] focus:outline-none focus:border-[#4fd1c5]">
-                    <option value="tree">🌳 Árbol</option>
-                    <option value="solar" selected>🪐 Sistema solar</option>
+                    <option value="tree" data-i18n="ui.arbol">🌳 Árbol</option>
+                    <option value="solar" selected data-i18n="ui.sistema_solar">🪐 Sistema solar</option>
                 </select>
             </div>
 
             <!-- Deshacer: regresa el esquema (nodos y flechas) a como estaba antes
                  de la última acción del usuario. Se deshabilita solo cuando no hay
                  nada que deshacer. Ver captureUndoSnapshotIfNeeded/performUndo en app.js. -->
-            <button id="btnUndo" title="Deshacer la última acción (Ctrl/Cmd+Z)" disabled class="text-[#8a92b2] hover:text-[#4fd1c5] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-[#8a92b2] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>↩️</span> <span class="hidden md:inline">Deshacer</span>
+            <button id="btnUndo" title="Deshacer la última acción (Ctrl/Cmd+Z)" disabled class="text-[#8a92b2] hover:text-[#4fd1c5] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-[#8a92b2] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.deshacer_la_ultima_accion_ctrl">
+                <span>↩️</span> <span class="hidden md:inline" data-i18n="ui.deshacer">Deshacer</span>
             </button>
 
             <!-- Controles de exploración del esquema: buscar, repetir la aparición,
                  modo foco (resalta lo más conectado) y modo presentación (oculta toda
                  la interfaz de edición para mostrar solo el lienzo). -->
-            <button id="btnSearchNodes" title="Buscar un nodo (Ctrl/Cmd+K)" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>🔍</span> <span class="hidden md:inline">Buscar</span>
+            <button id="btnSearchNodes" title="Buscar un nodo (Ctrl/Cmd+K)" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.buscar_un_nodo_ctrl_cmd">
+                <span>🔍</span> <span class="hidden md:inline" data-i18n="ui.buscar">Buscar</span>
             </button>
-            <button id="btnFocusMode" title="Modo foco: resalta los conceptos más conectados del esquema" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>🎯</span> <span class="hidden md:inline">Modo foco</span>
+            <button id="btnFocusMode" title="Modo foco: resalta los conceptos más conectados del esquema" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.modo_foco_resalta_los_conceptos">
+                <span>🎯</span> <span class="hidden md:inline" data-i18n="ui.modo_foco">Modo foco</span>
             </button>
             <!-- Recorrido, Replay y Quiz se quitaron de la cabecera (2026-10-04). El Recorrido
                  sigue existiendo por dentro porque el modo móvil lo usa. -->
-            <button id="btnPresentationMode" title="Modo presentación: oculta toda la interfaz y deja solo el lienzo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>🖥️</span> <span class="hidden md:inline">Presentación</span>
+            <button id="btnPresentationMode" title="Modo presentación: oculta toda la interfaz y deja solo el lienzo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.modo_presentacion_oculta_toda_la">
+                <span>🖥️</span> <span class="hidden md:inline" data-i18n="ui.presentacion">Presentación</span>
             </button>
             <!-- Informe: descarga un .rtf con un subtítulo por nodo (más grande el central), su
                  definición, explicación sencilla y ejemplo práctico. Ver exportReportRtf en app.js. -->
-            <button id="btnExportReport" title="Descargar un informe (.rtf) del esquema actual" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>📄</span> <span class="hidden md:inline">Informe</span>
+            <button id="btnExportReport" title="Descargar un informe (.rtf) del esquema actual" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.descargar_un_informe_rtf_del">
+                <span>📄</span> <span class="hidden md:inline" data-i18n="ui.informe">Informe</span>
             </button>
-            <button id="btnSoundToggle" title="Sonido al crear nodos: encendido" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+            <button id="btnSoundToggle" title="Sonido al crear nodos: encendido" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.sonido_al_crear_nodos_encendido">
                 <span id="soundToggleIcon">🔊</span>
             </button>
-            <button id="btnClear" class="text-[#8a92b2] hover:text-rose-300 text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+            <button id="btnClear" class="text-[#8a92b2] hover:text-rose-300 text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n="ui.limpiar">
                 <span>🧹</span> Limpiar
             </button>
         </div>
@@ -504,7 +505,7 @@
 
     <!-- Botón flotante para salir del Modo presentación (lo único visible, además
          del lienzo, mientras ese modo está activo). -->
-    <button id="btnExitPresentation" class="hidden fixed top-4 right-4 z-[250] bg-slate-950/90 border border-slate-700 text-slate-200 hover:text-white hover:border-[#4fd1c5] text-xs font-semibold py-2 px-3.5 rounded-full shadow-xl transition-colors">
+    <button id="btnExitPresentation" class="hidden fixed top-4 right-4 z-[250] bg-slate-950/90 border border-slate-700 text-slate-200 hover:text-white hover:border-[#4fd1c5] text-xs font-semibold py-2 px-3.5 rounded-full shadow-xl transition-colors" data-i18n="ui.salir_de_presentacion">
         ✕ Salir de presentación
     </button>
 
@@ -525,7 +526,7 @@
              de vis-network detrás, que ya fue encuadrado con fit() + el nodo
              siguiente resaltado) — solo agrega el letrero de abajo. -->
         <div id="tourMapCaption" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 bg-slate-950/90 border border-[#4fd1c5]/50 rounded-2xl px-6 py-3 shadow-2xl">
-            <p class="text-[11px] text-[#8a92b2] uppercase tracking-wider mb-0.5">Siguiente lugar del recorrido</p>
+            <p class="text-[11px] text-[#8a92b2] uppercase tracking-wider mb-0.5" data-i18n="ui.siguiente_lugar_del_recorrido">Siguiente lugar del recorrido</p>
             <p id="tourMapCaptionTitle" class="text-lg font-bold text-[#eef1fb] font-heading"></p>
         </div>
 
@@ -541,12 +542,12 @@
 
         <!-- Barra de control, siempre encima de cualquier fase. -->
         <div id="tourControls" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[410] flex items-center gap-1 bg-slate-950/90 border border-slate-700 rounded-full shadow-2xl px-2 py-1.5">
-            <button id="tourBtnPrev" title="Nodo anterior" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">‹</button>
-            <button id="tourBtnPlayPause" title="Pausar / reanudar" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">⏸</button>
-            <button id="tourBtnNext" title="Siguiente nodo" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">›</button>
+            <button id="tourBtnPrev" title="Nodo anterior" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" data-i18n-title="ui.nodo_anterior">‹</button>
+            <button id="tourBtnPlayPause" title="Pausar / reanudar" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" data-i18n-title="ui.pausar_reanudar">⏸</button>
+            <button id="tourBtnNext" title="Siguiente nodo" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-300 hover:text-white hover:bg-slate-800 transition-colors" data-i18n-title="ui.siguiente_nodo">›</button>
             <span id="tourProgress" class="text-xs text-slate-400 font-semibold px-2 tabular-nums">1 / 1</span>
             <span class="w-px h-5 bg-slate-700 mx-1"></span>
-            <button id="tourBtnExit" title="Salir del recorrido (Esc)" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors">✕</button>
+            <button id="tourBtnExit" title="Salir del recorrido (Esc)" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors" data-i18n-title="ui.salir_del_recorrido_esc">✕</button>
         </div>
     </div>
 
@@ -567,7 +568,7 @@
         <div id="quizControls" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-[410] flex items-center gap-1 bg-slate-950/90 border border-slate-700 rounded-full shadow-2xl px-2 py-1.5">
             <span id="quizProgress" class="text-xs text-slate-400 font-semibold px-3 tabular-nums">1 / 1</span>
             <span class="w-px h-5 bg-slate-700 mx-1"></span>
-            <button id="quizBtnExit" title="Salir del quiz (Esc)" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors">✕</button>
+            <button id="quizBtnExit" title="Salir del quiz (Esc)" class="w-9 h-9 flex items-center justify-center rounded-full text-slate-400 hover:text-rose-300 hover:bg-slate-800 transition-colors" data-i18n-title="ui.salir_del_quiz_esc">✕</button>
         </div>
     </div>
 
@@ -575,7 +576,7 @@
          texto y Enter/clic para enfocarlo en el lienzo. -->
     <div id="searchPalette" class="hidden fixed inset-0 z-[260] bg-slate-950/70 backdrop-blur-sm items-start justify-center pt-24 px-4">
         <div class="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <input id="searchPaletteInput" type="text" placeholder="Buscar un nodo por su texto..." class="w-full bg-transparent px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none border-b border-slate-800 font-sans">
+            <input id="searchPaletteInput" type="text" placeholder="Buscar un nodo por su texto..." class="w-full bg-transparent px-4 py-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none border-b border-slate-800 font-sans" data-i18n-placeholder="ui.buscar_un_nodo_por_su">
             <div id="searchPaletteResults" class="max-h-72 overflow-y-auto"></div>
         </div>
     </div>
@@ -611,18 +612,18 @@
         <div id="readerPanel" data-role="panel" class="reader-panel-instance absolute w-[480px] max-w-[92vw] h-[560px] max-h-[82vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px; z-index: 501;">
             <div id="readerPanelHeader" data-role="header" class="px-3 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 select-none cursor-move">
                 <div class="flex items-center justify-between gap-2">
-                    <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider">📖 Modo Lector</h3>
+                    <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider" data-i18n="ui.modo_lector">📖 Modo Lector</h3>
                     <div class="flex items-center gap-1.5">
                         <!-- A propósito NO es un ícono gris más entre los demás botones: subir un
                              PDF es una función importante y poco común, así que lleva color sólido
                              + su propio texto para que se note de entrada en vez de que el usuario
                              tenga que descubrirla. -->
-                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se extrae su texto, con el formato más parecido posible, al editor de abajo; podés elegir qué páginas)" class="bg-rose-600 hover:bg-rose-500 border border-rose-400/60 text-white px-2.5 py-1 rounded-md text-[11px] font-bold transition-all shadow-sm shadow-rose-900/50 flex items-center gap-1 whitespace-nowrap">
-                            <span>📄</span><span>Subir PDF</span>
+                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se extrae su texto, con el formato más parecido posible, al editor de abajo; podés elegir qué páginas)" class="bg-rose-600 hover:bg-rose-500 border border-rose-400/60 text-white px-2.5 py-1 rounded-md text-[11px] font-bold transition-all shadow-sm shadow-rose-900/50 flex items-center gap-1 whitespace-nowrap" data-i18n-title="ui.importar_un_pdf_se_extrae">
+                            <span>📄</span><span data-i18n="ui.subir_pdf">Subir PDF</span>
                         </button>
-                        <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">➕</button>
-                        <button id="btnClearReader" data-role="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all">🧹</button>
-                        <button id="btnCloseReader" data-role="btnClose" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all">✕</button>
+                        <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.abrir_otro_lector_otro_esquema">➕</button>
+                        <button id="btnClearReader" data-role="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.limpiar_texto_y_contexto">🧹</button>
+                        <button id="btnCloseReader" data-role="btnClose" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.cerrar">✕</button>
                     </div>
                 </div>
                 <!-- Input de archivo oculto para "Importar PDF" — ver btnImportPdf en app.js. -->
@@ -632,15 +633,15 @@
                      texto antes de procesar el documento entero. Ver app.js
                      (extractPdfRangeIntoReader). -->
                 <div id="pdfRangeBar" data-role="pdfRangeBar" class="hidden items-center gap-1.5 bg-[#0f1428] border border-[#2c3458] rounded-lg px-2 py-1.5 text-[11px] text-slate-300 flex-wrap">
-                    <span class="truncate" id="pdfRangeFileName">documento.pdf</span>
+                    <span class="truncate" id="pdfRangeFileName" data-i18n="ui.documento_pdf">documento.pdf</span>
                     <span class="text-slate-500">·</span>
-                    <span>Páginas</span>
+                    <span data-i18n="ui.paginas">Páginas</span>
                     <input type="number" id="pdfRangeFrom" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-rose-400">
                     <span>a</span>
                     <input type="number" id="pdfRangeTo" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-rose-400">
-                    <span class="text-slate-500">de <span id="pdfRangeTotal">1</span></span>
+                    <span class="text-slate-500"><span data-i18n="ui.de">de</span> <span id="pdfRangeTotal">1</span></span>
                     <div class="flex-1"></div>
-                    <button id="btnPdfRangeLoad" class="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-md font-bold transition-colors">Cargar</button>
+                    <button id="btnPdfRangeLoad" class="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-md font-bold transition-colors" data-i18n="ui.cargar">Cargar</button>
                     <button id="btnPdfRangeCancel" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md transition-colors">✕</button>
                 </div>
                 <!-- "Generar Esquema" estructura lo que el texto DICE (sus temas, fases,
@@ -651,21 +652,21 @@
                      incluidos los clonados con ➕ — ver runTextAnalysis en app.js). -->
                 <div class="flex items-center gap-2">
                     <button id="btnParseReaderText" data-role="btnGenerate" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-                        <span>🌐 Generar Esquema</span>
+                        <span data-i18n="ui.generar_esquema">🌐 Generar Esquema</span>
                     </button>
-                    <button id="btnAnalyzeReaderText" data-role="btnAnalyzeText" title="Analiza el texto (su argumentación, estructura, etc.) en vez de solo estructurar lo que dice" class="flex-1 bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-                        <span>🔎 Analizar Texto</span>
+                    <button id="btnAnalyzeReaderText" data-role="btnAnalyzeText" title="Analiza el texto (su argumentación, estructura, etc.) en vez de solo estructurar lo que dice" class="flex-1 bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5" data-i18n-title="ui.analiza_el_texto_su_argumentacion">
+                        <span data-i18n="ui.analizar_texto">🔎 Analizar Texto</span>
                     </button>
                 </div>
                 <!-- El contexto (para desambiguar definiciones después) ya no es un campo
                      que el usuario tenga que llenar: se detecta solo del texto o del título
                      de la página leída. Solo aparece, muy discreto, cuando hay algo que mostrar. -->
                 <div id="docContextChip" data-role="docContextChip" class="hidden items-center gap-1.5 text-[10px] text-slate-500">
-                    <span class="truncate">📎 Contexto: <span id="docContextChipText" data-role="docContextChipText" class="text-slate-400"></span></span>
-                    <button id="btnEditContext" data-role="btnEditContext" class="underline hover:text-indigo-300 shrink-0">editar</button>
+                    <span class="truncate"><span data-i18n="ui.contexto">📎 Contexto:</span> <span id="docContextChipText" data-role="docContextChipText" class="text-slate-400"></span></span>
+                    <button id="btnEditContext" data-role="btnEditContext" class="underline hover:text-indigo-300 shrink-0" data-i18n="ui.editar">editar</button>
                 </div>
                 <div id="docContextEditRow" data-role="docContextEditRow" class="hidden items-center gap-2">
-                    <input type="text" id="docContextInput" data-role="docContextInput" placeholder="Detectado automático, o escríbelo tú..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans">
+                    <input type="text" id="docContextInput" data-role="docContextInput" placeholder="Detectado automático, o escríbelo tú..." class="w-full bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-sans" data-i18n-placeholder="ui.detectado_automatico_o_escribelo_tu">
                 </div>
                 <!-- Barra de formato de texto (negrita, cursiva, subrayado, encabezados,
                      listas, tamaño, quitar formato) sobre el editor del Modo Lector —
@@ -677,33 +678,33 @@
                      el panel ni perder la selección del editor (ver el truco de
                      mousedown/preventDefault en wireRtfToolbar). -->
                 <div data-role="rtfToolbar" class="flex items-center gap-1 flex-wrap bg-[#0f1428] border border-[#2c3458] rounded-lg px-2 py-1.5 cursor-default">
-                    <button type="button" data-cmd="bold" title="Negrita" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors">N</button>
-                    <button type="button" data-cmd="italic" title="Cursiva" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs italic transition-colors">I</button>
-                    <button type="button" data-cmd="underline" title="Subrayado" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs underline transition-colors">S</button>
+                    <button type="button" data-cmd="bold" title="Negrita" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors" data-i18n-title="ui.negrita">N</button>
+                    <button type="button" data-cmd="italic" title="Cursiva" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs italic transition-colors" data-i18n-title="ui.cursiva">I</button>
+                    <button type="button" data-cmd="underline" title="Subrayado" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs underline transition-colors" data-i18n-title="ui.subrayado">S</button>
                     <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
-                    <button type="button" data-cmd="formatBlock" data-value="H2" title="Título grande" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] font-bold transition-colors">H2</button>
-                    <button type="button" data-cmd="formatBlock" data-value="H3" title="Título mediano" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] font-bold transition-colors">H3</button>
-                    <button type="button" data-cmd="formatBlock" data-value="P" title="Párrafo normal" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors">¶</button>
+                    <button type="button" data-cmd="formatBlock" data-value="H2" title="Título grande" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] font-bold transition-colors" data-i18n-title="ui.titulo_grande">H2</button>
+                    <button type="button" data-cmd="formatBlock" data-value="H3" title="Título mediano" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] font-bold transition-colors" data-i18n-title="ui.titulo_mediano">H3</button>
+                    <button type="button" data-cmd="formatBlock" data-value="P" title="Párrafo normal" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors" data-i18n-title="ui.parrafo_normal">¶</button>
                     <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
-                    <button type="button" data-cmd="insertUnorderedList" title="Lista con viñetas" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors">•≡</button>
-                    <button type="button" data-cmd="insertOrderedList" title="Lista numerada" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] transition-colors">1.≡</button>
+                    <button type="button" data-cmd="insertUnorderedList" title="Lista con viñetas" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors" data-i18n-title="ui.lista_con_vinetas">•≡</button>
+                    <button type="button" data-cmd="insertOrderedList" title="Lista numerada" class="text-slate-300 hover:text-white hover:bg-slate-700 w-7 h-6 rounded text-[10px] transition-colors" data-i18n-title="ui.lista_numerada">1.≡</button>
                     <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
-                    <select data-cmd="fontSize" title="Tamaño de letra" class="bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-200 py-0.5 focus:outline-none focus:border-indigo-500">
-                        <option value="2">Pequeño</option>
-                        <option value="3" selected>Normal</option>
-                        <option value="5">Grande</option>
-                        <option value="6">Muy grande</option>
+                    <select data-cmd="fontSize" title="Tamaño de letra" class="bg-slate-800 border border-slate-600 rounded text-[10px] text-slate-200 py-0.5 focus:outline-none focus:border-indigo-500" data-i18n-title="ui.tamano_de_letra">
+                        <option value="2" data-i18n="ui.pequeno">Pequeño</option>
+                        <option value="3" selected data-i18n="ui.normal">Normal</option>
+                        <option value="5" data-i18n="ui.grande">Grande</option>
+                        <option value="6" data-i18n="ui.muy_grande">Muy grande</option>
                     </select>
                     <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
-                    <button type="button" data-cmd="removeFormat" title="Quitar formato" class="text-slate-400 hover:text-red-300 hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors">⌫</button>
+                    <button type="button" data-cmd="removeFormat" title="Quitar formato" class="text-slate-400 hover:text-red-300 hover:bg-slate-700 w-6 h-6 rounded text-xs transition-colors" data-i18n-title="ui.quitar_formato">⌫</button>
                     <span class="w-px h-4 bg-slate-700 mx-0.5"></span>
                     <!-- Zoom de TODO el texto del lector (a diferencia del selector "Tamaño de
                          letra" de arriba, que solo afecta la selección activa vía
                          execCommand): cambia el font-size base de #readerTextMode completo.
                          Ver wireRtfToolbar en app.js. -->
-                    <button type="button" data-role="btnZoomOut" title="Reducir el tamaño de todo el texto del lector" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors">A-</button>
+                    <button type="button" data-role="btnZoomOut" title="Reducir el tamaño de todo el texto del lector" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors" data-i18n-title="ui.reducir_el_tamano_de_todo">A-</button>
                     <span data-role="zoomLabel" class="text-[10px] text-slate-400 w-9 text-center select-none">100%</span>
-                    <button type="button" data-role="btnZoomIn" title="Aumentar el tamaño de todo el texto del lector" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors">A+</button>
+                    <button type="button" data-role="btnZoomIn" title="Aumentar el tamaño de todo el texto del lector" class="text-slate-300 hover:text-white hover:bg-slate-700 w-6 h-6 rounded text-xs font-bold transition-colors" data-i18n-title="ui.aumentar_el_tamano_de_todo">A+</button>
                 </div>
             </div>
 
@@ -716,7 +717,7 @@
                      vistazo, que es una opción válida y fuerte. Se oculta sola en cuanto
                      el usuario escribe o pega algo (ver listener 'input' en app.js). -->
                 <div id="readerEmptyHint" data-role="emptyHint" class="absolute inset-6 top-6 pointer-events-none select-none">
-                    <p class="text-slate-400 text-base leading-relaxed">
+                    <p class="text-slate-400 text-base leading-relaxed" data-i18n="ui.pega_aqui_un_texto_o">
                         Pega aquí un texto o <span class="text-indigo-600 font-semibold">un enlace</span>
                     </p>
                 </div>
@@ -726,14 +727,14 @@
 
     <div id="nodeSelectionTooltip" class="hidden fixed bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-40 text-xs select-none">
         <span id="nodeTooltipPreview" class="text-slate-300 italic max-w-[150px] truncate">"..."</span>
-        <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors">⚡ Crear elemento en esquema</button>
+        <button id="nodeBtnExtractChild" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors" data-i18n="ui.crear_elemento_en_esquema">⚡ Crear elemento en esquema</button>
     </div>
 
     <!-- Menú Flotante ÚNICO al Subrayar en el Lector -->
     <div id="selectionTooltip" class="hidden absolute bg-slate-950 text-white px-3 py-2 rounded-lg shadow-xl border border-slate-700 flex items-center gap-2 z-[120] text-xs select-none">
         <span id="tooltipSelectedTextPreview" class="text-slate-300 italic max-w-[150px] truncate">"..."</span>
-        <button id="tipBtnCreateNode" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors whitespace-nowrap">⚡ Crear elemento en esquema</button>
-        <button id="tipBtnLinkToNode" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded font-semibold transition-colors whitespace-nowrap">🔗 Vincular a nodo...</button>
+        <button id="tipBtnCreateNode" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded font-semibold transition-colors whitespace-nowrap" data-i18n="ui.crear_elemento_en_esquema">⚡ Crear elemento en esquema</button>
+        <button id="tipBtnLinkToNode" class="bg-slate-700 hover:bg-slate-600 text-white px-2.5 py-1 rounded font-semibold transition-colors whitespace-nowrap" data-i18n="ui.vincular_a_nodo">🔗 Vincular a nodo...</button>
     </div>
 
     <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
@@ -749,10 +750,10 @@
          escritorio: es un camino aparte que reutiliza el mismo backend. -->
     <div id="mobileShell" class="fixed inset-0 z-[60] flex-col items-center px-6 pt-10 pb-8 overflow-y-auto" style="background:var(--void);">
         <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-[#4fd1c5] to-[#8b7cf6] text-[#0a0e1a] flex items-center justify-center font-bold font-heading text-base shadow-[0_0_18px_rgba(79,209,197,0.35)] mb-4 shrink-0">Γ</div>
-        <h1 class="text-2xl font-heading font-extrabold text-[#eef1fb] text-center mb-1.5">Graphikosmos</h1>
-        <p class="text-[#9aa3c7] text-sm text-center max-w-[32ch] mb-7 leading-relaxed">Pegá un texto, un enlace, o subí un PDF — armamos tu esquema y te lo mostramos paso a paso, una idea a la vez.</p>
+        <h1 class="text-2xl font-heading font-extrabold text-[#eef1fb] text-center mb-1.5" data-i18n="ui.graphikosmos">Graphikosmos</h1>
+        <p class="text-[#9aa3c7] text-sm text-center max-w-[32ch] mb-7 leading-relaxed" data-i18n="ui.pega_un_texto_un_enlace">Pegá un texto, un enlace, o subí un PDF — armamos tu esquema y te lo mostramos paso a paso, una idea a la vez.</p>
 
-        <textarea id="mobilePasteInput" rows="5" placeholder="Pegá aquí un texto, un tema, o el enlace de una página web..." class="w-full max-w-md bg-[#161c35] border border-[#2c3458] rounded-xl px-4 py-3.5 text-[15px] text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans resize-none mb-3"></textarea>
+        <textarea id="mobilePasteInput" rows="5" placeholder="Pegá aquí un texto, un tema, o el enlace de una página web..." data-i18n-placeholder="ui.ph_mobile_paste" class="w-full max-w-md bg-[#161c35] border border-[#2c3458] rounded-xl px-4 py-3.5 text-[15px] text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans resize-none mb-3"></textarea>
 
         <div class="w-full max-w-md flex items-center gap-3 text-[#4b5578] text-xs mb-3">
             <div class="flex-1 h-px bg-[#2c3458]"></div>
@@ -762,18 +763,18 @@
 
         <input type="file" id="mobilePdfInput" accept="application/pdf" class="hidden">
         <button id="btnMobilePdf" type="button" class="w-full max-w-md bg-[#161c35] hover:bg-[#1d2442] border border-[#2c3458] text-[#eef1fb] px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 mb-1.5">
-            📄 <span id="mobilePdfLabel">Subir un PDF</span>
+            📄 <span id="mobilePdfLabel" data-i18n="ui.subir_un_pdf">Subir un PDF</span>
         </button>
         <!-- Simplificación deliberada frente al selector de rango de páginas
              de escritorio (pdfRangeBar): en el teléfono se toman directo las
              primeras páginas (hasta MAX_PDF_DEFAULT_PAGES, el mismo tope que
              ya usa escritorio por default) sin pedir que elijan el rango —
              un control de dos campos numéricos no vale la pena acá. -->
-        <p class="text-[#4b5578] text-[11px] text-center mb-6">Se usan las primeras páginas del PDF.</p>
+        <p class="text-[#4b5578] text-[11px] text-center mb-6" data-i18n="ui.se_usan_las_primeras_paginas">Se usan las primeras páginas del PDF.</p>
 
-        <button id="btnMobileGenerate" class="w-full max-w-md bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">Crear mi esquema</button>
+        <button id="btnMobileGenerate" class="w-full max-w-md bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95" data-i18n="ui.crear_mi_esquema">Crear mi esquema</button>
 
-        <p class="text-[#4b5578] text-[11px] text-center mt-6 max-w-[30ch] leading-relaxed">Graphikosmos está pensado para usarse en computadora — esta es una vista simplificada para explorar desde el teléfono.</p>
+        <p class="text-[#4b5578] text-[11px] text-center mt-6 max-w-[30ch] leading-relaxed" data-i18n="ui.graphikosmos_esta_pensado_para_usarse">Graphikosmos está pensado para usarse en computadora — esta es una vista simplificada para explorar desde el teléfono.</p>
     </div>
 
     <!-- Pantalla de Bienvenida: asistente de 5 preguntas (SOLO primera vez, ver
@@ -797,77 +798,77 @@
 
             <!-- PASO 1: el campo de estudio (teclado) -->
             <div id="onbStep1" class="onb-step">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">Hablemos del campo de estudio que buscás explorar</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Un tema de la universidad, algo del trabajo, o pura curiosidad — con eso armamos tu primer esquema.</p>
-                <input id="onbTopicInput" type="text" placeholder="Ej: La Revolución Francesa, Computación Cuántica..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400/50 focus:outline-none focus:border-slate-400 mb-3">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight" data-i18n="ui.hablemos_del_campo_de_estudio">Hablemos del campo de estudio que buscás explorar</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto" data-i18n="ui.un_tema_de_la_universidad">Un tema de la universidad, algo del trabajo, o pura curiosidad — con eso armamos tu primer esquema.</p>
+                <input id="onbTopicInput" type="text" placeholder="Ej: La Revolución Francesa, Computación Cuántica..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400/50 focus:outline-none focus:border-slate-400 mb-3" data-i18n-placeholder="ui.ej_la_revolucion_francesa_computacion">
                 <div class="flex flex-wrap gap-2 justify-center mb-5" id="onbSuggestionChips"></div>
-                <button id="onbNext1" class="w-full bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Siguiente →</button>
+                <button id="onbNext1" class="w-full bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled data-i18n="ui.siguiente">Siguiente →</button>
                 <div class="mt-3 flex flex-col items-center gap-1">
-                    <button id="onbGoSource" class="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2 transition-colors">Ya tengo un texto, un enlace o un PDF</button>
-                    <button id="onbSkipToRandom" class="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors">Probar con un tema al azar, sin preguntas</button>
+                    <button id="onbGoSource" class="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2 transition-colors" data-i18n="ui.ya_tengo_un_texto_un">Ya tengo un texto, un enlace o un PDF</button>
+                    <button id="onbSkipToRandom" class="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors" data-i18n="ui.probar_con_un_tema_al">Probar con un tema al azar, sin preguntas</button>
                 </div>
             </div>
 
             <!-- PASO 2: para qué lo estudia (una opción) -->
             <div id="onbStep2" class="onb-step hidden">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Para qué lo estudiás?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Cambia el enfoque con el que armamos tu texto y tu esquema.</p>
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight" data-i18n="ui.para_que_lo_estudias">¿Para qué lo estudiás?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto" data-i18n="ui.cambia_el_enfoque_con_el">Cambia el enfoque con el que armamos tu texto y tu esquema.</p>
                 <div class="flex flex-col gap-2 mb-5" id="onbPurposeOptions">
-                    <button type="button" data-value="exam" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Preparar un examen o un curso</span></button>
-                    <button type="button" data-value="research" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Una tesis o una investigación</span></button>
-                    <button type="button" data-value="teach" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Enseñarlo a otras personas</span></button>
-                    <button type="button" data-value="work" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Mi trabajo o mi profesión</span></button>
-                    <button type="button" data-value="curiosity" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Curiosidad personal</span></button>
+                    <button type="button" data-value="exam" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.preparar_un_examen_o_un">Preparar un examen o un curso</span></button>
+                    <button type="button" data-value="research" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.una_tesis_o_una_investigacion">Una tesis o una investigación</span></button>
+                    <button type="button" data-value="teach" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.ensenarlo_a_otras_personas">Enseñarlo a otras personas</span></button>
+                    <button type="button" data-value="work" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.mi_trabajo_o_mi_profesion">Mi trabajo o mi profesión</span></button>
+                    <button type="button" data-value="curiosity" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.curiosidad_personal">Curiosidad personal</span></button>
                 </div>
                 <div class="flex gap-2">
-                    <button id="onbBack2" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
-                    <button id="onbNext2" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Siguiente →</button>
+                    <button id="onbBack2" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors" data-i18n="ui.atras">← Atrás</button>
+                    <button id="onbNext2" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled data-i18n="ui.siguiente">Siguiente →</button>
                 </div>
             </div>
 
             <!-- PASO 3: áreas relacionadas (lista grande con buscador, hasta 3) -->
             <div id="onbStep3" class="onb-step hidden">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué otras áreas te interesan?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-4 max-w-sm mx-auto">Elegí hasta 3. Buscamos cómo conversan con tu campo. <span id="onbAreaCount" class="font-bold text-slate-700">0/3</span></p>
-                <input id="onbAreaSearch" type="text" placeholder="Buscar un área..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 mb-3">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight" data-i18n="ui.que_otras_areas_te_interesan">¿Qué otras áreas te interesan?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-4 max-w-sm mx-auto"><span data-i18n="ui.elegi_hasta_3_buscamos_como">Elegí hasta 3. Buscamos cómo conversan con tu campo.</span> <span id="onbAreaCount" class="font-bold text-slate-700">0/3</span></p>
+                <input id="onbAreaSearch" type="text" placeholder="Buscar un área..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 mb-3" data-i18n-placeholder="ui.buscar_un_area">
                 <div id="onbAreaChips" class="flex flex-wrap gap-2 justify-center max-h-48 overflow-y-auto mb-5 p-1"></div>
                 <div class="flex gap-2">
-                    <button id="onbBack3" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
-                    <button id="onbNext3" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Siguiente →</button>
+                    <button id="onbBack3" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors" data-i18n="ui.atras">← Atrás</button>
+                    <button id="onbNext3" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95" data-i18n="ui.siguiente">Siguiente →</button>
                 </div>
             </div>
 
             <!-- PASO 4: nivel (una opción) -->
             <div id="onbStep4" class="onb-step hidden">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué tanto conocés del tema?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Así ajustamos qué tan técnico es el texto.</p>
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight" data-i18n="ui.que_tanto_conoces_del_tema">¿Qué tanto conocés del tema?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto" data-i18n="ui.asi_ajustamos_que_tan_tecnico">Así ajustamos qué tan técnico es el texto.</p>
                 <div class="flex flex-col gap-2 mb-5" id="onbLevelOptions">
-                    <button type="button" data-value="beginner" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Estoy empezando</span></button>
-                    <button type="button" data-value="intermediate" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Conozco lo básico</span></button>
-                    <button type="button" data-value="advanced" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Tengo bastante base</span></button>
+                    <button type="button" data-value="beginner" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.estoy_empezando">Estoy empezando</span></button>
+                    <button type="button" data-value="intermediate" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.conozco_lo_basico">Conozco lo básico</span></button>
+                    <button type="button" data-value="advanced" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800" data-i18n="ui.tengo_bastante_base">Tengo bastante base</span></button>
                 </div>
                 <div class="flex gap-2">
-                    <button id="onbBack4" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
-                    <button id="onbNext4" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Siguiente →</button>
+                    <button id="onbBack4" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors" data-i18n="ui.atras">← Atrás</button>
+                    <button id="onbNext4" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled data-i18n="ui.siguiente">Siguiente →</button>
                 </div>
             </div>
 
             <!-- PASO 5: una duda (teclado, opcional) -->
             <div id="onbStep5" class="onb-step hidden">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué duda o pregunta te intriga?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Opcional. Si la escribís, la respondemos dentro de tu texto.</p>
-                <textarea id="onbQuestionInput" rows="3" placeholder="Ej: ¿Por qué se dio así? ¿En qué se diferencia de...?" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400/50 focus:outline-none focus:border-slate-400 mb-5 resize-none"></textarea>
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight" data-i18n="ui.que_duda_o_pregunta_te">¿Qué duda o pregunta te intriga?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto" data-i18n="ui.opcional_si_la_escribis_la">Opcional. Si la escribís, la respondemos dentro de tu texto.</p>
+                <textarea id="onbQuestionInput" rows="3" placeholder="Ej: ¿Por qué se dio así? ¿En qué se diferencia de...?" data-i18n-placeholder="ui.ph_onb_question" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400/50 focus:outline-none focus:border-slate-400 mb-5 resize-none"></textarea>
                 <div class="flex gap-2">
-                    <button id="onbBack5" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
-                    <button id="btnOnbFinish" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Crear mi esquema →</button>
+                    <button id="onbBack5" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors" data-i18n="ui.atras">← Atrás</button>
+                    <button id="btnOnbFinish" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95" data-i18n="ui.crear_mi_esquema_2">Crear mi esquema →</button>
                 </div>
             </div>
 
             <!-- SALIDA: ya tengo mi propio texto / enlace / PDF (salta las preguntas) -->
             <div id="onbStepSource" class="onb-step hidden">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué querés estudiar?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Pegá un texto, un enlace o subí un PDF, y armamos el esquema a partir de eso.</p>
-                <textarea id="onbSourceInput" rows="4" placeholder="Pegá aquí un texto o el enlace de una página..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 mb-3 resize-none"></textarea>
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight" data-i18n="ui.que_queres_estudiar">¿Qué querés estudiar?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto" data-i18n="ui.pega_un_texto_un_enlace_2">Pegá un texto, un enlace o subí un PDF, y armamos el esquema a partir de eso.</p>
+                <textarea id="onbSourceInput" rows="4" placeholder="Pegá aquí un texto o el enlace de una página..." data-i18n-placeholder="ui.ph_onb_source" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 mb-3 resize-none"></textarea>
                 <div class="flex items-center gap-3 text-slate-400 text-xs mb-3">
                     <div class="flex-1 h-px bg-slate-200"></div>
                     <span>o</span>
@@ -875,19 +876,19 @@
                 </div>
                 <input type="file" id="onbPdfInput" accept="application/pdf" class="hidden">
                 <button id="btnOnbPdf" type="button" class="w-full bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 px-4 py-3 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 mb-5">
-                    📄 <span id="onbPdfLabel">Subir un PDF</span>
+                    📄 <span id="onbPdfLabel" data-i18n="ui.subir_un_pdf">Subir un PDF</span>
                 </button>
                 <div class="flex gap-2">
-                    <button id="onbBackSource" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
-                    <button id="btnOnbFinishSource" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Crear mi esquema →</button>
+                    <button id="onbBackSource" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors" data-i18n="ui.atras">← Atrás</button>
+                    <button id="btnOnbFinishSource" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95" data-i18n="ui.crear_mi_esquema_2">Crear mi esquema →</button>
                 </div>
             </div>
 
             <!-- GENERANDO: mientras se crea el texto y luego el esquema -->
             <div id="onbGenerating" class="onb-step hidden py-4">
                 <div class="w-10 h-10 mx-auto mb-5 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
-                <h2 class="text-lg md:text-xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">Generando tu primer esquema</h2>
-                <p class="text-xs md:text-sm text-slate-500 max-w-sm mx-auto">Lo hacemos a partir de un texto que te estoy generando ahora mismo. Más adelante podrás usar el texto que quieras: pegado, un enlace o un PDF.</p>
+                <h2 class="text-lg md:text-xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight" data-i18n="ui.generando_tu_primer_esquema">Generando tu primer esquema</h2>
+                <p class="text-xs md:text-sm text-slate-500 max-w-sm mx-auto" data-i18n="ui.lo_hacemos_a_partir_de">Lo hacemos a partir de un texto que te estoy generando ahora mismo. Más adelante podrás usar el texto que quieras: pegado, un enlace o un PDF.</p>
             </div>
         </div>
     </div>
@@ -895,9 +896,9 @@
     <!-- Aviso que aparece tras el asistente: explica que el esquema/texto son un
          EJEMPLO de uso y que el texto lo generó una IA (hay que verificarlo). -->
     <div id="onbExampleNote" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-[250] w-[min(92vw,560px)] bg-[#0f1428] border border-[#2c3458] rounded-xl shadow-2xl p-4 text-left">
-        <p class="text-sm font-bold text-[#eef1fb] mb-1">Esto es un ejemplo de cómo se usa Graphikosmos</p>
-        <p class="text-xs text-[#9aa3c7] leading-relaxed mb-3">Armamos este esquema a partir de tus respuestas. El texto lo generó una IA solo para el ejemplo, así que verificá los datos antes de citarlo. Cuando quieras, pegá tu propio texto, un enlace o un PDF en el Modo Lector.</p>
-        <button id="onbExampleNoteClose" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-4 py-1.5 rounded-lg text-xs font-bold transition-all">Entendido</button>
+        <p class="text-sm font-bold text-[#eef1fb] mb-1" data-i18n="ui.esto_es_un_ejemplo_de">Esto es un ejemplo de cómo se usa Graphikosmos</p>
+        <p class="text-xs text-[#9aa3c7] leading-relaxed mb-3" data-i18n="ui.armamos_este_esquema_a_partir">Armamos este esquema a partir de tus respuestas. El texto lo generó una IA solo para el ejemplo, así que verificá los datos antes de citarlo. Cuando quieras, pegá tu propio texto, un enlace o un PDF en el Modo Lector.</p>
+        <button id="onbExampleNoteClose" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-4 py-1.5 rounded-lg text-xs font-bold transition-all" data-i18n="ui.entendido">Entendido</button>
     </div>
 
     <!-- Menú de tipos de análisis para "🔎 Analizar Texto". Es un SOLO menú
@@ -910,30 +911,30 @@
          el texto a analizar. -->
     <div id="analyzeTypeMenu" class="hidden fixed bg-[#0f1428] border border-[#2c3458] rounded-lg shadow-2xl z-[300] p-1.5 flex-col gap-0.5 w-72">
         <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="critico">
-            <span class="block text-xs font-bold text-slate-100">Argumentativo / crítico</span>
-            <span class="block text-[10px] text-slate-500 mt-0.5">Tesis, argumentos, evidencia, supuestos, objeciones</span>
+            <span class="block text-xs font-bold text-slate-100" data-i18n="ui.argumentativo_critico">Argumentativo / crítico</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5" data-i18n="ui.tesis_argumentos_evidencia_supuestos_objeciones">Tesis, argumentos, evidencia, supuestos, objeciones</span>
         </button>
         <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="academico">
-            <span class="block text-xs font-bold text-slate-100">Académico / de investigación</span>
-            <span class="block text-[10px] text-slate-500 mt-0.5">Pregunta, metodología, hallazgos, limitaciones, conclusiones</span>
+            <span class="block text-xs font-bold text-slate-100" data-i18n="ui.academico_de_investigacion">Académico / de investigación</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5" data-i18n="ui.pregunta_metodologia_hallazgos_limitaciones_conclusiones">Pregunta, metodología, hallazgos, limitaciones, conclusiones</span>
         </button>
         <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="literario">
-            <span class="block text-xs font-bold text-slate-100">Literario</span>
-            <span class="block text-[10px] text-slate-500 mt-0.5">Tema, estructura narrativa, estilo, voz, símbolos</span>
+            <span class="block text-xs font-bold text-slate-100" data-i18n="ui.literario">Literario</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5" data-i18n="ui.tema_estructura_narrativa_estilo_voz">Tema, estructura narrativa, estilo, voz, símbolos</span>
         </button>
         <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="retorico">
-            <span class="block text-xs font-bold text-slate-100">Retórico / persuasivo</span>
-            <span class="block text-[10px] text-slate-500 mt-0.5">Propósito, audiencia, estrategias, tono</span>
+            <span class="block text-xs font-bold text-slate-100" data-i18n="ui.retorico_persuasivo">Retórico / persuasivo</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5" data-i18n="ui.proposito_audiencia_estrategias_tono">Propósito, audiencia, estrategias, tono</span>
         </button>
         <button type="button" class="analyze-option text-left px-2.5 py-2 rounded-md hover:bg-violet-500/20 transition-colors" data-analysis-type="comparativo">
-            <span class="block text-xs font-bold text-slate-100">Comparativo de posturas</span>
-            <span class="block text-[10px] text-slate-500 mt-0.5">Posiciones en tensión, fundamentos, acuerdos/desacuerdos</span>
+            <span class="block text-xs font-bold text-slate-100" data-i18n="ui.comparativo_de_posturas">Comparativo de posturas</span>
+            <span class="block text-[10px] text-slate-500 mt-0.5" data-i18n="ui.posiciones_en_tension_fundamentos_acuerdos">Posiciones en tensión, fundamentos, acuerdos/desacuerdos</span>
         </button>
         <div class="h-px bg-[#2c3458] my-1"></div>
         <div class="flex items-center gap-1.5 px-1 py-1">
             <input type="text" data-role="analyzeCustomInput" placeholder="Otro tipo de análisis..." maxlength="200"
-                   class="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500">
-            <button type="button" data-role="btnAnalyzeCustomGo" class="shrink-0 bg-violet-600 hover:bg-violet-500 text-white px-2.5 py-1.5 rounded text-xs font-bold transition-colors">Ir</button>
+                   class="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-violet-500" data-i18n-placeholder="ui.otro_tipo_de_analisis">
+            <button type="button" data-role="btnAnalyzeCustomGo" class="shrink-0 bg-violet-600 hover:bg-violet-500 text-white px-2.5 py-1.5 rounded text-xs font-bold transition-colors" data-i18n="ui.ir">Ir</button>
         </div>
     </div>
 
@@ -950,22 +951,22 @@
          text-sm) para que cada opción sea un blanco de clic cómodo. -->
     <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col w-[220px] shadow-xl">
         <div class="py-1">
-            <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors">
+            <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors" data-i18n="ui.ver_definicion">
                 Ver definición
             </button>
-            <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2.5 hover:bg-[#1c2a1a] text-lime-300 font-medium text-sm text-left transition-colors">
+            <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2.5 hover:bg-[#1c2a1a] text-lime-300 font-medium text-sm text-left transition-colors" data-i18n="ui.explicacion_sencilla">
                 Explicación sencilla
             </button>
             <!-- "Recorrido desde aquí" y "Autoevaluarme desde aquí" se quitaron del menú
                  contextual (2026-10-04); siguen disponibles en la cabecera (Recorrido / Quiz). -->
 
             <!-- Botón y Campo de Petición Personalizada -->
-            <button id="btnMenuCustom" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuCustom" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.prompt_personalizado">
                 Prompt personalizado
             </button>
             <div id="customPromptBox" class="hidden px-3.5 py-2.5 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-2">
                 <textarea id="customPromptInput" rows="2" placeholder="" class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg p-2 text-sm text-[#eef1fb] placeholder-[#5b6388] focus:outline-none focus:border-[#8b7cf6] resize-none font-sans"></textarea>
-                <button id="btnSendCustomPrompt" class="w-full bg-[#8b7cf6] hover:bg-[#9d90f9] text-[#0a0e1a] font-bold py-1.5 rounded-lg text-sm transition-all">
+                <button id="btnSendCustomPrompt" class="w-full bg-[#8b7cf6] hover:bg-[#9d90f9] text-[#0a0e1a] font-bold py-1.5 rounded-lg text-sm transition-all" data-i18n="ui.explorar">
                     Explorar
                 </button>
             </div>
@@ -974,15 +975,15 @@
                  la cabecera, y dispara exactamente la misma generación de esquema completo
                  (mismo generateFullSchemaFromTopic, mismo costo, mismo diálogo de "¿limpiar
                  el lienzo?" si ya hay algo ahí) — ver btnMenuFullSchema en app.js. -->
-            <button id="btnMenuFullSchema" class="w-full px-3.5 py-2.5 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuFullSchema" class="w-full px-3.5 py-2.5 hover:bg-[#0f2e2c] text-[#4fd1c5] font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.generar_esquema_completo_a_partir">
                 Generar esquema completo a partir de aquí
             </button>
 
-            <button id="btnMenuEditText" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuEditText" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.editar_2">
                 Editar
             </button>
 
-            <button id="btnMenuExpandSub" class="hidden w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuExpandSub" class="hidden w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.expandir_subesquema">
                 Expandir subesquema
             </button>
 
@@ -992,17 +993,17 @@
                  mismas de siempre, solo que agrupadas — ver wireMenuGroup en app.js. -->
             <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuLink">
                 <button type="button" id="btnMenuLinkGroup" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left flex items-center justify-between transition-colors">
-                    <span>Enlazar</span>
+                    <span data-i18n="ui.enlazar">Enlazar</span>
                     <span class="text-[#5b6388] text-sm">›</span>
                 </button>
                 <div id="submenuLink" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden w-[200px] shadow-xl z-50">
-                    <button id="btnMenuConnect" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors">
+                    <button id="btnMenuConnect" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors" data-i18n="ui.vincular_con">
                         Vincular con...
                     </button>
-                    <button id="btnMenuSynergy" class="w-full px-3.5 py-2.5 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuSynergy" class="w-full px-3.5 py-2.5 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.generar_sinergia_con">
                         Generar Sinergia con...
                     </button>
-                    <button id="btnMenuLocateText" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuLocateText" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.ver_en_el_texto">
                         Ver en el texto
                     </button>
                 </div>
@@ -1011,20 +1012,20 @@
             <!-- Grupo "Generar": acciones que crean nodos nuevos a partir de este. -->
             <div class="relative gk-menu-group border-t border-[#2c3458]" data-submenu="submenuGenerate">
                 <button type="button" id="btnMenuGenerateGroup" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left flex items-center justify-between transition-colors">
-                    <span>Generar</span>
+                    <span data-i18n="ui.generar">Generar</span>
                     <span class="text-[#5b6388] text-sm">›</span>
                 </button>
                 <div id="submenuGenerate" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden w-[200px] shadow-xl z-50">
-                    <button id="btnMenuExpand" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors">
+                    <button id="btnMenuExpand" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors" data-i18n="ui.conceptos_relacionados">
                         Conceptos Relacionados
                     </button>
-                    <button id="btnMenuAntithesis" class="w-full px-3.5 py-2.5 hover:bg-[#2a1620] text-rose-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuAntithesis" class="w-full px-3.5 py-2.5 hover:bg-[#2a1620] text-rose-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.cuestionar_antitesis">
                         Cuestionar / Antítesis
                     </button>
-                    <button id="btnMenuChallenge" class="w-full px-3.5 py-2.5 hover:bg-[#122a22] text-emerald-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuChallenge" class="w-full px-3.5 py-2.5 hover:bg-[#122a22] text-emerald-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.ponme_a_prueba">
                         Ponme a prueba
                     </button>
-                    <button id="btnMenuExamples" class="w-full px-3.5 py-2.5 hover:bg-[#2a2314] text-amber-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                    <button id="btnMenuExamples" class="w-full px-3.5 py-2.5 hover:bg-[#2a2314] text-amber-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.ejemplos_practicos">
                         Ejemplos Prácticos
                     </button>
                 </div>
@@ -1035,7 +1036,7 @@
                  sin ícono ni color de alerta, para que no compita con las
                  acciones principales. El borde punteado del nodo en el lienzo
                  sigue siendo la primera señal visual. -->
-            <button id="btnMenuShowGaps" class="hidden w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#8a92b2] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+            <button id="btnMenuShowGaps" class="hidden w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#8a92b2] font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.analisis_de_lagunas_conceptuales">
                 Análisis de lagunas conceptuales
             </button>
             <div id="gapsBox" class="hidden px-3.5 py-2.5 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-2.5"></div>
@@ -1043,7 +1044,7 @@
         </div>
 
        <div class="border-t border-[#2c3458] p-0.5">
-            <button id="btnMenuDelete" class="w-full px-2 py-1 hover:bg-[#2a1620] text-rose-400 font-medium text-[10px] rounded text-left transition-colors">
+            <button id="btnMenuDelete" class="w-full px-2 py-1 hover:bg-[#2a1620] text-rose-400 font-medium text-[10px] rounded text-left transition-colors" data-i18n="ui.eliminar">
                 Eliminar
             </button>
         </div>
@@ -1058,8 +1059,8 @@
             <!-- Cabecera Fija -->
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 rounded-t-3xl">
                 <div>
-                    <h2 class="text-xl font-bold font-heading text-slate-900">Amplía tu Cosmos</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Con gusto te ayudamos a seguir creando esquemas.</p>
+                    <h2 class="text-xl font-bold font-heading text-slate-900" data-i18n="ui.amplia_tu_cosmos">Amplía tu Cosmos</h2>
+                    <p class="text-xs text-slate-500 mt-0.5" data-i18n="ui.con_gusto_te_ayudamos_a">Con gusto te ayudamos a seguir creando esquemas.</p>
                 </div>
                 <button id="closeStore" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1076,8 +1077,8 @@
                     <div class="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 text-white flex items-center justify-center text-3xl shadow-lg shadow-emerald-500/30">✨</div>
 
                     <div class="space-y-2">
-                        <h3 class="text-xl font-bold font-heading text-slate-900">Contáctanos para seguir usando la aplicación</h3>
-                        <p class="text-sm text-slate-500 leading-relaxed max-w-[280px] mx-auto">
+                        <h3 class="text-xl font-bold font-heading text-slate-900" data-i18n="ui.contactanos_para_seguir_usando_la">Contáctanos para seguir usando la aplicación</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed max-w-[280px] mx-auto" data-i18n="ui.escribenos_un_momento_y_seguimos">
                             Escríbenos un momento y seguimos juntos construyendo tu cosmos de ideas.
                         </p>
                     </div>
@@ -1087,12 +1088,12 @@
                         <svg class="w-7 h-7 shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                             <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.198.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.372-.025-.521-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413"/>
                         </svg>
-                        <span>Escribir por WhatsApp</span>
+                        <span data-i18n="ui.escribir_por_whatsapp">Escribir por WhatsApp</span>
                     </a>
 
                     <div class="flex items-center gap-3 w-full">
                         <div class="flex-1 h-px bg-slate-200"></div>
-                        <span class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">o te escribimos nosotros</span>
+                        <span class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold" data-i18n="ui.o_te_escribimos_nosotros">o te escribimos nosotros</span>
                         <div class="flex-1 h-px bg-slate-200"></div>
                     </div>
 
@@ -1102,15 +1103,15 @@
                          solo hace falta dejar el correo donde contestarte. -->
                     <form id="rechargeRequestForm" class="w-full flex flex-col gap-2">
                         <input type="email" id="rechargeRequestEmail" required placeholder="Tu correo"
-                               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100">
+                               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100" data-i18n-placeholder="ui.tu_correo">
                         <button type="submit" id="btnRechargeRequestSend"
-                                class="w-full bg-slate-800 hover:bg-slate-900 active:scale-[0.98] text-white font-bold text-sm py-3 rounded-xl transition-all">
+                                class="w-full bg-slate-800 hover:bg-slate-900 active:scale-[0.98] text-white font-bold text-sm py-3 rounded-xl transition-all" data-i18n="ui.enviar">
                             Enviar
                         </button>
                         <p id="rechargeRequestStatus" class="text-xs text-slate-500 min-h-[1em]"></p>
                     </form>
                     <p class="text-[11px] text-slate-400 -mt-1">
-                        También podés escribirnos directo a
+                        <span data-i18n="ui.tambien_podes_escribirnos_directo_a">También podés escribirnos directo a</span>
                         <a href="mailto:bonillapretiz@gmail.com" id="manualPurchaseEmailLink" class="underline hover:text-emerald-600"><span id="manualPurchaseEmailAddress">bonillapretiz@gmail.com</span></a>.
                     </p>
 
@@ -1134,8 +1135,8 @@
 
         <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0 rounded-t-3xl">
             <div>
-                <h2 class="text-xl font-bold font-heading text-slate-900">¿Alguna idea o comentario?</h2>
-                <p class="text-xs text-slate-500 mt-0.5">Leemos todo — nos ayuda a mejorar Graphikosmos.</p>
+                <h2 class="text-xl font-bold font-heading text-slate-900" data-i18n="ui.alguna_idea_o_comentario">¿Alguna idea o comentario?</h2>
+                <p class="text-xs text-slate-500 mt-0.5" data-i18n="ui.leemos_todo_nos_ayuda_a">Leemos todo — nos ayuda a mejorar Graphikosmos.</p>
             </div>
             <button id="closeFeedback" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -1147,12 +1148,12 @@
                 <!-- Estado "formulario": visible mientras no se envió nada. -->
                 <form id="feedbackForm" class="flex flex-col gap-3">
                     <textarea id="feedbackMessage" required rows="5" maxlength="4000"
-                              placeholder="Contanos qué se te ocurrió, qué no te funcionó, o qué te gustaría que la app hiciera..."
+                              placeholder="Contanos qué se te ocurrió, qué no te funcionó, o qué te gustaría que la app hiciera..." data-i18n-placeholder="ui.ph_feedback"
                               class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 resize-none"></textarea>
                     <input type="email" id="feedbackEmail" placeholder="Tu correo (opcional, si querés que te respondamos)"
-                           class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                           class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" data-i18n-placeholder="ui.tu_correo_opcional_si_queres">
                     <button type="submit" id="btnFeedbackSend"
-                            class="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-sm py-3 rounded-xl transition-all shadow-md">
+                            class="w-full bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white font-bold text-sm py-3 rounded-xl transition-all shadow-md" data-i18n="ui.enviar">
                         Enviar
                     </button>
                     <p id="feedbackStatus" class="text-xs text-slate-500 min-h-[1em] text-center"></p>
@@ -1161,7 +1162,7 @@
                 <!-- Estado "enviado": se muestra en vez del formulario tras un envío exitoso. -->
                 <div id="feedbackSentView" class="hidden flex-col items-center text-center gap-3 py-4">
                     <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center text-2xl">✓</div>
-                    <p class="text-sm font-semibold text-slate-800">¡Gracias! Ya lo leímos.</p>
+                    <p class="text-sm font-semibold text-slate-800" data-i18n="ui.gracias_ya_lo_leimos">¡Gracias! Ya lo leímos.</p>
                 </div>
             </div>
         </div>
@@ -1173,15 +1174,15 @@
     <div id="authWallModal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md z-[160] hidden items-center justify-center p-4 transition-opacity">
         <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl flex flex-col border border-slate-200 text-center p-6">
             <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl mx-auto mb-4">🚀</div>
-            <h3 class="text-lg font-bold text-slate-900 mb-2">Continúa explorando</h3>
+            <h3 class="text-lg font-bold text-slate-900 mb-2" data-i18n="ui.continua_explorando">Continúa explorando</h3>
             <p class="text-sm text-slate-500 mb-6 px-2">
-                Para <span id="authWallReason" class="font-bold text-slate-700">continuar explorando</span>, inicia sesión gratis. Guardaremos tu progreso en la nube y desbloquearemos tus <span class="font-bold text-emerald-600">50 nodos de bienvenida</span>.
+                <span data-i18n="ui.para">Para</span> <span id="authWallReason" class="font-bold text-slate-700" data-i18n="ui.continuar_explorando">continuar explorando</span><span data-i18n="ui.inicia_sesion_gratis_guardaremos_tu">, inicia sesión gratis. Guardaremos tu progreso en la nube y desbloquearemos tus</span> <span class="font-bold text-emerald-600" data-i18n="ui.50_nodos_de_bienvenida">50 nodos de bienvenida</span>.
             </p>
             <div class="flex flex-col gap-2">
-                <button id="btnTriggerNetlifyLogin" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all shadow-md">
+                <button id="btnTriggerNetlifyLogin" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-xl text-sm transition-all shadow-md" data-i18n="ui.iniciar_sesion_registrarse">
                     Iniciar Sesión / Registrarse
                 </button>
-                <button id="closeAuthWall" class="w-full text-slate-400 hover:text-slate-600 py-2 text-xs font-semibold">
+                <button id="closeAuthWall" class="w-full text-slate-400 hover:text-slate-600 py-2 text-xs font-semibold" data-i18n="ui.cerrar">
                     Cerrar
                 </button>
             </div>
@@ -1193,8 +1194,8 @@
         <div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col border border-slate-200 max-h-[85vh]">
             <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 rounded-t-3xl">
                 <div>
-                    <h2 class="text-lg font-bold font-heading text-slate-900">Mis Proyectos</h2>
-                    <p class="text-xs text-slate-500">Tus mapas guardados en la nube.</p>
+                    <h2 class="text-lg font-bold font-heading text-slate-900" data-i18n="ui.mis_proyectos">Mis Proyectos</h2>
+                    <p class="text-xs text-slate-500" data-i18n="ui.tus_mapas_guardados_en_la">Tus mapas guardados en la nube.</p>
                 </div>
                 <button id="closeProjectsModal" class="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-200/50 transition-colors">✕</button>
             </div>
@@ -1202,30 +1203,30 @@
                 <div class="flex items-center gap-2">
                     <span class="text-base">🌌</span>
                     <div>
-                        <p class="font-bold text-indigo-200 uppercase tracking-wider text-[10px]">Rango Intelectual</p>
-                        <p id="cosmosRankTitle" class="font-extrabold text-white text-xs">Explorador Conceptual</p>
+                        <p class="font-bold text-indigo-200 uppercase tracking-wider text-[10px]" data-i18n="ui.rango_intelectual">Rango Intelectual</p>
+                        <p id="cosmosRankTitle" class="font-extrabold text-white text-xs" data-i18n="ui.explorador_conceptual">Explorador Conceptual</p>
                     </div>
                 </div>
                 <div class="flex gap-4 text-right">
                     <div>
                         <p id="cosmosTotalProjects" class="font-extrabold text-amber-400 text-sm">0</p>
-                        <p class="text-[10px] text-indigo-300">Mapas</p>
+                        <p class="text-[10px] text-indigo-300" data-i18n="ui.mapas">Mapas</p>
                     </div>
                     <div>
                         <p id="cosmosTotalNodes" class="font-extrabold text-emerald-400 text-sm">0</p>
-                        <p class="text-[10px] text-indigo-300">Conceptos</p>
+                        <p class="text-[10px] text-indigo-300" data-i18n="ui.conceptos">Conceptos</p>
                     </div>
                 </div>
             </div>
             <div class="p-4 md:p-6 overflow-y-auto flex-1 bg-slate-50/30">
                 <div id="projectsList" class="flex flex-col gap-2"></div>
-                <div id="noProjectsMsg" class="hidden text-center py-8 text-slate-400 text-sm font-medium">
+                <div id="noProjectsMsg" class="hidden text-center py-8 text-slate-400 text-sm font-medium" data-i18n="ui.no_tienes_proyectos_guardados_aun">
                     No tienes proyectos guardados aún.
                 </div>
             </div>
 
             <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/80 rounded-b-3xl flex justify-between items-center">
-                <button id="btnNewProject" class="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2">
+                <button id="btnNewProject" class="w-full bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-2" data-i18n="ui.crear_nuevo_esquema_en_blanco">
                     <span>✨</span> Crear Nuevo Esquema en Blanco
                 </button>
             </div>
@@ -1248,8 +1249,8 @@
             </div>
             <input id="appDialogInput" type="text" class="hidden w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:outline-none focus:border-indigo-500 font-sans">
             <div class="flex gap-2 justify-end pt-1">
-                <button id="appDialogCancel" class="hidden px-4 py-2 rounded-full text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors">Cancelar</button>
-                <button id="appDialogOk" class="px-5 py-2 rounded-full text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors shadow-sm">Entendido</button>
+                <button id="appDialogCancel" class="hidden px-4 py-2 rounded-full text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors" data-i18n="ui.cancelar">Cancelar</button>
+                <button id="appDialogOk" class="px-5 py-2 rounded-full text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors shadow-sm" data-i18n="ui.entendido">Entendido</button>
             </div>
         </div>
     </div>
@@ -1262,8 +1263,8 @@
                 <div class="flex items-center gap-2.5">
                     <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm">?</div>
                     <div>
-                        <h2 class="text-lg font-bold font-heading text-slate-900">Guía Rápida de Graphikosmos</h2>
-                        <p class="text-xs text-slate-500">Domina todas las herramientas de síntesis y mapeo visual.</p>
+                        <h2 class="text-lg font-bold font-heading text-slate-900" data-i18n="ui.guia_rapida_de_graphikosmos">Guía Rápida de Graphikosmos</h2>
+                        <p class="text-xs text-slate-500" data-i18n="ui.domina_todas_las_herramientas_de">Domina todas las herramientas de síntesis y mapeo visual.</p>
                     </div>
                 </div>
                 <button id="closeHelpModal" class="text-slate-400 hover:text-slate-700 p-2 rounded-lg hover:bg-slate-200/50 transition-colors">
@@ -1276,84 +1277,84 @@
                 
                 <!-- Sección 1: Controles del Lienzo -->
                 <div class="bg-indigo-50/60 border border-indigo-100 rounded-2xl p-4">
-                    <h3 class="font-bold text-indigo-950 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <h3 class="font-bold text-indigo-950 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5" data-i18n="ui.controles_del_lienzo">
                         <span>🖱️</span> Controles del Lienzo
                     </h3>
                     <ul class="space-y-2 text-xs text-slate-700">
                         <li class="flex items-start gap-2">
-                            <span class="font-bold text-indigo-600 shrink-0">• Mover el lienzo:</span>
-                            <span>Arrastra el fondo vacío con clic izquierdo para desplazarte por el mapa.</span>
+                            <span class="font-bold text-indigo-600 shrink-0" data-i18n="ui.mover_el_lienzo">• Mover el lienzo:</span>
+                            <span data-i18n="ui.arrastra_el_fondo_vacio_con">Arrastra el fondo vacío con clic izquierdo para desplazarte por el mapa.</span>
                         </li>
                         <li class="flex items-start gap-2">
-                            <span class="font-bold text-indigo-600 shrink-0">• Zoom:</span>
-                            <span>Usa la rueda del mouse para acercarte o alejarte.</span>
+                            <span class="font-bold text-indigo-600 shrink-0" data-i18n="ui.zoom">• Zoom:</span>
+                            <span data-i18n="ui.usa_la_rueda_del_mouse">Usa la rueda del mouse para acercarte o alejarte.</span>
                         </li>
                         <li class="flex items-start gap-2">
-                            <span class="font-bold text-indigo-600 shrink-0">• Mover un nodo:</span>
-                            <span>Arrástralo directamente con clic izquierdo; queda fijo donde lo sueltes.</span>
+                            <span class="font-bold text-indigo-600 shrink-0" data-i18n="ui.mover_un_nodo">• Mover un nodo:</span>
+                            <span data-i18n="ui.arrastralo_directamente_con_clic_izquierdo">Arrástralo directamente con clic izquierdo; queda fijo donde lo sueltes.</span>
                         </li>
                     </ul>
                 </div>
 
                 <!-- Sección 2: Cómo empezar un esquema -->
                 <div>
-                    <h3 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <h3 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5" data-i18n="ui.1_creacion_de_esquemas_3">
                         <span>🌐</span> 1. Creación de Esquemas (3 Niveles)
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                         <div class="border border-slate-200 rounded-xl p-3 bg-slate-50/40">
-                            <p class="font-bold text-slate-800 mb-1">Desde un Tema</p>
-                            <p class="text-slate-500">Si el lienzo está vacío, escribe cualquier tema en la barra superior y presiona <strong>Agregar</strong>. Se desplegará automáticamente un árbol completo de 3 niveles. (Si ya hay nodos en el lienzo, se agregará como un nodo individual).</p>
+                            <p class="font-bold text-slate-800 mb-1" data-i18n="ui.desde_un_tema">Desde un Tema</p>
+                            <p class="text-slate-500" data-i18n="ui.si_el_lienzo_esta_vacio">Si el lienzo está vacío, escribe cualquier tema en la barra superior y presiona <strong>Agregar</strong>. Se desplegará automáticamente un árbol completo de 3 niveles. (Si ya hay nodos en el lienzo, se agregará como un nodo individual).</p>
                         </div>
                         <div class="border border-slate-200 rounded-xl p-3 bg-slate-50/40">
-                            <p class="font-bold text-slate-800 mb-1">Desde el Modo Lector</p>
-                            <p class="text-slate-500">Pega un ensayo, artículo o capítulo en el panel izquierdo y presiona <strong>Generar Esquema del texto</strong> para estructurar su contenido fielmente en 3 niveles.</p>
+                            <p class="font-bold text-slate-800 mb-1" data-i18n="ui.desde_el_modo_lector">Desde el Modo Lector</p>
+                            <p class="text-slate-500" data-i18n="ui.pega_un_ensayo_articulo_o">Pega un ensayo, artículo o capítulo en el panel izquierdo y presiona <strong>Generar Esquema del texto</strong> para estructurar su contenido fielmente en 3 niveles.</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Sección 3: Interacción con Nodos -->
                 <div>
-                    <h3 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <h3 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5" data-i18n="ui.2_menu_de_acciones_de">
                         <span>⚡</span> 2. Menú de Acciones de cada Nodo (Clic sobre un nodo)
                     </h3>
                     <div class="space-y-2.5 text-xs">
                         <div class="flex items-start gap-2.5">
-                            <span class="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded shrink-0">Conceptos e Incógnitas</span>
-                            <p class="text-slate-600">Despliega sub-ramas teóricas y desbloquea un nodo gratuito de <strong>❓ Incógnita</strong> con una paradoja o misterio del tema. Expande la incógnita para revelar su respuesta.</p>
+                            <span class="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded shrink-0" data-i18n="ui.conceptos_e_incognitas">Conceptos e Incógnitas</span>
+                            <p class="text-slate-600" data-i18n="ui.despliega_sub_ramas_teoricas_y">Despliega sub-ramas teóricas y desbloquea un nodo gratuito de <strong>❓ Incógnita</strong> con una paradoja o misterio del tema. Expande la incógnita para revelar su respuesta.</p>
                         </div>
                         <div class="flex items-start gap-2.5">
-                            <span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded shrink-0">⚡ Cuestionar / Antítesis</span>
-                            <p class="text-slate-600">Genera pensamiento crítico mostrando posturas opuestas, límites teóricos o refutaciones históricas al concepto seleccionado.</p>
+                            <span class="bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded shrink-0" data-i18n="ui.cuestionar_antitesis_2">⚡ Cuestionar / Antítesis</span>
+                            <p class="text-slate-600" data-i18n="ui.genera_pensamiento_critico_mostrando_posturas">Genera pensamiento crítico mostrando posturas opuestas, límites teóricos o refutaciones históricas al concepto seleccionado.</p>
                         </div>
                         <div class="flex items-start gap-2.5">
-                            <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded shrink-0">🧠 Ponme a prueba</span>
-                            <p class="text-slate-600">Abre un reto socrático en el panel lateral. Al validar tu argumento, desbloqueas un <strong>🏆 Nodo Dorado de Dominio</strong> con tu propia síntesis.</p>
+                            <span class="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded shrink-0" data-i18n="ui.ponme_a_prueba_2">🧠 Ponme a prueba</span>
+                            <p class="text-slate-600" data-i18n="ui.abre_un_reto_socratico_en">Abre un reto socrático en el panel lateral. Al validar tu argumento, desbloqueas un <strong>🏆 Nodo Dorado de Dominio</strong> con tu propia síntesis.</p>
                         </div>
                         <div class="flex items-start gap-2.5">
-                            <span class="bg-fuchsia-100 text-fuchsia-800 font-bold px-2 py-0.5 rounded shrink-0">⚡ Generar Sinergia</span>
-                            <p class="text-slate-600">Selecciona esta opción en un nodo y luego haz clic en otro nodo distinto para descubrir la convergencia o síntesis entre ambos conceptos.</p>
+                            <span class="bg-fuchsia-100 text-fuchsia-800 font-bold px-2 py-0.5 rounded shrink-0" data-i18n="ui.generar_sinergia">⚡ Generar Sinergia</span>
+                            <p class="text-slate-600" data-i18n="ui.selecciona_esta_opcion_en_un">Selecciona esta opción en un nodo y luego haz clic en otro nodo distinto para descubrir la convergencia o síntesis entre ambos conceptos.</p>
                         </div>
                         <div class="flex items-start gap-2.5">
-                            <span class="bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded shrink-0">✨ Prompt personalizado</span>
-                            <p class="text-slate-600">Escribe una instrucción libre para ese nodo (ej. <em>"Explica esto según Max Weber"</em>). Se creará un nodo puente con tu consulta y sus respuestas.</p>
+                            <span class="bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded shrink-0" data-i18n="ui.prompt_personalizado_2">✨ Prompt personalizado</span>
+                            <p class="text-slate-600" data-i18n="ui.escribe_una_instruccion_libre_para">Escribe una instrucción libre para ese nodo (ej. <em>"Explica esto según Max Weber"</em>). Se creará un nodo puente con tu consulta y sus respuestas.</p>
                         </div>
                         <div class="flex items-start gap-2.5">
-                            <span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded shrink-0">📖 Definiciones Interactivas</span>
-                            <p class="text-slate-600">Usa <strong>Ver definición</strong> para leerla dentro del nodo o <strong>Usar definición</strong> para abrirla en el panel lateral con conceptos clave resaltados (hazles clic para lanzarlos al mapa).</p>
+                            <span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded shrink-0" data-i18n="ui.definiciones_interactivas">📖 Definiciones Interactivas</span>
+                            <p class="text-slate-600" data-i18n="ui.usa_ver_definicion_para_leerla">Usa <strong>Ver definición</strong> para leerla dentro del nodo o <strong>Usar definición</strong> para abrirla en el panel lateral con conceptos clave resaltados (hazles clic para lanzarlos al mapa).</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Sección 4: Subrayado Inteligente y Guardado -->
                 <div>
-                    <h3 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <h3 class="font-bold text-slate-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5" data-i18n="ui.3_extraccion_por_subrayado_y">
                         <span>📖</span> 3. Extracción por Subrayado y Guardado
                     </h3>
                     <ul class="space-y-2 text-xs text-slate-600">
-                        <li>• <strong>Subrayar en el Lector o en Definiciones:</strong> Selecciona cualquier palabra o frase con el mouse dentro del Modo Lector o en el panel lateral de definición para que aparezca el botón flotante <strong>⚡ Crear elemento en esquema</strong>. El texto quedará subrayado y vinculado al nodo.</li>
-                        <li>• <strong>Eliminación Inteligente:</strong> Al borrar un nodo que tiene descendientes, el sistema te preguntará si deseas eliminar también todos sus sub-nodos hijos o conservarlos.</li>
-                        <li>• <strong>Mis Proyectos y Captura:</strong> Inicia sesión para que tus mapas se guarden automáticamente en la nube, o usa el botón <strong>Capturar</strong> en la barra superior para descargar tu mapa en alta resolución (PNG).</li>
+                        <li data-i18n="ui.subrayar_en_el_lector_o">• <strong>Subrayar en el Lector o en Definiciones:</strong> Selecciona cualquier palabra o frase con el mouse dentro del Modo Lector o en el panel lateral de definición para que aparezca el botón flotante <strong>⚡ Crear elemento en esquema</strong>. El texto quedará subrayado y vinculado al nodo.</li>
+                        <li data-i18n="ui.eliminacion_inteligente_al_borrar_un">• <strong>Eliminación Inteligente:</strong> Al borrar un nodo que tiene descendientes, el sistema te preguntará si deseas eliminar también todos sus sub-nodos hijos o conservarlos.</li>
+                        <li data-i18n="ui.mis_proyectos_y_captura_inicia">• <strong>Mis Proyectos y Captura:</strong> Inicia sesión para que tus mapas se guarden automáticamente en la nube, o usa el botón <strong>Capturar</strong> en la barra superior para descargar tu mapa en alta resolución (PNG).</li>
                     </ul>
                 </div>
 
@@ -1361,7 +1362,7 @@
 
             <!-- Pie Fijo -->
             <div class="px-6 py-3.5 border-t border-slate-100 bg-slate-50 shrink-0 rounded-b-3xl flex justify-end">
-                <button id="btnGotItHelp" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-sm">
+                <button id="btnGotItHelp" class="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2 rounded-xl text-xs font-bold transition-all shadow-sm" data-i18n="ui.entendido">
                     Entendido
                 </button>
             </div>
@@ -1397,6 +1398,9 @@
             document.addEventListener('keydown', skip, { once: true });
         })();
     </script>
+    <script src="/i18n/es.js"></script>
+    <script src="/i18n/en.js"></script>
+    <script src="/i18n/core.js"></script>
     <script src="/app.js"></script>
 </body>
 </html>

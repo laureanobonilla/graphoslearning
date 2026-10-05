@@ -23,7 +23,7 @@ function sign(params, secret) {
 async function uploadPrivate(dataUri, publicId) {
     const { cloud, key, secret } = cfg();
     const timestamp = Math.floor(Date.now() / 1000);
-    const toSign = { public_id: publicId, timestamp, type: 'authenticated', overwrite: 'true' };
+    const toSign = { public_id: publicId, timestamp, type: 'authenticated', overwrite: 'true', invalidate: 'true' };
     const body = new URLSearchParams({ ...toSign, file: dataUri, api_key: key, signature: sign(toSign, secret) });
     const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body });
     const data = await res.json().catch(() => ({}));

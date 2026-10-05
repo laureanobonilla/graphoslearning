@@ -10,7 +10,7 @@ const FALLBACK_MODELS = [
     'gemini-3.6-flash'
 ];
 
-async function generateWithFallback(payload) {
+async function generateWithFallbackBase(payload) {
     let lastError = null;
 
     for (let i = 0; i < FALLBACK_MODELS.length; i++) {
@@ -46,13 +46,29 @@ async function generateWithFallback(payload) {
     throw lastError;
 }
 
+
+// Idioma de salida. Los prompts están escritos en español; para otros idiomas se antepone una
+// instrucción única (en vez de duplicar cada prompt). Las claves JSON y los valores enum no cambian.
+const LANG_DIRECTIVES = {
+    en: 'OUTPUT LANGUAGE: Write EVERY user-facing text value (titles, labels, definitions, explanations, questions, examples, feedback) in natural English, even though the instructions below are in Spanish. If the source text or topic is in another language, still answer in English. Keep JSON keys, field names and enum values exactly as specified, and keep any literal marker in the instructions that is not human-readable text.\n\n'
+};
+function normalizeLang(l) { return Object.prototype.hasOwnProperty.call(LANG_DIRECTIVES, l) ? l : 'es'; }
+function localizePayload(payload, lang) {
+    const d = LANG_DIRECTIVES[lang];
+    if (!d || typeof payload.contents !== 'string') return payload;
+    return { ...payload, contents: d + payload.contents };
+}
+
 async function rawHandler(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, lang: rawLang } = JSON.parse(event.body);
+        const lang = normalizeLang(rawLang);
+        // Todas las llamadas de abajo pasan por aquí: añade la instrucción de idioma.
+        const generateWithFallback = (payload) => generateWithFallbackBase(localizePayload(payload, lang));
 
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
@@ -726,14 +742,14 @@ async function rawHandler(event, context) {
             const schema = {
                 type: 'OBJECT',
                 properties: {
-                    title: { type: 'STRING', description: 'Título corto (máximo 8 palabras) del texto, en español.' },
-                    text: { type: 'STRING', description: 'El texto completo, en español, de 450 a 650 palabras, en párrafos separados por una línea en blanco. Sin markdown, sin listas con viñetas, sin encabezados con # ni asteriscos.' }
+                    title: { type: 'STRING', description: lang === 'en' ? 'Short title (max 8 words) of the text, in English.' : 'Título corto (máximo 8 palabras) del texto, en español.' },
+                    text: { type: 'STRING', description: lang === 'en' ? 'The full text, in English, 450 to 650 words, in paragraphs separated by a blank line. No markdown, no bullet lists, no headings with # or asterisks.' : 'El texto completo, en español, de 450 a 650 palabras, en párrafos separados por una línea en blanco. Sin markdown, sin listas con viñetas, sin encabezados con # ni asteriscos.' }
                 },
                 required: ['title', 'text']
             };
 
             const response = await generateWithFallback({
-                contents: `Escribe un texto de estudio en español para una persona que quiere explorar este campo: "${field}".
+                contents: `Escribe un texto de estudio en ${lang === 'en' ? 'inglés' : 'español'} para una persona que quiere explorar este campo: "${field}".
 ${purpose ? `Lo estudia para: ${purpose}.` : ''}
 ${areas.length ? `Sus intereses académicos relacionados son: ${areas.join(', ')}.` : ''}
 ${level ? `Su nivel actual: ${level}.` : ''}

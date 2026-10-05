@@ -278,7 +278,7 @@ const storeModal = document.getElementById('storeModal');
 // no menciona paquete ni precio: eso se conversa por chat, no se expone en la UI
 // como si fuera un cobro automático (ver nota en index.html, modal storeModal).
 function updateManualPurchaseBox() {
-    const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : '(sin iniciar sesión)';
+    const userEmail = (typeof currentUser !== 'undefined' && currentUser?.email) ? currentUser.email : tr("js.sin_iniciar_sesion");
 
     const emailAddressEl = document.getElementById('manualPurchaseEmailAddress');
     if (emailAddressEl) emailAddressEl.innerText = SUPPORT_EMAIL;
@@ -289,7 +289,7 @@ function updateManualPurchaseBox() {
     // cobro automático o a una queja), sino que la persona quiere seguir
     // usando la herramienta — es información para quien responde por
     // WhatsApp, que es quien conversa el paquete/precio.
-    const message = `Hola, uso Graphikosmos y me gustaría seguir utilizándolo. ¿Podrían contarme las opciones disponibles para continuar? Mi correo de cuenta es: ${userEmail}`;
+    const message = tr("js.hola_uso_graphikosmos_y_me", { userEmail });
     const waLink = document.getElementById('manualPurchaseWhatsapp');
     if (waLink) waLink.href = `https://wa.me/${SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 
@@ -316,7 +316,7 @@ function openStoreModal() {
 // app" de la Tienda como para el modal de Sugerencias/Comentarios.
 // ==========================================
 async function sendFeedbackRequest(kind, { email, message }, statusEl, submitBtn) {
-    if (statusEl) { statusEl.textContent = 'Enviando...'; statusEl.className = 'text-xs text-slate-500 min-h-[1em]'; }
+    if (statusEl) { statusEl.textContent = tr("js.enviando"); statusEl.className = 'text-xs text-slate-500 min-h-[1em]'; }
     if (submitBtn) submitBtn.disabled = true;
     try {
         const { ok, data } = await apiFetch('/.netlify/functions/send-feedback', {
@@ -326,8 +326,8 @@ async function sendFeedbackRequest(kind, { email, message }, statusEl, submitBtn
         if (!ok) {
             if (statusEl) {
                 statusEl.textContent = data?.error === 'rate_limited'
-                    ? 'Ya nos escribiste varias veces seguidas — dános un momento para contestarte.'
-                    : 'No se pudo enviar. Intenta de nuevo en unos minutos.';
+                    ? tr("js.ya_nos_escribiste_varias_veces")
+                    : tr("js.no_se_pudo_enviar_intenta");
                 statusEl.className = 'text-xs text-rose-500 min-h-[1em]';
             }
             return false;
@@ -335,7 +335,7 @@ async function sendFeedbackRequest(kind, { email, message }, statusEl, submitBtn
         return true;
     } catch (err) {
         console.error(err);
-        if (statusEl) { statusEl.textContent = 'No se pudo enviar. Revisa tu conexión e intenta de nuevo.'; statusEl.className = 'text-xs text-rose-500 min-h-[1em]'; }
+        if (statusEl) { statusEl.textContent = tr("js.no_se_pudo_enviar_revisa"); statusEl.className = 'text-xs text-rose-500 min-h-[1em]'; }
         return false;
     } finally {
         if (submitBtn) submitBtn.disabled = false;
@@ -359,7 +359,7 @@ document.getElementById('rechargeRequestForm')?.addEventListener('submit', async
         // registra el evento "feedback_sent" una sola vez por envío exitoso
         // (lo usa también para el límite anti-spam) — duplicarlo del lado
         // del cliente solo inflaría el conteo sin agregar información.
-        if (statusEl) { statusEl.textContent = '¡Listo! Te vamos a escribir a ese correo.'; statusEl.className = 'text-xs text-emerald-600 min-h-[1em] font-semibold'; }
+        if (statusEl) { statusEl.textContent = tr("js.listo_te_vamos_a_escribir"); statusEl.className = 'text-xs text-emerald-600 min-h-[1em] font-semibold'; }
         if (emailInput) emailInput.disabled = true;
         if (submitBtn) submitBtn.disabled = true;
     }
@@ -453,7 +453,7 @@ const appDialogOk = document.getElementById('appDialogOk');
 
 let dialogQueue = Promise.resolve();
 
-function showAppDialog({ title = '', message = '', mode = 'alert', defaultValue = '', okText, cancelText = 'Cancelar' }) {
+function showAppDialog({ title = '', message = '', mode = 'alert', defaultValue = '', okText, cancelText = tr("js.cancelar") }) {
     const run = () => new Promise((resolve) => {
         if (!appDialogModal) {
             // Red de seguridad por si el HTML no cargó este modal por algún motivo:
@@ -472,7 +472,7 @@ function showAppDialog({ title = '', message = '', mode = 'alert', defaultValue 
             appDialogTitle.classList.toggle('hidden', !title);
         }
         if (appDialogMessage) appDialogMessage.textContent = message;
-        if (appDialogOk) appDialogOk.textContent = okText || (isPrompt ? 'Guardar' : 'Entendido');
+        if (appDialogOk) appDialogOk.textContent = okText || (isPrompt ? tr("js.guardar") : tr("js.entendido"));
         if (appDialogInput) {
             appDialogInput.classList.toggle('hidden', !isPrompt);
             if (isPrompt) appDialogInput.value = defaultValue || '';
@@ -536,9 +536,9 @@ function showLoader(msg) {
         
         const steps = [
             msg,
-            "Analizando jerarquía conceptual...",
-            "Conectando nodos y relaciones...",
-            "Organizando niveles en el lienzo..."
+            tr("js.analizando_jerarquia_conceptual"),
+            tr("js.conectando_nodos_y_relaciones"),
+            tr("js.organizando_niveles_en_el_lienzo")
         ];
         let stepIdx = 0;
         clearInterval(loaderInterval);
@@ -667,7 +667,7 @@ function getGuestDisplayName() {
             localStorage.setItem('gk_display_name', name);
         }
         return name;
-    } catch { return 'Invitado'; }
+    } catch { return tr("js.invitado"); }
 }
 function getDisplayName() {
     if (typeof currentUser !== 'undefined' && currentUser?.email) return currentUser.email;
@@ -683,7 +683,7 @@ function track(eventName, metadata = {}) {
                 credentials: 'same-origin',
                 keepalive: true, // para que sobreviva si el usuario navega fuera justo después
                 headers,
-                body: JSON.stringify({ event: eventName, anonId: getAnonId(), displayName: getDisplayName(), metadata })
+                body: JSON.stringify({ event: eventName, anonId: getAnonId(), displayName: getDisplayName(), metadata: { lang: I18N.lang, ...metadata } })
             });
         } catch (_err) { /* nunca debe notarse en la UI */ }
     })();
@@ -707,6 +707,9 @@ document.addEventListener('pagehide', () => {
     } catch (_err) { /* nunca debe notarse en la UI */ }
 });
 
+const RELATED_EDGE_LABELS = new Set(['relacionado', 'related']);
+function isRelatedEdgeLabel(l) { return RELATED_EDGE_LABELS.has(l); }
+
 // Interceptor de red: en vez de editar cada uno de los ~18 fetch() a gemini.js/db.js/
 // balance.js repartidos por app.js (cada uno maneja sus errores distinto),
 // añadimos aquí el token de sesión a todos ellos y capturamos en un solo lugar los
@@ -721,6 +724,10 @@ document.addEventListener('pagehide', () => {
         if (!isOurFn) return nativeFetch(url, options);
 
         const finalOptions = { ...options, credentials: 'same-origin', headers: await authHeaders(options.headers) };
+        // El servidor responde (prompts de Gemini) en el idioma de la página.
+        if (target.includes('/.netlify/functions/gemini') && typeof options.body === 'string') {
+            try { finalOptions.body = JSON.stringify({ ...JSON.parse(options.body), lang: I18N.lang }); } catch (_e) { /* cuerpo no JSON: se envía igual */ }
+        }
 
         return nativeFetch(url, finalOptions).then(res => {
             const isBillingError = target.includes('/.netlify/functions/gemini')
@@ -739,7 +746,7 @@ document.addEventListener('pagehide', () => {
 })();
 
 if (window.netlifyIdentity) {
-    netlifyIdentity.init({ locale: 'es' });
+    netlifyIdentity.init({ locale: I18N.lang });
     currentUser = netlifyIdentity.currentUser();
     refreshBalanceFromServer();
     updateAuthUI();
@@ -794,11 +801,11 @@ function handleBillingError(status, data) {
         return true;
     }
     if (status === 429) {
-        appAlert('Estás generando muy rápido. Espera un minuto y vuelve a intentar.');
+        appAlert(tr("js.estas_generando_muy_rapido_espera"));
         return true;
     }
     if (status === 401) {
-        requireAuth('procesar este esquema');
+        requireAuth(tr("js.procesar_este_esquema"));
         return true;
     }
     return false;
@@ -828,10 +835,10 @@ function updateAuthUI() {
     if (!loginText || !userStatusDot) return;
     
     if (currentUser) {
-        loginText.innerText = currentUser.user_metadata?.full_name?.split(' ')[0] || "Mi Cuenta";
+        loginText.innerText = currentUser.user_metadata?.full_name?.split(' ')[0] || tr("js.mi_cuenta");
         userStatusDot.className = 'w-2 h-2 rounded-full bg-indigo-500';
     } else {
-        loginText.innerText = "Iniciar Sesión";
+        loginText.innerText = tr("js.iniciar_sesion");
         userStatusDot.className = 'w-2 h-2 rounded-full bg-slate-300';
     }
 
@@ -874,7 +881,7 @@ function updateCounterDisplay() {
         dot.className = 'w-2 h-2 rounded-full bg-purple-500';
         return;
     }
-    display.innerText = `${availableNodes} Nodos`;
+    display.innerText = tr("js.nodos", { availableNodes });
     if (availableNodes <= 0) dot.className = 'w-2 h-2 rounded-full bg-red-500';
     else if (availableNodes < 10 && currentUser) dot.className = 'w-2 h-2 rounded-full bg-amber-500';
     else dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
@@ -892,7 +899,7 @@ function checkBalance(cost) {
     if (isAdmin) return true;
     if (!balanceKnown) return true; // aún no sabemos el saldo real: dejamos que el servidor decida
     if (availableNodes < cost) {
-        if (isGuestUser) requireAuth("procesar este esquema");
+        if (isGuestUser) requireAuth(tr("js.procesar_este_esquema"));
         else {
             if (actionMenu) actionMenu.classList.add('hidden');
             track('paywall_shown', { reason: 'checkBalance_client_side' });
@@ -956,7 +963,7 @@ function settleNewNodesOrganically(newIds) {
 function getHierarchyDescendants(parentId) {
     const children = new Map();
     edges.get().forEach(e => {
-        if (e.label === 'relacionado') return;
+        if (isRelatedEdgeLabel(e.label)) return;
         if (!children.has(e.from)) children.set(e.from, []);
         children.get(e.from).push(e.to);
     });
@@ -1115,10 +1122,10 @@ async function renderThreeLevelTree(data, opts = {}) {
         rootX = existingPos.x;
         rootY = existingPos.y;
     } else if (nodes.length > 1) {
-        const shouldClear = await appConfirm("Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?", {
-            title: '¿Limpiar el lienzo?',
-            okText: 'Sí, crear proyecto nuevo',
-            cancelText: 'No, agregar al actual'
+        const shouldClear = await appConfirm(tr("js.ya_tienes_un_esquema_en"), {
+            title: tr("js.limpiar_el_lienzo"),
+            okText: tr("js.si_crear_proyecto_nuevo"),
+            cancelText: tr("js.no_agregar_al_actual")
         });
         if (shouldClear) {
             isClearingCanvas = true;
@@ -1324,7 +1331,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     const topicPreview = isLong ? (globalDocumentContext || null) : topicText.trim().slice(0, 60);
     track('schema_generate_attempt', { mode: isLong ? 'text' : 'topic', length: topicText.length, layoutMode: schemaLayoutMode, topicPreview });
 
-    showLoader(`Estructurando esquema...`);
+    showLoader(tr("js.estructurando_esquema"));
     if (topicInput) topicInput.value = '';
 
     try {
@@ -1333,7 +1340,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
             body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText })
         });
         if (!ok) {
-            if (!handleBillingError(status, data)) appAlert(data?.error || 'Intenta de nuevo en unos segundos.');
+            if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.intenta_de_nuevo_en_unos"));
             track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(data?.error || status).slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
             return;
         }
@@ -1348,7 +1355,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     } catch (err) {
         console.error(err);
         track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
-        appAlert('Intenta de nuevo en unos segundos.');
+        appAlert(tr("js.intenta_de_nuevo_en_unos"));
     } finally {
         hideLoader();
     }
@@ -1362,12 +1369,12 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
 // 'analyze_text') devuelve la misma forma de árbol de 3 niveles, solo que
 // con contenido analítico en vez de expositivo.
 const ANALYSIS_TYPE_LABELS = {
-    critico: 'Argumentativo / crítico',
-    academico: 'Académico / de investigación',
-    literario: 'Literario',
-    retorico: 'Retórico / persuasivo',
-    comparativo: 'Comparativo de posturas',
-    custom: 'Personalizado'
+    critico: tr("js.argumentativo_critico"),
+    academico: tr("js.academico_de_investigacion"),
+    literario: tr("js.literario"),
+    retorico: tr("js.retorico_persuasivo"),
+    comparativo: tr("js.comparativo_de_posturas"),
+    custom: tr("js.personalizado")
 };
 
 async function generateTextAnalysis(textContent, analysisType, customType, opts = {}) {
@@ -1375,7 +1382,7 @@ async function generateTextAnalysis(textContent, analysisType, customType, opts 
     if (!checkBalance(1)) return;
 
     const { originPanelId = null, attachToNodeId = null } = opts;
-    const analysisLabel = ANALYSIS_TYPE_LABELS[analysisType] || 'Personalizado';
+    const analysisLabel = ANALYSIS_TYPE_LABELS[analysisType] || tr("js.personalizado");
     // Mismo principio de privacidad que generateFullSchemaFromTopic: nunca se
     // manda el texto en sí a la tabla de eventos, solo el contexto corto que
     // la app ya detecta sola (o, si no hay, el tipo de análisis elegido).
@@ -1385,7 +1392,7 @@ async function generateTextAnalysis(textContent, analysisType, customType, opts 
         length: textContent.length, layoutMode: schemaLayoutMode, topicPreview
     });
 
-    showLoader(`Analizando texto (${analysisLabel})...`);
+    showLoader(tr("js.analizando_texto", { analysisLabel }));
 
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
@@ -1393,7 +1400,7 @@ async function generateTextAnalysis(textContent, analysisType, customType, opts 
             body: JSON.stringify({ action: 'analyze_text', text: textContent, analysisType, customType: customType || '' })
         });
         if (!ok) {
-            if (!handleBillingError(status, data)) appAlert(data?.error || 'Intenta de nuevo en unos segundos.');
+            if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.intenta_de_nuevo_en_unos"));
             track('schema_analyze_error', { analysisType, message: String(data?.error || status).slice(0, 120), topicPreview });
             return;
         }
@@ -1406,7 +1413,7 @@ async function generateTextAnalysis(textContent, analysisType, customType, opts 
     } catch (err) {
         console.error(err);
         track('schema_analyze_error', { analysisType, message: String(err?.message || '').slice(0, 120), topicPreview });
-        appAlert('Intenta de nuevo en unos segundos.');
+        appAlert(tr("js.intenta_de_nuevo_en_unos"));
     } finally {
         hideLoader();
     }
@@ -1458,7 +1465,7 @@ async function runTextAnalysis(analysisType, customType) {
     if (!context) return;
 
     let textContent = context.textEl ? context.textEl.innerText.trim() : "";
-    if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
+    if (!textContent || textContent.length < 3) return appAlert(tr("js.escribe_un_tema_pega_un"));
 
     textContent = await resolveTextOrWebLink(textContent, { targetTextEl: context.textEl, onTitle: context.onTitle });
     if (textContent === null) return;
@@ -1589,7 +1596,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
-    if (!requireAuth("profundizar en conceptos relacionados")) return;
+    if (!requireAuth(tr("js.profundizar_en_conceptos_relacionados"))) return;
 
     const currentNode = nodes.get(selectedNodeId);
     const topicName = currentNode.baseTitle || selectedNodeId;
@@ -1597,7 +1604,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
     // Si es un nodo de Incógnita (❓), al expandirlo revelamos la respuesta
     if (currentNode && currentNode.isMystery) {
         if (!checkBalance(1)) return;
-        showLoader('Revelando incógnita...');
+        showLoader(tr("js.revelando_incognita"));
         try {
             const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
                 method: 'POST',
@@ -1605,11 +1612,11 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                     action: 'custom_prompt',
                     topic: topicName,
                     contextPath: getContextPath(selectedNodeId),
-                    customRequest: `Responde de forma clara, reveladora y directa a esta incógnita: ${topicName}`,
+                    customRequest: tr("js.responde_de_forma_clara_reveladora", { topicName }),
                     documentContext: globalDocumentContext || currentDocumentText
                 })
             });
-            if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo resolver la incógnita.'); return; }
+            if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudo_resolver_la")); return; }
             const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
             let createdCount = 0;
             let firstAnswer = null;
@@ -1626,24 +1633,24 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                     x: parentPos.x, y: parentPos.y + 140,
                     widthConstraint: { minimum: 150, maximum: 240 }
                 });
-                edges.add({ from: selectedNodeId, to: newId, label: 'se explica por' });
+                edges.add({ from: selectedNodeId, to: newId, label: tr("js.se_explica_por") });
                 if (!firstAnswer) firstAnswer = { id: newId, title: item.title, content: item.content };
                 createdCount++;
             });
             nodes.update({ id: selectedNodeId, isMystery: false });
             applyServerBalance(data); consumeNodes(createdCount);
             if (firstAnswer) showContentInFloatingPanel(firstAnswer.id, firstAnswer.title, firstAnswer.content);
-        } catch { appAlert("Error al resolver la incógnita."); } finally { hideLoader(); }
+        } catch { appAlert(tr("js.error_al_resolver_la_incognita")); } finally { hideLoader(); }
         return;
     }
 
     const nodeCountVal = document.getElementById('nodeCount')?.value || 'auto';
-    const maxNodes = nodeCountVal === 'auto' ? 'entre 3 y 5 (según relevancia)' : parseInt(nodeCountVal, 10);
+    const maxNodes = nodeCountVal === 'auto' ? tr("js.entre_3_y_5_segun") : parseInt(nodeCountVal, 10);
     const estimatedCost = nodeCountVal === 'auto' ? 4 : maxNodes;
     if (!checkBalance(estimatedCost)) return;
 
     if (currentNode && currentNode.expanded) return;
-    showLoader('Generando conceptos relacionados...');
+    showLoader(tr("js.generando_conceptos_relacionados"));
 
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
@@ -1657,7 +1664,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 documentContext: globalDocumentContext || currentDocumentText
             })
         });
-        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudieron generar conceptos relacionados.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudieron_generar_conceptos")); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
@@ -1681,7 +1688,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
             const hookId = `mystery_${Date.now()}`;
             nodes.update({
                 id: hookId,
-                label: `*❓ Incógnita:*\n${data.curiosityHook.question}`,
+                label: tr("js.incognita", { question: data.curiosityHook.question }),
                 baseTitle: data.curiosityHook.question,
                 isMystery: true,
                 color: { background: '#faf5ff', border: '#a855f7' },
@@ -1689,13 +1696,13 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 widthConstraint: { minimum: 170, maximum: 230 },
                 x: parentPos.x + 120, y: parentPos.y + 120, fixed: { x: false, y: false }
             });
-            edges.add({ from: selectedNodeId, to: hookId, label: 'plantea duda', dashes: true, color: { color: '#a855f7' } });
+            edges.add({ from: selectedNodeId, to: hookId, label: tr("js.plantea_duda"), dashes: true, color: { color: '#a855f7' } });
         }
 
         nodes.update({ id: selectedNodeId, expanded: true });
         applyServerBalance(data); consumeNodes(createdCount);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
-    } catch { appAlert("Error al conectar con el servicio."); } finally { hideLoader(); }
+    } catch { appAlert(tr("js.error_al_conectar_con_el")); } finally { hideLoader(); }
 });
 
 // ==========================================
@@ -1706,7 +1713,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
     if (!selectedNodeId) return;
 
     const nodeCountVal = document.getElementById('nodeCount')?.value || 'auto';
-    const maxNodes = nodeCountVal === 'auto' ? 'varios (entre 3 y 5 representativos)' : parseInt(nodeCountVal, 10);
+    const maxNodes = nodeCountVal === 'auto' ? tr("js.varios_entre_3_y_5") : parseInt(nodeCountVal, 10);
     const estimatedCost = nodeCountVal === 'auto' ? 4 : maxNodes;
     if (!checkBalance(estimatedCost)) return;
 
@@ -1714,14 +1721,14 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
     const currentNode = nodes.get(selectedNodeId);
     const topicName = currentNode.baseTitle || selectedNodeId;
 
-    showLoader('Buscando casos prácticos...');
+    showLoader(tr("js.buscando_casos_practicos"));
 
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
             body: JSON.stringify({ action: 'examples', topic: topicName, contextPath, maxNodes, documentContext: globalDocumentContext || currentDocumentText })
         });
-        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudieron generar ejemplos.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudieron_generar_ejemplos")); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([selectedNodeId])[selectedNodeId];
         network.setOptions({ physics: { enabled: true } });
@@ -1739,7 +1746,7 @@ document.getElementById('btnMenuExamples')?.addEventListener('click', async () =
         });
         applyServerBalance(data); consumeNodes(createdCount);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
-    } catch { appAlert("Error al conectar con el servicio."); } finally { hideLoader(); }
+    } catch { appAlert(tr("js.error_al_conectar_con_el")); } finally { hideLoader(); }
 });
 
 // ==========================================
@@ -1933,7 +1940,7 @@ network.on('click', async function (params) {
                 });
                 trackNodeUsage(topic); consumeNodes(1);
             }
-            edges.add({ from: clickedNodeId, to: nodeId, label: 'del texto' });
+            edges.add({ from: clickedNodeId, to: nodeId, label: tr("js.del_texto") });
             highlightCoverageForPanel(panelId);
             selectedNodeId = nodeId;
             setTimeout(() => flashNewNode(nodeId), 50);
@@ -1951,13 +1958,13 @@ network.on('click', async function (params) {
             const banner = document.getElementById('synergyBanner');
             if(banner) banner.classList.add('hidden');
 
-            showLoader('Calculando convergencia...');
+            showLoader(tr("js.calculando_convergencia"));
             try {
                 const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
                     method: 'POST',
                     body: JSON.stringify({ action: 'synergy', topic: topicA, topicB: topicB, density: document.getElementById('nodeCount')?.value || 'auto' })
                 });
-                if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo generar la sinergia.'); return; }
+                if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudo_generar_la")); return; }
 
                 const totalNodes = 1 + (data.pathsFromA?.length || 0) + (data.pathsFromB?.length || 0);
                 if (!checkBalance(totalNodes)) return;
@@ -2004,7 +2011,7 @@ network.on('click', async function (params) {
 
                 applyServerBalance(data); consumeNodes(totalNodes);
                 setTimeout(() => { stopPhysicsAndUnlock(); }, 1800);
-            } catch (err) { appAlert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
+            } catch (err) { appAlert(tr("js.intenta_de_nuevo_en_unos_2")); } finally { hideLoader(); }
             return; // ¡Este return detiene el código para que NO abra el menú!
         }
 
@@ -2021,13 +2028,13 @@ network.on('click', async function (params) {
 
             if (!checkBalance(1)) return;
 
-            showLoader('Generando puente conceptual...');
+            showLoader(tr("js.generando_puente_conceptual"));
             try {
                 const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
                     method: 'POST',
                     body: JSON.stringify({ action: 'connect', topic: topicA, topicB: topicB })
                 });
-                if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo generar el vínculo.'); return; }
+                if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudo_generar_el")); return; }
 
                 const posA = network.getPositions([nodeA.id])[nodeA.id];
                 const posB = network.getPositions([nodeB.id])[nodeB.id];
@@ -2042,7 +2049,7 @@ network.on('click', async function (params) {
                 }
                 edges.add({ from: nodeA.id, to: bridge.id, label: bridge.relFromA });
                 edges.add({ from: bridge.id, to: nodeB.id, label: bridge.relToB });
-            } catch (err) { appAlert("Intenta de nuevo en unos segundos"); } finally { hideLoader(); }
+            } catch (err) { appAlert(tr("js.intenta_de_nuevo_en_unos_2")); } finally { hideLoader(); }
             return; // ¡Este return detiene el código para que NO abra el menú!
         }
 
@@ -2209,7 +2216,7 @@ function updateSubschemeActionBar() {
     const count = network.getSelectedNodes().length;
     if (count >= 2) {
         subschemeActionBar.classList.remove('hidden');
-        if (subschemeSelectionCount) subschemeSelectionCount.innerText = `${count} nodos seleccionados`;
+        if (subschemeSelectionCount) subschemeSelectionCount.innerText = tr("js.nodos_seleccionados", { count });
     } else {
         subschemeActionBar.classList.add('hidden');
     }
@@ -2225,7 +2232,7 @@ function updateSchemeBreadcrumb() {
     } else {
         schemeBreadcrumb.classList.remove('hidden');
         const top = schemeStack[schemeStack.length - 1];
-        if (schemeBreadcrumbLabel) schemeBreadcrumbLabel.innerText = `Dentro de: ${top.label}`;
+        if (schemeBreadcrumbLabel) schemeBreadcrumbLabel.innerText = tr("js.dentro_de", { label: top.label });
     }
 }
 
@@ -2254,7 +2261,7 @@ function convertSelectionToSubscheme() {
     const centerX = sumX / selectedIds.length;
     const centerY = sumY / selectedIds.length;
 
-    const subTitle = (innerNodes[0] && innerNodes[0].baseTitle) || 'Subesquema';
+    const subTitle = (innerNodes[0] && innerNodes[0].baseTitle) || tr("js.subesquema");
     const subId = `subscheme_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const thumbnail = generateSubschemeThumbnail(innerNodes, internalEdges, positions);
 
@@ -2307,7 +2314,7 @@ function enterSubscheme(nodeId) {
         nodes: nodes.get(),
         edges: plainEdges(),
         collapsedNodeId: nodeId,
-        label: node.baseTitle || 'Subesquema',
+        label: node.baseTitle || tr("js.subesquema"),
         panelState: serializeFloatingPanels()
     });
     closeAllFloatingPanels();
@@ -2343,7 +2350,7 @@ function exitSubscheme() {
         return {
             ...n,
             subSchemeData: { nodes: freshNodes, edges: freshEdges },
-            label: `📦 ${n.baseTitle || 'Subesquema'}`,
+            label: `📦 ${n.baseTitle || tr("js.subesquema")}`,
             image: generateSubschemeThumbnail(freshNodes, freshEdges, freshPositions)
         };
     });
@@ -2939,14 +2946,14 @@ function showLinkSuggestionToast(idA, idB) {
     const labelA = (nodeA.baseTitle || idA);
     const labelB = (nodeB.baseTitle || idB);
     toast.innerHTML = `
-        <span>💡 "${labelA}" y "${labelB}" aparecen muy cerca en el texto. ¿Vincularlos?</span>
-        <button id="gkLinkSuggestAccept" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded font-semibold shrink-0">Vincular</button>
-        <button id="gkLinkSuggestDismiss" class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded shrink-0">Descartar</button>
+        <span>${tr('toast.link_suggest', { a: labelA, b: labelB })}</span>
+        <button id="gkLinkSuggestAccept" class="bg-indigo-600 hover:bg-indigo-500 px-2.5 py-1 rounded font-semibold shrink-0">${tr('toast.link')}</button>
+        <button id="gkLinkSuggestDismiss" class="bg-slate-800 hover:bg-slate-700 px-2.5 py-1 rounded shrink-0">${tr('toast.dismiss')}</button>
     `;
     document.body.appendChild(toast);
     document.getElementById('gkLinkSuggestAccept')?.addEventListener('click', () => {
         const alreadyLinked = edges.get({ filter: e => (e.from === idA && e.to === idB) || (e.from === idB && e.to === idA) }).length > 0;
-        if (!alreadyLinked) edges.add({ from: idA, to: idB, label: 'relacionado', dashes: [2, 3], color: { color: '#94a3b8' } });
+        if (!alreadyLinked) edges.add({ from: idA, to: idB, label: tr("js.relacionado"), dashes: [2, 3], color: { color: '#94a3b8' } });
         toast.remove();
     });
     document.getElementById('gkLinkSuggestDismiss')?.addEventListener('click', () => toast.remove());
@@ -2958,12 +2965,12 @@ function locateNodeInText(nodeId) {
     const node = nodes.get(nodeId);
     if (!node) return;
     if (!node.originPanelId || !node.sourceQuote) {
-        appAlert('Este nodo no quedó vinculado a ninguna cita del texto (puede venir de un tema escrito a mano, no de un documento).');
+        appAlert(tr("js.este_nodo_no_quedo_vinculado"));
         return;
     }
     const entry = readerPanelRegistry.get(node.originPanelId);
     if (!entry || !entry.root || !document.body.contains(entry.root)) {
-        appAlert('No se encontró el panel de lectura de origen de este nodo (puede que lo hayas cerrado).');
+        appAlert(tr("js.no_se_encontro_el_panel"));
         return;
     }
     if (entry.root.classList.contains('hidden')) openReaderPanel();
@@ -2978,7 +2985,7 @@ function locateNodeInText(nodeId) {
         mark = entry.textEl?.querySelector(`mark[data-node-id="${nodeId}"]`);
     }
     if (!mark) {
-        appAlert('No se pudo ubicar la cita exacta dentro del texto actual (puede que lo hayas editado).');
+        appAlert(tr("js.no_se_pudo_ubicar_la"));
         return;
     }
     mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -3161,7 +3168,7 @@ function panelLinkBanner(show) {
         b.id = 'panelLinkBanner';
         b.className = 'hidden';
         b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100000;background:#0f172a;color:#fbbf24;border:1px solid #fbbf24;border-radius:10px;padding:8px 14px;font-size:12px;font-family:sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5)';
-        b.textContent = 'Elige el nodo o panel al que apuntará la flecha · Esc para cancelar';
+        b.textContent = tr("js.elige_el_nodo_o_panel");
         document.body.appendChild(b);
     }
     b.classList.toggle('hidden', !show);
@@ -3456,9 +3463,9 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
     el.innerHTML = `
         <div class="fp-header px-3 py-2 bg-slate-950 border-b border-slate-800 rounded-t-xl flex justify-between items-center gap-2 cursor-move select-none">
             <h3 class="fp-title text-xs font-bold font-heading text-[#4fd1c5] uppercase tracking-wider truncate flex-1"></h3>
-            <button class="fp-link text-amber-300 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Unir con una flecha a otro nodo o panel">🔗</button>
-            <button class="fp-minimize text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Minimizar">—</button>
-            <button class="fp-close text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Cerrar">✕</button>
+            <button class="fp-link text-amber-300 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="${tr('panel.link_title')}">🔗</button>
+            <button class="fp-minimize text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="${tr('panel.minimize')}">—</button>
+            <button class="fp-close text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="${tr('panel.close')}">✕</button>
         </div>
         <div class="fp-content flex-1 overflow-auto p-4 text-slate-200 text-sm leading-relaxed font-sans select-text"></div>
     `;
@@ -3499,14 +3506,14 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
             el.style.resize = 'none';
             contentEl.classList.add('hidden');
             minimizeBtn.textContent = '▢';
-            minimizeBtn.title = 'Restaurar';
+            minimizeBtn.title = tr("js.restaurar");
         } else {
             el.style.height = heightBeforeMinimize || '';
             el.style.minHeight = '';
             el.style.resize = '';
             contentEl.classList.remove('hidden');
             minimizeBtn.textContent = '—';
-            minimizeBtn.title = 'Minimizar';
+            minimizeBtn.title = tr("js.minimizar");
         }
         if (typeof network !== 'undefined' && network) network.redraw();
     });
@@ -3770,10 +3777,10 @@ let pdfCurrentFileName = '';
 async function handlePdfFileSelected(file) {
     if (!file) return;
     if (!/pdf$/i.test(file.type) && !/\.pdf$/i.test(file.name)) {
-        appAlert('Elegí un archivo PDF.');
+        appAlert(tr("js.elegi_un_archivo_pdf"));
         return;
     }
-    showLoader('Leyendo el PDF...');
+    showLoader(tr("js.leyendo_el_pdf"));
     try {
         const arrayBuffer = await file.arrayBuffer();
         const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -3788,7 +3795,7 @@ async function handlePdfFileSelected(file) {
         track('pdf_import_selected', { pages: doc.numPages, sizeKb: Math.round(file.size / 1024) });
     } catch (err) {
         console.error(err);
-        appAlert('No se pudo leer ese archivo como PDF (puede estar dañado o protegido con contraseña).');
+        appAlert(tr("js.no_se_pudo_leer_ese"));
         track('pdf_import_error', { stage: 'read', message: String(err?.message || '').slice(0, 120) });
     } finally {
         hideLoader();
@@ -3875,7 +3882,7 @@ function medianOfNumbers(numbers) {
 // generación de esquema (ver highlightCoverageForPanel/getPanelRawText).
 async function extractPdfRangeIntoReader(fromPage, toPage) {
     if (!activePdfDoc) return;
-    showLoader(`Extrayendo texto de las páginas ${fromPage}–${toPage}...`);
+    showLoader(tr("js.extrayendo_texto_de_las_paginas", { fromPage, toPage }));
     try {
         const pagesData = [];
         for (let pageNum = fromPage; pageNum <= toPage; pageNum++) {
@@ -3948,7 +3955,7 @@ async function extractPdfRangeIntoReader(fromPage, toPage) {
 
         const extractedHtml = htmlParts.join('\n');
         if (!extractedHtml.trim()) {
-            appAlert('No se encontró texto en esas páginas (puede ser un PDF escaneado, sin texto real dentro del archivo).');
+            appAlert(tr("js.no_se_encontro_texto_en"));
             track('pdf_import_error', { stage: 'extract', message: 'empty' });
             return;
         }
@@ -3956,7 +3963,7 @@ async function extractPdfRangeIntoReader(fromPage, toPage) {
         readerTextMode.innerHTML = extractedHtml;
         updateReaderEmptyHint();
 
-        globalDocumentContext = `${pdfCurrentFileName || 'PDF'} (pág. ${fromPage}–${toPage})`;
+        globalDocumentContext = tr("js.pag", { file: pdfCurrentFileName || 'PDF', fromPage, toPage });
         if (docContextInput) docContextInput.value = globalDocumentContext;
         updateDocContextChip();
 
@@ -3966,7 +3973,7 @@ async function extractPdfRangeIntoReader(fromPage, toPage) {
         track('pdf_import_success', { pages: (toPage - fromPage + 1) });
     } catch (err) {
         console.error(err);
-        appAlert('No se pudo extraer el texto de esas páginas del PDF.');
+        appAlert(tr("js.no_se_pudo_extraer_el"));
         track('pdf_import_error', { stage: 'extract', message: String(err?.message || '').slice(0, 120) });
     } finally {
         hideLoader();
@@ -4054,7 +4061,7 @@ document.getElementById('tipBtnLinkToNode')?.addEventListener('click', () => {
     activeSelectedText = ""; activeSelectionRange = null; activeSelectionPanelId = null; activeSelectionOffsetHint = null;
     awaitingLinkTargetClick = true;
     document.body.classList.add('gk-picking-link-target');
-    appAlert('Ahora haz clic en el nodo del esquema al que quieres vincular este fragmento como hijo.');
+    appAlert(tr("js.ahora_haz_clic_en_el"));
 });
 
 // ==========================================
@@ -4165,7 +4172,7 @@ function wireReaderPanelClone(root, panelId) {
     btnClear?.addEventListener('click', async () => {
         const hasText = textEl && textEl.innerText.trim() !== "";
         if (!hasText && !localContext) return;
-        if (await appConfirm("¿Deseas limpiar el texto y el contexto de este lector?")) {
+        if (await appConfirm(tr("js.deseas_limpiar_el_texto_y"))) {
             localContext = "";
             if (textEl) textEl.innerText = "";
             if (contextInput) contextInput.value = "";
@@ -4193,7 +4200,7 @@ function wireReaderPanelClone(root, panelId) {
 
     btnGenerate?.addEventListener('click', async () => {
         let textContent = textEl ? textEl.innerText.trim() : "";
-        if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
+        if (!textContent || textContent.length < 3) return appAlert(tr("js.escribe_un_tema_pega_un"));
 
         textContent = await resolveTextOrWebLink(textContent, {
             targetTextEl: textEl,
@@ -4308,7 +4315,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
                     <div class="absolute inset-0 border-[3px] border-slate-700 rounded-full"></div>
                     <div class="absolute inset-0 border-[3px] border-[#4fd1c5] rounded-full border-t-transparent animate-spin"></div>
                 </div>
-                <p class="text-slate-400 text-xs italic">Redactando definición…</p>
+                <p class="text-slate-400 text-xs italic">${tr('def.writing')}</p>
             </div>
         `;
         try {
@@ -4322,7 +4329,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
                     documentContext: globalDocumentContext || currentDocumentText
                 })
             });
-            if (!ok) { panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">No se pudo obtener la definición.</p>`; return; }
+            if (!ok) { panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">${tr('def.err_get')}</p>`; return; }
             applyServerBalance(data);
             definitionText = data.definition;
             defSource = data.source || 'gemini';
@@ -4333,7 +4340,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
                 definitionSource: defSource, wikiImage, wikiUrl
             });
         } catch (err) {
-            panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">Error al obtener definición.</p>`;
+            panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">${tr('def.err_get_generic')}</p>`;
             return;
         }
     }
@@ -4342,14 +4349,14 @@ async function showDefinitionInFloatingPanel(nodeId) {
         panel.contentEl.innerHTML = `
             ${wikiImage ? `<img src="${wikiImage}" alt="${title}" class="w-full h-32 object-cover rounded-lg mb-3 border border-slate-700">` : ''}
             <p class="leading-relaxed text-slate-200">${definitionText}</p>
-            <p class="mt-3 text-[10px] text-slate-500">Fuente: ${wikiUrl ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="underline hover:text-slate-300">Wikipedia</a>` : 'Wikipedia'}</p>
+            <p class="mt-3 text-[10px] text-slate-500">${tr('def.source')}: ${wikiUrl ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="underline hover:text-slate-300">Wikipedia</a>` : 'Wikipedia'}</p>
         `;
         return;
     }
 
     const hasInteractiveHints = definitionText.includes('[[');
     panel.contentEl.innerHTML = `
-        ${hasInteractiveHints ? `<p class="text-[11px] text-slate-400 mb-3">💡 Haz clic en los conceptos resaltados con ⚡ para agregarlos al mapa.</p>` : ''}
+        ${hasInteractiveHints ? `<p class="text-[11px] text-slate-400 mb-3">${tr('def.hint')}</p>` : ''}
         <div class="leading-relaxed text-slate-200">${formatInteractiveDefinition(definitionText, nodeId)}</div>
     `;
 
@@ -4360,7 +4367,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
             if (!checkBalance(1)) return;
 
             if (!nodes.get(term)) {
-                spawnNodeFromPanel(panel.el, nodeId, parentId, term, 'involucra');
+                spawnNodeFromPanel(panel.el, nodeId, parentId, term, tr("js.involucra"));
                 trackNodeUsage(term);
                 consumeNodes(1);
                 network.focus(term, { scale: 1.0, animation: { duration: 500 } });
@@ -4426,7 +4433,7 @@ document.getElementById('btnMenuEditText')?.addEventListener('click', async () =
     const prefixEmoji = (prefixMatch && prefixMatch[1]) ? prefixMatch[1] : '';
     const currentPlainText = node.baseTitle || currentLabel.replace(/^\*/, '').replace(/\*$/, '').replace(/^(?:\p{Emoji_Presentation}|\p{Extended_Pictographic})\s/u, '');
 
-    const newText = await appPrompt('Editar texto del nodo:', currentPlainText, { title: '✏️ Editar texto' });
+    const newText = await appPrompt(tr("js.editar_texto_del_nodo"), currentPlainText, { title: tr("js.editar_texto") });
     if (newText === null) return; // canceló
     const trimmed = newText.trim();
     if (!trimmed) return;
@@ -4472,7 +4479,7 @@ async function showSimpleExplanationInFloatingPanel(nodeId) {
                     <div class="absolute inset-0 border-[3px] border-slate-700 rounded-full"></div>
                     <div class="absolute inset-0 border-[3px] border-lime-400 rounded-full border-t-transparent animate-spin"></div>
                 </div>
-                <p class="text-slate-400 text-xs italic">Preparando una explicación sencilla…</p>
+                <p class="text-slate-400 text-xs italic">${tr('def.preparing_simple')}</p>
             </div>
         `;
         try {
@@ -4485,12 +4492,12 @@ async function showSimpleExplanationInFloatingPanel(nodeId) {
                     documentContext: globalDocumentContext || currentDocumentText
                 })
             });
-            if (!ok) { panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">No se pudo generar la explicación.</p>`; return; }
+            if (!ok) { panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">${tr('def.err_simple')}</p>`; return; }
             applyServerBalance(data);
             simple = { definition: data.definition, analogy: data.analogy, example: data.example };
             nodes.update({ id: nodeId, simpleExplanation: simple });
         } catch (err) {
-            panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">Error al generar la explicación.</p>`;
+            panel.contentEl.innerHTML = `<p class="text-rose-400 text-xs">${tr('def.err_simple_generic')}</p>`;
             return;
         }
     }
@@ -4499,15 +4506,15 @@ async function showSimpleExplanationInFloatingPanel(nodeId) {
     panel.contentEl.innerHTML = `
         <div class="flex flex-col gap-4">
             <div>
-                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">En palabras simples</p>
+                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">${tr('def.simple_words')}</p>
                 <p class="leading-relaxed text-slate-200">${esc(simple.definition)}</p>
             </div>
             <div class="bg-lime-500/10 border border-lime-500/20 rounded-lg p-3">
-                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">🔗 Es como...</p>
+                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">${tr('def.its_like')}</p>
                 <p class="leading-relaxed text-slate-200 text-[13px]">${esc(simple.analogy)}</p>
             </div>
             <div>
-                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">Por ejemplo</p>
+                <p class="text-[10px] font-bold text-lime-400 uppercase tracking-wider mb-1">${tr('def.for_example')}</p>
                 <p class="leading-relaxed text-slate-200 text-[13px]">${esc(simple.example)}</p>
             </div>
         </div>
@@ -4569,7 +4576,7 @@ nodeBtnExtractChild?.addEventListener('click', () => {
     if (!nodes.get(originId)) return;
 
     // El nodo nace DESDE EL PANEL y la flecha sale de él (ver spawnNodeFromPanel).
-    if (spawnNodeFromPanel(panelEl, panelKey, originId, childTopic, 'deriva en')) {
+    if (spawnNodeFromPanel(panelEl, panelKey, originId, childTopic, tr("js.deriva_en"))) {
         trackNodeUsage(childTopic); consumeNodes(1);
     }
 });
@@ -4803,7 +4810,7 @@ function wireRichPaste(textEl) {
 async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null } = {}) {
     if (!looksLikeWebLink(raw)) return raw;
 
-    showLoader('Leyendo la página...');
+    showLoader(tr("js.leyendo_la_pagina"));
     try {
         const resp = await fetch('/.netlify/functions/read-webpage', {
             method: 'POST',
@@ -4811,7 +4818,7 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
             body: JSON.stringify({ url: raw })
         });
         const data = await resp.json();
-        if (!resp.ok) throw new Error(data.error || 'No se pudo leer esa página.');
+        if (!resp.ok) throw new Error(data.error || tr("js.no_se_pudo_leer_esa"));
         let textForSchema = data.text;
         if (targetTextEl) {
             if (data.contentHtml && data.contentHtml.trim()) {
@@ -4838,7 +4845,7 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
         return textForSchema;
     } catch (err) {
         track('webpage_read_error', { message: String(err?.message || '').slice(0, 160) });
-        appAlert(err.message || "No se pudo leer esa página.");
+        appAlert(err.message || tr("js.no_se_pudo_leer_esa"));
         return null;
     } finally {
         hideLoader();
@@ -4847,7 +4854,7 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
 
 document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
     let textContent = readerTextMode.innerText.trim();
-    if (!textContent || textContent.length < 3) return appAlert("Escribe un tema, pega un texto o el enlace de una página web en el lector.");
+    if (!textContent || textContent.length < 3) return appAlert(tr("js.escribe_un_tema_pega_un"));
 
     textContent = await resolveTextOrWebLink(textContent, {
         targetTextEl: readerTextMode,
@@ -4904,7 +4911,7 @@ async function runMobileGeneration() {
     const pastedRaw = (mobilePasteInput?.value || '').trim();
 
     if (!pastedRaw && !mobilePdfPendingFile) {
-        appAlert('Pegá un texto, un tema, un enlace, o subí un PDF para empezar.');
+        appAlert(tr("js.pega_un_texto_un_tema"));
         return;
     }
 
@@ -4946,7 +4953,7 @@ async function runMobileGeneration() {
 
     currentDocumentText = textContent;
     mobilePdfPendingFile = null;
-    if (mobilePdfLabel) mobilePdfLabel.textContent = 'Subir un PDF';
+    if (mobilePdfLabel) mobilePdfLabel.textContent = tr("js.subir_un_pdf");
 
     await generateFullSchemaFromTopic(textContent, { originPanelId: 'main' });
 
@@ -4998,9 +5005,9 @@ nodes.on('*', () => { if (nodes.length > 0 && !hasDismissedWelcomeScreen) dismis
 
 // Temas precargados para las sugerencias del paso 1 y para "probar al azar"
 const hookTopics = [
-    "La Paradoja de Fermi", "El Mito de la Caverna", "Computación Cuántica",
-    "Filosofía Estoica", "Neuroplasticidad", "Inteligencia Artificial General",
-    "Economía Conductual", "La Teoría de Cuerdas", "Imperio Romano"
+    tr("js.la_paradoja_de_fermi"), tr("js.el_mito_de_la_caverna"), tr("js.computacion_cuantica"),
+    tr("js.filosofia_estoica"), tr("js.neuroplasticidad"), tr("js.inteligencia_artificial_general"),
+    tr("js.economia_conductual"), tr("js.la_teoria_de_cuerdas"), tr("js.imperio_romano")
 ];
 
 // ==========================================
@@ -5031,26 +5038,26 @@ const btnOnbPdf = document.getElementById('btnOnbPdf');
 const onbPdfLabel = document.getElementById('onbPdfLabel');
 
 const ONB_PURPOSE_LABELS = {
-    exam: 'preparar un examen o un curso',
-    research: 'una tesis o una investigación',
-    teach: 'enseñarlo a otras personas',
-    work: 'su trabajo o su profesión',
-    curiosity: 'curiosidad personal'
+    exam: tr("js.preparar_un_examen_o_un"),
+    research: tr("js.una_tesis_o_una_investigacion"),
+    teach: tr("js.ensenarlo_a_otras_personas"),
+    work: tr("js.su_trabajo_o_su_profesion"),
+    curiosity: tr("js.curiosidad_personal")
 };
 const ONB_LEVEL_LABELS = {
-    beginner: 'principiante, está empezando',
-    intermediate: 'intermedio, conoce lo básico',
-    advanced: 'avanzado, tiene bastante base'
+    beginner: tr("js.principiante_esta_empezando"),
+    intermediate: tr("js.intermedio_conoce_lo_basico"),
+    advanced: tr("js.avanzado_tiene_bastante_base")
 };
 // Lista grande de áreas (categorías fijas: es lo que se guarda en el registro).
 const ONB_AREAS = [
-    'Historia', 'Filosofía', 'Psicología', 'Sociología', 'Antropología', 'Ciencia política',
-    'Economía', 'Derecho', 'Educación', 'Comunicación', 'Lingüística', 'Literatura',
-    'Arte', 'Música', 'Arquitectura y diseño', 'Teología y religiones', 'Ética',
-    'Matemáticas', 'Estadística', 'Física', 'Química', 'Biología', 'Medicina y salud',
-    'Neurociencia', 'Ecología y ambiente', 'Geografía', 'Astronomía', 'Geología',
-    'Computación', 'Inteligencia artificial', 'Ingeniería', 'Administración y negocios',
-    'Contabilidad y finanzas', 'Mercadeo', 'Trabajo social', 'Agricultura'
+    tr("js.historia"), tr("js.filosofia"), tr("js.psicologia"), tr("js.sociologia"), tr("js.antropologia"), tr("js.ciencia_politica"),
+    tr("js.economia"), tr("js.derecho"), tr("js.educacion"), tr("js.comunicacion"), tr("js.linguistica"), tr("js.literatura"),
+    tr("js.arte"), tr("js.musica"), tr("js.arquitectura_y_diseno"), tr("js.teologia_y_religiones"), tr("js.etica"),
+    tr("js.matematicas"), tr("js.estadistica"), tr("js.fisica"), tr("js.quimica"), tr("js.biologia"), tr("js.medicina_y_salud"),
+    tr("js.neurociencia"), tr("js.ecologia_y_ambiente"), tr("js.geografia"), tr("js.astronomia"), tr("js.geologia"),
+    tr("js.computacion"), tr("js.inteligencia_artificial"), tr("js.ingenieria"), tr("js.administracion_y_negocios"),
+    tr("js.contabilidad_y_finanzas"), tr("js.mercadeo"), tr("js.trabajo_social"), tr("js.agricultura")
 ];
 
 let onbPurpose = null;
@@ -5147,7 +5154,7 @@ function renderOnbAreas() {
         });
         onbAreaChips.appendChild(chip);
     });
-    if (!onbAreaChips.children.length) onbAreaChips.innerHTML = '<p class="text-xs text-slate-400 py-2">Ninguna área coincide con tu búsqueda.</p>';
+    if (!onbAreaChips.children.length) onbAreaChips.innerHTML = '<p class="text-xs text-slate-400 py-2">' + tr('onb.no_area') + '</p>';
     if (onbAreaCount) onbAreaCount.textContent = `${onbAreas.size}/${ONB_MAX_AREAS}`;
 }
 renderOnbAreas();
@@ -5236,7 +5243,7 @@ document.getElementById('btnOnbFinish')?.addEventListener('click', runOnboarding
 // Camino con fuente propia (texto / enlace / PDF): el flujo de siempre
 async function runOnboardingFromSource() {
     const sourceRaw = (onbSourceInput?.value || '').trim();
-    if (!sourceRaw && !onbPdfPendingFile) { appAlert('Pegá un texto o un enlace, o subí un PDF.'); return; }
+    if (!sourceRaw && !onbPdfPendingFile) { appAlert(tr("js.pega_un_texto_o_un")); return; }
     let textContent = null;
 
     if (onbPdfPendingFile) {
@@ -5304,11 +5311,11 @@ async function deleteNodesFlow(ids) {
         let toRemove = base;
         if (desc.size > 0) {
             const msg = base.length === 1
-                ? `Este nodo tiene ${desc.size} sub-nodo(s) conectado(s).`
-                : `Estos ${base.length} nodos tienen ${desc.size} sub-nodo(s) conectado(s).`;
+                ? tr("js.este_nodo_tiene_sub_nodo", { size: desc.size })
+                : tr("js.estos_nodos_tienen_sub_nodo", { length: base.length, size: desc.size });
             const deleteAll = await appConfirm(msg, {
-                title: base.length === 1 ? '¿Eliminar nodo y sus hijos?' : '¿Eliminar nodos y sus hijos?',
-                okText: 'Eliminar todo', cancelText: base.length === 1 ? 'Solo este nodo' : 'Solo los marcados'
+                title: base.length === 1 ? tr("js.eliminar_nodo_y_sus_hijos") : tr("js.eliminar_nodos_y_sus_hijos"),
+                okText: tr("js.eliminar_todo"), cancelText: base.length === 1 ? tr("js.solo_este_nodo") : tr("js.solo_los_marcados")
             });
             if (deleteAll) toRemove = [...base, ...desc];
         }
@@ -5364,12 +5371,12 @@ const btnSoundToggle = document.getElementById('btnSoundToggle');
 const soundToggleIcon = document.getElementById('soundToggleIcon');
 // Refleja en la cabecera el estado inicial (puede ser encendido por default).
 if (soundToggleIcon) soundToggleIcon.textContent = soundEnabled ? '🔊' : '🔇';
-if (btnSoundToggle) btnSoundToggle.title = `Sonido al crear nodos: ${soundEnabled ? 'encendido' : 'apagado'}`;
+if (btnSoundToggle) btnSoundToggle.title = tr("js.sonido_al_crear_nodos", { state: soundEnabled ? tr("js.encendido") : tr("js.apagado") });
 btnSoundToggle?.addEventListener('click', () => {
     soundEnabled = !soundEnabled;
     try { localStorage.setItem('gk_sound', soundEnabled ? 'on' : 'off'); } catch {}
     if (soundToggleIcon) soundToggleIcon.textContent = soundEnabled ? '🔊' : '🔇';
-    if (btnSoundToggle) btnSoundToggle.title = `Sonido al crear nodos: ${soundEnabled ? 'encendido' : 'apagado'}`;
+    if (btnSoundToggle) btnSoundToggle.title = tr("js.sonido_al_crear_nodos", { state: soundEnabled ? tr("js.encendido") : tr("js.apagado") });
     if (soundEnabled) { getAudioCtx(); playChime(660); }
 });
 
@@ -5399,7 +5406,7 @@ function renderSearchResults(query) {
         : all
     ).slice(0, 40);
     if (!matches.length) {
-        searchPaletteResults.innerHTML = `<div class="px-4 py-3 text-xs text-slate-500 font-sans">Sin resultados.</div>`;
+        searchPaletteResults.innerHTML = `<div class="px-4 py-3 text-xs text-slate-500 font-sans">${tr('search.no_results')}</div>`;
         return;
     }
     searchPaletteResults.innerHTML = matches.map(n => `
@@ -5700,7 +5707,7 @@ function tourShowContentPhase(node, content) {
     card.classList.remove('hidden'); card.classList.add('flex');
 
     const title = node.baseTitle || node.id;
-    const def = stripTourMarkup(content?.definition) || 'No se pudo obtener una definición para este nodo.';
+    const def = stripTourMarkup(content?.definition) || tr("js.no_se_pudo_obtener_una");
     const simple = content?.simple;
 
     inner.innerHTML = `
@@ -5708,9 +5715,9 @@ function tourShowContentPhase(node, content) {
         <p class="text-[#eef1fb] leading-snug font-medium text-center" style="font-size: clamp(1.6rem, 3.6vw, 2.8rem);">${escapeHtml(def)}</p>
         ${simple ? `
         <div class="w-full bg-lime-500/10 border border-lime-500/25 rounded-2xl px-6 py-5 md:px-10 md:py-7 mt-2">
-            <p class="text-lime-400 font-bold uppercase tracking-wider mb-2 text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">En palabras simples</p>
+            <p class="text-lime-400 font-bold uppercase tracking-wider mb-2 text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">${tr('def.simple_words')}</p>
             <p class="text-slate-100 leading-snug text-center" style="font-size: clamp(1.3rem, 2.8vw, 2rem);">${escapeHtml(simple.definition || '')}</p>
-            ${simple.analogy ? `<p class="text-slate-300 italic mt-3 text-center" style="font-size: clamp(1.05rem, 2.1vw, 1.5rem);">Como ${escapeHtml(simple.analogy)}</p>` : ''}
+            ${simple.analogy ? `<p class="text-slate-300 italic mt-3 text-center" style="font-size: clamp(1.05rem, 2.1vw, 1.5rem);">${tr('tour.like', { analogy: escapeHtml(simple.analogy) })}</p>` : ''}
         </div>` : ''}
     `;
 }
@@ -5723,8 +5730,8 @@ function tourShowEndCard() {
     card.classList.remove('hidden'); card.classList.add('flex');
     inner.innerHTML = `
         <p style="font-size: clamp(2.5rem, 6vw, 4rem);">🏁</p>
-        <h1 class="font-heading text-3xl md:text-5xl font-bold text-[#eef1fb] text-center">Fin del recorrido</h1>
-        <p class="text-slate-400 text-center" style="font-size: clamp(1rem, 1.6vw, 1.25rem);">Recorriste ${tourState.order.length} ${tourState.order.length === 1 ? 'lugar' : 'lugares'} del esquema.</p>
+        <h1 class="font-heading text-3xl md:text-5xl font-bold text-[#eef1fb] text-center">${tr('tour.end')}</h1>
+        <p class="text-slate-400 text-center" style="font-size: clamp(1rem, 1.6vw, 1.25rem);">${tourState.order.length === 1 ? tr('tour.visited_one') : tr('tour.visited_many', { n: tourState.order.length })}</p>
     `;
     const playBtn = document.getElementById('tourBtnPlayPause');
     if (playBtn) playBtn.textContent = '↺';
@@ -5785,7 +5792,7 @@ function tourPrev() {
 
 function startTour(nodeIds, opts = {}) {
     const order = buildTourOrder(nodeIds);
-    if (!order.length) { appAlert('No hay nada que recorrer todavía — genera un esquema primero.'); return; }
+    if (!order.length) { appAlert(tr("js.no_hay_nada_que_recorrer")); return; }
 
     tourState = {
         order, index: -1, playing: true, cancelCurrentWait: false,
@@ -5878,10 +5885,10 @@ function quizShowQuestionPhase(node) {
     if (!inner) return;
     const title = node.baseTitle || node.id;
     inner.innerHTML = `
-        <p class="text-[#4fd1c5] font-bold uppercase tracking-wider text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">Pregunta ${quizState.index + 1} de ${quizState.order.length}</p>
-        <h1 class="font-heading font-bold text-[#eef1fb] leading-[1.15] text-center" style="font-size: clamp(1.8rem, 5vw, 3.6rem);">¿Qué es “${escapeHtml(title)}”?</h1>
-        <p class="text-slate-400 text-center" style="font-size: clamp(0.95rem, 1.6vw, 1.15rem);">Pensá tu respuesta antes de revelarla.</p>
-        <button id="quizBtnReveal" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">Mostrar respuesta</button>
+        <p class="text-[#4fd1c5] font-bold uppercase tracking-wider text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">${tr('quiz.question_of', { i: quizState.index + 1, n: quizState.order.length })}</p>
+        <h1 class="font-heading font-bold text-[#eef1fb] leading-[1.15] text-center" style="font-size: clamp(1.8rem, 5vw, 3.6rem);">${tr('quiz.what_is', { title: escapeHtml(title) })}</h1>
+        <p class="text-slate-400 text-center" style="font-size: clamp(0.95rem, 1.6vw, 1.15rem);">${tr('quiz.think')}</p>
+        <button id="quizBtnReveal" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">${tr('quiz.show_answer')}</button>
     `;
     document.getElementById('quizBtnReveal')?.addEventListener('click', quizReveal);
 }
@@ -5890,19 +5897,19 @@ function quizShowAnswerPhase(node, content) {
     const inner = document.getElementById('quizCardInner');
     if (!inner) return;
     const title = node.baseTitle || node.id;
-    const def = stripTourMarkup(content?.definition) || 'No se pudo obtener una definición para este nodo.';
+    const def = stripTourMarkup(content?.definition) || tr("js.no_se_pudo_obtener_una");
     const simple = content?.simple;
     inner.innerHTML = `
         <p class="text-[#4fd1c5] font-bold uppercase tracking-wider text-center" style="font-size: clamp(0.8rem, 1.4vw, 1rem);">${escapeHtml(title)}</p>
         <p class="text-[#eef1fb] leading-snug font-medium text-center" style="font-size: clamp(1.3rem, 2.8vw, 2.2rem);">${escapeHtml(def)}</p>
         ${simple ? `
         <div class="w-full bg-lime-500/10 border border-lime-500/25 rounded-2xl px-6 py-5 mt-1">
-            <p class="text-lime-400 font-bold uppercase tracking-wider mb-2 text-center" style="font-size: clamp(0.75rem, 1.2vw, 0.9rem);">En palabras simples</p>
+            <p class="text-lime-400 font-bold uppercase tracking-wider mb-2 text-center" style="font-size: clamp(0.75rem, 1.2vw, 0.9rem);">${tr('def.simple_words')}</p>
             <p class="text-slate-100 leading-snug text-center" style="font-size: clamp(1.05rem, 2vw, 1.4rem);">${escapeHtml(simple.definition || '')}</p>
         </div>` : ''}
         <div class="flex flex-col sm:flex-row gap-2.5 mt-4 w-full max-w-md">
-            <button id="quizBtnKnew" class="flex-1 bg-lime-500/15 border border-lime-500/40 hover:bg-lime-500/25 text-lime-300 px-5 py-3 rounded-xl font-bold text-sm transition-colors active:scale-95">✓ Lo sabía</button>
-            <button id="quizBtnDidntKnow" class="flex-1 bg-rose-500/15 border border-rose-500/40 hover:bg-rose-500/25 text-rose-300 px-5 py-3 rounded-xl font-bold text-sm transition-colors active:scale-95">✗ No lo sabía</button>
+            <button id="quizBtnKnew" class="flex-1 bg-lime-500/15 border border-lime-500/40 hover:bg-lime-500/25 text-lime-300 px-5 py-3 rounded-xl font-bold text-sm transition-colors active:scale-95">${tr('quiz.knew')}</button>
+            <button id="quizBtnDidntKnow" class="flex-1 bg-rose-500/15 border border-rose-500/40 hover:bg-rose-500/25 text-rose-300 px-5 py-3 rounded-xl font-bold text-sm transition-colors active:scale-95">${tr('quiz.didnt_know')}</button>
         </div>
     `;
     document.getElementById('quizBtnKnew')?.addEventListener('click', () => quizAnswer(true));
@@ -5916,9 +5923,9 @@ function quizShowEndCard() {
     const pct = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0;
     inner.innerHTML = `
         <p style="font-size: clamp(2.5rem, 6vw, 4rem);">${pct >= 70 ? '🎉' : '📚'}</p>
-        <h1 class="font-heading text-3xl md:text-5xl font-bold text-[#eef1fb] text-center">Quiz terminado</h1>
-        <p class="text-slate-300 text-center" style="font-size: clamp(1.1rem, 2vw, 1.4rem);">Sabías ${correctCount} de ${answeredCount} (${pct}%)</p>
-        <button id="quizBtnRetry" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">Reintentar</button>
+        <h1 class="font-heading text-3xl md:text-5xl font-bold text-[#eef1fb] text-center">${tr('quiz.done')}</h1>
+        <p class="text-slate-300 text-center" style="font-size: clamp(1.1rem, 2vw, 1.4rem);">${tr('quiz.score', { ok: correctCount, total: answeredCount, pct })}</p>
+        <button id="quizBtnRetry" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">${tr('quiz.retry')}</button>
     `;
     document.getElementById('quizBtnRetry')?.addEventListener('click', () => startQuiz(quizState.order, { isRetry: true }));
     quizState.index = quizState.order.length;
@@ -5959,7 +5966,7 @@ function quizAnswer(knewIt) {
 
 function startQuiz(nodeIds, opts = {}) {
     const order = opts.isRetry ? nodeIds : buildTourOrder(nodeIds);
-    if (!order.length) { appAlert('No hay nada para el quiz todavía — genera un esquema primero.'); return; }
+    if (!order.length) { appAlert(tr("js.no_hay_nada_para_el")); return; }
 
     quizState = { order, index: -1, correctCount: 0, answeredCount: 0, revealed: false };
     document.getElementById('quizOverlay')?.classList.remove('hidden');
@@ -6090,7 +6097,7 @@ function computeNodeDepths() {
     const children = new Map();
     const hasParent = new Set();
     edges.get().forEach(e => {
-        if (e.label === 'relacionado') return;
+        if (isRelatedEdgeLabel(e.label)) return;
         if (!children.has(e.from)) children.set(e.from, []);
         children.get(e.from).push(e.to);
         hasParent.add(e.to);
@@ -6138,7 +6145,7 @@ function applyImportanceStyling() {
     // "relacionado" conservan su estilo propio).
     const edgeUpdates = [];
     edges.get().forEach(e => {
-        if (e.label === 'relacionado') return;
+        if (isRelatedEdgeLabel(e.label)) return;
         if (!depths.has(e.from) || !depths.has(e.to)) return;
         const deeper = Math.max(depths.get(e.from), depths.get(e.to));
         const width = deeper <= 1 ? 3.6 : deeper === 2 ? 2.4 : 1.6;
@@ -6206,9 +6213,9 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
     await saveCurrentProjectToBin();
 
     const createNewProject = await appConfirm(
-        "Vas a limpiar el lienzo actual. Este esquema ya quedó guardado en 'Mis Proyectos'.\n\n" +
-        "¿Deseas que lo próximo que hagas se guarde en un proyecto NUEVO, aparte de este?",
-        { title: '¿Limpiar el lienzo?', okText: 'Sí, proyecto nuevo', cancelText: 'No, seguir en este' }
+        tr("js.vas_a_limpiar_el_lienzo") +
+        tr("js.deseas_que_lo_proximo_que"),
+        { title: tr("js.limpiar_el_lienzo"), okText: tr("js.si_proyecto_nuevo"), cancelText: tr("js.no_seguir_en_este") }
     );
 
     isClearingCanvas = true;
@@ -6248,7 +6255,7 @@ document.getElementById('btnClearReader')?.addEventListener('click', async () =>
 
     if (!hasText && !hasContext) return;
 
-    if (await appConfirm("¿Deseas limpiar el texto y el contexto del panel de lectura?")) {
+    if (await appConfirm(tr("js.deseas_limpiar_el_texto_y_2"))) {
         currentDocumentText = "";
         globalDocumentContext = "";
         if (readerTextMode) readerTextMode.innerText = "";
@@ -6261,11 +6268,11 @@ document.getElementById('btnClearReader')?.addEventListener('click', async () =>
 
 document.getElementById('btnCapture')?.addEventListener('click', () => {
     if (nodes.length === 0) {
-        appAlert("El lienzo está vacío.");
+        appAlert(tr("js.el_lienzo_esta_vacio"));
         return;
     }
     actionMenu.classList.add('hidden');
-    showLoader('Preparando captura...');
+    showLoader(tr("js.preparando_captura"));
     network.fit({ animation: false });
 
     setTimeout(() => {
@@ -6287,7 +6294,7 @@ document.getElementById('btnCapture')?.addEventListener('click', () => {
             downloadLink.click();
             document.body.removeChild(downloadLink);
         } catch {
-            appAlert("Error al exportar la imagen.");
+            appAlert(tr("js.error_al_exportar_la_imagen"));
         } finally {
             hideLoader();
         }
@@ -6366,13 +6373,13 @@ function showSaveFeedback(state) {
 
     if (state === 'saving') {
         icon.innerText = '⏳';
-        text.innerText = 'Guardando...';
+        text.innerText = tr("js.guardando");
     } else if (state === 'saved') {
         icon.innerText = '✅';
-        text.innerText = 'Guardado';
+        text.innerText = tr("js.guardado");
         setTimeout(() => {
             icon.innerText = '📁';
-            text.innerText = 'Mis Proyectos';
+            text.innerText = tr("js.mis_proyectos");
         }, 1800);
     }
 }
@@ -6390,7 +6397,7 @@ async function saveCurrentProjectToBin() {
     const allEdges = plainEdges();
 
     const firstNode = allNodes[0];
-    const projectTitle = firstNode.baseTitle || firstNode.label?.replace(/\*/g, '').split('\n')[0] || "Mi Esquema";
+    const projectTitle = firstNode.baseTitle || firstNode.label?.replace(/\*/g, '').split('\n')[0] || tr("js.mi_esquema");
 
     // Si aún no tiene ID de proyecto, generamos uno nuevo único
     if (!currentProjectId) {
@@ -6407,7 +6414,7 @@ async function saveCurrentProjectToBin() {
     // applyLoadedProject). Con tope de tamaño — ver MAX_SAVED_READER_TEXT_LENGTH.
     const readerTextToSave = readerTextMode ? readerTextMode.innerText.slice(0, MAX_SAVED_READER_TEXT_LENGTH) : '';
     const projectData = {
-        owner: currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : 'Invitado',
+        owner: currentUser ? (currentUser.user_metadata?.full_name || currentUser.email) : tr("js.invitado"),
         email: currentUser ? currentUser.email : 'local',
         nodes: allNodes,
         edges: allEdges,
@@ -6470,7 +6477,7 @@ async function saveCurrentProjectToBin() {
                 }
             }
         } catch (err) {
-            console.error("Error al sincronizar en la nube:", err);
+            console.error(tr("js.error_al_sincronizar_en_la"), err);
         }
     }
 
@@ -6515,9 +6522,9 @@ function renderProjectsList() {
     if (elProjects) elProjects.innerText = catalog.length;
     if (elNodes) elNodes.innerText = totalTracked;
     if (elRank) {
-        if (totalTracked > 100) elRank.innerText = "Polímata Maestro 🌌";
-        else if (totalTracked > 40) elRank.innerText = "Arquitecto de Ideas 🏛️";
-        else if (totalTracked > 15) elRank.innerText = "Analista Sintético 🔭";
+        if (totalTracked > 100) elRank.innerText = tr("js.polimata_maestro");
+        else if (totalTracked > 40) elRank.innerText = tr("js.arquitecto_de_ideas");
+        else if (totalTracked > 15) elRank.innerText = tr("js.analista_sintetico");
         else elRank.innerText = "Explorador Conceptual 🌱";
     }
 
@@ -6537,14 +6544,14 @@ function renderProjectsList() {
                     <div>
                         <h4 class="text-sm font-bold text-slate-800 flex items-center gap-2">
                             ${proj.title}
-                            ${isCurrent ? '<span class="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">Actual</span>' : ''}
+                            ${isCurrent ? '<span class="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-bold uppercase">' + tr('proj.current') + '</span>' : ''}
                         </h4>
-                        <p class="text-[10px] text-slate-400">Último guardado: ${new Date(proj.date).toLocaleString()}</p>
+                        <p class="text-[10px] text-slate-400">${tr('proj.last_saved')}: ${new Date(proj.date).toLocaleString()}</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-1.5">
                     <button class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg font-bold transition-colors btn-load-proj" data-id="${proj.id}">
-                        Abrir
+                        ${tr('proj.open')}
                     </button>
                 </div>
             `;
@@ -6560,7 +6567,7 @@ function renderProjectsList() {
 async function loadProjectById(projectId) {
     projectsModal.classList.add('hidden');
     projectsModal.classList.remove('flex');
-    showLoader("Cargando tu proyecto...");
+    showLoader(tr("js.cargando_tu_proyecto"));
 
     try {
         // 1. Intentar cargar desde respaldo instantáneo local
@@ -6573,13 +6580,13 @@ async function loadProjectById(projectId) {
 
         // 2. Si no está en local, pedirlo a la nube
         const response = await fetch(`/.netlify/functions/db?projectId=${projectId}`);
-        if (!response.ok) throw new Error("No se pudo cargar");
+        if (!response.ok) throw new Error(tr("js.no_se_pudo_cargar"));
         const resData = await response.json();
         if (resData.data) {
             applyLoadedProject(projectId, resData.data);
         }
     } catch (err) {
-        appAlert("Error al abrir el proyecto.");
+        appAlert(tr("js.error_al_abrir_el_proyecto"));
     } finally {
         hideLoader();
     }
@@ -6620,7 +6627,7 @@ function applyLoadedProject(projectId, record) {
 
 document.getElementById('btnNewProject')?.addEventListener('click', async () => {
     if (nodes.length > 0) {
-        if (!await appConfirm("¿Deseas iniciar un esquema completamente en blanco en un proyecto aparte?")) return;
+        if (!await appConfirm(tr("js.deseas_iniciar_un_esquema_completamente"))) return;
     }
     isClearingCanvas = true;
     schemeStack = [];
@@ -6670,7 +6677,7 @@ async function loadPaypalSdk() {
             const s = document.createElement('script');
             s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(data.clientId)}&currency=USD`;
             s.onload = resolve;
-            s.onerror = () => reject(new Error('No se pudo cargar el SDK de PayPal.'));
+            s.onerror = () => reject(new Error(tr("js.no_se_pudo_cargar_el")));
             document.head.appendChild(s);
         });
         return !!window.paypal;
@@ -6692,7 +6699,7 @@ async function loadPaypalSdk() {
 
     paypal.Buttons({
         createOrder: async function () {
-            if (!requireAuth('comprar nodos')) {
+            if (!requireAuth(tr("js.comprar_nodos"))) {
                 // requireAuth ya mostró el muro de login; cancelamos esta orden.
                 throw new Error('auth_required');
             }
@@ -6702,8 +6709,8 @@ async function loadPaypalSdk() {
                 body: JSON.stringify({ packageId: selected.value })
             });
             if (!ok) {
-                if (status === 401) requireAuth('comprar nodos');
-                else appAlert(data?.error || 'No se pudo iniciar la compra. Intenta de nuevo.');
+                if (status === 401) requireAuth(tr("js.comprar_nodos"));
+                else appAlert(data?.error || tr("js.no_se_pudo_iniciar_la"));
                 throw new Error('create_order_failed');
             }
             return data.orderID;
@@ -6715,13 +6722,13 @@ async function loadPaypalSdk() {
                 body: JSON.stringify({ orderID: data.orderID, packageId: selected.value })
             });
             if (!result.ok) {
-                appAlert(result.data?.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos para acreditarte los nodos.');
+                appAlert(result.data?.error || tr("js.no_se_pudo_confirmar_el"));
                 return;
             }
 
             // El saldo que importa es el que confirma el servidor, no una suma local.
             if (typeof result.data.balance === 'number') { availableNodes = result.data.balance; updateCounterDisplay(); }
-            appAlert(`¡Éxito! Se han añadido ${result.data.nodesAdded} nodos a tu cuenta.`);
+            appAlert(tr("js.exito_se_han_anadido_nodos", { nodesAdded: result.data.nodesAdded }));
 
             document.getElementById('storeModal').classList.add('hidden');
             document.getElementById('storeModal').classList.remove('flex');
@@ -6734,7 +6741,7 @@ async function loadPaypalSdk() {
         onError: function (err) {
             console.error('[paypal]', err);
             if (!/auth_required|create_order_failed/.test(String(err?.message))) {
-                appAlert('Ocurrió un problema con PayPal. Intenta de nuevo en un momento.');
+                appAlert(tr("js.ocurrio_un_problema_con_paypal"));
             }
         }
     }).render('#paypal-button-container');
@@ -6764,9 +6771,9 @@ btnMenuShowGaps?.addEventListener('click', (e) => {
             <div class="border border-[#2c3458] bg-[#161c35] rounded-lg px-2.5 py-2">
                 <p class="text-[#eef1fb] font-bold text-xs mb-0.5">${escapeHtml(gap.term)}</p>
                 <p class="text-[#9aa3c7] text-[11px] leading-snug mb-1.5">${escapeHtml(gap.note)}</p>
-                <button data-gap-idx="${idx}" class="btnFillGap w-full bg-[#1d2442] hover:bg-[#262f55] border border-[#2c3458] text-[#9db4ff] text-[11px] font-semibold py-1.5 rounded-md transition-colors">Generar esquema para esto →</button>
+                <button data-gap-idx="${idx}" class="btnFillGap w-full bg-[#1d2442] hover:bg-[#262f55] border border-[#2c3458] text-[#9db4ff] text-[11px] font-semibold py-1.5 rounded-md transition-colors">${tr('gaps.generate')}</button>
             </div>
-        `).join('') || `<p class="text-[#5b6388] text-xs px-1">No hay lagunas para mostrar.</p>`;
+        `).join('') || `<p class="text-[#5b6388] text-xs px-1">${tr('gaps.none')}</p>`;
 
         gapsBox.querySelectorAll('.btnFillGap').forEach((btn) => {
             btn.addEventListener('click', async () => {
@@ -6826,14 +6833,14 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
     customPromptBox.classList.add('hidden');
     customPromptBox.classList.remove('flex');
 
-    if (!requireAuth("realizar peticiones personalizadas")) return;
+    if (!requireAuth(tr("js.realizar_peticiones_personalizadas"))) return;
     if (!checkBalance(1)) return;
 
     const currentNode = nodes.get(originNodeId);
     const topicName = currentNode.baseTitle || originNodeId;
     const contextPath = getContextPath(originNodeId);
 
-    showLoader('Desarrollando tu petición...');
+    showLoader(tr("js.desarrollando_tu_peticion"));
 
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
@@ -6847,7 +6854,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
             })
         });
 
-        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo procesar tu petición.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudo_procesar_tu")); return; }
         const generatedItems = data.nodes || [];
 
         if (!checkBalance(generatedItems.length)) return;
@@ -6864,7 +6871,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
 
         nodes.add({
             id: queryNodeId,
-            label: `*✨ Petición:*\n"${customRequest}"`,
+            label: tr("js.peticion", { customRequest }),
             baseTitle: customRequest,
             x: queryX,
             y: queryY,
@@ -6877,7 +6884,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
         edges.add({
             from: originNodeId,
             to: queryNodeId,
-            label: 'consulta',
+            label: tr("js.consulta"),
             color: { color: '#818cf8' },
             dashes: true
         });
@@ -6925,7 +6932,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1400);
     } catch (err) {
         console.error(err);
-        appAlert("Intenta de nuevo en unos segundos");
+        appAlert(tr("js.intenta_de_nuevo_en_unos_2"));
     } finally {
         hideLoader();
     }
@@ -6963,19 +6970,19 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
-    if (!requireAuth("explorar antítesis y pensamiento crítico")) return;
+    if (!requireAuth(tr("js.explorar_antitesis_y_pensamiento_critico"))) return;
     if (!checkBalance(2)) return;
 
     const originId = selectedNodeId;
     const topicName = nodes.get(originId).baseTitle || originId;
 
-    showLoader('Buscando contradicciones y límites teóricos...');
+    showLoader(tr("js.buscando_contradicciones_y_limites_teoricos"));
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
             body: JSON.stringify({ action: 'antithesis', topic: topicName, contextPath: getContextPath(originId) })
         });
-        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo generar la antítesis.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudo_generar_la_2")); return; }
         nodes.update(nodes.get().map(n => ({ id: n.id, fixed: { x: true, y: true } })));
         const parentPos = network.getPositions([originId])[originId];
         network.setOptions({ physics: { enabled: true } });
@@ -7005,24 +7012,24 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
         });
         applyServerBalance(data); consumeNodes(count);
         setTimeout(() => { stopPhysicsAndUnlock(); }, 1200);
-    } catch { appAlert("Error al generar antítesis."); } finally { hideLoader(); }
+    } catch { appAlert(tr("js.error_al_generar_antitesis")); } finally { hideLoader(); }
 });
 
 
 // Panel del reto socrático. Se separa en función para poder reconstruirlo al
 // reabrir un proyecto (saved = { answer, feedbackHtml } del panel guardado).
 function buildSocraticPanel(challengePanelId, originId, topicName, question, saved) {
-    const panel = openFloatingPanel(challengePanelId, `🧠 Reto Socrático: ${topicName}`, originId);
+    const panel = openFloatingPanel(challengePanelId, tr("js.reto_socratico", { topicName }), originId);
     panel.el.dataset.nodeId = challengePanelId;
     panel.meta = { kind: 'socratic', topicName, question };
     panel.contentEl.innerHTML = `
         <div class="bg-slate-800/90 border border-emerald-500/40 rounded-xl p-4 mb-4">
-            <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Desafío de Comprensión</p>
+            <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">${tr('soc.challenge')}</p>
             <p class="text-slate-100 text-sm font-medium leading-relaxed">${question}</p>
         </div>
-        <textarea id="socraticInput" rows="4" placeholder="Escribe tu deducción o argumento aquí..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 mb-3"></textarea>
+        <textarea id="socraticInput" rows="4" placeholder="${tr('soc.placeholder')}" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 mb-3"></textarea>
         <button id="btnSubmitSocratic" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-lg">
-            Validar mi Razonamiento (+Nodo de Dominio)
+            ${tr('soc.submit')}
         </button>
         <div id="socraticFeedbackBox" class="hidden mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-200 leading-relaxed"></div>
     `;
@@ -7038,24 +7045,24 @@ function buildSocraticPanel(challengePanelId, originId, topicName, question, sav
 
     panel.contentEl.querySelector('#btnSubmitSocratic')?.addEventListener('click', async () => {
         const userAnswer = panel.contentEl.querySelector('#socraticInput').value.trim();
-        if (userAnswer.length < 5) return appAlert("Escribe una respuesta breve para evaluar.");
+        if (userAnswer.length < 5) return appAlert(tr("js.escribe_una_respuesta_breve_para"));
         if (!checkBalance(1)) return;
 
-        showLoader('Evaluando tu argumento...');
+        showLoader(tr("js.evaluando_tu_argumento"));
         try {
             const { ok: evalOk, status: evalStatus, data: evalData } = await apiFetch('/.netlify/functions/gemini', {
                 method: 'POST',
                 body: JSON.stringify({ action: 'socratic_evaluate', topic: topicName, question, userAnswer })
             });
-            if (!evalOk) { if (!handleBillingError(evalStatus, evalData)) appAlert(evalData?.error || 'No se pudo evaluar tu respuesta.'); return; }
+            if (!evalOk) { if (!handleBillingError(evalStatus, evalData)) appAlert(evalData?.error || tr("js.no_se_pudo_evaluar_tu")); return; }
 
             const fbBox = panel.contentEl.querySelector('#socraticFeedbackBox');
-            fbBox.innerHTML = `<p class="font-bold text-amber-400 mb-1">🌟 Veredicto:</p><p>${evalData.feedback}</p>`;
+            fbBox.innerHTML = `<p class="font-bold text-amber-400 mb-1">${tr('soc.verdict')}</p><p>${evalData.feedback}</p>`;
             fbBox.classList.remove('hidden');
 
             const parentPos = network.getPositions([originId])[originId];
             const masteryId = `mastery_${Date.now()}`;
-            const masterySynthesis = `Tu síntesis: "${userAnswer}"\n\nRetroalimentación: ${evalData.feedback}`;
+            const masterySynthesis = tr("js.tu_sintesis_retroalimentacion", { userAnswer, feedback: evalData.feedback });
             // Nodo pequeño como el resto; la síntesis completa se abre en su propio panel.
             nodes.update({
                 id: masteryId,
@@ -7067,10 +7074,10 @@ function buildSocraticPanel(challengePanelId, originId, topicName, question, sav
                 x: parentPos.x, y: parentPos.y + 150,
                 fixed: { x: false, y: false }
             });
-            edges.add({ from: originId, to: masteryId, label: 'síntesis propia', color: { color: '#eab308' } });
+            edges.add({ from: originId, to: masteryId, label: tr("js.sintesis_propia"), color: { color: '#eab308' } });
             applyServerBalance(evalData); consumeNodes(1);
             showContentInFloatingPanel(masteryId, `🏆 ${evalData.masteryNodeTitle}`, masterySynthesis);
-        } catch { appAlert("Error al evaluar."); } finally { hideLoader(); }
+        } catch { appAlert(tr("js.error_al_evaluar")); } finally { hideLoader(); }
     });
     return panel;
 }
@@ -7078,21 +7085,21 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
-    if (!requireAuth("activar el reto socrático")) return;
+    if (!requireAuth(tr("js.activar_el_reto_socratico"))) return;
 
     const originId = selectedNodeId;
     const topicName = nodes.get(originId).baseTitle || originId;
 
-    showLoader('Formulando desafío socrático...');
+    showLoader(tr("js.formulando_desafio_socratico"));
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
             body: JSON.stringify({ action: 'socratic_question', topic: topicName, contextPath: getContextPath(originId) })
         });
-        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo iniciar el reto.'); return; }
+        if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.no_se_pudo_iniciar_el")); return; }
 
         buildSocraticPanel(`socratic_${originId}_${Date.now()}`, originId, topicName, data.question, null);
-    } catch { appAlert("Error al iniciar el reto."); } finally { hideLoader(); }
+    } catch { appAlert(tr("js.error_al_iniciar_el_reto")); } finally { hideLoader(); }
 });
 
 // ==========================================
@@ -7136,7 +7143,7 @@ function rtfEscape(text) {
   return out;
 }
 
-function isReportExampleNode(n) { return /^\*?Ejemplo:\*?/i.test(String(n?.label || '').trim()); }
+function isReportExampleNode(n) { return /^\*?(Ejemplo|Example):\*?/i.test(String(n?.label || '').trim()); }
 
 // Árbol del informe: [{id,title,depth,examples:[texto]}] en orden de lectura (raíz → rama completa).
 function collectReportNodes() {
@@ -7163,8 +7170,8 @@ function buildReportRtf(items, contentById) {
   const rtf = [];
   rtf.push('{\\rtf1\\ansi\\ansicpg1252\\deff0\\uc1{\\fonttbl{\\f0\\fswiss\\fcharset0 Calibri;}{\\f1\\froman\\fcharset0 Cambria;}}');
   rtf.push('{\\colortbl;\\red27\\green42\\blue65;\\red15\\green118\\blue110;\\red100\\green116\\blue139;}');
-  const mainTitle = items.length ? items[0].title : 'Esquema';
-  rtf.push(`\\pard\\sa120\\f1\\cf3\\fs20 Informe generado con Graphikosmos \\u8226? ${rtfEscape(new Date().toLocaleDateString('es'))}\\par`);
+  const mainTitle = items.length ? items[0].title : tr("js.esquema");
+  rtf.push(`\\pard\\sa120\\f1\\cf3\\fs20 ${rtfEscape(tr('rpt.generated'))} \\u8226? ${rtfEscape(new Date().toLocaleDateString(I18N.lang))}\\par`);
   items.forEach(it => {
     const c = contentById.get(it.id) || {};
     const size = REPORT_HEADING_SIZES[Math.min(it.depth, REPORT_HEADING_SIZES.length - 1)];
@@ -7174,15 +7181,15 @@ function buildReportRtf(items, contentById) {
     const body = (t) => `\\pard\\sa100\\qj\\f0\\cf1\\fs22 ${rtfEscape(t)}\\par`;
     const def = reportPlainText(c.definition);
     const s = c.simple || {};
-    if (def) { rtf.push(label('Definición')); rtf.push(body(def)); }
-    if (s.definition) { rtf.push(label('Explicación sencilla')); rtf.push(body(reportPlainText(s.definition))); }
-    if (s.analogy) { rtf.push(label('Analogía')); rtf.push(body(reportPlainText(s.analogy))); }
+    if (def) { rtf.push(label(tr("js.definicion"))); rtf.push(body(def)); }
+    if (s.definition) { rtf.push(label(tr("js.explicacion_sencilla"))); rtf.push(body(reportPlainText(s.definition))); }
+    if (s.analogy) { rtf.push(label(tr("js.analogia"))); rtf.push(body(reportPlainText(s.analogy))); }
     if (s.example || it.examples.length) {
-      rtf.push(label('Ejemplos prácticos'));
+      rtf.push(label(tr("js.ejemplos_practicos")));
       if (s.example) rtf.push(`\\pard\\li360\\fi-240\\sa60\\f0\\cf1\\fs22 \\u8226? ${rtfEscape(reportPlainText(s.example))}\\par`);
       it.examples.forEach(e => rtf.push(`\\pard\\li360\\fi-240\\sa60\\f0\\cf1\\fs22 \\u8226? ${rtfEscape(e)}\\par`));
     }
-    if (!def && !s.definition) rtf.push(`\\pard\\sa100\\f0\\i\\cf3\\fs20 Sin definición generada todavía.\\i0\\par`);
+    if (!def && !s.definition) rtf.push(`\\pard\\sa100\\f0\\i\\cf3\\fs20 ${rtfEscape(tr('rpt.no_definition'))}\\i0\\par`);
   });
   rtf.push('}');
   return { text: rtf.join('\n'), mainTitle };
@@ -7192,28 +7199,28 @@ let reportBusy = false;
 async function exportReportRtf() {
   if (reportBusy) return;
   const items = collectReportNodes();
-  if (!items.length) { appAlert('Todavía no hay un esquema para hacer el informe.'); return; }
+  if (!items.length) { appAlert(tr("js.todavia_no_hay_un_esquema")); return; }
   const missing = items.filter(it => { const n = nodes.get(it.id); return !n.definition || !n.simpleExplanation; });
   let generate = false;
   if (missing.length) {
     generate = await appConfirm(
-      `${missing.length} de ${items.length} nodos todavía no tienen definición o explicación sencilla. ` +
-      `Si las generas, se usan los mismos servicios (y el mismo saldo) que al abrirlas una por una desde cada nodo. ` +
-      `Si no, el informe incluye solo lo que ya existe.`,
-      { title: 'Armar el informe', okText: `Generar lo que falta (${missing.length})`, cancelText: 'Solo lo que ya existe' });
+      tr("js.de_nodos_todavia_no_tienen", { missing: missing.length, total: items.length }) +
+      tr("js.si_las_generas_se_usan") +
+      tr("js.si_no_el_informe_incluye"),
+      { title: tr("js.armar_el_informe"), okText: tr("js.generar_lo_que_falta", { missing: missing.length }), cancelText: tr("js.solo_lo_que_ya_existe") });
   }
   reportBusy = true;
   const contentById = new Map();
   try {
     if (generate) {
       let done = 0;
-      showLoader(`Preparando el contenido del informe (0 de ${missing.length})…`);
+      showLoader(tr("js.preparando_el_contenido_del_informe", { missing: missing.length }));
       const queue = missing.slice();
       const worker = async () => {
         while (queue.length) {
           const it = queue.shift();
           try { await ensureNodeContent(it.id); } catch (e) { console.error('[informe]', e.message); }
-          done++; if (loaderText) loaderText.innerText = `Preparando el contenido del informe (${done} de ${missing.length})…`;
+          done++; if (loaderText) loaderText.innerText = tr("js.preparando_el_contenido_del_informe_2", { done, missing: missing.length });
         }
       };
       // Dos a la vez: cada nodo hace 2 llamadas; más que eso arriesga topes de uso de la IA.
@@ -7225,7 +7232,7 @@ async function exportReportRtf() {
       contentById.set(it.id, { definition: n.definition, simple: n.simpleExplanation });
     });
     const { text, mainTitle } = buildReportRtf(items, contentById);
-    const safeName = mainTitle.replace(/[\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || 'Esquema';
+    const safeName = mainTitle.replace(/[\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || tr("js.esquema");
     const blob = new Blob([text], { type: 'application/rtf' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = `Informe - ${safeName}.rtf`;
