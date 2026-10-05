@@ -367,7 +367,10 @@ async function rawHandler(event, context) {
 // ==========================================
         // 5. SINTETIZAR ESQUEMA INICIAL (3 NIVELES, SIN EJEMPLOS)
         // ==========================================
-        if (action === 'parse_text') {
+        // 'welcome_schema' = el primer esquema del asistente de bienvenida: se genera
+        // EXACTAMENTE igual que parse_text; solo cambia que billing.js lo deja gratis
+        // (una vez por persona).
+        if (action === 'parse_text' || action === 'welcome_schema') {
             const isShortTopic = text.trim().split(/\s+/).length < 25;
             const { focusTerms } = JSON.parse(event.body);
 
@@ -702,6 +705,53 @@ async function rawHandler(event, context) {
             });
             return { statusCode: 200, body: response.text };
         }
+
+        // ==========================================
+        // 12. TEXTO DE BIENVENIDA (asistente de primera visita, GRATIS)
+        // ==========================================
+        // Genera un texto de lectura breve, alineado con los intereses
+        // académicos que la persona declaró en el asistente, con énfasis en las
+        // BASES del tema. Ese texto se usa luego como fuente del primer esquema,
+        // para mostrar el flujo "texto → esquema" de la herramienta.
+        if (action === 'onboarding_text') {
+            const ob = JSON.parse(event.body);
+            const clip = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+            const field = clip(topic, 200);
+            if (!field) return { statusCode: 400, body: JSON.stringify({ error: 'Falta el campo de estudio' }) };
+            const purpose = clip(ob.purpose, 60);
+            const level = clip(ob.level, 30);
+            const question = clip(ob.question, 400);
+            const areas = (Array.isArray(ob.areas) ? ob.areas : []).slice(0, 3).map(a => clip(a, 50)).filter(Boolean);
+
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    title: { type: 'STRING', description: 'Título corto (máximo 8 palabras) del texto, en español.' },
+                    text: { type: 'STRING', description: 'El texto completo, en español, de 450 a 650 palabras, en párrafos separados por una línea en blanco. Sin markdown, sin listas con viñetas, sin encabezados con # ni asteriscos.' }
+                },
+                required: ['title', 'text']
+            };
+
+            const response = await generateWithFallback({
+                contents: `Escribe un texto de estudio en español para una persona que quiere explorar este campo: "${field}".
+${purpose ? `Lo estudia para: ${purpose}.` : ''}
+${areas.length ? `Sus intereses académicos relacionados son: ${areas.join(', ')}.` : ''}
+${level ? `Su nivel actual: ${level}.` : ''}
+${question ? `Una duda que le intriga: "${question}".` : ''}
+
+INSTRUCCIONES:
+1. Explora con profundidad las BASES del tema: qué es exactamente, de dónde surge, sus conceptos y distinciones fundamentales, los supuestos sobre los que se apoya y las principales corrientes o enfoques.
+2. Conecta el campo con los intereses académicos indicados (si hay): muestra cómo dialogan, qué se toman prestado y dónde chocan. Si no hay intereses, profundiza solo en el campo.
+3. Ajusta el nivel de dificultad al nivel indicado; si es principiante, define cada término técnico la primera vez que aparezca.
+4. Si hay una duda, respóndela dentro del texto de forma natural, sin hacer un apartado aparte.
+5. NO inventes citas textuales, referencias bibliográficas, estudios, cifras ni fechas dudosas. Si algo es debatido o incierto, dilo claramente en vez de afirmarlo.
+6. Es un texto para estudiar y para que se pueda convertir en un esquema conceptual: cada párrafo debe desarrollar una idea distinta y clara, con términos bien definidos.
+7. Tono académico pero claro, en segunda persona del plural o impersonal; nada de saludos, ni "en este texto veremos".`,
+                config: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.5 }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
         return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 
     } catch (error) {

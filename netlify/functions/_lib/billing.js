@@ -6,11 +6,14 @@
 const KNOWN = new Set([
     'parse_text', 'expand', 'examples', 'synergy', 'connect', 'define',
     'simple_explanation', 'custom_prompt', 'antithesis', 'socratic_question', 'socratic_evaluate',
-    'extract_key_terms', 'analyze_text'
+    'extract_key_terms', 'analyze_text',
+    // Asistente de bienvenida (primera visita): el texto de ejemplo y el primer
+    // esquema son gratis, ver la lógica de "welcomeFree" en withBilling.
+    'onboarding_text', 'welcome_schema'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms']);
+const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.
@@ -18,7 +21,7 @@ const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2, analyze_text: 5 
 
 const LIMITS = { topic: 500, topicB: 500, contextPath: 2000, customRequest: 1500,
                  question: 1500, userAnswer: 4000, text: 60000, documentContext: 12000,
-                 analysisType: 30, customType: 200 };
+                 analysisType: 30, customType: 200, purpose: 60, level: 30, question: 600 };
 
 const len = a => (Array.isArray(a) ? a.length : 0);
 
@@ -34,6 +37,7 @@ function computeCost(action, d) {
         case 'socratic_evaluate': return 1;
         case 'extract_key_terms': return len(d.terms);
         case 'analyze_text':      return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
+        // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
         default:                  return 0;
     }
 }
@@ -46,8 +50,24 @@ function sanitize(body) {
     if (typeof body.maxNodes === 'number') body.maxNodes = Math.min(Math.max(body.maxNodes, 1), 10);
 }
 
-function json(statusCode, obj, extraHeaders) {
-    return { statusCode, headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) }, body: JSON.stringify(obj) };
+function json(statusCode, obj, extraHeaders, cookies) {
+    const res = { statusCode, headers: { 'Content-Type': 'application/json', ...(extraHeaders || {}) }, body: JSON.stringify(obj) };
+    // Varias cookies en una misma respuesta (identidad de invitado + marca de
+    // "ya usó el esquema de bienvenida"): Netlify necesita multiValueHeaders.
+    if (cookies && cookies.length) {
+        if (cookies.length === 1) res.headers['Set-Cookie'] = cookies[0];
+        else res.multiValueHeaders = { 'Set-Cookie': cookies };
+    }
+    return res;
+}
+
+const WELCOME_COOKIE = 'gk_welcome';
+function hasWelcomeCookie(event) {
+    const raw = (event.headers && (event.headers.cookie || event.headers.Cookie)) || '';
+    return new RegExp('(?:^|;\\s*)' + WELCOME_COOKIE + '=1(?:;|$)').test(raw);
+}
+function buildWelcomeCookie() {
+    return `${WELCOME_COOKIE}=1; Path=/; Max-Age=${60 * 60 * 24 * 365}; HttpOnly; Secure; SameSite=Lax`;
 }
 
 // Resuelve la identidad de quien llama: usuario de Netlify Identity si hay sesión,
@@ -82,7 +102,7 @@ function withBilling(raw, overrides = {}) {
         let body;
         try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
 
-        const action = body.action;
+        let action = body.action;
         if (!KNOWN.has(action)) return json(400, { error: 'Acción no válida' });
 
         const identity = await resolveIdentity(event, context, deps);
@@ -91,6 +111,8 @@ function withBilling(raw, overrides = {}) {
         sanitize(body);
 
         let balance = null;
+        let welcomeFree = false;
+        if (action === 'welcome_schema' && identity.isAdmin) welcomeFree = true;
         if (!identity.isAdmin) {
             try {
                 balance = identity.kind === 'user'
@@ -104,6 +126,18 @@ function withBilling(raw, overrides = {}) {
             } catch (err) {
                 console.error('[billing] error de base de datos:', err.message);
                 return json(503, { error: 'billing_unavailable' }, cookieHeaders);
+            }
+
+            // Esquema de bienvenida GRATIS, una sola vez por persona: solo si no
+            // trae la marca de haberlo usado y aún no ha gastado nada de su saldo
+            // inicial. Si no cumple, se cobra como un parse_text normal (nunca se
+            // rechaza: es mejor cobrar que dejar a alguien sin esquema).
+            if (action === 'welcome_schema') {
+                const initial = identity.kind === 'user'
+                    ? Number(process.env.INITIAL_FREE_NODES || 50)
+                    : Number(process.env.GUEST_FREE_NODES || 15);
+                if (!hasWelcomeCookie(event) && balance >= initial) welcomeFree = true;
+                else { action = 'parse_text'; body.action = 'parse_text'; }
             }
 
             const min = FREE.has(action) ? 0 : (MIN_BALANCE[action] || 1);
@@ -132,8 +166,9 @@ function withBilling(raw, overrides = {}) {
             }
         }
 
-        return json(200, { ...data, balance, cost, admin: !!identity.isAdmin, guest: identity.kind === 'guest' }, cookieHeaders);
+        const outCookies = [identity.setCookie, (welcomeFree && !identity.isAdmin) ? buildWelcomeCookie() : null].filter(Boolean);
+        return json(200, { ...data, balance, cost, admin: !!identity.isAdmin, guest: identity.kind === 'guest' }, null, outCookies);
     };
 }
 
-module.exports = { withBilling, computeCost, KNOWN };
+module.exports = { withBilling, computeCost, KNOWN, hasWelcomeCookie };

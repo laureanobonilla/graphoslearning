@@ -327,15 +327,16 @@
             #mobileShell { display: flex !important; }
         }
 
-        /* --- ASISTENTE DE BIENVENIDA (3 preguntas, solo primera vez) ---
+        /* --- ASISTENTE DE BIENVENIDA (5 preguntas, solo primera vez) ---
            Ver #welcomeScreen en el body y la sección "ASISTENTE DE
-           BIENVENIDA" en app.js. .onb-depth-option.is-selected marca
-           visualmente cuál profundidad eligió en el paso 2. */
-        .onb-depth-option.is-selected {
+           BIENVENIDA" en app.js. .onb-depth-option / .onb-area-chip con
+           .is-selected marcan visualmente lo elegido. */
+        .onb-depth-option.is-selected, .onb-area-chip.is-selected {
             border-color: #0f172a;
-            background: #f8fafc;
+            background: #f1f5f9;
             box-shadow: 0 0 0 1px #0f172a inset;
         }
+        .onb-area-chip.is-disabled { opacity: .4; cursor: not-allowed; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
@@ -479,31 +480,13 @@
             <button id="btnSearchNodes" title="Buscar un nodo (Ctrl/Cmd+K)" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🔍</span> <span class="hidden md:inline">Buscar</span>
             </button>
-            <button id="btnReplay" title="Repetir la aparición del esquema, nodo por nodo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>▶️</span> <span class="hidden md:inline">Replay</span>
-            </button>
             <button id="btnFocusMode" title="Modo foco: resalta los conceptos más conectados del esquema" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🎯</span> <span class="hidden md:inline">Modo foco</span>
             </button>
+            <!-- Recorrido, Replay y Quiz se quitaron de la cabecera (2026-10-04). El Recorrido
+                 sigue existiendo por dentro porque el modo móvil lo usa. -->
             <button id="btnPresentationMode" title="Modo presentación: oculta toda la interfaz y deja solo el lienzo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🖥️</span> <span class="hidden md:inline">Presentación</span>
-            </button>
-            <!-- Recorrido guiado de pantalla completa: va nodo por nodo (ver
-                 startTour/ANALYSIS... en app.js, sección "RECORRIDO GUIADO").
-                 Antes de entrar a cada nodo muestra el mapa completo con ese
-                 nodo resaltado (para no perder la orientación), luego su
-                 título en grande, y luego su definición + explicación
-                 sencilla en grande, unos segundos cada una. -->
-            <button id="btnStartTour" title="Recorrido guiado: recorre el esquema nodo por nodo, mostrando título, definición y explicación sencilla en pantalla completa" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>🎬</span> <span class="hidden md:inline">Recorrido</span>
-            </button>
-            <!-- Modo Quiz: autoevaluación nodo por nodo (ver sección "MODO QUIZ"
-                 en app.js). Reutiliza el mismo orden de recorrido que el Tour
-                 (buildTourOrder/getCanvasRootIds) pero es un flujo propio e
-                 independiente — no comparte estado con startTour/tourState,
-                 para no arriesgar esa función ya en uso. -->
-            <button id="btnStartQuiz" title="Modo quiz: intenta recordar cada nodo antes de ver la respuesta, y marca qué tan bien te fue" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span>🧠</span> <span class="hidden md:inline">Quiz</span>
             </button>
             <button id="btnSoundToggle" title="Sonido al crear nodos: encendido" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span id="soundToggleIcon">🔊</span>
@@ -788,51 +771,48 @@
         <p class="text-[#4b5578] text-[11px] text-center mt-6 max-w-[30ch] leading-relaxed">Graphikosmos está pensado para usarse en computadora — esta es una vista simplificada para explorar desde el teléfono.</p>
     </div>
 
-    <!-- Pantalla de Bienvenida: ahora un asistente de 3 preguntas (SOLO
-         primera vez, ver gk_has_visited/isFirstTimeUser en app.js). En vez
-         de dejar al usuario frente a un lienzo vacío, le preguntamos qué
-         quiere aprender, qué tan a fondo, y si ya tiene algo que esté
-         leyendo — y con eso armamos de una vez el esquema + el texto en el
-         Modo Lector, para que al "entrar" a la app ya esté todo construido.
-         "Probar con un tema al azar" (abajo del paso 1) es el escape rápido
-         para quien solo quiere ver la magia sin responder nada. -->
+    <!-- Pantalla de Bienvenida: asistente de 5 preguntas (SOLO primera vez, ver
+         gk_has_visited/isFirstTimeUser en app.js): campo de estudio, para qué
+         lo estudia, áreas relacionadas (lista con buscador, hasta 3), nivel y
+         una duda opcional. Con eso la IA escribe un texto de ejemplo (queda en
+         el Modo Lector) y de él sale el primer esquema, ambos gratis. "Ya tengo
+         un texto, un enlace o un PDF" y "Probar con un tema al azar" (paso 1)
+         son las salidas rápidas. -->
         <div id="welcomeScreen" class="hidden absolute inset-0 z-20 flex-col items-center justify-start md:justify-center p-4 pt-8 md:pt-4 bg-slate-900/5 backdrop-blur-[2px] transition-opacity duration-500 overflow-y-auto">        <div class="glass-dock p-5 md:p-10 rounded-3xl max-w-md w-full text-center shadow-2xl border border-slate-200/80 my-auto">
             <div class="w-14 h-14 md:w-16 md:h-16 mx-auto bg-slate-900 text-white rounded-2xl flex items-center justify-center text-2xl md:text-3xl mb-4 md:mb-5 shadow-lg shadow-slate-900/20">Γ</div>
 
-            <!-- Puntos de progreso (1 de 3 / 2 de 3 / 3 de 3) -->
+            <!-- Puntos de progreso (5 pasos) -->
             <div class="flex items-center justify-center gap-1.5 mb-5" id="onbProgressDots">
                 <span class="w-6 h-1.5 rounded-full bg-slate-900 transition-colors" data-dot="1"></span>
                 <span class="w-6 h-1.5 rounded-full bg-slate-200 transition-colors" data-dot="2"></span>
                 <span class="w-6 h-1.5 rounded-full bg-slate-200 transition-colors" data-dot="3"></span>
+                <span class="w-6 h-1.5 rounded-full bg-slate-200 transition-colors" data-dot="4"></span>
+                <span class="w-6 h-1.5 rounded-full bg-slate-200 transition-colors" data-dot="5"></span>
             </div>
 
-            <!-- PASO 1: el tema -->
+            <!-- PASO 1: el campo de estudio (teclado) -->
             <div id="onbStep1" class="onb-step">
                 <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">Hablemos del campo de estudio que buscás explorar</h2>
                 <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Un tema de la universidad, algo del trabajo, o pura curiosidad — con eso armamos tu primer esquema.</p>
-                <input id="onbTopicInput" type="text" placeholder="Ej: La Revolución Francesa, Computación Cuántica..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400/50 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10 transition-shadow mb-3">
+                <input id="onbTopicInput" type="text" placeholder="Ej: La Revolución Francesa, Computación Cuántica..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400/50 focus:outline-none focus:border-slate-400 mb-3">
                 <div class="flex flex-wrap gap-2 justify-center mb-5" id="onbSuggestionChips"></div>
                 <button id="onbNext1" class="w-full bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Siguiente →</button>
-                <button id="onbSkipToRandom" class="mt-3 text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors">Probar con un tema al azar, sin preguntas</button>
+                <div class="mt-3 flex flex-col items-center gap-1">
+                    <button id="onbGoSource" class="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2 transition-colors">Ya tengo un texto, un enlace o un PDF</button>
+                    <button id="onbSkipToRandom" class="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors">Probar con un tema al azar, sin preguntas</button>
+                </div>
             </div>
 
-            <!-- PASO 2: qué tan a fondo -->
+            <!-- PASO 2: para qué lo estudia (una opción) -->
             <div id="onbStep2" class="onb-step hidden">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué tan a fondo lo querés?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Esto decide qué tan denso armamos tu esquema.</p>
-                <div class="flex flex-col gap-2 mb-5" id="onbDepthOptions">
-                    <button type="button" data-depth="essential" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors">
-                        <span class="block text-sm font-bold text-slate-800">Solo lo esencial</span>
-                        <span class="block text-xs text-slate-500">Un resumen claro de lo más importante</span>
-                    </button>
-                    <button type="button" data-depth="exam" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors">
-                        <span class="block text-sm font-bold text-slate-800">Dominarlo a fondo</span>
-                        <span class="block text-xs text-slate-500">Para un examen o un trabajo importante</span>
-                    </button>
-                    <button type="button" data-depth="explore" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors">
-                        <span class="block text-sm font-bold text-slate-800">Explorarlo ampliamente</span>
-                        <span class="block text-xs text-slate-500">Muchas ramas y conexiones distintas</span>
-                    </button>
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Para qué lo estudiás?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Cambia el enfoque con el que armamos tu texto y tu esquema.</p>
+                <div class="flex flex-col gap-2 mb-5" id="onbPurposeOptions">
+                    <button type="button" data-value="exam" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Preparar un examen o un curso</span></button>
+                    <button type="button" data-value="research" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Una tesis o una investigación</span></button>
+                    <button type="button" data-value="teach" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Enseñarlo a otras personas</span></button>
+                    <button type="button" data-value="work" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Mi trabajo o mi profesión</span></button>
+                    <button type="button" data-value="curiosity" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Curiosidad personal</span></button>
                 </div>
                 <div class="flex gap-2">
                     <button id="onbBack2" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
@@ -840,11 +820,49 @@
                 </div>
             </div>
 
-            <!-- PASO 3: fuente opcional (texto/enlace/PDF) -->
+            <!-- PASO 3: áreas relacionadas (lista grande con buscador, hasta 3) -->
             <div id="onbStep3" class="onb-step hidden">
-                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Ya tenés algo que estés leyendo?</h2>
-                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Opcional — si pegás un texto, un enlace o subís un PDF, armamos el esquema a partir de eso en vez de investigar el tema desde cero.</p>
-                <textarea id="onbSourceInput" rows="4" placeholder="Pegá aquí un texto o el enlace de una página (opcional)..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-900/10 transition-shadow resize-none mb-3"></textarea>
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué otras áreas te interesan?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-4 max-w-sm mx-auto">Elegí hasta 3. Buscamos cómo conversan con tu campo. <span id="onbAreaCount" class="font-bold text-slate-700">0/3</span></p>
+                <input id="onbAreaSearch" type="text" placeholder="Buscar un área..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 mb-3">
+                <div id="onbAreaChips" class="flex flex-wrap gap-2 justify-center max-h-48 overflow-y-auto mb-5 p-1"></div>
+                <div class="flex gap-2">
+                    <button id="onbBack3" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
+                    <button id="onbNext3" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Siguiente →</button>
+                </div>
+            </div>
+
+            <!-- PASO 4: nivel (una opción) -->
+            <div id="onbStep4" class="onb-step hidden">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué tanto conocés del tema?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Así ajustamos qué tan técnico es el texto.</p>
+                <div class="flex flex-col gap-2 mb-5" id="onbLevelOptions">
+                    <button type="button" data-value="beginner" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Estoy empezando</span></button>
+                    <button type="button" data-value="intermediate" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Conozco lo básico</span></button>
+                    <button type="button" data-value="advanced" class="onb-depth-option text-left px-4 py-3 rounded-xl border border-slate-200 bg-white hover:border-slate-400 transition-colors"><span class="block text-sm font-bold text-slate-800">Tengo bastante base</span></button>
+                </div>
+                <div class="flex gap-2">
+                    <button id="onbBack4" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
+                    <button id="onbNext4" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed" disabled>Siguiente →</button>
+                </div>
+            </div>
+
+            <!-- PASO 5: una duda (teclado, opcional) -->
+            <div id="onbStep5" class="onb-step hidden">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué duda o pregunta te intriga?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Opcional. Si la escribís, la respondemos dentro de tu texto.</p>
+                <textarea id="onbQuestionInput" rows="3" placeholder="Ej: ¿Por qué se dio así? ¿En qué se diferencia de...?" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400/50 focus:outline-none focus:border-slate-400 mb-5 resize-none"></textarea>
+                <div class="flex gap-2">
+                    <button id="onbBack5" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
+                    <button id="btnOnbFinish" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Crear mi esquema →</button>
+                </div>
+            </div>
+
+            <!-- SALIDA: ya tengo mi propio texto / enlace / PDF (salta las preguntas) -->
+            <div id="onbStepSource" class="onb-step hidden">
+                <h2 class="text-xl md:text-2xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">¿Qué querés estudiar?</h2>
+                <p class="text-xs md:text-sm text-slate-500 mb-5 max-w-sm mx-auto">Pegá un texto, un enlace o subí un PDF, y armamos el esquema a partir de eso.</p>
+                <textarea id="onbSourceInput" rows="4" placeholder="Pegá aquí un texto o el enlace de una página..." class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-slate-400 mb-3 resize-none"></textarea>
                 <div class="flex items-center gap-3 text-slate-400 text-xs mb-3">
                     <div class="flex-1 h-px bg-slate-200"></div>
                     <span>o</span>
@@ -855,11 +873,26 @@
                     📄 <span id="onbPdfLabel">Subir un PDF</span>
                 </button>
                 <div class="flex gap-2">
-                    <button id="onbBack3" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
-                    <button id="btnOnbFinish" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Crear mi esquema →</button>
+                    <button id="onbBackSource" class="px-4 py-3 rounded-xl border border-slate-200 text-slate-500 text-sm font-semibold hover:bg-slate-50 transition-colors">← Atrás</button>
+                    <button id="btnOnbFinishSource" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white px-5 py-3 rounded-xl font-bold text-sm transition-all active:scale-95">Crear mi esquema →</button>
                 </div>
             </div>
+
+            <!-- GENERANDO: mientras se crea el texto y luego el esquema -->
+            <div id="onbGenerating" class="onb-step hidden py-4">
+                <div class="w-10 h-10 mx-auto mb-5 border-4 border-slate-200 border-t-slate-900 rounded-full animate-spin"></div>
+                <h2 class="text-lg md:text-xl font-heading font-extrabold text-slate-900 mb-2 tracking-tight">Generando tu primer esquema</h2>
+                <p class="text-xs md:text-sm text-slate-500 max-w-sm mx-auto">Lo hacemos a partir de un texto que te estoy generando ahora mismo. Más adelante podrás usar el texto que quieras: pegado, un enlace o un PDF.</p>
+            </div>
         </div>
+    </div>
+
+    <!-- Aviso que aparece tras el asistente: explica que el esquema/texto son un
+         EJEMPLO de uso y que el texto lo generó una IA (hay que verificarlo). -->
+    <div id="onbExampleNote" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-[250] w-[min(92vw,560px)] bg-[#0f1428] border border-[#2c3458] rounded-xl shadow-2xl p-4 text-left">
+        <p class="text-sm font-bold text-[#eef1fb] mb-1">Esto es un ejemplo de cómo se usa Graphikosmos</p>
+        <p class="text-xs text-[#9aa3c7] leading-relaxed mb-3">Armamos este esquema a partir de tus respuestas. El texto lo generó una IA solo para el ejemplo, así que verificá los datos antes de citarlo. Cuando quieras, pegá tu propio texto, un enlace o un PDF en el Modo Lector.</p>
+        <button id="onbExampleNoteClose" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-4 py-1.5 rounded-lg text-xs font-bold transition-all">Entendido</button>
     </div>
 
     <!-- Menú de tipos de análisis para "🔎 Analizar Texto". Es un SOLO menú
@@ -920,17 +953,6 @@
             </button>
             <!-- "Recorrido desde aquí" y "Autoevaluarme desde aquí" se quitaron del menú
                  contextual (2026-10-04); siguen disponibles en la cabecera (Recorrido / Quiz). -->
-
-            <!-- DETECCIÓN DE HUECOS: solo visible si el nodo tiene node.gaps
-                 no vacío (ver toggle en app.js, sección "DETECCIÓN DE
-                 HUECOS" y el listener de click sobre nodos). El borde
-                 punteado del nodo en el lienzo ya es la primera señal
-                 visual; este botón abre el detalle y permite expandir cada
-                 hueco directo en un nuevo sub-nodo. -->
-            <button id="btnMenuShowGaps" class="hidden w-full px-3.5 py-2.5 hover:bg-[#2a1f10] text-amber-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
-                ⚠️ Huecos detectados
-            </button>
-            <div id="gapsBox" class="hidden px-3.5 py-2.5 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-2.5"></div>
 
             <!-- Botón y Campo de Petición Personalizada -->
             <button id="btnMenuCustom" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#9db4ff] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
@@ -1002,6 +1024,17 @@
                     </button>
                 </div>
             </div>
+            <!-- ANÁLISIS DE LAGUNAS CONCEPTUALES (antes "Huecos detectados"): solo
+                 visible si el nodo tiene node.gaps no vacío (ver toggle en
+                 app.js, sección "DETECCIÓN DE HUECOS"). Va AL FINAL del menú,
+                 sin ícono ni color de alerta, para que no compita con las
+                 acciones principales. El borde punteado del nodo en el lienzo
+                 sigue siendo la primera señal visual. -->
+            <button id="btnMenuShowGaps" class="hidden w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#8a92b2] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
+                Análisis de lagunas conceptuales
+            </button>
+            <div id="gapsBox" class="hidden px-3.5 py-2.5 bg-[#0f1428] border-t border-[#2c3458] flex-col gap-2.5"></div>
+
         </div>
 
        <div class="border-t border-[#2c3458] p-0.5">

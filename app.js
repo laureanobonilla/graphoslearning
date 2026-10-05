@@ -146,6 +146,33 @@ function getRandomColor() {
     return elegantPalette[Math.floor(Math.random() * elegantPalette.length)];
 }
 
+// Color por NIVEL (2026-10-04): cada nivel del esquema tiene su propio tono,
+// y un nodo nuevo nunca hereda el tono de su padre. El color se decide UNA
+// vez, al crear el nodo — nunca se recolorea después (ni al agregar niveles
+// nuevos ni al reabrir un proyecto), así lo que la persona cambie a mano se
+// queda como lo dejó.
+const LEVEL_PALETTE = [
+    { background: '#ccfbf1', border: '#14b8a6' }, // 0 raíz: turquesa
+    { background: '#e0e7ff', border: '#6366f1' }, // 1: índigo
+    { background: '#fef3c7', border: '#f59e0b' }, // 2: ámbar
+    { background: '#fce7f3', border: '#ec4899' }, // 3: rosa
+    { background: '#dcfce7', border: '#22c55e' }, // 4: verde
+    { background: '#ffedd5', border: '#f97316' }  // 5: naranja (luego vuelve a empezar)
+];
+function colorForDepth(depth, parentColor) {
+    const n = LEVEL_PALETTE.length;
+    let idx = ((depth % n) + n) % n;
+    const parentBg = parentColor && (parentColor.background || (typeof parentColor === 'string' ? parentColor : null));
+    // Si el padre (p. ej. recoloreado a mano) ya tiene justo este tono, saltar al siguiente.
+    if (parentBg && LEVEL_PALETTE[idx].background.toLowerCase() === String(parentBg).toLowerCase()) idx = (idx + 1) % n;
+    return { ...LEVEL_PALETTE[idx] };
+}
+function colorForChildOf(parentId) {
+    const parent = nodes.get(parentId);
+    const depth = (computeNodeDepths().get(parentId) ?? 0) + 1;
+    return colorForDepth(depth, parent && parent.color);
+}
+
 // ==========================================
 // 1.b MICRO-SONIDO AL CREAR NODOS (togglable, Web Audio sintetizado — sin
 // archivos de audio que cargar)
@@ -933,15 +960,21 @@ async function renderThreeLevelTree(data, opts = {}) {
     // nodo con el fragmento exacto de donde salió. Si no hay cita (esquema
     // generado solo a partir de un tema, sin documento), seguimos usando la
     // paleta aleatoria de siempre.
-    const appearanceFor = (hasQuote) => {
+    // 2026-10-04: el RELLENO ahora lo da el nivel (un tono distinto por nivel);
+    // cuando hay cita, el BORDE conserva el color del resaltado del lector
+    // (o el acento del panel), que es lo que sigue uniendo nodo y fragmento.
+    const baseDepth = attachToNodeId ? (computeNodeDepths().get(attachToNodeId) ?? 0) : 0;
+    const attachColor = attachToNodeId ? (nodes.get(attachToNodeId) || {}).color : null;
+    const appearanceFor = (hasQuote, level) => {
+        const lvl = colorForDepth(baseDepth + level, level === 1 ? attachColor : null);
         if (hasQuote) {
             const hc = nextHighlightColor();
             return {
-                color: { background: hc.node.background, border: (multiPanelMode && originAccent) ? originAccent : hc.node.border },
+                color: { background: lvl.background, border: (multiPanelMode && originAccent) ? originAccent : hc.node.border },
                 highlightColorIdx: hc.idx
             };
         }
-        return { color: getRandomColor(), highlightColorIdx: null };
+        return { color: lvl, highlightColorIdx: null };
     };
 
     // IDs de los nodos que se agregan EN ESTA llamada (para el "asentado"
@@ -1081,7 +1114,7 @@ async function renderThreeLevelTree(data, opts = {}) {
     // nodo que YA existe en el lienzo (attachToNodeId): en ese caso ese nodo
     // ya es la raíz, no se crea uno nuevo aparte ni se toca su texto.
     if (!attachToNodeId) {
-        const rootAppearance = appearanceFor(!!(root.sourceQuote && root.sourceQuote.trim()));
+        const rootAppearance = appearanceFor(!!(root.sourceQuote && root.sourceQuote.trim()), 0);
         const rootGaps = gapsForNode(root.id);
         nodes.add({
             id: root.id, label: `*${root.label}*`, baseTitle: root.label,
@@ -1118,7 +1151,7 @@ async function renderThreeLevelTree(data, opts = {}) {
             branchY = branchYTree;
         }
 
-        const branchAppearance = appearanceFor(!!(branch.sourceQuote && branch.sourceQuote.trim()));
+        const branchAppearance = appearanceFor(!!(branch.sourceQuote && branch.sourceQuote.trim()), 1);
         const branchGaps = gapsForNode(branch.id);
         nodes.add({
             id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label,
@@ -1157,7 +1190,7 @@ async function renderThreeLevelTree(data, opts = {}) {
                 subY = subBranchBaseYTree + (row * rowSpacing);
             }
 
-            const subAppearance = appearanceFor(!!(sub.sourceQuote && sub.sourceQuote.trim()));
+            const subAppearance = appearanceFor(!!(sub.sourceQuote && sub.sourceQuote.trim()), 2);
             const subGaps = gapsForNode(sub.id);
             nodes.add({
                 id: sub.id, label: `*${sub.label}*`, baseTitle: sub.label,
@@ -1208,10 +1241,13 @@ async function renderThreeLevelTree(data, opts = {}) {
 
 async function generateFullSchemaFromTopic(topicText, opts = {}) {
     if (!topicText) return;
-    // Verificamos que tenga al menos saldo disponible para iniciar
-    if (!checkBalance(1)) return;
+    const { originPanelId = null, attachToNodeId = null, welcome = false } = opts;
+    // Verificamos que tenga al menos saldo disponible para iniciar. El primer
+    // esquema del asistente de bienvenida es gratis ("welcome_schema" en
+    // billing.js): si por lo que sea el servidor no lo puede dejar gratis, lo
+    // cobra como uno normal y responde igual — por eso aquí no se bloquea.
+    if (!welcome && !checkBalance(1)) return;
 
-    const { originPanelId = null, attachToNodeId = null } = opts;
     const isLong = topicText.trim().split(/\s+/).length >= 25;
     // "topicPreview": para "topic" (un tema corto escrito a mano, como
     // "Segunda Guerra Mundial") es el tema completo — no hay nada que
@@ -1230,7 +1266,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
             method: 'POST',
-            body: JSON.stringify({ action: 'parse_text', text: topicText })
+            body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText })
         });
         if (!ok) {
             if (!handleBillingError(status, data)) appAlert(data?.error || 'Intenta de nuevo en unos segundos.');
@@ -1448,7 +1484,7 @@ function insertSingleNode(topic) {
     if (!checkBalance(1)) return;
     const viewCenter = network.getViewPosition();
     const spot = findFreeSpot(viewCenter.x, viewCenter.y);
-    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, color: getRandomColor(), x: spot.x, y: spot.y, fixed: { x: false, y: false } });
+    nodes.add({ id: topic, label: `*${topic}*`, baseTitle: topic, color: colorForDepth(0), x: spot.x, y: spot.y, fixed: { x: false, y: false } });
     trackNodeUsage(topic); consumeNodes(1); topicInput.value = '';
     setTimeout(() => {
         network.focus(topic, { scale: 1.1, animation: { duration: 600 } });
@@ -1563,11 +1599,12 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
         network.setOptions({ physics: { enabled: true } });
 
         let createdCount = 0;
+        const expandChildColor = colorForChildOf(selectedNodeId);
         (data.concepts || []).forEach((concept, idx) => {
             const cId = nodes.get(concept.id) ? `${concept.id}_${Date.now()}_${idx}` : concept.id;
             nodes.update({
                 id: cId, label: `*${concept.label}*`, baseTitle: concept.label,
-                color: getRandomColor(), expanded: false,
+                color: expandChildColor, expanded: false,
                 x: parentPos.x, y: parentPos.y, fixed: { x: false, y: false }
             });
             edges.add({ from: selectedNodeId, to: cId, label: concept.relationship });
@@ -1911,7 +1948,7 @@ network.on('click', async function (params) {
 
                 const bridge = data.bridge;
                 if (!nodes.get(bridge.id)) {
-                    nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: midX, y: midY, fixed: { x: false, y: false }, color: getRandomColor() });
+                    nodes.add({ id: bridge.id, label: `*${bridge.label}*`, baseTitle: bridge.label, x: midX, y: midY, fixed: { x: false, y: false }, color: colorForChildOf(nodeA.id) });
                     trackNodeUsage(bridge.label);
                     applyServerBalance(data); consumeNodes(1);
                 }
@@ -3540,7 +3577,7 @@ container.addEventListener('drop', (e) => {
     const nodeId = text;
     if (!nodes.get(nodeId)) {
         nodes.add({
-            id: nodeId, label: `*${text}*`, baseTitle: text, color: getRandomColor(),
+            id: nodeId, label: `*${text}*`, baseTitle: text, color: colorForDepth(0),
             x: canvasPos.x, y: canvasPos.y, fixed: { x: false, y: false }
         });
         trackNodeUsage(text); consumeNodes(1);
@@ -3906,7 +3943,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
             const parentPos = network.getPositions([parentId])[parentId] || network.getViewPosition();
             if (!nodes.get(term)) {
                 nodes.add({
-                    id: term, label: `*${term}*`, baseTitle: term, color: getRandomColor(),
+                    id: term, label: `*${term}*`, baseTitle: term, color: colorForChildOf(parentId),
                     x: parentPos.x + (Math.random() * 180 - 90), y: parentPos.y + 140,
                     fixed: { x: false, y: false }
                 });
@@ -4112,7 +4149,7 @@ nodeBtnExtractChild?.addEventListener('click', () => {
 
     if (!nodes.get(newId)) {
         nodes.add({
-            id: newId, label: `*${childTopic}*`, baseTitle: childTopic, color: getRandomColor(),
+            id: newId, label: `*${childTopic}*`, baseTitle: childTopic, color: colorForChildOf(activeNodeDetailId),
             x: parentPos.x + 250, y: parentPos.y + (Math.random() * 100 - 50),
             fixed: { x: false, y: false },
             widthConstraint: { minimum: 150, maximum: 250 }, heightConstraint: { minimum: 50, maximum: 90 }
@@ -4552,47 +4589,80 @@ const hookTopics = [
 ];
 
 // ==========================================
-// ASISTENTE DE BIENVENIDA (3 preguntas, solo primera vez)
+// ASISTENTE DE BIENVENIDA (5 preguntas, solo primera vez)
 // ==========================================
 // En vez de soltar al usuario frente a un lienzo vacío en su primerísima
-// visita, le preguntamos 1) qué quiere entender, 2) qué tan a fondo, y
-// 3) si ya tiene algo que esté leyendo (opcional) — y con esas respuestas
-// armamos el esquema Y dejamos el texto correspondiente en el Modo Lector,
-// para que al cerrarse este asistente la app ya esté con todo construido,
-// en vez de un lienzo en blanco esperando que el usuario sepa qué hacer.
-// Reutiliza exactamente las mismas funciones que ya usa el flujo normal de
-// escritorio (generateFullSchemaFromTopic, resolveTextOrWebLink,
-// handlePdfFileSelected, extractPdfRangeIntoReader) — no hay backend nuevo.
-const onbStep1 = document.getElementById('onbStep1');
-const onbStep2 = document.getElementById('onbStep2');
-const onbStep3 = document.getElementById('onbStep3');
+// visita, le preguntamos 1) el campo que quiere explorar (teclado), 2) para
+// qué lo estudia, 3) qué otras áreas le interesan (lista grande, hasta 3),
+// 4) qué tanto sabe y 5) una duda que le intrigue (teclado, opcional). Con
+// eso la IA escribe un TEXTO de estudio alineado con sus intereses (acción
+// gratuita "onboarding_text"), el texto queda en el Modo Lector y de él sale
+// el primer esquema (acción gratuita "welcome_schema", una vez por persona —
+// ver billing.js). Al terminar se avisa que fue un EJEMPLO de uso y que el
+// texto es de una IA. "Ya tengo un texto, un enlace o un PDF" salta las
+// preguntas y usa lo que la persona traiga (flujo de siempre).
+// Registro (ver track-event.js): se manda el paso en que está, el propósito,
+// el nivel y las ÁREAS elegidas de la lista (categorías, no texto personal).
+// Lo escrito con teclado NUNCA se manda, solo si lo hubo y su longitud.
+const ONB_STEP_IDS = { 1: 'onbStep1', 2: 'onbStep2', 3: 'onbStep3', 4: 'onbStep4', 5: 'onbStep5', source: 'onbStepSource', gen: 'onbGenerating' };
 const onbTopicInput = document.getElementById('onbTopicInput');
 const onbNext1 = document.getElementById('onbNext1');
 const onbNext2 = document.getElementById('onbNext2');
+const onbNext4 = document.getElementById('onbNext4');
+const onbQuestionInput = document.getElementById('onbQuestionInput');
 const onbSourceInput = document.getElementById('onbSourceInput');
 const onbPdfInput = document.getElementById('onbPdfInput');
 const btnOnbPdf = document.getElementById('btnOnbPdf');
 const onbPdfLabel = document.getElementById('onbPdfLabel');
 
-const DEPTH_HINTS = {
-    essential: 'Quiero solo lo esencial: un resumen claro y breve de lo más importante, sin entrar en demasiado detalle.',
-    exam: 'Necesito dominarlo a fondo, como para un examen o un trabajo importante: con buen nivel de detalle y precisión.',
-    explore: 'Quiero explorarlo ampliamente: con muchas ramificaciones y conexiones distintas entre sí.'
+const ONB_PURPOSE_LABELS = {
+    exam: 'preparar un examen o un curso',
+    research: 'una tesis o una investigación',
+    teach: 'enseñarlo a otras personas',
+    work: 'su trabajo o su profesión',
+    curiosity: 'curiosidad personal'
 };
+const ONB_LEVEL_LABELS = {
+    beginner: 'principiante, está empezando',
+    intermediate: 'intermedio, conoce lo básico',
+    advanced: 'avanzado, tiene bastante base'
+};
+// Lista grande de áreas (categorías fijas: es lo que se guarda en el registro).
+const ONB_AREAS = [
+    'Historia', 'Filosofía', 'Psicología', 'Sociología', 'Antropología', 'Ciencia política',
+    'Economía', 'Derecho', 'Educación', 'Comunicación', 'Lingüística', 'Literatura',
+    'Arte', 'Música', 'Arquitectura y diseño', 'Teología y religiones', 'Ética',
+    'Matemáticas', 'Estadística', 'Física', 'Química', 'Biología', 'Medicina y salud',
+    'Neurociencia', 'Ecología y ambiente', 'Geografía', 'Astronomía', 'Geología',
+    'Computación', 'Inteligencia artificial', 'Ingeniería', 'Administración y negocios',
+    'Contabilidad y finanzas', 'Mercadeo', 'Trabajo social', 'Agricultura'
+];
 
-let onbDepth = null;
+let onbPurpose = null;
+let onbLevel = null;
+const onbAreas = new Set();
 let onbPdfPendingFile = null;
+let onbCurrentStep = 1;
 
 function setOnbStep(n) {
-    [onbStep1, onbStep2, onbStep3].forEach((el, idx) => el?.classList.toggle('hidden', idx !== n - 1));
-    document.querySelectorAll('#onbProgressDots [data-dot]').forEach((dot) => {
-        const active = parseInt(dot.dataset.dot, 10) <= n;
-        dot.classList.toggle('bg-slate-900', active);
-        dot.classList.toggle('bg-slate-200', !active);
+    onbCurrentStep = n;
+    Object.entries(ONB_STEP_IDS).forEach(([key, id]) => {
+        document.getElementById(id)?.classList.toggle('hidden', String(key) !== String(n));
     });
+    const dots = document.getElementById('onbProgressDots');
+    const numeric = typeof n === 'number';
+    dots?.classList.toggle('hidden', !numeric);
+    if (numeric) {
+        document.querySelectorAll('#onbProgressDots [data-dot]').forEach((dot) => {
+            const active = parseInt(dot.dataset.dot, 10) <= n;
+            dot.classList.toggle('bg-slate-900', active);
+            dot.classList.toggle('bg-slate-200', !active);
+        });
+    }
+    track('onboarding_step', { step: String(n) });
 }
 
-// Paso 1: tema + sugerencias al azar
+// Paso 1: campo de estudio + sugerencias al azar
 const onbChipsContainer = document.getElementById('onbSuggestionChips');
 if (onbChipsContainer) {
     const shuffled = [...hookTopics].sort(() => 0.5 - Math.random());
@@ -4610,28 +4680,71 @@ if (onbChipsContainer) {
 onbTopicInput?.addEventListener('input', () => {
     if (onbNext1) onbNext1.disabled = !onbTopicInput.value.trim();
 });
+onbTopicInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && onbTopicInput.value.trim()) setOnbStep(2); });
 onbNext1?.addEventListener('click', () => { if (onbTopicInput?.value.trim()) setOnbStep(2); });
 
 // Escape rápido: probar con un tema al azar sin contestar nada
 document.getElementById('onbSkipToRandom')?.addEventListener('click', () => {
     const randomTopic = hookTopics[Math.floor(Math.random() * hookTopics.length)];
+    track('onboarding_skip_random');
     dismissWelcomeScreen();
-    generateFullSchemaFromTopic(randomTopic, { originPanelId: 'main' });
+    generateFullSchemaFromTopic(randomTopic, { originPanelId: 'main', welcome: true });
 });
+// Salida: ya traigo mi propio texto / enlace / PDF
+document.getElementById('onbGoSource')?.addEventListener('click', () => { track('onboarding_go_source'); setOnbStep('source'); });
+document.getElementById('onbBackSource')?.addEventListener('click', () => setOnbStep(1));
 
-// Paso 2: profundidad deseada
-document.querySelectorAll('.onb-depth-option').forEach((btn) => {
-    btn.addEventListener('click', () => {
-        onbDepth = btn.dataset.depth;
-        document.querySelectorAll('.onb-depth-option').forEach(b => b.classList.toggle('is-selected', b === btn));
-        if (onbNext2) onbNext2.disabled = false;
+// Pasos 2 y 4: una sola opción
+function wireSingleChoice(containerId, onPick) {
+    document.querySelectorAll(`#${containerId} .onb-depth-option`).forEach((btn) => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll(`#${containerId} .onb-depth-option`).forEach(b => b.classList.toggle('is-selected', b === btn));
+            onPick(btn.dataset.value);
+        });
     });
-});
+}
+wireSingleChoice('onbPurposeOptions', (v) => { onbPurpose = v; if (onbNext2) onbNext2.disabled = false; });
+wireSingleChoice('onbLevelOptions', (v) => { onbLevel = v; if (onbNext4) onbNext4.disabled = false; });
 document.getElementById('onbBack2')?.addEventListener('click', () => setOnbStep(1));
-onbNext2?.addEventListener('click', () => { if (onbDepth) setOnbStep(3); });
+onbNext2?.addEventListener('click', () => { if (onbPurpose) setOnbStep(3); });
 
-// Paso 3: fuente opcional (texto/enlace/PDF)
+// Paso 3: lista grande de áreas con buscador, hasta 3 (opcional)
+const ONB_MAX_AREAS = 3;
+const onbAreaChips = document.getElementById('onbAreaChips');
+const onbAreaSearch = document.getElementById('onbAreaSearch');
+const onbAreaCount = document.getElementById('onbAreaCount');
+function renderOnbAreas() {
+    if (!onbAreaChips) return;
+    const q = (onbAreaSearch?.value || '').trim().toLowerCase();
+    onbAreaChips.innerHTML = '';
+    const full = onbAreas.size >= ONB_MAX_AREAS;
+    ONB_AREAS.filter(a => !q || a.toLowerCase().includes(q)).forEach((area) => {
+        const selected = onbAreas.has(area);
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'onb-area-chip px-3 py-1.5 rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:border-slate-400 transition-colors'
+            + (selected ? ' is-selected' : '') + (!selected && full ? ' is-disabled' : '');
+        chip.textContent = area;
+        chip.addEventListener('click', () => {
+            if (onbAreas.has(area)) onbAreas.delete(area);
+            else if (onbAreas.size < ONB_MAX_AREAS) onbAreas.add(area);
+            renderOnbAreas();
+        });
+        onbAreaChips.appendChild(chip);
+    });
+    if (!onbAreaChips.children.length) onbAreaChips.innerHTML = '<p class="text-xs text-slate-400 py-2">Ninguna área coincide con tu búsqueda.</p>';
+    if (onbAreaCount) onbAreaCount.textContent = `${onbAreas.size}/${ONB_MAX_AREAS}`;
+}
+renderOnbAreas();
+onbAreaSearch?.addEventListener('input', renderOnbAreas);
 document.getElementById('onbBack3')?.addEventListener('click', () => setOnbStep(2));
+document.getElementById('onbNext3')?.addEventListener('click', () => setOnbStep(4));
+
+document.getElementById('onbBack4')?.addEventListener('click', () => setOnbStep(3));
+onbNext4?.addEventListener('click', () => { if (onbLevel) setOnbStep(5); });
+document.getElementById('onbBack5')?.addEventListener('click', () => setOnbStep(4));
+
+// Salida con fuente propia: PDF
 btnOnbPdf?.addEventListener('click', () => onbPdfInput?.click());
 onbPdfInput?.addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
@@ -4642,9 +4755,73 @@ onbPdfInput?.addEventListener('change', (e) => {
     e.target.value = '';
 });
 
+// Aviso final: esto fue un ejemplo y el texto es de una IA
+const onbExampleNote = document.getElementById('onbExampleNote');
+function showOnbExampleNote() { onbExampleNote?.classList.remove('hidden'); }
+document.getElementById('onbExampleNoteClose')?.addEventListener('click', () => onbExampleNote?.classList.add('hidden'));
+
+// Camino con preguntas: texto generado por IA → Modo Lector → primer esquema gratis
 async function runOnboardingGeneration() {
-    const topic = (onbTopicInput?.value || '').trim();
+    const field = (onbTopicInput?.value || '').trim();
+    if (!field) { setOnbStep(1); return; }
+    const question = (onbQuestionInput?.value || '').trim();
+    const areas = [...onbAreas];
+
+    track('onboarding_completed', {
+        purpose: onbPurpose, level: onbLevel, areas,
+        fieldLength: field.length, hasQuestion: !!question, questionLength: question.length
+    });
+    setOnbStep('gen');
+
+    let title = null, generatedText = null;
+    try {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
+            method: 'POST',
+            body: JSON.stringify({
+                action: 'onboarding_text',
+                topic: field,
+                purpose: ONB_PURPOSE_LABELS[onbPurpose] || '',
+                level: ONB_LEVEL_LABELS[onbLevel] || '',
+                areas,
+                question
+            })
+        });
+        if (ok && data && typeof data.text === 'string' && data.text.trim().length > 200) {
+            title = (data.title || '').trim() || field;
+            generatedText = data.text.trim();
+        } else {
+            track('onboarding_text_error', { status: String(status) });
+        }
+    } catch (err) {
+        track('onboarding_text_error', { status: 'network' });
+    }
+
+    let textForSchema = field; // respaldo: si el texto falla, se arma desde el tema como siempre
+    if (generatedText) {
+        readerTextMode.innerHTML = textToParagraphHtml(generatedText);
+        // El esquema y el resaltado deben basarse en el MISMO texto que quedó en el panel
+        textForSchema = buildEditableTextIndex(readerTextMode).text || generatedText;
+        currentDocumentText = textForSchema;
+        if (!globalDocumentContext) {
+            globalDocumentContext = title;
+            if (docContextInput) docContextInput.value = title;
+            updateDocContextChip();
+        }
+    } else {
+        currentDocumentText = field;
+    }
+
+    dismissWelcomeScreen();
+    await generateFullSchemaFromTopic(textForSchema, { originPanelId: 'main', welcome: true });
+    if (generatedText) openReaderPanel();
+    showOnbExampleNote();
+}
+document.getElementById('btnOnbFinish')?.addEventListener('click', runOnboardingGeneration);
+
+// Camino con fuente propia (texto / enlace / PDF): el flujo de siempre
+async function runOnboardingFromSource() {
     const sourceRaw = (onbSourceInput?.value || '').trim();
+    if (!sourceRaw && !onbPdfPendingFile) { appAlert('Pegá un texto o un enlace, o subí un PDF.'); return; }
     let textContent = null;
 
     if (onbPdfPendingFile) {
@@ -4654,7 +4831,7 @@ async function runOnboardingGeneration() {
         await extractPdfRangeIntoReader(1, toPage);
         if (!readerTextMode.innerText.trim()) return;
         textContent = readerTextMode.innerText.trim();
-    } else if (sourceRaw) {
+    } else {
         textContent = await resolveTextOrWebLink(sourceRaw, {
             targetTextEl: readerTextMode,
             onTitle: (title) => {
@@ -4666,23 +4843,15 @@ async function runOnboardingGeneration() {
             }
         });
         if (textContent === null) return;
-    } else {
-        textContent = topic;
     }
 
+    track('onboarding_source_used', { kind: onbPdfPendingFile ? 'pdf' : (looksLikeWebLink(sourceRaw) ? 'link' : 'text') });
     currentDocumentText = textContent;
     dismissWelcomeScreen();
-
-    const depthHint = DEPTH_HINTS[onbDepth] || '';
-    const combinedText = depthHint ? `${depthHint}\n\n${textContent}` : textContent;
-    await generateFullSchemaFromTopic(combinedText, { originPanelId: 'main' });
-
-    // Mostramos el Modo Lector con el texto usado (si lo hubo) para que, al
-    // "entrar" a la app, ya se vea tanto el esquema como su fuente.
-    if (onbPdfPendingFile || sourceRaw) openReaderPanel();
+    await generateFullSchemaFromTopic(textContent, { originPanelId: 'main', welcome: true });
+    openReaderPanel();
 }
-
-document.getElementById('btnOnbFinish')?.addEventListener('click', runOnboardingGeneration);
+document.getElementById('btnOnbFinishSource')?.addEventListener('click', runOnboardingFromSource);
 
 // Función auxiliar para encontrar todos los descendientes (hijos, nietos, etc.) de un nodo
 function getAllDescendants(parentNodeId) {
@@ -6137,12 +6306,12 @@ btnMenuShowGaps?.addEventListener('click', (e) => {
         const node = nodes.get(selectedNodeId);
         const gaps = (node?.gaps) || [];
         gapsBox.innerHTML = gaps.map((gap, idx) => `
-            <div class="border border-amber-500/25 bg-amber-500/5 rounded-lg px-2.5 py-2">
-                <p class="text-amber-200 font-bold text-xs mb-0.5">${escapeHtml(gap.term)}</p>
+            <div class="border border-[#2c3458] bg-[#161c35] rounded-lg px-2.5 py-2">
+                <p class="text-[#eef1fb] font-bold text-xs mb-0.5">${escapeHtml(gap.term)}</p>
                 <p class="text-[#9aa3c7] text-[11px] leading-snug mb-1.5">${escapeHtml(gap.note)}</p>
-                <button data-gap-idx="${idx}" class="btnFillGap w-full bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-200 text-[11px] font-semibold py-1.5 rounded-md transition-colors">Generar esquema para esto →</button>
+                <button data-gap-idx="${idx}" class="btnFillGap w-full bg-[#1d2442] hover:bg-[#262f55] border border-[#2c3458] text-[#9db4ff] text-[11px] font-semibold py-1.5 rounded-md transition-colors">Generar esquema para esto →</button>
             </div>
-        `).join('') || `<p class="text-[#5b6388] text-xs px-1">No hay huecos para mostrar.</p>`;
+        `).join('') || `<p class="text-[#5b6388] text-xs px-1">No hay lagunas para mostrar.</p>`;
 
         gapsBox.querySelectorAll('.btnFillGap').forEach((btn) => {
             btn.addEventListener('click', async () => {
@@ -6274,7 +6443,7 @@ btnSendCustomPrompt?.addEventListener('click', async () => {
                     label: `*${item.title}*`,
                     baseTitle: item.title,
                     definition: item.content || null,
-                    color: getRandomColor(),
+                    color: colorForChildOf(queryNodeId),
                     x: queryX + offsetX,
                     y: queryY + 150,
                     fixed: { x: false, y: false },
