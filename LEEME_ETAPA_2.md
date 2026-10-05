@@ -2701,3 +2701,6 @@ usaba párrafos propios y sigue igual.
   `resolveTextOrWebLink` (reemplaza el `innerText = ...` del camino sin
   HTML), en `wireRichPaste` (pegado de texto plano) y en
   `applyLoadedProject` (restaurar el texto guardado de un proyecto).
+
+## 46. Nueva app: "Vestirte" (`vestirte/`)
+10 preguntas + 5 fotos con ropa puesta → perfil de estilo → 10 ocasiones (2 gratis, 8 de pago; cada una con opción cara, intermedia y barata). Reutiliza la generación en 3 pasos, el almacén y el pago de quien-eres. Fotos privadas en Cloudinary, panel en `/vestirte/admin/`, borrado por la persona y limpieza automática. Instrucciones completas: `vestirte/LEEME.md`; SQL: `supabase/vestirte.sql`.

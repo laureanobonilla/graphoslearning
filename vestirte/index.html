@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vestirte</title>
+<meta name="description" content="10 preguntas y 5 fotos para saber qué ropa y qué colores te quedan mejor, en tres presupuestos y para 10 ocasiones.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f1f3f2; --paper-2:#e4e8e6; --ink:#1b2a41; --ink-soft:#4a5a70; --chalk:#d1495b; --chalk-dark:#a8303f;
+  --tape:#f2c14e; --white:#fff; --line:#b9c2cc; --ok:#2f7d5b;
+  --display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif; --body:'Hanken Grotesk','Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 1rem/1.55 var(--body);min-height:100vh}
+.display{font-family:var(--display);letter-spacing:-.01em}
+.is-hidden{display:none!important}
+:focus-visible{outline:3px solid var(--chalk);outline-offset:2px}
+button{font:inherit;color:inherit;cursor:pointer}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px}
+.screen{display:none;max-width:640px;margin:0 auto;padding:28px 16px 72px}
+.screen.is-active{display:block}
+
+#progress{position:sticky;top:0;z-index:5;height:6px;background:var(--paper-2)}
+#progressFill{height:100%;width:0;background:var(--chalk);transition:width .3s}
+
+/* Botones */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 24px;border:2px solid var(--ink);border-radius:999px;font-weight:600;background:var(--white);transition:transform .12s,background .12s}
+.btn:hover:not(:disabled){transform:translateY(-1px)}
+.btn-primary{background:var(--ink);color:var(--white)}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed}
+.btn-outline{background:transparent}
+.btn-ghost{background:none;border:0;text-decoration:underline;text-underline-offset:3px;min-height:44px;padding:0 8px;color:var(--ink-soft)}
+.btn-block{width:100%}
+
+/* Portada */
+.cover-mark{font:800 clamp(3.4rem,17vw,6.4rem)/.9 var(--display);letter-spacing:-.04em;margin:18px 0 6px}
+.cover-mark span{display:inline-block;background:linear-gradient(transparent 62%,var(--tape) 62%)}
+.cover-sub{font-size:1.2rem;color:var(--ink-soft);max-width:30ch;margin:0 0 28px}
+.cover-list{list-style:none;margin:0 0 28px;padding:0;display:grid;gap:10px}
+.cover-list li{display:flex;gap:12px;align-items:baseline;border-bottom:2px dashed var(--line);padding-bottom:10px}
+.cover-list b{font-family:var(--display);font-size:1.6rem;min-width:3.2ch;color:var(--chalk)}
+.privacy-note{font-size:.88rem;color:var(--ink-soft);border:2px dashed var(--line);border-radius:14px;padding:12px 14px;margin:0 0 24px}
+
+/* Cuestionario */
+.q-top{display:flex;align-items:center;gap:8px;margin-bottom:18px}
+#btnBack{width:44px;height:44px;border-radius:50%;border:2px solid var(--ink);background:var(--white);font-size:1.4rem;line-height:1}
+.q-step{font-size:.9rem;color:var(--ink-soft);font-weight:600}
+.q-prompt{font-size:clamp(1.5rem,5.6vw,2rem);line-height:1.15;font-weight:700;margin:0 0 8px}
+.q-help{color:var(--ink-soft);margin:0 0 18px;font-size:.95rem}
+.options{display:grid;gap:10px;margin-top:14px}
+.option{display:flex;align-items:center;gap:12px;text-align:left;min-height:52px;padding:10px 16px;border:2px solid var(--line);border-radius:14px;background:var(--white)}
+.option .dot{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid var(--ink-soft)}
+.option.is-selected{border-color:var(--ink);background:#fff7e0}
+.option.is-selected .dot{background:var(--chalk);border-color:var(--chalk);box-shadow:inset 0 0 0 3px #fff7e0}
+.short-input{width:100%;font:inherit;padding:14px;border:2px solid var(--line);border-radius:14px;background:var(--white);resize:vertical;min-height:96px}
+.short-input:focus{border-color:var(--ink);outline:none}
+.q-actions{display:flex;margin-top:26px}
+.q-actions .btn{flex:1}
+
+/* Fotos: el marco imita un patrón de costura */
+.photo-wrap{display:grid;gap:18px;margin-top:6px}
+.frame{position:relative;width:min(100%,300px);aspect-ratio:3/4;margin:0 auto;border:3px dashed var(--ink);border-radius:6px;background:var(--white);overflow:hidden;display:flex;align-items:center;justify-content:center}
+.frame::before{content:"";position:absolute;inset:0 auto 0 0;width:14px;background:repeating-linear-gradient(to bottom,var(--tape) 0 2px,transparent 2px 10px);opacity:.9;z-index:2;pointer-events:none}
+.frame img{width:100%;height:100%;object-fit:contain;display:block}
+.frame.has-photo img{object-fit:cover}
+.frame .fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--ink-soft);font-size:.85rem;text-align:center;padding:24px}
+.frame .fallback svg{width:46%;height:auto;stroke:var(--ink-soft);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.guide-chip{position:absolute;right:8px;bottom:8px;z-index:3;width:54px;height:72px;border:2px solid var(--white);border-radius:6px;background:var(--white) center/contain no-repeat;box-shadow:0 1px 6px #0003}
+.photo-why{background:var(--white);border:2px solid var(--line);border-radius:14px;padding:14px 16px}
+.photo-why p{margin:0}
+.photo-why p+p{margin-top:8px}
+.photo-why .tip{color:var(--ink-soft);font-size:.92rem}
+.upload-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.upload-row .btn{flex:1 1 180px}
+.consent{display:grid;gap:12px;background:#fff7e0;border:2px solid var(--tape);border-radius:14px;padding:14px 16px;margin-bottom:18px}
+.consent label{display:flex;gap:12px;align-items:flex-start;font-size:.93rem}
+.consent input{flex:none;width:22px;height:22px;margin-top:1px;accent-color:var(--chalk)}
+.consent p{margin:0;font-size:.93rem}
+
+/* Carga y error */
+.center{text-align:center;padding-top:20vh}
+.spinner{width:46px;height:46px;border-radius:50%;border:5px solid var(--paper-2);border-top-color:var(--chalk);margin:0 auto 18px;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spinner{animation:none}.btn,#progressFill{transition:none}}
+.error-box{padding-top:12vh}
+#errorDetail{color:var(--ink-soft);word-break:break-word}
+
+/* Resultado */
+.style-name{font-size:clamp(2.1rem,9vw,3.2rem);line-height:1;font-weight:800;letter-spacing:-.03em;margin:6px 0 10px}
+.hook-line{font-size:1.1rem;color:var(--ink-soft);margin:0 0 22px}
+.palette-title{font-weight:700;margin:0 0 8px}
+.swatches{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 6px}
+.sw{display:flex;align-items:center;gap:8px;font-size:.85rem;background:var(--white);border:2px solid var(--line);border-radius:999px;padding:4px 12px 4px 4px}
+.sw i{width:26px;height:26px;border-radius:50%;border:1px solid #0003;display:block}
+.sw.avoid{opacity:.8;border-style:dashed}
+.palette-block{margin-bottom:28px}
+.occasion{background:var(--white);border:2px solid var(--ink);border-radius:18px;padding:18px 16px;margin-bottom:20px}
+.occasion h3{margin:0 0 4px;font-size:1.45rem;line-height:1.15}
+.occasion .why{color:var(--ink-soft);margin:0 0 14px}
+.tier{border-top:2px dashed var(--line);padding-top:12px;margin-top:12px}
+.tier-tag{display:inline-block;font-weight:700;font-size:.85rem;border-radius:999px;padding:2px 12px;color:var(--white);background:var(--ink)}
+.tier-tag.cara{background:var(--chalk-dark)}
+.tier-tag.intermedia{background:var(--ink)}
+.tier-tag.barata{background:var(--ok)}
+.tier h4{margin:6px 0 6px;font-size:1.1rem}
+.tier ul{margin:0 0 8px;padding-left:20px}
+.tier .style{margin:0 0 4px}
+.tier .tip{margin:0;color:var(--ink-soft);font-size:.92rem}
+.tier .swatches{margin:6px 0}
+.locked-intro{font-weight:700;margin:6px 0 10px}
+.locked-item{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-top:2px dashed var(--line)}
+.lock-ico{flex:none;width:26px;height:26px;margin-top:3px;stroke:var(--ink-soft);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.locked-title{margin:0;font-size:1.15rem;font-weight:700}
+.locked-hook{margin:2px 0 0;color:var(--ink-soft)}
+.locked-words{margin:2px 0 0;font-size:.82rem;color:var(--ink-soft)}
+.paywall{margin-top:24px;background:var(--ink);color:var(--white);border-radius:20px;padding:22px 18px;text-align:center}
+.paywall-commitment{margin:0 0 4px;color:#c9d4e2;font-size:.95rem}
+.paywall-label{font-size:1.5rem;font-weight:700;margin:0 0 8px;line-height:1.15}
+.paywall-price{margin:0 0 16px}
+.paywall .btn-outline{color:var(--white);border-color:#8fa0b6;margin-top:12px}
+.paywall .btn-ghost{color:#c9d4e2}
+#paypal-button-container{max-width:360px;margin:0 auto}
+.reason-block{margin:14px 0}
+.reason-list{display:grid;gap:8px;margin-top:8px}
+.skip-reason{min-height:44px;border-radius:12px;border:2px solid #8fa0b6;background:transparent;color:var(--white);padding:6px 12px}
+.closing-line{font-family:var(--display);font-size:1.4rem;font-weight:700;line-height:1.25;margin:20px 0}
+.privacy-actions{margin-top:30px;border-top:2px dashed var(--line);padding-top:16px;font-size:.92rem;color:var(--ink-soft)}
+.privacy-actions p{margin:0 0 8px}
+@media (min-width:700px){.screen{padding-top:44px}}
+</style>
+</head>
+<body>
+  <div id="progress" class="is-hidden"><div id="progressFill"></div></div>
+
+  <!-- PORTADA -->
+  <section id="screen-cover" class="screen is-active">
+    <h1 class="cover-mark display"><span>Vestirte</span></h1>
+    <p class="cover-sub">La ropa y los colores que mejor te quedan, para cada ocasión.</p>
+    <ul class="cover-list">
+      <li><b>10</b><span>preguntas rápidas sobre tu vida y tu presupuesto</span></li>
+      <li><b>5</b><span>fotos tuyas, con ropa normal, para ver tus colores y tus proporciones</span></li>
+      <li><b>10</b><span>ocasiones, cada una con tres opciones: cara, intermedia y barata</span></li>
+    </ul>
+    <p class="privacy-note">Solo para mayores de 18 años. Tus fotos se guardan en un espacio privado, se usan solo para armar tu recomendación y puedes pedir que se borren cuando quieras.</p>
+    <button id="btnStart" class="btn btn-primary btn-block">Empezar</button>
+    <button id="btnResume" class="btn btn-ghost is-hidden" style="margin-top:12px"></button>
+  </section>
+
+  <!-- PASOS (10 preguntas + 5 fotos) -->
+  <section id="screen-quiz" class="screen">
+    <div class="q-top">
+      <button id="btnBack" aria-label="Paso anterior">‹</button>
+      <span id="qStep" class="q-step"></span>
+    </div>
+    <h2 id="qPrompt" class="q-prompt display"></h2>
+    <p id="qHelp" class="q-help is-hidden"></p>
+    <div id="qBody"></div>
+    <div class="q-actions"><button id="btnNext" class="btn btn-primary" disabled>Siguiente</button></div>
+  </section>
+
+  <!-- CARGA -->
+  <section id="screen-loading" class="screen">
+    <div class="center">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loadingLabel" class="display" style="font-size:1.3rem;font-weight:700;margin:0 0 6px">Mirando tus fotos…</p>
+      <p style="color:var(--ink-soft);margin:0">Tarda menos de un minuto. No cierres esta página.</p>
+    </div>
+  </section>
+
+  <!-- ERROR -->
+  <section id="screen-error" class="screen">
+    <div class="error-box">
+      <p id="errorMsg" class="display" style="font-size:1.4rem;font-weight:700;margin:0 0 8px"></p>
+      <p id="errorDetail"></p>
+      <button id="btnRetry" class="btn btn-primary">Intentar de nuevo</button>
+      <button id="btnErrorRestart" class="btn btn-ghost is-hidden">Volver a empezar</button>
+    </div>
+  </section>
+
+  <!-- RESULTADO -->
+  <section id="screen-reveal" class="screen">
+    <h2 id="styleName" class="style-name display"></h2>
+    <p id="hookLine" class="hook-line"></p>
+    <div id="paletteBlock" class="palette-block">
+      <p class="palette-title">Tus colores</p>
+      <div id="swBest" class="swatches"></div>
+      <p class="palette-title" style="margin-top:12px">Mejor lejos de tu rostro</p>
+      <div id="swAvoid" class="swatches"></div>
+    </div>
+
+    <div id="occasions"></div>
+    <div id="lockedList" class="is-hidden"></div>
+
+    <div id="paywall" class="paywall">
+      <div id="payBlock">
+        <p id="paywallCommitment" class="paywall-commitment"></p>
+        <p id="paywallHook" class="paywall-label display">Tu guía de ropa continúa</p>
+        <p class="paywall-price">Desbloquea las ocasiones que faltan por <b id="priceLabel">$9.99</b></p>
+        <div id="paypal-button-container"></div>
+        <button id="btnSkipPaywall" class="btn btn-outline">No desbloquear por ahora</button>
+      </div>
+      <div id="skippedNote" class="is-hidden">
+        <p class="display" style="font-size:1.2rem;font-weight:700;margin:0 0 6px">Tu guía queda guardada 24 horas.</p>
+        <p style="margin:0 0 10px;color:#c9d4e2">Si vuelves desde este mismo navegador, la retomas donde estaba.</p>
+        <div id="reasonBlock" class="reason-block">
+          <div id="skipReasonBox">
+            <p style="margin:0">¿Qué te frena?</p>
+            <div class="reason-list">
+              <button class="skip-reason" data-reason="price">Prefiero no pagar</button>
+              <button class="skip-reason" data-reason="unsure">No estoy seguro/a de que valga la pena</button>
+              <button class="skip-reason" data-reason="later">Lo veo más tarde</button>
+              <button class="skip-reason" data-reason="payment">No puedo pagar con PayPal</button>
+            </div>
+          </div>
+          <p id="skipReasonThanks" class="is-hidden" style="margin:0">Gracias, nos ayuda.</p>
+        </div>
+        <button id="btnShowPay" class="btn btn-outline">Volver a ver cómo desbloquear el resto</button>
+        <button id="btnRestartFromSkip" class="btn btn-ghost">Empezar de nuevo</button>
+      </div>
+    </div>
+
+    <div id="fullContainer" class="is-hidden">
+      <p id="closingLine" class="closing-line"></p>
+      <button id="btnRestart" class="btn btn-ghost">Empezar de nuevo</button>
+    </div>
+
+    <div id="privacyActions" class="privacy-actions">
+      <p id="photosStatus">Tus fotos están guardadas en un espacio privado.</p>
+      <button id="btnDeletePhotos" class="btn btn-outline">Borrar mis fotos ahora</button>
+    </div>
+  </section>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -50,7 +50,7 @@ let isApplyingUndo = false;
 let undoSnapshotWindowOpen = false;
 
 function snapshotSchemaState() {
-    return { nodeData: nodes.get(), edgeData: edges.get() };
+    return { nodeData: nodes.get(), edgeData: plainEdges() };
 }
 
 function captureUndoSnapshotIfNeeded() {
@@ -1874,6 +1874,13 @@ new MutationObserver(() => {
 }).observe(actionMenu, { attributes: true, attributeFilter: ['class'] });
 
 network.on('click', async function (params) {
+    // Modo "unir con flecha" iniciado desde un panel (botón 🔗): el siguiente
+    // clic en un nodo completa la flecha; un clic en el fondo cancela.
+    if (panelLinkSourceKey) {
+        if (params.nodes.length > 0) completePanelLink('node', params.nodes[0]);
+        else cancelPanelLinkMode();
+        return;
+    }
     if (params.nodes.length > 0) {
         const clickedNodeId = params.nodes[0];
 
@@ -2236,7 +2243,7 @@ function convertSelectionToSubscheme() {
         selectedIds.forEach(id => closeFloatingPanel(id));
     }
 
-    const allEdges = edges.get();
+    const allEdges = plainEdges();
     const internalEdges = allEdges.filter(e => selectedSet.has(e.from) && selectedSet.has(e.to));
     const bridgeEdges = allEdges.filter(e => (selectedSet.has(e.from) || selectedSet.has(e.to)) && !(selectedSet.has(e.from) && selectedSet.has(e.to)));
 
@@ -2298,10 +2305,12 @@ function enterSubscheme(nodeId) {
 
     schemeStack.push({
         nodes: nodes.get(),
-        edges: edges.get(),
+        edges: plainEdges(),
         collapsedNodeId: nodeId,
-        label: node.baseTitle || 'Subesquema'
+        label: node.baseTitle || 'Subesquema',
+        panelState: serializeFloatingPanels()
     });
+    closeAllFloatingPanels();
 
     const innerNodes = (node.subSchemeData.nodes || []).map(n => ({ ...n }));
     const innerEdges = (node.subSchemeData.edges || []).map(e => ({ ...e }));
@@ -2326,7 +2335,7 @@ function exitSubscheme() {
     const frame = schemeStack.pop();
 
     const freshNodes = nodes.get();
-    const freshEdges = edges.get();
+    const freshEdges = plainEdges();
     const freshPositions = network.getPositions(freshNodes.map(n => n.id));
 
     const restoredNodes = frame.nodes.map(n => {
@@ -2342,8 +2351,10 @@ function exitSubscheme() {
     isClearingCanvas = true;
     nodes.clear();
     edges.clear();
+    closeAllFloatingPanels();
     nodes.add(restoredNodes);
     edges.add(frame.edges);
+    restoreFloatingPanels(frame.panelState);
     isClearingCanvas = false;
 
     updateSchemeBreadcrumb();
@@ -3069,7 +3080,229 @@ function anchorFloatingPanelToWorld(panelKey, el, anchorNodeId) {
     const realAnchorId = anchorNodeId || panelKey;
     if (!network || !el || !nodes.get(realAnchorId)) return;
     const screenPoint = { x: el.offsetLeft, y: el.offsetTop + 20 };
-    floatingPanelAnchors.set(panelKey, { worldPoint: network.DOMtoCanvas(screenPoint), anchorNodeId: realAnchorId });
+    const worldPoint = network.DOMtoCanvas(screenPoint);
+    // Se guarda también la posición RELATIVA al nodo: así el panel se mueve
+    // con su nodo (al arrastrarlo, al arrastrar a su padre con descendientes,
+    // al reacomodar el esquema), igual que cualquier otro nodo hijo.
+    const nodePos = (network.getPositions([realAnchorId]) || {})[realAnchorId] || { x: 0, y: 0 };
+    floatingPanelAnchors.set(panelKey, { worldPoint, anchorNodeId: realAnchorId, offset: { x: worldPoint.x - nodePos.x, y: worldPoint.y - nodePos.y } });
+}
+
+// Nodos extraídos del TEXTO de un panel flotante: la flecha sale del panel (no
+// del nodo original). Mientras el panel está abierto, la arista real
+// original→hijo se oculta (hidden + _panelHidden) para no dibujar dos flechas;
+// al cerrar el panel reaparece, así la relación padre→hijo nunca se pierde.
+const panelChildLinks = new Map(); // childId -> { panelKey, edgeId }
+
+// Copia de las aristas SIN el ocultamiento temporal, para guardar/deshacer/
+// colapsar: una arista nunca debe persistir "oculta" por un panel que ya no existe.
+function plainEdges(list) {
+    return (list || edges.get()).map(e => {
+        if (!e._panelHidden) return e;
+        const { hidden, _panelHidden, ...rest } = e;
+        return rest;
+    });
+}
+
+function releasePanelLink(childId) {
+    const link = panelChildLinks.get(childId);
+    if (!link) return;
+    panelChildLinks.delete(childId);
+    if (edges.get(link.edgeId)) edges.update({ id: link.edgeId, hidden: false, _panelHidden: false });
+}
+
+// Crea un nodo hijo que "sale" del panel: lo coloca pasando el panel (en la
+// dirección nodo → panel) y lo une con una flecha que nace en el panel. La
+// arista real origen→hijo se conserva (oculta mientras el panel esté abierto).
+// Devuelve false si ya existía un nodo con ese nombre.
+function spawnNodeFromPanel(panelEl, panelKey, originId, topic, edgeLabel) {
+    if (nodes.get(topic)) return false;
+    const parentPos = (network.getPositions([originId]) || {})[originId] || { x: 0, y: 0 };
+    let spawn = { x: parentPos.x + 250, y: parentPos.y + (Math.random() * 100 - 50) };
+    if (panelEl && panelEl.isConnected) {
+        const rect = panelEl.getBoundingClientRect();
+        const host = (floatingPanelsLayer || network.body.container).getBoundingClientRect();
+        const cx = rect.left - host.left + rect.width / 2;
+        const cy = rect.top - host.top + rect.height / 2;
+        const nodeDom = network.canvasToDOM(parentPos);
+        let dx = cx - nodeDom.x, dy = cy - nodeDom.y;
+        const len = Math.hypot(dx, dy);
+        if (len < 1) { dx = 1; dy = 0; } else { dx /= len; dy /= len; }
+        const toEdge = Math.min((rect.width / 2) / (Math.abs(dx) || 1e-6), (rect.height / 2) / (Math.abs(dy) || 1e-6));
+        const jitter = (Math.random() - 0.5) * 60;
+        spawn = network.DOMtoCanvas({ x: cx + dx * (toEdge + 120) - dy * jitter, y: cy + dy * (toEdge + 120) + dx * jitter });
+    }
+    nodes.add({
+        id: topic, label: `*${topic}*`, baseTitle: topic, color: colorForChildOf(originId),
+        x: spawn.x, y: spawn.y,
+        fixed: { x: false, y: false },
+        widthConstraint: { minimum: 150, maximum: 250 }, heightConstraint: { minimum: 50, maximum: 90 }
+    });
+    if (panelKey) {
+        const edgeId = `pe_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        edges.add({ id: edgeId, from: originId, to: topic, label: edgeLabel, hidden: true, _panelHidden: true });
+        panelChildLinks.set(topic, { panelKey, edgeId });
+        updateFloatingPanelAnchors();
+    } else {
+        edges.add({ from: originId, to: topic, label: edgeLabel });
+    }
+    return true;
+}
+
+// ---- Flechas que el usuario une a mano entre un panel y un nodo / otro panel ----
+// { id, from: panelKey, to: nodeId|panelKey, toType: 'node'|'panel' }
+let panelLinks = [];
+let panelLinkSourceKey = null;
+
+function panelLinkBanner(show) {
+    let b = document.getElementById('panelLinkBanner');
+    if (!b) {
+        b = document.createElement('div');
+        b.id = 'panelLinkBanner';
+        b.className = 'hidden';
+        b.style.cssText = 'position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100000;background:#0f172a;color:#fbbf24;border:1px solid #fbbf24;border-radius:10px;padding:8px 14px;font-size:12px;font-family:sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+        b.textContent = 'Elige el nodo o panel al que apuntará la flecha · Esc para cancelar';
+        document.body.appendChild(b);
+    }
+    b.classList.toggle('hidden', !show);
+}
+function cancelPanelLinkMode() {
+    if (panelLinkSourceKey && openFloatingPanels.get(panelLinkSourceKey)) openFloatingPanels.get(panelLinkSourceKey).el.classList.remove('gk-panel-linking');
+    panelLinkSourceKey = null;
+    panelLinkBanner(false);
+}
+function startPanelLinkMode(key) {
+    if (panelLinkSourceKey === key) { cancelPanelLinkMode(); return; }
+    cancelPanelLinkMode();
+    panelLinkSourceKey = key;
+    const p = openFloatingPanels.get(key);
+    if (p) p.el.classList.add('gk-panel-linking');
+    panelLinkBanner(true);
+}
+function completePanelLink(toType, toId) {
+    const from = panelLinkSourceKey;
+    if (!from || (toType === 'panel' && toId === from)) return;
+    const i = panelLinks.findIndex(l => l.from === from && l.to === toId && l.toType === toType);
+    if (i >= 0) panelLinks.splice(i, 1); // unir dos veces lo mismo = quitar la flecha
+    else panelLinks.push({ id: `pl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, from, to: toId, toType });
+    cancelPanelLinkMode();
+    updateFloatingPanelAnchors();
+    triggerAutoSave();
+}
+function panelKeyOfElement(el) {
+    for (const [key, p] of openFloatingPanels.entries()) if (p.el === el) return key;
+    return null;
+}
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && panelLinkSourceKey) cancelPanelLinkMode(); });
+// En modo "unir": un clic en OTRO panel completa la flecha panel → panel.
+document.addEventListener('mousedown', (e) => {
+    if (!panelLinkSourceKey) return;
+    const target = e.target.closest && e.target.closest('.gk-floating-panel');
+    if (!target) return;
+    const key = panelKeyOfElement(target);
+    if (!key) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (key === panelLinkSourceKey) { cancelPanelLinkMode(); return; }
+    completePanelLink('panel', key);
+}, true);
+
+// Rectángulo (en píxeles de pantalla, relativo a la capa de paneles) de un extremo de flecha.
+function linkEndpointBox(type, id) {
+    if (type === 'panel') {
+        const p = openFloatingPanels.get(id);
+        if (!p) return null;
+        const el = p.el;
+        return { cx: el.offsetLeft + el.offsetWidth / 2, cy: el.offsetTop + el.offsetHeight / 2, hw: el.offsetWidth / 2, hh: el.offsetHeight / 2 };
+    }
+    if (!nodes.get(id)) return null;
+    const pos = (network.getPositions([id]) || {})[id];
+    if (!pos) return null;
+    const c = network.canvasToDOM(pos);
+    let hw = 0, hh = 0;
+    const box = network.getBoundingBox(id);
+    if (box) {
+        const a = network.canvasToDOM({ x: box.left, y: box.top }), b = network.canvasToDOM({ x: box.right, y: box.bottom });
+        hw = Math.abs(b.x - a.x) / 2; hh = Math.abs(b.y - a.y) / 2;
+    }
+    return { cx: c.x, cy: c.y, hw, hh };
+}
+
+// ---- Guardar / restaurar los paneles junto con el proyecto ----
+function serializeFloatingPanels() {
+    const panels = [];
+    for (const [key, p] of openFloatingPanels.entries()) {
+        const anchor = floatingPanelAnchors.get(key);
+        const meta = p.meta;
+        if (!anchor || !meta) continue;
+        const anchorNode = nodes.get(anchor.anchorNodeId);
+        if (!anchorNode) continue;
+        // Definición / explicación: solo si ya hay contenido guardado en el nodo
+        // (si todavía estaba "cargando", no hay nada que restaurar sin llamar a la IA).
+        if (meta.kind === 'definition' && !anchorNode.definition) continue;
+        if (meta.kind === 'simple' && !anchorNode.simpleExplanation) continue;
+        const minimized = p.contentEl.classList.contains('hidden');
+        const rec = {
+            key, kind: meta.kind, anchorNodeId: anchor.anchorNodeId,
+            offset: anchor.offset || { x: 0, y: 0 },
+            w: p.el.offsetWidth,
+            h: minimized ? (parseInt(p.el.dataset.fullHeight, 10) || 420) : p.el.offsetHeight,
+            minimized
+        };
+        if (meta.kind === 'content') { rec.title = meta.title; rec.content = meta.content; }
+        if (meta.kind === 'socratic') {
+            rec.topicName = meta.topicName; rec.question = meta.question;
+            rec.answer = p.contentEl.querySelector('#socraticInput')?.value || '';
+            const fb = p.contentEl.querySelector('#socraticFeedbackBox');
+            rec.feedbackHtml = fb && !fb.classList.contains('hidden') ? fb.innerHTML : '';
+        }
+        panels.push(rec);
+    }
+    const keys = new Set(panels.map(r => r.key));
+    return {
+        panels,
+        childLinks: Array.from(panelChildLinks.entries()).filter(([, l]) => keys.has(l.panelKey)).map(([childId, l]) => ({ childId, panelKey: l.panelKey, edgeId: l.edgeId })),
+        links: panelLinks.filter(l => keys.has(l.from) && (l.toType === 'panel' ? keys.has(l.to) : !!nodes.get(l.to))).map(l => ({ ...l }))
+    };
+}
+
+function closeAllFloatingPanels() {
+    cancelPanelLinkMode();
+    Array.from(openFloatingPanels.keys()).forEach(closeFloatingPanel);
+    panelLinks = [];
+}
+
+function restoreFloatingPanels(state) {
+    if (!state || !Array.isArray(state.panels)) return;
+    for (const rec of state.panels) {
+        if (!nodes.get(rec.anchorNodeId)) continue;
+        try {
+            if (rec.kind === 'definition') showDefinitionInFloatingPanel(rec.anchorNodeId);
+            else if (rec.kind === 'simple') showSimpleExplanationInFloatingPanel(rec.anchorNodeId);
+            else if (rec.kind === 'content') showContentInFloatingPanel(rec.key, rec.title, rec.content);
+            else if (rec.kind === 'socratic') buildSocraticPanel(rec.key, rec.anchorNodeId, rec.topicName, rec.question, rec);
+        } catch (err) { console.warn('[paneles] no se pudo restaurar', rec.key, err); }
+        const panel = openFloatingPanels.get(rec.key);
+        if (!panel) continue;
+        if (rec.w) panel.el.style.width = `${rec.w}px`;
+        if (rec.h) panel.el.style.height = `${rec.h}px`;
+        const anchor = floatingPanelAnchors.get(rec.key);
+        if (anchor && rec.offset) anchor.offset = { ...rec.offset };
+        if (rec.minimized) panel.el.querySelector('.fp-minimize')?.click();
+    }
+    (state.childLinks || []).forEach(l => {
+        if (!openFloatingPanels.has(l.panelKey) || !nodes.get(l.childId) || !edges.get(l.edgeId)) return;
+        panelChildLinks.set(l.childId, { panelKey: l.panelKey, edgeId: l.edgeId });
+        edges.update({ id: l.edgeId, hidden: true, _panelHidden: true });
+    });
+    panelLinks = (state.links || []).filter(l => openFloatingPanels.has(l.from) && (l.toType === 'panel' ? openFloatingPanels.has(l.to) : !!nodes.get(l.to)));
+    updateFloatingPanelAnchors();
+}
+
+// Punto donde un rayo desde el centro (cx,cy) con dirección (dx,dy) sale de un rectángulo hw×hh.
+function rayRectExit(cx, cy, hw, hh, dx, dy) {
+    const t = Math.min(hw / (Math.abs(dx) || 1e-6), hh / (Math.abs(dy) || 1e-6));
+    return { x: cx + dx * t, y: cy + dy * t };
 }
 
 // Se llama en cada redibujado del lienzo (pan, zoom, arrastre de nodos...):
@@ -3082,21 +3315,59 @@ function updateFloatingPanelAnchors() {
     for (const [panelKey, anchor] of Array.from(floatingPanelAnchors.entries())) {
         const panel = openFloatingPanels.get(panelKey);
         const node = nodes.get(anchor.anchorNodeId);
-        if (!panel || !node) { floatingPanelAnchors.delete(panelKey); continue; }
-        const domPoint = network.canvasToDOM(anchor.worldPoint);
-        panel.el.style.left = `${domPoint.x}px`;
-        panel.el.style.top = `${domPoint.y - 20}px`;
-
+        // Si el nodo al que pertenece el panel ya no existe (se borró, se
+        // limpió el lienzo, se cambió de nivel), el panel se va con él.
+        if (!node) { if (panel) closeFloatingPanel(panelKey); else floatingPanelAnchors.delete(panelKey); continue; }
+        if (!panel) { floatingPanelAnchors.delete(panelKey); continue; }
         const positions = network.getPositions([anchor.anchorNodeId]);
         const nodePos = positions && positions[anchor.anchorNodeId];
         if (!nodePos) continue;
+        if (anchor.offset) anchor.worldPoint = { x: nodePos.x + anchor.offset.x, y: nodePos.y + anchor.offset.y };
+        const domPoint = network.canvasToDOM(anchor.worldPoint);
+        panel.el.style.left = `${domPoint.x}px`;
+        panel.el.style.top = `${domPoint.y - 20}px`;
         const nodeDom = network.canvasToDOM(nodePos);
         lines.push(`<line x1="${nodeDom.x}" y1="${nodeDom.y}" x2="${domPoint.x}" y2="${domPoint.y}" stroke="#4fd1c5" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#gkFloatingPanelArrowHead)" />`);
+    }
+    for (const [childId, link] of Array.from(panelChildLinks.entries())) {
+        const panel = openFloatingPanels.get(link.panelKey);
+        if (!panel || !nodes.get(childId)) { releasePanelLink(childId); continue; }
+        const childPos = network.getPositions([childId])[childId];
+        if (!childPos) continue;
+        const el = panel.el;
+        const pcx = el.offsetLeft + el.offsetWidth / 2, pcy = el.offsetTop + el.offsetHeight / 2;
+        const childDom = network.canvasToDOM(childPos);
+        let dx = childDom.x - pcx, dy = childDom.y - pcy;
+        const len = Math.hypot(dx, dy) || 1;
+        dx /= len; dy /= len;
+        const from = rayRectExit(pcx, pcy, el.offsetWidth / 2, el.offsetHeight / 2, dx, dy);
+        let to = childDom;
+        const box = network.getBoundingBox(childId);
+        if (box) {
+            const a = network.canvasToDOM({ x: box.left, y: box.top }), b = network.canvasToDOM({ x: box.right, y: box.bottom });
+            const hw = Math.abs(b.x - a.x) / 2, hh = Math.abs(b.y - a.y) / 2;
+            if (hw > 0 && hh > 0) { const e = rayRectExit(childDom.x, childDom.y, hw, hh, -dx, -dy); to = { x: e.x - dx * 3, y: e.y - dy * 3 }; }
+        }
+        lines.push(`<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" stroke="#4fd1c5" stroke-width="2" marker-end="url(#gkFloatingPanelArrowHead)" />`);
+    }
+    for (const link of panelLinks.slice()) {
+        const a = linkEndpointBox('panel', link.from);
+        const b = linkEndpointBox(link.toType, link.to);
+        if (!a || !b) { panelLinks = panelLinks.filter(l => l !== link); continue; }
+        let dx = b.cx - a.cx, dy = b.cy - a.cy;
+        const len = Math.hypot(dx, dy) || 1;
+        dx /= len; dy /= len;
+        const p1 = rayRectExit(a.cx, a.cy, a.hw, a.hh, dx, dy);
+        const p2 = (b.hw > 0 && b.hh > 0) ? rayRectExit(b.cx, b.cy, b.hw, b.hh, -dx, -dy) : { x: b.cx, y: b.cy };
+        lines.push(`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x - dx * 3}" y2="${p2.y - dy * 3}" stroke="#fbbf24" stroke-width="2" stroke-dasharray="2,5" stroke-linecap="round" marker-end="url(#gkPanelLinkArrowHead)" />`);
     }
     svg.innerHTML = `
         <defs>
             <marker id="gkFloatingPanelArrowHead" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
                 <path d="M0,0 L9,4.5 L0,9 Z" fill="#4fd1c5" />
+            </marker>
+            <marker id="gkPanelLinkArrowHead" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+                <path d="M0,0 L9,4.5 L0,9 Z" fill="#fbbf24" />
             </marker>
         </defs>
         ${lines.join('')}
@@ -3104,12 +3375,46 @@ function updateFloatingPanelAnchors() {
 }
 network.on('afterDrawing', () => updateFloatingPanelAnchors());
 
+// Un panel flotante pertenece a su nodo: si el nodo desaparece (por cualquier
+// vía: Supr, menú, "eliminar con hijos", subesquema, limpiar), el panel se
+// cierra con él. Se revisa en el siguiente ciclo para no cerrar paneles cuando
+// un nodo se quita y se vuelve a poner en la misma operación (rearmados).
+function closeOrphanFloatingPanels() {
+    for (const [key, anchor] of Array.from(floatingPanelAnchors.entries())) {
+        if (openFloatingPanels.has(key) && !nodes.get(anchor.anchorNodeId)) closeFloatingPanel(key);
+    }
+}
+nodes.on('remove', () => setTimeout(closeOrphanFloatingPanels, 0));
+
+// Selección de paneles (se marcan al pulsar su cabecera) para poder cerrarlos con Supr.
+let selectedFloatingPanelKey = null;
+function selectFloatingPanel(key) {
+    if (selectedFloatingPanelKey && openFloatingPanels.get(selectedFloatingPanelKey)) {
+        openFloatingPanels.get(selectedFloatingPanelKey).el.classList.remove('gk-panel-selected');
+    }
+    selectedFloatingPanelKey = key;
+    if (key && openFloatingPanels.get(key)) openFloatingPanels.get(key).el.classList.add('gk-panel-selected');
+}
+document.addEventListener('mousedown', (e) => {
+    if (!selectedFloatingPanelKey) return;
+    const inHeader = e.target.closest && e.target.closest('.gk-floating-panel .fp-header');
+    if (!inHeader) selectFloatingPanel(null);
+});
+
 function closeFloatingPanel(nodeId) {
     const panel = openFloatingPanels.get(nodeId);
     if (!panel) return;
     panel.el.remove();
     openFloatingPanels.delete(nodeId);
     floatingPanelAnchors.delete(nodeId);
+    if (selectedFloatingPanelKey === nodeId) selectedFloatingPanelKey = null;
+    if (panelLinkSourceKey === nodeId) cancelPanelLinkMode();
+    panelLinks = panelLinks.filter(l => l.from !== nodeId && !(l.toType === 'panel' && l.to === nodeId));
+    for (const [childId, link] of Array.from(panelChildLinks.entries())) {
+        if (link.panelKey === nodeId) releasePanelLink(childId);
+    }
+    updateFloatingPanelAnchors();
+    triggerAutoSave();
 }
 
 function focusFloatingPanel(nodeId) {
@@ -3151,6 +3456,7 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
     el.innerHTML = `
         <div class="fp-header px-3 py-2 bg-slate-950 border-b border-slate-800 rounded-t-xl flex justify-between items-center gap-2 cursor-move select-none">
             <h3 class="fp-title text-xs font-bold font-heading text-[#4fd1c5] uppercase tracking-wider truncate flex-1"></h3>
+            <button class="fp-link text-amber-300 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Unir con una flecha a otro nodo o panel">🔗</button>
             <button class="fp-minimize text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Minimizar">—</button>
             <button class="fp-close text-slate-400 hover:text-white text-xs px-1.5 py-0.5 rounded bg-slate-800 transition-colors" title="Cerrar">✕</button>
         </div>
@@ -3178,6 +3484,8 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
     // un espacio vacío grande debajo rellenando esos 160px. La solución es
     // anular también `min-height` (a 0) mientras está minimizado, y
     // restaurarla al expandir.
+    el.querySelector('.fp-link')?.addEventListener('click', () => startPanelLinkMode(nodeId));
+    el.addEventListener('mouseup', () => triggerAutoSave()); // mover / redimensionar el panel
     const minimizeBtn = el.querySelector('.fp-minimize');
     let isMinimized = false;
     let heightBeforeMinimize = null;
@@ -3185,6 +3493,7 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
         isMinimized = !isMinimized;
         if (isMinimized) {
             heightBeforeMinimize = el.style.height || `${el.offsetHeight}px`;
+            el.dataset.fullHeight = heightBeforeMinimize;
             el.style.height = 'auto';
             el.style.minHeight = '0px';
             el.style.resize = 'none';
@@ -3208,6 +3517,7 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
     let dragState = null;
     headerEl.addEventListener('mousedown', (e) => {
         if (e.target.closest('button')) return;
+        selectFloatingPanel(nodeId);
         dragState = { startX: e.clientX, startY: e.clientY, left: el.offsetLeft, top: el.offsetTop };
         e.preventDefault();
     });
@@ -3235,8 +3545,9 @@ function openFloatingPanel(nodeId, title, anchorNodeId) {
     // flecha aparece desde ya y el panel viaja con el nodo si se hace pan/zoom.
     anchorFloatingPanelToWorld(nodeId, el, anchorNodeId);
 
-    const panel = { el, contentEl, titleEl };
+    const panel = { el, contentEl, titleEl, meta: null };
     openFloatingPanels.set(nodeId, panel);
+    triggerAutoSave();
     return panel;
 }
 
@@ -3255,6 +3566,7 @@ let activeSelectionRange = null;
 let activeSelectionPanelId = null;
 let activeSelectionOffsetHint = null;
 let activeNodeDetailId = null;
+let activeNodePanelEl = null; // el panel flotante donde se hizo la selección (para sacar el nodo nuevo desde ahí)
 let activeNodeSelectionRange = null;
 let activeNodeSelectedText = "";
 
@@ -3965,6 +4277,7 @@ function formatInteractiveDefinition(rawText, parentNodeId) {
 function showContentInFloatingPanel(nodeId, title, content) {
     const panel = openFloatingPanel(nodeId, title);
     panel.el.dataset.nodeId = nodeId;
+    panel.meta = { kind: 'content', title, content: String(content || '') };
     const safeHtml = String(content || '').replace(/\n/g, '<br>');
     panel.contentEl.innerHTML = `<div class="leading-relaxed text-slate-200">${safeHtml}</div>`;
 }
@@ -3985,6 +4298,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
 
     const panel = openFloatingPanel(nodeId, title);
     panel.el.dataset.nodeId = nodeId;
+    panel.meta = { kind: 'definition' };
 
     const cacheIsUsable = definitionText && (defSource === 'wikipedia' || defSource === 'pregenerated' || definitionText.includes('[['));
     if (!cacheIsUsable) {
@@ -4045,14 +4359,8 @@ async function showDefinitionInFloatingPanel(nodeId) {
             const parentId = e.currentTarget.dataset.parent;
             if (!checkBalance(1)) return;
 
-            const parentPos = network.getPositions([parentId])[parentId] || network.getViewPosition();
             if (!nodes.get(term)) {
-                nodes.add({
-                    id: term, label: `*${term}*`, baseTitle: term, color: colorForChildOf(parentId),
-                    x: parentPos.x + (Math.random() * 180 - 90), y: parentPos.y + 140,
-                    fixed: { x: false, y: false }
-                });
-                edges.add({ from: parentId, to: term, label: 'involucra' });
+                spawnNodeFromPanel(panel.el, nodeId, parentId, term, 'involucra');
                 trackNodeUsage(term);
                 consumeNodes(1);
                 network.focus(term, { scale: 1.0, animation: { duration: 500 } });
@@ -4149,6 +4457,7 @@ async function showSimpleExplanationInFloatingPanel(nodeId) {
     // dibujaba para este panel — ver anchorFloatingPanelToWorld).
     const panel = openFloatingPanel(panelKey, `💡 ${title}`, nodeId);
     panel.el.dataset.nodeId = nodeId;
+    panel.meta = { kind: 'simple' };
     // Acento visual distinto (verde-lima) para diferenciarlo del panel de
     // definición normal (teal) con solo mirar el borde/título.
     panel.el.classList.add('border-lime-600/40');
@@ -4224,6 +4533,7 @@ floatingPanelsLayer?.addEventListener('mouseup', (e) => {
     if (panelEl && text.length > 2) {
         activeNodeSelectedText = text;
         activeNodeDetailId = panelEl.dataset.nodeId;
+        activeNodePanelEl = panelEl;
         activeNodeSelectionRange = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
         if (nodeTooltipPreview) nodeTooltipPreview.innerText = `"${text.substring(0, 20)}..."`;
         nodeSelectionTooltip.style.left = `${e.clientX - 20}px`;
@@ -4249,17 +4559,17 @@ nodeBtnExtractChild?.addEventListener('click', () => {
 
     if (!checkBalance(1)) return;
 
-    const parentPos = network.getPositions([activeNodeDetailId])[activeNodeDetailId];
-    const newId = childTopic;
+    // Nodo REAL del que deriva el concepto. Los paneles con clave sintética
+    // (reto socrático, etc.) guardan su nodo real en floatingPanelAnchors.
+    const panelEl = activeNodePanelEl;
+    activeNodePanelEl = null;
+    const panelKey = panelKeyOfElement(panelEl);
+    let originId = activeNodeDetailId;
+    if (panelKey && floatingPanelAnchors.get(panelKey)) originId = floatingPanelAnchors.get(panelKey).anchorNodeId;
+    if (!nodes.get(originId)) return;
 
-    if (!nodes.get(newId)) {
-        nodes.add({
-            id: newId, label: `*${childTopic}*`, baseTitle: childTopic, color: colorForChildOf(activeNodeDetailId),
-            x: parentPos.x + 250, y: parentPos.y + (Math.random() * 100 - 50),
-            fixed: { x: false, y: false },
-            widthConstraint: { minimum: 150, maximum: 250 }, heightConstraint: { minimum: 50, maximum: 90 }
-        });
-        edges.add({ from: activeNodeDetailId, to: newId, label: 'deriva en' });
+    // El nodo nace DESDE EL PANEL y la flecha sale de él (ver spawnNodeFromPanel).
+    if (spawnNodeFromPanel(panelEl, panelKey, originId, childTopic, 'deriva en')) {
         trackNodeUsage(childTopic); consumeNodes(1);
     }
 });
@@ -4977,28 +5287,63 @@ function getAllDescendants(parentNodeId) {
     return Array.from(descendants);
 }
 
+// Borrado de uno o varios nodos (menú contextual y tecla Supr), con la misma
+// pregunta de "¿eliminar también sus hijos?". Los paneles flotantes de cada
+// nodo se cierran solos (ver closeOrphanFloatingPanels).
+let deleteFlowBusy = false;
+async function deleteNodesFlow(ids) {
+    if (deleteFlowBusy) return;
+    deleteFlowBusy = true;
+    try {
+        const base = (ids || []).filter(id => nodes.get(id));
+        if (!base.length) return;
+        const baseSet = new Set(base);
+        const desc = new Set();
+        base.forEach(id => getAllDescendants(id).forEach(d => { if (!baseSet.has(d)) desc.add(d); }));
+
+        let toRemove = base;
+        if (desc.size > 0) {
+            const msg = base.length === 1
+                ? `Este nodo tiene ${desc.size} sub-nodo(s) conectado(s).`
+                : `Estos ${base.length} nodos tienen ${desc.size} sub-nodo(s) conectado(s).`;
+            const deleteAll = await appConfirm(msg, {
+                title: base.length === 1 ? '¿Eliminar nodo y sus hijos?' : '¿Eliminar nodos y sus hijos?',
+                okText: 'Eliminar todo', cancelText: base.length === 1 ? 'Solo este nodo' : 'Solo los marcados'
+            });
+            if (deleteAll) toRemove = [...base, ...desc];
+        }
+        nodes.remove(toRemove);
+    } finally {
+        deleteFlowBusy = false;
+    }
+}
+
 document.getElementById('btnMenuDelete')?.addEventListener('click', async () => {
     if (!selectedNodeId) return;
-
-    const descendants = getAllDescendants(selectedNodeId);
-
-    if (descendants.length > 0) {
-        const deleteAll = await appConfirm(
-            `Este nodo tiene ${descendants.length} sub-nodo(s) conectado(s).`,
-            { title: '¿Eliminar nodo y sus hijos?', okText: 'Eliminar todo', cancelText: 'Solo este nodo' }
-        );
-
-        if (deleteAll) {
-            nodes.remove([selectedNodeId, ...descendants]);
-        } else {
-            nodes.remove(selectedNodeId);
-        }
-    } else {
-        nodes.remove(selectedNodeId);
-    }
-
+    const id = selectedNodeId;
     actionMenu.classList.add('hidden');
+    await deleteNodesFlow([id]);
     selectedNodeId = null;
+});
+
+// Tecla Supr: cierra el panel flotante marcado, o elimina los nodos marcados.
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Delete') return;
+    const ae = document.activeElement;
+    const tag = ae ? ae.tagName : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (ae && ae.isContentEditable)) return;
+    if (deleteFlowBusy) return;
+
+    if (selectedFloatingPanelKey && openFloatingPanels.has(selectedFloatingPanelKey)) {
+        e.preventDefault();
+        closeFloatingPanel(selectedFloatingPanelKey);
+        return;
+    }
+    const ids = network.getSelectedNodes ? network.getSelectedNodes() : [];
+    if (!ids || !ids.length) return;
+    e.preventDefault();
+    actionMenu.classList.add('hidden');
+    deleteNodesFlow(ids).then(() => { selectedNodeId = null; });
 });
 
 // ==========================================
@@ -6042,7 +6387,7 @@ async function saveCurrentProjectToBin() {
     showSaveFeedback('saving');
     const userKey = getActiveUserKey();
     const allNodes = nodes.get();
-    const allEdges = edges.get();
+    const allEdges = plainEdges();
 
     const firstNode = allNodes[0];
     const projectTitle = firstNode.baseTitle || firstNode.label?.replace(/\*/g, '').split('\n')[0] || "Mi Esquema";
@@ -6067,7 +6412,8 @@ async function saveCurrentProjectToBin() {
         nodes: allNodes,
         edges: allEdges,
         readerText: readerTextToSave,
-        documentContext: globalDocumentContext || ''
+        documentContext: globalDocumentContext || '',
+        panelState: serializeFloatingPanels()
     };
 
     // 1. Guardado instantáneo en catálogo local
@@ -6243,10 +6589,13 @@ function applyLoadedProject(projectId, record) {
     isClearingCanvas = true;
     schemeStack = [];
     updateSchemeBreadcrumb();
+    closeAllFloatingPanels();
     nodes.clear();
     edges.clear();
     if (record.nodes) nodes.add(record.nodes);
     if (record.edges) edges.add(record.edges);
+    // Paneles flotantes (definiciones, explicaciones, retos...) guardados con el proyecto.
+    restoreFloatingPanels(record.panelState);
     // Restaura el texto del Modo Lector guardado junto con este proyecto (ver
     // saveCurrentProjectToBin). Proyectos guardados ANTES de este cambio no
     // tienen `readerText` — en ese caso se deja el lector como estaba (no se
@@ -6279,6 +6628,7 @@ document.getElementById('btnNewProject')?.addEventListener('click', async () => 
     clearTimeout(window._binSaveTimer);
     currentProjectId = null;
     localStorage.removeItem('gk_current_project_id');
+    closeAllFloatingPanels();
     nodes.clear();
     edges.clear();
     isClearingCanvas = false;
@@ -6658,6 +7008,72 @@ document.getElementById('btnMenuAntithesis')?.addEventListener('click', async ()
     } catch { appAlert("Error al generar antítesis."); } finally { hideLoader(); }
 });
 
+
+// Panel del reto socrático. Se separa en función para poder reconstruirlo al
+// reabrir un proyecto (saved = { answer, feedbackHtml } del panel guardado).
+function buildSocraticPanel(challengePanelId, originId, topicName, question, saved) {
+    const panel = openFloatingPanel(challengePanelId, `🧠 Reto Socrático: ${topicName}`, originId);
+    panel.el.dataset.nodeId = challengePanelId;
+    panel.meta = { kind: 'socratic', topicName, question };
+    panel.contentEl.innerHTML = `
+        <div class="bg-slate-800/90 border border-emerald-500/40 rounded-xl p-4 mb-4">
+            <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Desafío de Comprensión</p>
+            <p class="text-slate-100 text-sm font-medium leading-relaxed">${question}</p>
+        </div>
+        <textarea id="socraticInput" rows="4" placeholder="Escribe tu deducción o argumento aquí..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 mb-3"></textarea>
+        <button id="btnSubmitSocratic" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-lg">
+            Validar mi Razonamiento (+Nodo de Dominio)
+        </button>
+        <div id="socraticFeedbackBox" class="hidden mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-200 leading-relaxed"></div>
+    `;
+    if (saved) {
+        const input = panel.contentEl.querySelector('#socraticInput');
+        if (input && saved.answer) input.value = saved.answer;
+        if (saved.feedbackHtml) {
+            const fb = panel.contentEl.querySelector('#socraticFeedbackBox');
+            fb.innerHTML = saved.feedbackHtml;
+            fb.classList.remove('hidden');
+        }
+    }
+
+    panel.contentEl.querySelector('#btnSubmitSocratic')?.addEventListener('click', async () => {
+        const userAnswer = panel.contentEl.querySelector('#socraticInput').value.trim();
+        if (userAnswer.length < 5) return appAlert("Escribe una respuesta breve para evaluar.");
+        if (!checkBalance(1)) return;
+
+        showLoader('Evaluando tu argumento...');
+        try {
+            const { ok: evalOk, status: evalStatus, data: evalData } = await apiFetch('/.netlify/functions/gemini', {
+                method: 'POST',
+                body: JSON.stringify({ action: 'socratic_evaluate', topic: topicName, question, userAnswer })
+            });
+            if (!evalOk) { if (!handleBillingError(evalStatus, evalData)) appAlert(evalData?.error || 'No se pudo evaluar tu respuesta.'); return; }
+
+            const fbBox = panel.contentEl.querySelector('#socraticFeedbackBox');
+            fbBox.innerHTML = `<p class="font-bold text-amber-400 mb-1">🌟 Veredicto:</p><p>${evalData.feedback}</p>`;
+            fbBox.classList.remove('hidden');
+
+            const parentPos = network.getPositions([originId])[originId];
+            const masteryId = `mastery_${Date.now()}`;
+            const masterySynthesis = `Tu síntesis: "${userAnswer}"\n\nRetroalimentación: ${evalData.feedback}`;
+            // Nodo pequeño como el resto; la síntesis completa se abre en su propio panel.
+            nodes.update({
+                id: masteryId,
+                label: `*🏆 Dominio:*\n${evalData.masteryNodeTitle}`,
+                baseTitle: evalData.masteryNodeTitle,
+                definition: masterySynthesis,
+                color: { background: '#fefce8', border: '#eab308' },
+                borderWidth: 2.5,
+                x: parentPos.x, y: parentPos.y + 150,
+                fixed: { x: false, y: false }
+            });
+            edges.add({ from: originId, to: masteryId, label: 'síntesis propia', color: { color: '#eab308' } });
+            applyServerBalance(evalData); consumeNodes(1);
+            showContentInFloatingPanel(masteryId, `🏆 ${evalData.masteryNodeTitle}`, masterySynthesis);
+        } catch { appAlert("Error al evaluar."); } finally { hideLoader(); }
+    });
+    return panel;
+}
 document.getElementById('btnMenuChallenge')?.addEventListener('click', async () => {
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');
@@ -6675,61 +7091,6 @@ document.getElementById('btnMenuChallenge')?.addEventListener('click', async () 
         });
         if (!ok) { if (!handleBillingError(status, data)) appAlert(data?.error || 'No se pudo iniciar el reto.'); return; }
 
-        // Panel propio para el reto (no es la definición de ningún nodo existente,
-        // así que usa un id sintético para no chocar con el panel de otro nodo).
-        const challengePanelId = `socratic_${originId}_${Date.now()}`;
-        // Tercer argumento: el nodo real (originId) al que debe apuntar la
-        // flecha — challengePanelId es sintético, así que sin esto la flecha
-        // nunca se dibujaba (ver anchorFloatingPanelToWorld).
-        const panel = openFloatingPanel(challengePanelId, `🧠 Reto Socrático: ${topicName}`, originId);
-        panel.el.dataset.nodeId = challengePanelId;
-        panel.contentEl.innerHTML = `
-            <div class="bg-slate-800/90 border border-emerald-500/40 rounded-xl p-4 mb-4">
-                <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Desafío de Comprensión</p>
-                <p class="text-slate-100 text-sm font-medium leading-relaxed">${data.question}</p>
-            </div>
-            <textarea id="socraticInput" rows="4" placeholder="Escribe tu deducción o argumento aquí..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 mb-3"></textarea>
-            <button id="btnSubmitSocratic" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 rounded-xl text-xs transition-all shadow-lg">
-                Validar mi Razonamiento (+Nodo de Dominio)
-            </button>
-            <div id="socraticFeedbackBox" class="hidden mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-xs text-amber-200 leading-relaxed"></div>
-        `;
-
-        panel.contentEl.querySelector('#btnSubmitSocratic')?.addEventListener('click', async () => {
-            const userAnswer = panel.contentEl.querySelector('#socraticInput').value.trim();
-            if (userAnswer.length < 5) return appAlert("Escribe una respuesta breve para evaluar.");
-            if (!checkBalance(1)) return;
-
-            showLoader('Evaluando tu argumento...');
-            try {
-                const { ok: evalOk, status: evalStatus, data: evalData } = await apiFetch('/.netlify/functions/gemini', {
-                    method: 'POST',
-                    body: JSON.stringify({ action: 'socratic_evaluate', topic: topicName, question: data.question, userAnswer })
-                });
-                if (!evalOk) { if (!handleBillingError(evalStatus, evalData)) appAlert(evalData?.error || 'No se pudo evaluar tu respuesta.'); return; }
-
-                const fbBox = panel.contentEl.querySelector('#socraticFeedbackBox');
-                fbBox.innerHTML = `<p class="font-bold text-amber-400 mb-1">🌟 Veredicto:</p><p>${evalData.feedback}</p>`;
-                fbBox.classList.remove('hidden');
-
-                const parentPos = network.getPositions([originId])[originId];
-                const masteryId = `mastery_${Date.now()}`;
-                const masterySynthesis = `Tu síntesis: "${userAnswer}"\n\nRetroalimentación: ${evalData.feedback}`;
-                // Nodo pequeño como el resto; la síntesis completa se abre en su propio panel.
-                nodes.update({
-                    id: masteryId,
-                    label: `*🏆 Dominio:*\n${evalData.masteryNodeTitle}`,
-                    baseTitle: evalData.masteryNodeTitle,
-                    definition: masterySynthesis,
-                    color: { background: '#fefce8', border: '#eab308' },
-                    borderWidth: 2.5,
-                    x: parentPos.x, y: parentPos.y + 150,
-                    fixed: { x: false, y: false }
-                });
-                edges.add({ from: originId, to: masteryId, label: 'síntesis propia', color: { color: '#eab308' } });
-                applyServerBalance(evalData); consumeNodes(1);
-                showContentInFloatingPanel(masteryId, `🏆 ${evalData.masteryNodeTitle}`, masterySynthesis);
-            } catch { appAlert("Error al evaluar."); } finally { hideLoader(); }
-        });
+        buildSocraticPanel(`socratic_${originId}_${Date.now()}`, originId, topicName, data.question, null);
     } catch { appAlert("Error al iniciar el reto."); } finally { hideLoader(); }
 });
