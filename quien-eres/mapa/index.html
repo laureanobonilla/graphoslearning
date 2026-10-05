@@ -244,7 +244,7 @@
     #unlockPanel.is-flash{ animation:none; }
   }
 
-  /* "Continuar sin pagar" y "¿Qué te frena?": explícitos, con borde y tamaño de
+  /* "No desbloquear por ahora" y "¿Qué te frena?": explícitos, con borde y tamaño de
      botón real — antes eran texto tenue y casi nadie los veía como opción. */
   .btn-outline{ appearance:none; display:block; width:100%; margin-top:18px; background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.7); border-radius:999px; padding:14px 20px; font-family:'Work Sans',sans-serif; font-size:.98rem; font-weight:500; cursor:pointer; }
   .btn-outline:active{ background:rgba(255,255,255,.12); }
@@ -345,26 +345,23 @@
         <p class="paywall-price">Abrí todos los puntos por <b id="priceLabel">$9.99</b></p>
         <div id="paypal-button-container"></div>
         <p class="paywall-note">Pago seguro con PayPal · sin crear cuenta</p>
-        <button id="btnSkipPaywall" class="btn-outline">Continuar sin pagar</button>
+        <button id="btnSkipPaywall" class="btn-outline">No desbloquear por ahora</button>
       </div>
 
       <div id="skippedNote" class="is-hidden">
         <p class="skipped-text">Está bien. Puedes seguir leyendo los puntos que ya están abiertos.</p>
+        <div id="reasonBlock" class="reason-block">
+          <p class="reason-title">¿Qué te frena? Elige una — nos ayuda mucho</p>
+          <div id="skipReasonBox" class="reason-list">
+            <button class="reason-btn skip-reason" data-reason="precio">Me parece caro</button>
+            <button class="reason-btn skip-reason" data-reason="metodo_pago">No uso PayPal / el método de pago</button>
+            <button class="reason-btn skip-reason" data-reason="solo_ver">Solo quería ver el resultado</button>
+            <button class="reason-btn skip-reason" data-reason="sin_interes">No me interesó seguir</button>
+          </div>
+          <p id="skipReasonThanks" class="is-hidden reason-thanks">Gracias, de verdad.</p>
+        </div>
         <button id="btnShowPay" class="btn-outline">Volver a ver cómo abrir todo</button>
         <button id="btnRestartFromSkip" class="btn-ghost">Hacer el cuestionario de nuevo</button>
-      </div>
-
-      <!-- Siempre visible: antes estaba escondido detrás de "Seguir sin pagar"
-           (que casi nadie tocaba) y con botones tenues; así nunca se mostraba. -->
-      <div id="reasonBlock" class="reason-block">
-        <p class="reason-title">¿Qué te frena? Elige una — nos ayuda mucho</p>
-        <div id="skipReasonBox" class="reason-list">
-          <button class="reason-btn skip-reason" data-reason="precio">Me parece caro</button>
-          <button class="reason-btn skip-reason" data-reason="metodo_pago">No uso PayPal / el método de pago</button>
-          <button class="reason-btn skip-reason" data-reason="solo_ver">Solo quería ver el resultado</button>
-          <button class="reason-btn skip-reason" data-reason="sin_interes">No me interesó seguir</button>
-        </div>
-        <p id="skipReasonThanks" class="is-hidden reason-thanks">Gracias, de verdad.</p>
       </div>
     </div>
 

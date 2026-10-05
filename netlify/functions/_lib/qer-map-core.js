@@ -27,7 +27,8 @@ const THEMES = [
 ];
 const CHUNKS = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]; // 5 llamadas en paralelo de 2 rubros
 
-const RULES = `Tono: íntimo, perceptivo y teatral, en segunda persona ("tú"), como alguien que de verdad leyó cada respuesta y conecta detalles entre ellas — nunca como un horóscopo que le quedaría bien a cualquiera. Cita o parafrasea respuestas reales de la persona.
+const RULES = `Género: NO asumas el género de la persona ni escribas para un solo género. Evita adjetivos, participios y artículos con marca de género dirigidos a ella (en vez de "estás cansada" usa "el cansancio que cargas"; en vez de "eres sensible" usa "tu sensibilidad"). En el nombre del arquetipo usa sustantivos o formas neutras ("El Guardián" → "Quien guarda…", "Tu Faro Interior"). Solo usa género si sus respuestas lo declaran de forma explícita.
+Tono: íntimo, perceptivo y teatral, en segunda persona ("tú"), como alguien que de verdad leyó cada respuesta y conecta detalles entre ellas — nunca como un horóscopo que le quedaría bien a cualquiera. Cita o parafrasea respuestas reales de la persona.
 
 MUY IMPORTANTE sobre el lenguaje: palabras sencillas y cotidianas, las de un amigo que habla en serio. La profundidad viene de IMÁGENES CONCRETAS (una puerta cerrada, una casa con un cuarto sin luz, una deuda que nadie cobra, un espejo, agua quieta, un invitado que no se va), nunca de vocabulario técnico ni de sustantivos abstractos encadenados ("arquitectura emocional", "dialéctica", "cartografía defensiva"). Debe entenderse al vuelo desde el celular.
 
@@ -126,7 +127,8 @@ const READING_THEMES = [
     'LA CARTA PENDIENTE: el cierre catártico. Qué puede soltar, qué se le permite por fin, y lo que le diría su versión más honesta. Termina con alivio.'
 ];
 
-const READING_RULES = `Tono: íntimo, perceptivo y teatral, en segunda persona ("tú"), como alguien que leyó con atención cada una de sus respuestas y por fin las unió — jamás como un horóscopo que le quedaría bien a cualquiera.
+const READING_RULES = `Género: NO asumas el género de la persona ni escribas para un solo género. Evita adjetivos, participios y artículos con marca de género dirigidos a ella (en vez de "estás cansada" usa "el cansancio que cargas"; en vez de "eres sensible" usa "tu sensibilidad"). En el nombre del arquetipo usa sustantivos o formas neutras ("El Guardián" → "Quien guarda…", "Tu Faro Interior"). Solo usa género si sus respuestas lo declaran de forma explícita.
+Tono: íntimo, perceptivo y teatral, en segunda persona ("tú"), como alguien que leyó con atención cada una de sus respuestas y por fin las unió — jamás como un horóscopo que le quedaría bien a cualquiera.
 
 LA PERSONA RESPONDIÓ MUCHAS PREGUNTAS ABIERTAS. Úsalas: cita o parafrasea frases reales suyas (entre comillas cuando sirva) y conecta respuestas lejanas entre sí (la de la pregunta 4 con la de la 37…). Esas conexiones inesperadas son lo que la va a sorprender.
 

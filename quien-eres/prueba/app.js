@@ -77,16 +77,16 @@ const BLOT_D = `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/
 // (qué haces sin que nadie mire, qué proteges, cómo te ven vs. cómo te ves)
 // para que se siga sintiendo como una conversación y no como una encuesta.
 const QUESTIONS = [
-  { id: 'q1', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Termina la frase: \"La gente cree que soy..., pero en realidad soy...\"", placeholder: "Las dos partes, aunque no calcen" },
-  { id: 'q2', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando alguien te pregunta \"¿cómo estás?\" y contestas \"bien\", ¿qué es lo que de verdad querrías decir?", placeholder: "Dilo como lo sientes" },
   { id: 'q3', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Cuál es la mentira que más te repites a ti?", placeholder: "La que casi nunca dices en voz alta" },
-  { id: 'q4', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué parte de ti se nota menos de lo que quisieras?", placeholder: "Lo que los demás casi no ven" },
   { id: 'q5', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué hiciste esta semana solo para quedar bien con alguien?", placeholder: "Aunque parezca pequeño" },
-  { id: 'q6', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Describe la sonrisa que pones cuando no tienes ganas de sonreír. ¿Qué esconde?", placeholder: "Descríbela con detalle" },
   { id: 'q7', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué opinión tuya nunca dices en voz alta?", placeholder: "Esa que te guardas" },
-  { id: 'q8', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué personaje de película, serie o cuento se parece más a ti? ¿Qué parte suya te incomoda reconocer?", placeholder: "El personaje y la parte incómoda" },
+  { id: 'q4', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué parte de ti se nota menos de lo que quisieras?", placeholder: "Lo que los demás casi no ven" },
+  { id: 'q2', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando alguien te pregunta \"¿cómo estás?\" y contestas \"bien\", ¿qué es lo que de verdad querrías decir?", placeholder: "Dilo como lo sientes" },
   { id: 'q9', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?", placeholder: "Lo que haces sin darte cuenta" },
+  { id: 'q6', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Describe la sonrisa que pones cuando no tienes ganas de sonreír. ¿Qué esconde?", placeholder: "Descríbela con detalle" },
   { id: 'q10', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿De qué cosa de tu vida hablas como si ya estuviera resuelta, aunque no lo esté?", placeholder: "Lo que dices que ya pasó" },
+  { id: 'q8', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué personaje de película, serie o cuento se parece más a ti? ¿Qué parte suya te incomoda reconocer?", placeholder: "El personaje y la parte incómoda" },
+  { id: 'q1', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Termina la frase: \"La gente cree que soy..., pero en realidad soy...\"", placeholder: "Las dos partes, aunque no calcen" },
   { id: 'q11', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "Completa sin pensarlo mucho: \"Lo que más me cuesta perdonar en alguien es...\"", placeholder: "Lo primero que se te venga" },
   { id: 'q12', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "Piensa en la última vez que alguien te falló de verdad. ¿Qué fue lo que más te dolió?", placeholder: "Escribe solo lo que quieras compartir" },
   { id: 'q13', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "¿Qué palabra, frase o gesto de alguien te dolió hace años y todavía recuerdas exacto?", placeholder: "Tal como lo recuerdas" },
@@ -98,9 +98,9 @@ const QUESTIONS = [
   { id: 'q19', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "¿Quién cambió algo en ti para siempre sin saberlo?", placeholder: "Y qué cambió" },
   { id: 'q20', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "¿Qué es lo que más miedo te da que otros descubran de ti?", placeholder: "Aquí nadie te juzga" },
   { id: 'q21', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "Termina la frase: \"Si de verdad nadie fuera a enterarse, por fin me atrevería a...\"", placeholder: "Lo que hoy no te permites" },
-  { id: 'q22', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "¿Qué haces cuando estás solo que te daría vergüenza que alguien te viera hacer?", placeholder: "Lo que haces a puerta cerrada" },
+  { id: 'q22', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "¿Qué haces cuando estás a solas que te daría vergüenza que alguien te viera hacer?", placeholder: "Lo que haces a puerta cerrada" },
   { id: 'q23', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "¿Qué canción, lugar u olor te lleva de golpe a un recuerdo que te mueve por dentro? Cuéntalo.", placeholder: "El recuerdo, tal cual" },
-  { id: 'q24', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "¿Qué envidias en otras personas y te cuesta admitir?", placeholder: "Sé honesto contigo" },
+  { id: 'q24', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "¿Qué envidias en otras personas y te cuesta admitir?", placeholder: "Sin filtros, solo para ti" },
   { id: 'q25', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "Si pudieras borrar un recuerdo, ¿cuál sería y qué perderías al borrarlo?", placeholder: "Escribe solo lo que quieras compartir" },
   { id: 'q26', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "¿Qué fue lo más prohibido o impulsivo que has deseado hacer y no hiciste?", placeholder: "Eso que casi haces" },
   { id: 'q27', type: 'short', act: 3, actTitle: "Cuando nadie ve", prompt: "¿Qué guardas en un cajón, en una caja o en tu celular que nadie debe ver? ¿Por qué lo conservas?", placeholder: "Lo que no has podido tirar" },
@@ -393,7 +393,7 @@ if (btnResume && savedProgress) {
 // el navegador recibe ÚNICAMENTE título, gancho y cuántas palabras tienen. El
 // texto cerrado vive en el servidor y solo sale por qer-paypal-capture-order /
 // qer-get-reading cuando el pago está confirmado (ver qer-generate-map*.js).
-const PAYWALL_VERSION = 'read1'; // read1 = lectura de 50 preguntas en capítulos, $9.99, "Continuar sin pagar" y "¿Qué te frena?" visibles
+const PAYWALL_VERSION = 'read1'; // read1 = lectura de 50 preguntas en capítulos, $9.99, "No desbloquear por ahora" y "¿Qué te frena?" visibles
 let chapters = [];          // [{id,label,hook,free,words,text?}]
 let readingStats = null;    // {freeWords, hiddenWords, hiddenCount}
 let readUnlocked = false;
@@ -480,12 +480,6 @@ function drawChapters() {
       </div>`).join('');
   }
 
-  const stats = document.getElementById('readStats');
-  if (readingStats && closed.length) {
-    stats.textContent = `Leíste ${fmtInt(readingStats.freeWords)} palabras · quedan ${fmtInt(readingStats.hiddenWords)} por abrir`;
-  } else {
-    stats.textContent = readUnlocked ? 'Lectura completa' : '';
-  }
 }
 
 function renderReveal(data, { skipPaywall } = {}) {
@@ -704,55 +698,55 @@ document.getElementById('btnShare').addEventListener('click', async () => {
 
 // --- Arranque automático de la prueba ---
 const DEFAULT_ANSWERS = [
- "La gente cree que soy fuerte y tranquila, pero en realidad estoy cansada de aguantar todo sola.",
- "Que estoy agotada y que me gustaría que alguien me preguntara dos veces.",
  "Que todo está bien.",
- "Lo cansada que estoy; me ven siempre lista y sonriendo.",
- "Dije que sí a ayudar con algo de mi cuñada cuando lo único que quería era dormir.",
- "Una sonrisa chiquita y rápida, como de cortesía. Esconde que me estoy quedando sin energía.",
+ "Dije que sí a ayudar con algo de un familiar cuando lo único que quería era dormir.",
  "Que mi familia me pide demasiado y yo no sé decir que no.",
- "La mamá de una serie que siempre resuelve todo para los demás y nadie nota que ella se rompe. Me incomoda que me guste ser así.",
- "Sonrío, me acomodo el pelo y hablo bajito. Busco una cara conocida para no quedarme sola.",
- "De mi matrimonio anterior: digo que ya pasó, pero todavía me duele.",
+ "El cansancio que traigo; me ven siempre a punto y sonriendo.",
+ "Que me quedé sin energía y que me gustaría que alguien me preguntara dos veces.",
+ "Sonrío, me acomodo el pelo y hablo bajito. Busco una cara conocida para no quedarme a solas.",
+ "Una sonrisa chiquita y rápida, como de cortesía. Esconde que me estoy quedando sin energía.",
+ "De mi relación anterior: digo que ya pasó, pero todavía me duele.",
+ "Un personaje de serie que siempre resuelve todo para los demás y nadie nota que se rompe. Me incomoda que me guste ser así.",
+ "La gente cree que soy fuerte y tranquila, pero en realidad me pesa aguantar todo en silencio.",
  "La traición. Que me mientan en la cara después de todo lo que he dado.",
- "Mi mejor amiga contó algo mío que le pedí que guardara. Lo que más me dolió fue que lo hizo riéndose.",
+ "Mi mejor amistad contó algo mío que le pedí que guardara. Lo que más me dolió fue que lo hizo riéndose.",
  "Mi papá me dijo una vez 'tú no necesitas ayuda, tú eres la fuerte'. Lo recuerdo palabra por palabra.",
- "A mi mamá. Le diría que me hubiera gustado que me abrazara más y me corrigiera menos.",
+ "A mi mamá. Le diría que me habría gustado que me abrazara más y me corrigiera menos.",
  "Dejar de contestar mensajes de trabajo en la noche. Sigo haciéndolo.",
- "Cuento que me fui de mi casa por 'oportunidades', pero en realidad me fui porque ya no aguantaba el ambiente.",
+ "Cuento que me fui de casa por 'oportunidades', pero en realidad me fui porque ya no aguantaba el ambiente.",
  "Una amistad de la infancia. Nunca dije que me dolió que se alejara.",
- "Me quedo quieta, respiro hondo y sigo con lo que hacía como si nada. Luego lloro en el baño.",
- "Una maestra que me dijo que yo podía llegar lejos. No sabe lo que eso hizo en mí.",
- "Que descubran que a veces no soy tan buena como parezco y que me da igual quedar bien o no.",
- "Dejaría todo por un mes y me iría sola a una playa sin avisarle a nadie.",
+ "Me detengo, respiro hondo y sigo con lo que hacía como si nada. Luego lloro en el baño.",
+ "Alguien en la escuela que me dijo que yo podía llegar lejos. No sabe lo que eso hizo en mí.",
+ "Que descubran que a veces no soy tan sólido como parezco y que me da igual quedar bien o no.",
+ "Dejaría todo por un mes y me iría a una playa sin avisarle a nadie.",
  "Me como un helado entero en la cocina a oscuras, viendo videos viejos de mi familia.",
- "La canción 'Cielito lindo' en una fiesta: me lleva al funeral de mi abuela, que fue la única que me veía de verdad.",
+ "La canción 'Cielito lindo' en una fiesta: me lleva al funeral de mi abuela, que fue la única persona que me veía de verdad.",
  "A las personas que se permiten descansar y decir que no sin culpa.",
- "Borraría el día que dije algo hiriente a mi hermana. Perdería también lo que aprendí al pedirle perdón.",
+ "Borraría el día que dije algo hiriente a alguien de mi familia. Perdería también lo que aprendí al pedirle perdón.",
  "Salirme de una reunión de trabajo y no volver. Lo he imaginado muchas veces.",
  "Una cajita con cartas de mi ex que no he podido tirar, aunque sé que ya no me hacen bien.",
- "Me pongo callada y fría, pero por dentro me tiembla todo. Después me siento culpable por días.",
+ "Me cierro y me enfrío por fuera, pero por dentro me tiembla todo. Después me siento culpable por días.",
  "Sueño que estoy en una casa con muchos cuartos y siempre hay uno cerrado al que no me animo a entrar.",
  "Por la tarde, cuando termino todo lo de los demás y no queda nadie que me pregunte cómo estoy.",
- "Cuando mi abuela me peinaba y me dijo 'ahí estás tú'. Sentí que me veían sin que yo hiciera nada.",
+ "Cuando mi abuela me arreglaba el cabello y me dijo 'ahí estás tú'. Sentí que me veían sin que yo hiciera nada.",
  "Que está bien no poder con todo y que me quieren aunque no sirva para nada.",
  "Los problemas de todos en mi familia. Nadie me los pidió pero si no los cargo yo, siento que se caen.",
  "Que me abracen sin que yo lo pida y que me pregunten 'de verdad, ¿cómo estás?'.",
- "Mi disponibilidad. Todos me admiran por estar siempre y a mí me cansa ser la que siempre está.",
+ "Mi disponibilidad. Todos me admiran por estar siempre y a mí me cansa ser quien siempre está.",
  "Que me quieran sin que yo tenga que hacer algo. No sé por qué, pero no me lo creo.",
- "Me hago la difícil, me aíslo unos días y espero a ver si me buscan.",
- "Con mi prima Ana. Con ella puedo decir tonterías y llorar sin explicar.",
+ "Me pongo difícil, me aíslo unos días y espero a ver si me buscan.",
+ "Con una amistad de años. Con esa persona puedo decir tonterías y llorar sin explicar.",
  "Dormiría hasta tarde, no cocinaría y le diría a todos que hoy no estoy disponible.",
  "Un mensaje de alguien que dice 'pensé en ti' sin que yo haya hecho nada.",
  "Que no tienes que ganarte el cariño de nadie. Que ya eras suficiente.",
  "Que me perdones por haber esperado tanto para cuidarme. Y que descanses antes de que te obliguen a descansar.",
  "Las cenas de domingo donde finjo que no me afecta lo que dicen.",
- "Me iría a una ciudad con mar, me llevaría mis libros y dejaría la costumbre de ser la salvadora de todos.",
+ "Me iría a una ciudad con mar, me llevaría mis libros y dejaría la costumbre de ser quien salva a todos.",
  "A mi mamá. No sé cómo empezar, tal vez con una carta que no tenga que enviar.",
  "Revisar mi teléfono esperando que alguien me necesite. Ese miedo a que no me busquen.",
  "Que fui una persona que se dio cuenta de lo que otros no veían, y que cuidó sin pedir nada a cambio.",
  "Que todo se cae y que me van a reclamar que no estuve. Lo creo aunque sé que es mentira.",
- "Que a veces odio ser la que siempre está bien, y que tengo ganas de que alguien me cuide a mí.",
+ "Que a veces odio ser quien siempre está bien, y que tengo ganas de que alguien me cuide a mí.",
  "Que no soy lo que hago por los demás. Que valgo igual sin ser útil."
 ];
 DEFAULT_ANSWERS.forEach((a, i) => { answers[i] = a; });

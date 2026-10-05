@@ -368,7 +368,7 @@ document.getElementById('btnStart').addEventListener('click', () => {
 // (con texto); las demás llegan SOLO con etiqueta y un gancho corto — el
 // texto bloqueado nunca viaja al navegador hasta que el servidor confirma el
 // pago (ver netlify/functions/qer-generate-map.js y qer-paypal-capture-order.js).
-const PAYWALL_VERSION = 'map2'; // map2 = 10 puntos (3 gratis), lectura simbólica, $9.99, 'Continuar sin pagar' y '¿Qué te frena?' visibles
+const PAYWALL_VERSION = 'map2'; // map2 = 10 puntos (3 gratis), lectura simbólica, $9.99, 'No desbloquear por ahora' y '¿Qué te frena?' visibles
 let mapNodes = [];        // [{id,label,hook,free,text?}]
 let mapUnlocked = false;
 let lastFocusedNode = null;

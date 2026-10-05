@@ -303,7 +303,7 @@
          repetir ESE mismo reto casi textual: si el anuncio ya generó el
          impulso, la landing no debe bajarle el tono justo antes del botón
          "Empezar". -->
-    <p class="sub">No es un test cualquiera. Son 50 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más sincero seas, más te va a sorprender lo que sigue.</p>
+    <p class="sub">No es un test cualquiera. Son 50 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.</p>
     <!-- Antes decía "16 preguntas · 5 minutos" acá — se quitó a propósito:
          anunciar cuánto esfuerzo vas a pedir ANTES de generar curiosidad es
          justo lo que hace que alguien calcule "no tengo tiempo" y se vaya
@@ -354,7 +354,6 @@
     <h2 id="archetypeName" class="archetype-name display"></h2>
     <div class="rule"></div>
     <p id="hookLine" class="hook-line" style="margin-bottom:20px;"></p>
-    <p id="readStats" class="map-counter"></p>
 
     <div id="chapters" class="chapters"></div>
     <div id="lockedList" class="locked-list is-hidden"></div>
@@ -366,18 +365,12 @@
         <p class="paywall-price">Desbloquea los capítulos que faltan por <b id="priceLabel">$9.99</b></p>
         <div id="paypal-button-container"></div>
         <p class="paywall-note">Pago seguro con PayPal · sin crear cuenta</p>
-        <button id="btnSkipPaywall" class="btn-outline">Continuar sin pagar</button>
+        <button id="btnSkipPaywall" class="btn-outline">No desbloquear por ahora</button>
       </div>
 
       <div id="skippedNote" class="is-hidden">
         <p class="skipped-text">Está bien. Puedes seguir leyendo los capítulos que ya están abiertos.</p>
-        <button id="btnShowPay" class="btn-outline">Volver a ver cómo desbloquear el resto</button>
-        <button id="btnRestartFromSkip" class="btn-ghost">Hacer el cuestionario de nuevo</button>
-      </div>
-
-      <!-- Siempre visible: antes estaba escondido detrás de "Seguir sin pagar"
-           (que casi nadie tocaba) y con botones tenues; así nunca se mostraba. -->
-      <div id="reasonBlock" class="reason-block">
+        <div id="reasonBlock" class="reason-block">
         <p class="reason-title">¿Qué te frena? Elige una — nos ayuda mucho</p>
         <div id="skipReasonBox" class="reason-list">
           <button class="reason-btn skip-reason" data-reason="precio">Me parece caro</button>
@@ -386,6 +379,9 @@
           <button class="reason-btn skip-reason" data-reason="sin_interes">No me interesó seguir</button>
         </div>
         <p id="skipReasonThanks" class="is-hidden reason-thanks">Gracias, de verdad.</p>
+      </div>
+        <button id="btnShowPay" class="btn-outline">Volver a ver cómo desbloquear el resto</button>
+        <button id="btnRestartFromSkip" class="btn-ghost">Hacer el cuestionario de nuevo</button>
       </div>
     </div>
 
