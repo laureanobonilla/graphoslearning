@@ -426,7 +426,10 @@ function renderReveal(data, { skipPaywall } = {}) {
   });
 
   document.getElementById('paywall').classList.remove('is-hidden');
-  track('paywall_shown', { archetypeName: data.archetypeName || '' });
+  // paywallVersion: etiqueta para separar los datos por versión del paywall
+  // sin depender de la hora del deploy. Subir el valor ("g2", ...) cada vez
+  // que cambie el paywall. g1 = ancla de compromiso + skip atenuado.
+  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: 'g1' });
   initPaywall(readingId);
 }
 
@@ -517,6 +520,7 @@ function unlockFull({ full, closingLine }) {
 }
 
 document.getElementById('btnSkipPaywall').addEventListener('click', () => {
+  track('paywall_skipped', { paywallVersion: 'g1' });
   document.getElementById('paywall').classList.add('is-hidden');
   document.getElementById('skippedNote').classList.remove('is-hidden');
 });
