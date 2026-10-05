@@ -52,7 +52,8 @@ exports.handler = async (event) => {
 
         return json(200, {
             full: reading.full,
-            closingLine: reading.closingLine
+            closingLine: reading.closingLine,
+            ...(reading.map ? { mapTexts: reading.map.nodes.map(n => ({ id: n.id, text: n.text })) } : {})
         });
     } catch (err) {
         console.error('[paypal-capture-order]', err.message);

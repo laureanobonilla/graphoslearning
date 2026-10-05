@@ -250,6 +250,9 @@ let network = new vis.Network(container, { nodes, edges }, {
 
 function stopPhysicsAndUnlock() {
     network.setOptions({ physics: { enabled: false } });
+    // Guardar las posiciones finales en el dataset: sin esto, lo que el motor
+    // acomodó (o lo que se arrastró) no llegaba a los datos guardados.
+    try { network.storePositions(); } catch { /* no crítico */ }
     const allNodes = nodes.get();
     nodes.update(allNodes.map(n => ({ id: n.id, fixed: { x: false, y: false } })));
 }
@@ -946,6 +949,56 @@ function settleNewNodesOrganically(newIds) {
     setTimeout(() => { stopPhysicsAndUnlock(); }, 2000);
 }
 
+// Descendientes "de jerarquía" de un nodo (hijos, nietos…): sigue solo las
+// flechas padre→hijo; los vínculos 'relacionado' (cruzados, entre ramas
+// distintas) NO cuentan, para que mover un nodo no arrastre otra rama que
+// solo está enlazada con él.
+function getHierarchyDescendants(parentId) {
+    const children = new Map();
+    edges.get().forEach(e => {
+        if (e.label === 'relacionado') return;
+        if (!children.has(e.from)) children.set(e.from, []);
+        children.get(e.from).push(e.to);
+    });
+    const seen = new Set([parentId]);
+    const queue = [parentId];
+    const out = [];
+    while (queue.length) {
+        const id = queue.shift();
+        (children.get(id) || []).forEach(c => {
+            if (!seen.has(c)) { seen.add(c); out.push(c); queue.push(c); }
+        });
+    }
+    return out;
+}
+
+// Cuánto hay que desplazar un nodo (junto con su descendencia) para que un
+// esquema radial de radio `needed` centrado en él no pise al resto del
+// esquema. Función pura: recibe posiciones {id:{x,y}} y devuelve {dx,dy}
+// (0,0 si ya hay espacio, o si no hay "resto" contra el que chocar).
+function computeSolarClearance(positions, attachId, movingIds, needed) {
+    const moving = new Set(movingIds);
+    const others = Object.keys(positions).filter(id => !moving.has(id));
+    const p0 = positions[attachId];
+    if (!p0 || !others.length) return { dx: 0, dy: 0 };
+    let cx = 0, cy = 0;
+    others.forEach(id => { cx += positions[id].x; cy += positions[id].y; });
+    cx /= others.length; cy /= others.length;
+    let ux = p0.x - cx, uy = p0.y - cy;
+    const len = Math.hypot(ux, uy);
+    if (len < 1) { ux = 1; uy = 0; } else { ux /= len; uy /= len; }
+    const minDistTo = (x, y) => others.reduce((m, id) => Math.min(m, Math.hypot(positions[id].x - x, positions[id].y - y)), Infinity);
+    const fits = (d) => {
+        if (minDistTo(p0.x + ux * d, p0.y + uy * d) < needed) return false;
+        // La descendencia que se mueve con él tampoco debe quedar pegada a otras ramas.
+        return movingIds.every(id => id === attachId || minDistTo(positions[id].x + ux * d, positions[id].y + uy * d) >= 150);
+    };
+    if (fits(0)) return { dx: 0, dy: 0 };
+    let d = 0;
+    while (d < 5000 && !fits(d)) d += 40;
+    return { dx: ux * d, dy: uy * d };
+}
+
 async function renderThreeLevelTree(data, opts = {}) {
     const { originPanelId = null, attachToNodeId = null } = opts;
     // Si hay más de un panel de lectura registrado, coloreamos el borde de
@@ -1046,6 +1099,17 @@ async function renderThreeLevelTree(data, opts = {}) {
         // existe en el lienzo: el esquema nuevo PARTE de ese nodo (no se crea
         // una raíz aparte ni se pregunta si limpiar el lienzo — siempre se
         // agrega alrededor del nodo elegido).
+        // En sistema solar el esquema nuevo ocupa un círculo grande alrededor
+        // del nodo: antes de generarlo, se aleja el nodo (con toda su
+        // descendencia actual) del resto del esquema para que no se traslapen.
+        if (isSolarMode) {
+            const movingIds = [attachToNodeId, ...getHierarchyDescendants(attachToNodeId)];
+            const { dx, dy } = computeSolarClearance(network.getPositions(), attachToNodeId, movingIds, solarTotalWidth / 2 + 90);
+            if (dx || dy) {
+                const before = network.getPositions(movingIds);
+                movingIds.forEach(id => network.moveNode(id, before[id].x + dx, before[id].y + dy));
+            }
+        }
         const existingPos = network.getPositions([attachToNodeId])[attachToNodeId];
         rootId = attachToNodeId;
         rootX = existingPos.x;
@@ -2019,9 +2083,33 @@ network.on('click', async function (params) {
 });
 
 network.on('zoom', () => { actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden'); });
+// Al arrastrar un nodo, toda su descendencia (hijos, nietos…) se mueve con él,
+// conservando su posición relativa. Con Alt/Opción presionada se mueve solo el nodo.
+let dragFollowers = null;
 network.on('dragStart', (params) => {
     actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden');
     if (params.nodes.length > 0) nodes.update({ id: params.nodes[0], fixed: { x: false, y: false } });
+    dragFollowers = null;
+    // Con varios nodos seleccionados, vis-network ya mueve toda la selección.
+    if (params.nodes.length !== 1) return;
+    if (params.event && params.event.srcEvent && params.event.srcEvent.altKey) return;
+    const id = params.nodes[0];
+    const ids = getHierarchyDescendants(id);
+    if (!ids.length) return;
+    dragFollowers = { id, ids, start: network.getPositions([id, ...ids]) };
+});
+network.on('dragging', () => {
+    if (!dragFollowers) return;
+    const { id, ids, start } = dragFollowers;
+    const cur = network.getPositions([id])[id];
+    if (!cur) return;
+    const dx = cur.x - start[id].x, dy = cur.y - start[id].y;
+    ids.forEach(cid => { if (start[cid]) network.moveNode(cid, start[cid].x + dx, start[cid].y + dy); });
+});
+network.on('dragEnd', () => {
+    dragFollowers = null;
+    // Guarda las posiciones nuevas en los datos (y dispara el autoguardado).
+    try { network.storePositions(); } catch { /* no crítico */ }
 });
 
 // ==========================================

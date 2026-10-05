@@ -35,7 +35,12 @@ exports.handler = async (event) => {
             return json(200, { paid: false });
         }
 
-        return json(200, { paid: true, full: reading.full, closingLine: reading.closingLine });
+        return json(200, {
+            paid: true,
+            full: reading.full,
+            closingLine: reading.closingLine,
+            ...(reading.map ? { mapTexts: reading.map.nodes.map(n => ({ id: n.id, text: n.text })) } : {})
+        });
     } catch (err) {
         console.error('[get-reading]', err.message);
         return json(502, { error: 'No se pudo recuperar tu lectura en este momento.' });
