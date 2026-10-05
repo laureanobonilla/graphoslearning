@@ -120,7 +120,12 @@ let selectedDensity = 'auto';
 // Cómo se acomodan las ramas/sub-ramas al generar un esquema nuevo — "tree"
 // (el árbol de bloques de siempre) es el default; "solar" es el acomodo
 // radial en prueba. Se cambia con el selector "Modo" de la cabecera.
-let schemaLayoutMode = 'tree';
+// Default: sistema solar (decisión de producto 2026-10-04); si la persona ya
+// eligió otro modo antes, se respeta lo guardado.
+let schemaLayoutMode = (() => {
+    try { const v = localStorage.getItem('gk_layout_mode'); if (v === 'tree' || v === 'solar') return v; } catch {}
+    return 'solar';
+})();
 let sourceNodeForSynergy = null;
 const synergyBanner = document.getElementById('synergyBanner');
 
@@ -145,7 +150,13 @@ function getRandomColor() {
 // 1.b MICRO-SONIDO AL CREAR NODOS (togglable, Web Audio sintetizado — sin
 // archivos de audio que cargar)
 // ==========================================
-let soundEnabled = false;
+// Default: sonido encendido en escritorio (decisión de producto 2026-10-04);
+// se respeta lo que la persona haya elegido antes, y en pantallas chicas
+// (modo móvil) arranca apagado para no sorprender con ruido.
+let soundEnabled = (() => {
+    try { const v = localStorage.getItem('gk_sound'); if (v === 'on') return true; if (v === 'off') return false; } catch {}
+    return !window.matchMedia('(max-width: 780px)').matches;
+})();
 let audioCtxSingleton = null;
 function getAudioCtx() {
     if (!audioCtxSingleton) {
@@ -1532,7 +1543,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
     if (!checkBalance(estimatedCost)) return;
 
     if (currentNode && currentNode.expanded) return;
-    showLoader('Generando conceptos e incógnitas...');
+    showLoader('Generando conceptos relacionados...');
 
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
@@ -1542,7 +1553,7 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
                 topic: topicName,
                 contextPath: getContextPath(selectedNodeId),
                 maxNodes,
-                includeCuriosity: true,
+                includeCuriosity: false, // ya no se generan nodos de incógnita (❓) al expandir; el código que revela incógnitas viejas se mantiene para proyectos guardados
                 documentContext: globalDocumentContext || currentDocumentText
             })
         });
@@ -4722,15 +4733,22 @@ document.getElementById('btnMenuDelete')?.addEventListener('click', async () => 
 // ==========================================
 
 // --- Modo de acomodo del esquema (Árbol / Sistema solar) ---
-document.getElementById('schemaLayoutMode')?.addEventListener('change', (e) => {
+const schemaLayoutSelectEl = document.getElementById('schemaLayoutMode');
+if (schemaLayoutSelectEl) schemaLayoutSelectEl.value = schemaLayoutMode; // refleja el default / lo guardado
+schemaLayoutSelectEl?.addEventListener('change', (e) => {
     schemaLayoutMode = e.target.value;
+    try { localStorage.setItem('gk_layout_mode', schemaLayoutMode); } catch {}
 });
 
 // --- Sonido al crear nodos (togglable) ---
 const btnSoundToggle = document.getElementById('btnSoundToggle');
 const soundToggleIcon = document.getElementById('soundToggleIcon');
+// Refleja en la cabecera el estado inicial (puede ser encendido por default).
+if (soundToggleIcon) soundToggleIcon.textContent = soundEnabled ? '🔊' : '🔇';
+if (btnSoundToggle) btnSoundToggle.title = `Sonido al crear nodos: ${soundEnabled ? 'encendido' : 'apagado'}`;
 btnSoundToggle?.addEventListener('click', () => {
     soundEnabled = !soundEnabled;
+    try { localStorage.setItem('gk_sound', soundEnabled ? 'on' : 'off'); } catch {}
     if (soundToggleIcon) soundToggleIcon.textContent = soundEnabled ? '🔊' : '🔇';
     if (btnSoundToggle) btnSoundToggle.title = `Sonido al crear nodos: ${soundEnabled ? 'encendido' : 'apagado'}`;
     if (soundEnabled) { getAudioCtx(); playChime(660); }
@@ -5436,35 +5454,75 @@ network.on('zoom', () => {
     if (semanticZoomEl && network.getScale() < SEMANTIC_ZOOM_THRESHOLD) semanticZoomEl.classList.add('hidden');
 });
 
-// --- Estilo visual por importancia: tamaño/sombra por grado de conexión,
-// grosor de enlace reforzando la jerarquía por profundidad ---
+// --- Estilo visual por jerarquía: peso por PROFUNDIDAD del nodo en el grafo
+// (antes era por número de conexiones, y una rama con muchos hijos acababa
+// pesando más que la raíz) ---
 let importanceStylingTimer = null;
 function scheduleImportanceStyling() {
     clearTimeout(importanceStylingTimer);
     importanceStylingTimer = setTimeout(applyImportanceStyling, 220);
 }
+// Profundidad REAL de cada nodo, calculada del grafo (no asignada al crearlo):
+// así, si se agregan niveles después (Conceptos relacionados, ejemplos,
+// huecos…), la jerarquía visual se reajusta sola. Los enlaces "relacionado"
+// (cruces entre ramas) no cuentan, porque no son parentesco.
+function computeNodeDepths() {
+    const depth = new Map();
+    const children = new Map();
+    const hasParent = new Set();
+    edges.get().forEach(e => {
+        if (e.label === 'relacionado') return;
+        if (!children.has(e.from)) children.set(e.from, []);
+        children.get(e.from).push(e.to);
+        hasParent.add(e.to);
+    });
+    const queue = [];
+    nodes.getIds().forEach(id => { if (!hasParent.has(id)) { depth.set(id, 0); queue.push(id); } });
+    while (queue.length) {
+        const id = queue.shift();
+        (children.get(id) || []).forEach(c => {
+            if (!depth.has(c)) { depth.set(c, depth.get(id) + 1); queue.push(c); }
+        });
+    }
+    return depth; // nodos en ciclos sin raíz quedan sin entrada → se tratan como 0
+}
+
+// Peso visual por profundidad: el padre SIEMPRE pesa más que sus hijos. No se
+// tocan los colores (el color enlaza cada nodo con su resaltado en el lector y
+// puede haberlo elegido la persona): el peso va en tamaño de letra, borde,
+// márgenes y halo.
+const DEPTH_STYLE = [
+    { font: 24, bold: 26, border: 5,   glow: 34, margin: { top: 24, bottom: 24, left: 30, right: 30 } }, // 0 raíz
+    { font: 19, bold: 21, border: 3.5, glow: 22, margin: { top: 19, bottom: 19, left: 24, right: 24 } }, // 1
+    { font: 16, bold: 18, border: 2,   glow: 14, margin: { top: 16, bottom: 16, left: 20, right: 20 } }, // 2
+    { font: 14, bold: 15, border: 1.5, glow: 10, margin: { top: 13, bottom: 13, left: 17, right: 17 } }, // 3
+    { font: 13, bold: 14, border: 1.2, glow: 7,  margin: { top: 11, bottom: 11, left: 15, right: 15 } }  // 4+
+];
 function applyImportanceStyling() {
     const all = nodes.get();
     if (!all.length) return;
+    const depths = computeNodeDepths();
+    const styleFor = (d) => DEPTH_STYLE[Math.min(d, DEPTH_STYLE.length - 1)];
     const nodeUpdates = all.map(n => {
-        const degree = network.getConnectedEdges(n.id).length;
-        const borderWidth = Math.min(5, 1.5 + degree * 0.45);
-        const shadowSize = Math.min(32, 12 + degree * 2.5);
-        return { id: n.id, borderWidth, shadow: { enabled: true, color: 'rgba(79, 209, 197, 0.18)', size: shadowSize, x: 0, y: 0 } };
+        const st = styleFor(depths.get(n.id) ?? 0);
+        return {
+            id: n.id,
+            borderWidth: st.border,
+            margin: st.margin,
+            font: { size: st.font, bold: { size: st.bold } },
+            shadow: { enabled: true, color: 'rgba(79, 209, 197, 0.18)', size: st.glow, x: 0, y: 0 }
+        };
     });
     nodes.update(nodeUpdates);
 
-    // Grosor de enlace: solo tocamos los que forman parte del árbol principal
-    // (ambos extremos con depthLevel conocido), para no pisar colores/estilos
-    // ya puestos a propósito por otras funciones (antítesis, ejemplos, etc.).
-    const allEdges = edges.get();
+    // Grosor de enlace según el nivel del extremo más profundo (los cruces
+    // "relacionado" conservan su estilo propio).
     const edgeUpdates = [];
-    allEdges.forEach(e => {
-        const fromNode = nodes.get(e.from), toNode = nodes.get(e.to);
-        if (!fromNode || !toNode) return;
-        if (typeof fromNode.depthLevel !== 'number' || typeof toNode.depthLevel !== 'number') return;
-        const deeperLevel = Math.max(fromNode.depthLevel, toNode.depthLevel);
-        const width = deeperLevel <= 1 ? 3 : 2.2;
+    edges.get().forEach(e => {
+        if (e.label === 'relacionado') return;
+        if (!depths.has(e.from) || !depths.has(e.to)) return;
+        const deeper = Math.max(depths.get(e.from), depths.get(e.to));
+        const width = deeper <= 1 ? 3.6 : deeper === 2 ? 2.4 : 1.6;
         edgeUpdates.push({ id: e.id, width });
     });
     if (edgeUpdates.length) edges.update(edgeUpdates);

@@ -461,8 +461,8 @@
             <div class="flex items-center gap-1.5" title="Cómo se acomodan las ramas al generar un esquema nuevo">
                 <span class="text-[10px] text-[#5b6388] hidden lg:inline">Modo:</span>
                 <select id="schemaLayoutMode" class="bg-[#0f1428] border border-[#2c3458] rounded-md px-2 py-1 text-xs font-semibold text-[#eef1fb] focus:outline-none focus:border-[#4fd1c5]">
-                    <option value="tree" selected>🌳 Árbol</option>
-                    <option value="solar">🪐 Sistema solar</option>
+                    <option value="tree">🌳 Árbol</option>
+                    <option value="solar" selected>🪐 Sistema solar</option>
                 </select>
             </div>
 
@@ -505,8 +505,8 @@
             <button id="btnStartQuiz" title="Modo quiz: intenta recordar cada nodo antes de ver la respuesta, y marca qué tan bien te fue" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🧠</span> <span class="hidden md:inline">Quiz</span>
             </button>
-            <button id="btnSoundToggle" title="Sonido al crear nodos: apagado" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
-                <span id="soundToggleIcon">🔇</span>
+            <button id="btnSoundToggle" title="Sonido al crear nodos: encendido" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span id="soundToggleIcon">🔊</span>
             </button>
             <button id="btnClear" class="text-[#8a92b2] hover:text-rose-300 text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
                 <span>🧹</span> Limpiar
@@ -918,12 +918,8 @@
             <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2.5 hover:bg-[#1c2a1a] text-lime-300 font-medium text-sm text-left transition-colors">
                 Explicación sencilla
             </button>
-            <button id="btnMenuStartTour" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]">
-                🎬 Recorrido desde aquí
-            </button>
-            <button id="btnMenuStartQuiz" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors">
-                🧠 Autoevaluarme desde aquí
-            </button>
+            <!-- "Recorrido desde aquí" y "Autoevaluarme desde aquí" se quitaron del menú
+                 contextual (2026-10-04); siguen disponibles en la cabecera (Recorrido / Quiz). -->
 
             <!-- DETECCIÓN DE HUECOS: solo visible si el nodo tiene node.gaps
                  no vacío (ver toggle en app.js, sección "DETECCIÓN DE
