@@ -38,6 +38,20 @@ const STEPS = [...QUESTIONS.map(q => ({ kind: 'q', q })), ...PHOTOS.map(p => ({ 
 const answers = new Array(QUESTIONS.length).fill(null);
 const photos = {};          // slot → data URI JPEG (solo en memoria)
 let consentOk = false, adultOk = false;
+// Las fotos se suben una a una en cuanto se eligen. En el navegador solo se recuerda el id de la
+// sesión y qué fotos ya están subidas (nunca las imágenes).
+let sessionId = null; const uploaded = {};
+const SESSION_KEY = 'vst_session_v1';
+function saveSession() { try { localStorage.setItem(SESSION_KEY, JSON.stringify({ sessionId, uploaded: Object.keys(uploaded), consentOk, adultOk, savedAt: Date.now() })); } catch { /* no crítico */ } }
+function loadSession() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (!d || !d.sessionId || Date.now() - (d.savedAt || 0) > 3 * 86400000) return;
+    sessionId = d.sessionId; (d.uploaded || []).forEach(sl => { uploaded[sl] = true; }); consentOk = !!d.consentOk; adultOk = !!d.adultOk;
+  } catch { /* no crítico */ }
+}
+function clearSession() { sessionId = null; Object.keys(uploaded).forEach(k => delete uploaded[k]); try { localStorage.removeItem(SESSION_KEY); } catch { /* no crítico */ } }
+loadSession();
 let currentIndex = 0, readingId = null, styleNameForShare = '';
 
 // --- Registro de uso (nunca incluye fotos) ---------------------------------------------
@@ -135,7 +149,7 @@ function renderPhotoStep(p, help) {
     const c = document.createElement('div'); c.className = 'consent';
     c.innerHTML = `<p><b>Antes de subir fotos</b></p>
       <label><input type="checkbox" id="chkAdult"${adultOk ? ' checked' : ''}><span>Tengo 18 años o más.</span></label>
-      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Entiendo que puedo borrar las fotos cuando tenga mi resultado.</span></label>`;
+      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Entiendo que puedo borrar las fotos cuando tenga mi resultado.</span></label>`;      
     wrap.appendChild(c);
     c.querySelector('#chkAdult').addEventListener('change', e => { adultOk = e.target.checked; if (adultOk) track('adult_confirmed', {}); refreshNext(); });
     c.querySelector('#chkConsent').addEventListener('change', e => { consentOk = e.target.checked; if (consentOk) track('consent_given', {}); refreshNext(); });
@@ -180,22 +194,46 @@ function renderPhotoStep(p, help) {
     btnCam.textContent = 'Repetir con la cámara'; btnUp.textContent = 'Elegir otra de la galería';
   };
   btnCam.textContent = 'Tomar foto'; btnUp.textContent = 'Elegir de la galería';
+  const status = document.createElement('p'); status.style.cssText = 'text-align:center;margin:0;font-weight:600'; status.setAttribute('role', 'status'); wrap.appendChild(status);
+  let uploading = false;
   if (photos[p.slot]) showPhoto();
+  if (uploaded[p.slot]) status.textContent = 'Foto guardada ✓';
 
   async function handleFile(f) {
-    err.textContent = '';
+    err.textContent = ''; status.textContent = '';
+    let uri;
+    try { uri = await toJpegDataUri(f); }
+    catch (e) { err.textContent = e.message || 'No pudimos leer esa imagen. Prueba con otra.'; return; }
+    photos[p.slot] = uri; delete uploaded[p.slot];
+    track('photo_added', { slot: p.slot, kb: Math.round(uri.length * 0.75 / 1024), via: f.name ? 'file' : 'camera' });
+    frame.querySelector('.guide-chip')?.remove();
+    showPhoto(); upload();
+  }
+  async function upload() {
+    if (!photos[p.slot]) return;
+    uploading = true; err.textContent = ''; status.textContent = 'Guardando tu foto…'; refreshNext();
     try {
-      photos[p.slot] = await toJpegDataUri(f);
-      track('photo_added', { slot: p.slot, kb: Math.round(photos[p.slot].length * 0.75 / 1024), via: f.name ? 'file' : 'camera' });
-      frame.querySelector('.guide-chip')?.remove();
-      showPhoto(); refreshNext();
-    } catch (e) { err.textContent = e.message || 'No pudimos leer esa imagen. Prueba con otra.'; }
+      const r = await postWithOneRetry('vst-upload-photo', {
+        sessionId, slot: p.slot, photo: photos[p.slot], consent: consentOk, adult: adultOk, anonId,
+        answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' }))
+      });
+      sessionId = r.sessionId; uploaded[p.slot] = true; saveSession();
+      status.textContent = 'Foto guardada ✓'; track('photo_uploaded', { slot: p.slot });
+    } catch (e) {
+      status.textContent = '';
+      err.innerHTML = ''; err.append(`${e.message || 'No se pudo guardar la foto.'} `);
+      const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn-ghost'; retry.textContent = 'Reintentar';
+      retry.addEventListener('click', upload); err.appendChild(retry);
+      track('photo_upload_failed', { slot: p.slot, reason: String(e.message).slice(0, 120) });
+      if (e.data?.blocked) { clearSession(); }
+    }
+    uploading = false; refreshNext();
   }
   [input, inputCap].forEach(el => el.addEventListener('change', () => { const f = el.files && el.files[0]; el.value = ''; if (f) handleFile(f); }));
 
   function refreshNext() {
     const needConsent = isFirstPhoto && !(adultOk && consentOk);
-    btnNext.disabled = !photos[p.slot] || needConsent;
+    btnNext.disabled = !(photos[p.slot] || uploaded[p.slot]) || !uploaded[p.slot] || uploading || needConsent;
   }
   refreshNext();
 }
@@ -274,6 +312,7 @@ btnNext.addEventListener('click', () => {
     saveProgress();
   } else {
     track('photo_step_done', { stepIndex: currentIndex + 1, slot: step.p.slot });
+    saveProgress();
   }
   if (currentIndex < STEPS.length - 1) { currentIndex++; renderStep(currentIndex); }
   else { $('progressFill').style.width = '100%'; submit(); }
@@ -286,7 +325,7 @@ btnBack.addEventListener('click', () => {
 
 // --- Avance guardado (solo respuestas; las fotos jamás se guardan en el navegador) ------------
 const PROGRESS_KEY = 'vst_quiz_progress_v1';
-function saveProgress() { try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, currentIndex: Math.min(currentIndex + 1, QUESTIONS.length), savedAt: Date.now() })); } catch { /* no crítico */ } }
+function saveProgress() { try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, currentIndex: Math.min(currentIndex + 1, STEPS.length - 1), savedAt: Date.now() })); } catch { /* no crítico */ } }
 function loadProgress() {
   try {
     const p = JSON.parse(localStorage.getItem(PROGRESS_KEY) || 'null');
@@ -297,7 +336,7 @@ function loadProgress() {
 }
 function clearProgress() { try { localStorage.removeItem(PROGRESS_KEY); } catch { /* no crítico */ } }
 
-$('btnStart').addEventListener('click', () => { track('quiz_started', {}); clearProgress(); currentIndex = 0; renderStep(0); showScreen('quiz'); });
+$('btnStart').addEventListener('click', () => { track('quiz_started', {}); clearProgress(); clearSession(); currentIndex = 0; renderStep(0); showScreen('quiz'); });
 const savedProgress = loadProgress();
 if (savedProgress) {
   const b = $('btnResume');
@@ -331,22 +370,21 @@ async function submit() {
   const t0 = Date.now();
   try {
     const profile = await postWithOneRetry('vst-generate-profile', {
-      anonId, consent: consentOk, adult: adultOk,
-      answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })),
-      photos
+      anonId, consent: consentOk, adult: adultOk, sessionId,
+      answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' }))
     });
     label.textContent = LOADING_STEPS[2];
     await Promise.all([0, 1, 2, 3, 4].map(part => postWithOneRetry('vst-generate-part', { readingId: profile.readingId, part })));
     label.textContent = LOADING_STEPS[3];
     const data = await postWithOneRetry('vst-generate-finalize', { readingId: profile.readingId });
     track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000) });
-    clearProgress();
+    clearProgress(); clearSession();
     Object.keys(photos).forEach(k => delete photos[k]); // ya no se necesitan en memoria
     renderReveal(data);
   } catch (err) {
     track('reading_generated_error', { reason: String(err.message).slice(0, 200), blocked: !!err.data?.blocked, seconds: Math.round((Date.now() - t0) / 1000) });
     if (err.data?.blocked) {
-      Object.keys(photos).forEach(k => delete photos[k]);
+      Object.keys(photos).forEach(k => delete photos[k]); clearSession();
       showError('No pudimos usar tus fotos.', err.message, null);
     } else showError('Tu guía no pudo terminar de armarse.', err.message, submit);
   }
@@ -464,7 +502,6 @@ $('btnDeletePhotos').addEventListener('click', async () => {
   } catch (e) { alert(e.message || 'Tus fotos fueron borradas.'); }
   b.disabled = false;
 });
-
 // --- Medición después del paywall ----------------------------------------------------------------------
 const pageStartedAt = Date.now(); let paywallObserver = null, paywallSeen = false, scrollMaxPct = 0;
 function watchPaywallInView() {
@@ -482,7 +519,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function restart() {
-  currentIndex = 0; answers.fill(null); Object.keys(photos).forEach(k => delete photos[k]); readingId = null; occasions = []; photosDeleted = false;
+  currentIndex = 0; answers.fill(null); Object.keys(photos).forEach(k => delete photos[k]); clearSession(); readingId = null; occasions = []; photosDeleted = false;
   clearPending(); clearProgress(); track('quiz_started', { restart: true }); renderStep(0); showScreen('quiz');
 }
 $('btnRestart').addEventListener('click', restart);
