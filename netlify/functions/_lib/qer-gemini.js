@@ -7,15 +7,22 @@ const { GoogleGenAI } = require('@google/genai');
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
 
-async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, temperature = 0.85 } = {}) {
+async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, temperature = 0.85, deadline = null } = {}) {
     let lastError = null;
     for (let attempt = 0; attempt < FALLBACK_MODELS.length; attempt++) {
+        // `deadline` (ms epoch): Netlify corta la función a los ~26 s y devuelve un
+        // 502 genérico sin explicación. Mejor rendirse nosotros un poco antes y
+        // devolver un error claro.
+        if (deadline && Date.now() > deadline - 1500) {
+            throw lastError || new Error(`[${tag}] se acabó el tiempo disponible antes de poder reintentar`);
+        }
+        const timeoutMs = deadline ? Math.max(3000, deadline - Date.now()) : undefined;
         let response;
         try {
             response = await ai.models.generateContent({
                 contents: prompt,
                 model: FALLBACK_MODELS[attempt],
-                config: { responseMimeType: 'application/json', responseSchema: schema, temperature, maxOutputTokens }
+                config: { responseMimeType: 'application/json', responseSchema: schema, temperature, maxOutputTokens, ...(timeoutMs ? { httpOptions: { timeout: timeoutMs } } : {}) }
             });
         } catch (err) {
             lastError = err;

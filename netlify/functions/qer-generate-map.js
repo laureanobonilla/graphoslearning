@@ -31,7 +31,8 @@ const THEMES = [
     'EL HAMBRE DE SER VISTA: qué necesita que alguien vea de ella y por qué no deja que pase.',
     'LA CARTA PENDIENTE: lo que le debe decir a su yo del pasado y a su yo de ahora; el cierre catártico del mapa.'
 ];
-const CHUNKS = [[0, 1, 2, 3], [4, 5, 6], [7, 8, 9]];
+const CHUNKS = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]; // 5 llamadas en paralelo de 2 rubros: cada una es corta
+const TIME_BUDGET_MS = 23000; // Netlify corta a ~26 s
 
 const RULES = `Tono: íntimo, perceptivo y teatral, en segunda persona ("tú"), como alguien que de verdad leyó cada respuesta y conecta detalles entre ellas — nunca como un horóscopo que le quedaría bien a cualquiera. Cita o parafrasea respuestas reales de la persona.
 
@@ -118,18 +119,22 @@ exports.handler = async (event) => {
     const answers = sanitizeAnswers(body.answers);
     if (!answers) return json(400, { error: 'Faltan las respuestas del cuestionario.' });
     const transcript = transcriptOf(answers);
+    const t0 = Date.now();
+    const deadline = t0 + TIME_BUDGET_MS;
 
     try {
-        const axis = await generateWithRetries(axisPrompt(transcript), AXIS_SCHEMA, validAxis, { tag: 'map-axis', maxOutputTokens: 1024, temperature: 0.85 });
+        const axis = await generateWithRetries(axisPrompt(transcript), AXIS_SCHEMA, validAxis, { tag: 'map-axis', maxOutputTokens: 1024, temperature: 0.85, deadline });
+        console.log(`[generate-map] eje listo en ${Date.now() - t0} ms`);
 
         const parts = await Promise.all(CHUNKS.map((idxs, c) => generateWithRetries(
             chunkPrompt(transcript, axis, idxs),
             NODES_SCHEMA,
             d => d && Array.isArray(d.nodes) && d.nodes.length === idxs.length &&
                 d.nodes.every(n => n && n.label && n.hook && n.text && String(n.text).length > 250),
-            { tag: `map-nodes-${c}`, maxOutputTokens: 3072, temperature: 0.85 }
+            { tag: `map-nodes-${c}`, maxOutputTokens: 2048, temperature: 0.85, deadline }
         )));
 
+        console.log(`[generate-map] rubros listos en ${Date.now() - t0} ms`);
         const flat = parts.flatMap(p => p.nodes);
         const nodes = flat.map((n, i) => ({
             id: i,
@@ -159,8 +164,10 @@ exports.handler = async (event) => {
                 : { id: n.id, label: n.label, hook: n.hook, free: false })
         });
     } catch (err) {
-        console.error('[generate-map]', err.message);
-        return json(502, { error: 'No se pudo armar tu mapa. Intenta de nuevo en un momento.' });
+        console.error(`[generate-map] falló tras ${Date.now() - t0} ms:`, err.message);
+        // TEMPORAL mientras se confirma que el mapa nuevo funciona en producción:
+        // se manda el motivo técnico (truncado) para verlo directo en pantalla.
+        return json(502, { error: `No se pudo armar tu mapa. Detalle técnico: ${String(err.message || err).slice(0, 250)}` });
     }
 };
 
