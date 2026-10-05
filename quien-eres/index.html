@@ -179,6 +179,11 @@
   .paywall-skip button{ background:none; border:none; color: #e9c9ba; font-size: 0.74rem; text-decoration:underline; cursor:pointer; opacity: 0.55; }
 
   #fullContainer.is-hidden{ display:none; }
+  /* Sin estas reglas, add/remove('is-hidden') sobre estos elementos no tenía
+     ningún efecto visual (solo existían para #progress, #btnBack y
+     #fullContainer): "Seguir sin pagar" no ocultaba el paywall y la nota de
+     "Está bien…" se veía desde el principio. */
+  #paywall.is-hidden, #skippedNote.is-hidden, #skipReasonBox.is-hidden, #skipReasonThanks.is-hidden{ display:none; }
   #fullContainer{ animation: fadeUp 0.6s ease; }
   @keyframes fadeUp{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform:none; } }
   .closing-line{ font-family:'Fraunces', serif; font-style: italic; text-align:center; font-size: 1.15rem; line-height:1.5; max-width: 30ch; margin: 30px auto 36px; color: var(--brass); }
@@ -296,6 +301,18 @@
 
     <div id="skippedNote" class="is-hidden" style="text-align:center; margin: 10px 0 28px;">
       <p style="color:var(--muted); font-size:0.88rem; margin-bottom:14px;">Está bien. Tu lectura se queda hasta ahí.</p>
+      <!-- Pregunta de un toque: mide POR QUÉ no pagan en vez de adivinarlo
+           (ver conversación del 2026-10-04). Anónima y se puede ignorar. -->
+      <div id="skipReasonBox" style="margin-bottom:22px;">
+        <p style="color:var(--muted); font-size:0.82rem; margin-bottom:10px;">¿Qué te frenó? (un toque, nos ayuda mucho)</p>
+        <div style="display:flex; flex-direction:column; gap:8px; max-width:320px; margin:0 auto;">
+          <button class="btn-ghost skip-reason" data-reason="precio">El precio</button>
+          <button class="btn-ghost skip-reason" data-reason="metodo_pago">No uso PayPal / el método de pago</button>
+          <button class="btn-ghost skip-reason" data-reason="solo_ver">Solo quería ver el resultado</button>
+          <button class="btn-ghost skip-reason" data-reason="sin_interes">No me interesó seguir leyendo</button>
+        </div>
+      </div>
+      <p id="skipReasonThanks" class="is-hidden" style="color:var(--muted); font-size:0.82rem; margin-bottom:22px;">Gracias, de verdad.</p>
       <button id="btnRestartFromSkip" class="btn-ghost">Hacer el cuestionario de nuevo</button>
     </div>
 

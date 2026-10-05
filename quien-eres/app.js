@@ -525,6 +525,15 @@ document.getElementById('btnSkipPaywall').addEventListener('click', () => {
   document.getElementById('skippedNote').classList.remove('is-hidden');
 });
 
+// Pregunta "¿Qué te frenó?": un toque, se registra una sola vez por persona.
+document.querySelectorAll('.skip-reason').forEach(btn => {
+  btn.addEventListener('click', () => {
+    track('paywall_skip_reason', { reason: btn.dataset.reason, paywallVersion: 'g1' });
+    document.getElementById('skipReasonBox').classList.add('is-hidden');
+    document.getElementById('skipReasonThanks').classList.remove('is-hidden');
+  });
+});
+
 function restartQuiz() {
   currentIndex = 0;
   answers.fill(null);
