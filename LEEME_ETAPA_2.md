@@ -2794,3 +2794,6 @@ Debajo de la lectura (siempre visible, pague o no) aparece "¿Y si tu lectura fu
 
 ### 54b. Nombre opcional en la canción
 Casilla "Quiero que la canción lleve mi nombre" → aparece un campo de nombre. Se envía como `name` a `qer-song-request`, que lo valida (`cleanName` en `_lib/qer-song.js`: solo letras, espacios, ' y -, máx. 30), lo pide en el prompt de la letra (2–3 veces, sin deducir género) y lo pone en el correo ("Nombre en la canción"). No se guarda en la base: los eventos solo llevan `hasName`. Eventos nuevos: `song_name_toggled`, `song_name_invalid`.
+
+### 54c. Teclado en el celular
+Al abrir el formulario de la canción ya no se enfoca ningún campo (el teclado no sale solo). Cuando la persona toca el teléfono o el nombre, `bindSongViewportFit` (app.js) usa `visualViewport` para subir la hoja por encima del teclado y limitar su alto; mientras el teclado está abierto se oculta la letra pequeña. Probado con un `visualViewport` simulado; conviene confirmarlo en un celular real (Android y iPhone).

@@ -490,10 +490,33 @@ function buildSongPhone(dial, raw) {
   return /^\+[1-9]\d{7,14}$/.test(full) ? full : '';
 }
 
+// En el celular el teclado se dibuja ENCIMA de la página sin empujar lo que está fijo abajo: la hoja de la canción
+// se subía detrás de él. Con visualViewport se mide la parte realmente visible y se acomoda la hoja sobre el teclado.
+let songViewportBound = false;
+function bindSongViewportFit(box) {
+  const vv = window.visualViewport;
+  if (!vv || songViewportBound) return;
+  songViewportBound = true;
+  const fit = () => {
+    if (window.matchMedia('(min-width: 960px)').matches) { box.style.bottom = ''; box.style.maxHeight = ''; box.classList.remove('kb-open'); return; }
+    const covered = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    box.style.bottom = covered ? covered + 'px' : '';
+    box.style.maxHeight = covered ? Math.round(vv.height * 0.94) + 'px' : '';
+    box.classList.toggle('kb-open', covered > 80);
+    if (covered > 80) {
+      const el = document.activeElement;
+      if (el && box.contains(el)) { try { el.scrollIntoView({ block: 'center' }); } catch (_e) { /* no crítico */ } }
+    }
+  };
+  vv.addEventListener('resize', fit);
+  vv.addEventListener('scroll', fit);
+}
+
 function setupSongOffer(forReadingId, archetype) {
   const box = document.getElementById('songOffer');
   if (!box) return;
   box.classList.remove('is-hidden');
+  bindSongViewportFit(box);
   const teaser = document.getElementById('songTeaser'), form = document.getElementById('songForm'), done = document.getElementById('songDone');
   box.classList.remove('is-open');
   const tt = document.getElementById('songTeaserText');
@@ -506,7 +529,6 @@ function setupSongOffer(forReadingId, archetype) {
   wantName.onchange = () => {
     nameIn.classList.toggle('is-hidden', !wantName.checked);
     track('song_name_toggled', { on: wantName.checked });
-    if (wantName.checked) { try { nameIn.focus({ preventScroll: true }); } catch (_e) { /* no crítico */ } }
   };
   const dial = document.getElementById('songDial'), phone = document.getElementById('songPhone');
   const guess = guessDialCode();
@@ -514,7 +536,9 @@ function setupSongOffer(forReadingId, archetype) {
   document.getElementById('btnSongOpen').onclick = () => {
     track('song_cta_clicked', {});
     teaser.classList.add('is-hidden'); form.classList.remove('is-hidden'); box.classList.add('is-open');
-    try { phone.focus({ preventScroll: true }); form.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
+    // Sin enfocar el teléfono: si el teclado se abre solo, tapa el formulario y parece que algo falló.
+    // La persona ve primero el formulario completo y toca ella el campo cuando quiera.
+    box.scrollTop = 0;
   };
   box.querySelectorAll('.song-chip').forEach(chip => {
     chip.setAttribute('aria-pressed', chip.dataset.style === songStyle ? 'true' : 'false');
