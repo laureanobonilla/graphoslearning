@@ -171,6 +171,38 @@
   .paywall-price b{ color:#fff; font-size: 1.15rem; }
   #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
   .paywall-note{ text-align:center; color: #d8a79d; font-size: 0.74rem; margin-bottom: 4px; }
+  /* Alternativa al pago con PayPal: contacto directo (WhatsApp / correo) para coordinar otro método. */
+  .song-offer{ margin: 26px 0 8px; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--line); background: rgba(198,163,88,0.07); }
+  .song-offer h3{ margin: 0 0 8px; font-size: 1.15rem; color: var(--brass); }
+  .song-offer p{ margin: 0 0 12px; font-size: 0.88rem; line-height: 1.5; color: var(--muted); }
+  .song-offer .song-label{ margin: 0 0 8px; color:#e9e2d0; font-weight: 500; }
+  .song-offer .song-fine{ margin: 8px 0 12px; font-size: 0.76rem; }
+  .song-offer .song-fine a{ color: var(--muted); }
+  .song-offer .song-error{ margin: 10px 0 0; color:#f2b3a6; font-size: 0.84rem; }
+  .song-styles{ display:flex; flex-wrap:wrap; gap:8px; margin: 0 0 16px; }
+  .song-chip{ appearance:none; cursor:pointer; border: 1px solid var(--line); background: transparent; color: #e9e2d0; border-radius: 999px; padding: 7px 14px; font-family:'Work Sans',sans-serif; font-size: 0.82rem; }
+  .song-chip[aria-pressed="true"]{ border-color: var(--brass); background: rgba(198,163,88,0.16); color: #f4e9c9; }
+  .song-phone{ display:flex; gap:8px; }
+  .song-phone select, .song-phone input{ appearance:none; border:1px solid var(--line); background: rgba(0,0,0,0.25); color:#f4efe2; border-radius: 12px; padding: 12px; font-family:'Work Sans',sans-serif; font-size: 1rem; min-width:0; }
+  .song-phone select{ flex: 0 0 38%; font-size: 0.88rem; }
+  .song-phone input{ flex: 1 1 auto; }
+  .song-go{ appearance:none; width:100%; border:none; cursor:pointer; border-radius: 999px; padding: 14px 18px; background: var(--brass); color:#211a0c; font-family:'Work Sans',sans-serif; font-size: 0.98rem; font-weight: 600; }
+  .song-go:disabled{ background:#4a4436; color:#8a8575; cursor:default; }
+  .song-form.is-hidden, .song-teaser.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden{ display:none; }
+  .song-offer .song-title{ margin: 2px 0 8px; font-size: 1.3rem; line-height: 1.25; color:#f4e9c9; }
+  .classic-pay{ margin: 0 0 14px; text-align:center; }
+  .classic-pay.is-hidden{ display:none; }
+  .btn-classic-pay{ appearance:none; width:100%; border:none; cursor:pointer; border-radius:999px; padding:15px 20px; background:#ffc439; color:#1a1a1a; font-family:'Work Sans',sans-serif; font-size:1rem; font-weight:600; }
+  .btn-classic-pay:active{ background:#f2b72e; }
+  .classic-pay-note{ margin:8px 0 0; font-size:0.74rem; color:#d8a79d; }
+  .pay-wait{ margin: 14px 0; padding: 12px 14px; border-radius: 12px; text-align:center; font-size:0.9rem; color:#f2e3d6; background: rgba(255,255,255,0.08); }
+  .pay-wait.is-hidden{ display:none; }
+  .alt-pay{ margin: 14px 0 6px; padding: 12px 14px; border: 1px dashed rgba(233,201,186,0.35); border-radius: 12px; text-align:center; }
+  .alt-pay.is-nudged{ border-style: solid; border-color:#f2c9a8; background: rgba(242,201,168,0.12); }
+  .alt-pay p{ margin: 0 0 10px; font-size: 0.82rem; line-height: 1.45; color: #e9c9ba; }
+  .alt-pay .alt-links{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .alt-pay a{ display:inline-block; padding: 9px 14px; border-radius: 999px; border:1px solid rgba(233,201,186,0.55); color:#f6e7de; font-size:0.82rem; text-decoration:none; }
+  .alt-pay a:hover, .alt-pay a:focus-visible{ background: rgba(233,201,186,0.14); }
   /* Botón de "seguir sin pagar": sigue ahí, siempre disponible y legible
      (no es un patrón oscuro ocultarlo), pero con más distancia del bloque
      de pago y menos peso visual, para que no compita al mismo nivel que el
@@ -245,7 +277,7 @@
     #unlockPanel.is-flash{ animation:none; }
   }
 
-  /* "Continuar sin pagar" y "¿Qué te frena?": explícitos, con borde y tamaño de
+  /* "No desbloquear por ahora" y "¿Qué te frena?": explícitos, con borde y tamaño de
      botón real — antes eran texto tenue y casi nadie los veía como opción. */
   .btn-outline{ appearance:none; display:block; width:100%; margin-top:18px; background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.7); border-radius:999px; padding:14px 20px; font-family:'Work Sans',sans-serif; font-size:.98rem; font-weight:500; cursor:pointer; }
   .btn-outline:active{ background:rgba(255,255,255,.12); }
@@ -362,24 +394,39 @@
       <div id="payBlock">
         <p id="paywallCommitment" class="paywall-commitment"></p>
         <p id="paywallHook" class="paywall-label display">Tu lectura continúa</p>
+        <p id="payWait" class="pay-wait is-hidden" role="status"></p>
         <p class="paywall-price">Desbloquea los capítulos que faltan por <b id="priceLabel">$9.99</b></p>
+        <div id="classicPay" class="classic-pay is-hidden">
+          <button type="button" id="btnClassicPay" class="btn-classic-pay">Pagar con tarjeta o PayPal</button>
+          <p class="classic-pay-note">Te llevamos a la página segura de PayPal y vuelves aquí automáticamente. No necesitas cuenta.</p>
+        </div>
         <div id="paypal-button-container"></div>
         <p class="paywall-note">Pago seguro con PayPal · sin crear cuenta</p>
+        <div class="alt-pay" id="altPay">
+          <p id="altPayLead">¿No puedes o no quieres pagar con PayPal? Escríbeme y te paso otro método de pago (precio: <b id="altPayPrice">$9.99</b>). Tu lectura queda guardada mientras tanto.</p>
+          <div class="alt-links">
+            <a id="altWhatsapp" href="https://wa.me/50687772993" target="_blank" rel="noopener">Escribir por WhatsApp</a>
+            <a id="altEmail" href="mailto:bonillapretiz@gmail.com">Enviar un correo</a>
+          </div>
+        </div>
         <button id="btnSkipPaywall" class="btn-outline">No desbloquear por ahora</button>
       </div>
 
       <div id="skippedNote" class="is-hidden">
         <p class="skipped-text">Está bien. Puedes seguir leyendo los capítulos que ya están abiertos.</p>
+        <p class="skipped-text" style="font-size:0.85rem">Si lo que te frenó fue el pago, escríbeme y lo resolvemos:
+          <a id="altWhatsapp2" href="https://wa.me/50687772993" target="_blank" rel="noopener" style="color:#f6e7de">WhatsApp</a> ·
+          <a id="altEmail2" href="mailto:bonillapretiz@gmail.com" style="color:#f6e7de">correo</a></p>
         <div id="reasonBlock" class="reason-block">
-        <p class="reason-title">¿Qué te frena? Elige una — nos ayuda mucho</p>
-        <div id="skipReasonBox" class="reason-list">
-          <button class="reason-btn skip-reason" data-reason="precio">Me parece caro</button>
-          <button class="reason-btn skip-reason" data-reason="metodo_pago">No uso PayPal / el método de pago</button>
-          <button class="reason-btn skip-reason" data-reason="solo_ver">Solo quería ver el resultado</button>
-          <button class="reason-btn skip-reason" data-reason="sin_interes">No me interesó seguir</button>
+          <p class="reason-title">¿Qué te frena? Elige una — nos ayuda mucho</p>
+          <div id="skipReasonBox" class="reason-list">
+            <button class="reason-btn skip-reason" data-reason="precio">Me parece caro</button>
+            <button class="reason-btn skip-reason" data-reason="metodo_pago">No uso PayPal / el método de pago</button>
+            <button class="reason-btn skip-reason" data-reason="solo_ver">Solo quería ver el resultado</button>
+            <button class="reason-btn skip-reason" data-reason="sin_interes">No me interesó seguir</button>
+          </div>
+          <p id="skipReasonThanks" class="is-hidden reason-thanks">Gracias, de verdad.</p>
         </div>
-        <p id="skipReasonThanks" class="is-hidden reason-thanks">Gracias, de verdad.</p>
-      </div>
         <button id="btnShowPay" class="btn-outline">Volver a ver cómo desbloquear el resto</button>
         <button id="btnRestartFromSkip" class="btn-ghost">Hacer el cuestionario de nuevo</button>
       </div>
@@ -393,6 +440,48 @@
       </div>
     </div>
 
+
+    <div id="songOffer" class="song-offer is-hidden">
+      <h3 class="display">¿Y si tu lectura fuera una canción?</h3>
+      <div id="songTeaser">
+        <p>Con lo que descubrimos de ti escribo la letra y te hago una muestra para que la escuches. Sin compromiso: hablamos de precio solo después de que la oigas.</p>
+        <button type="button" id="btnSongOpen" class="song-go">Quiero mi canción</button>
+      </div>
+      <form id="songForm" class="song-form is-hidden" novalidate>
+        <p class="song-label">¿En qué estilo la quieres?</p>
+        <div class="song-styles" role="group" aria-label="Estilo de la canción">
+          <button type="button" class="song-chip" data-style="Balada suave" aria-pressed="false">Balada suave</button>
+          <button type="button" class="song-chip" data-style="Pop" aria-pressed="false">Pop</button>
+          <button type="button" class="song-chip" data-style="Acústica" aria-pressed="false">Acústica</button>
+          <button type="button" class="song-chip" data-style="Rock suave" aria-pressed="false">Rock suave</button>
+          <button type="button" class="song-chip" data-style="Bolero" aria-pressed="false">Bolero</button>
+          <button type="button" class="song-chip" data-style="Urbano suave" aria-pressed="false">Urbano suave</button>
+          <button type="button" class="song-chip" data-style="Sorpréndeme" aria-pressed="true">Sorpréndeme</button>
+        </div>
+        <p class="song-label"><label for="songPhone">Tu WhatsApp, para enviarte la muestra</label></p>
+        <div class="song-phone">
+          <select id="songDial" aria-label="Código de país">
+            <option value="+506">CR +506</option><option value="+598">UY +598</option><option value="+52">MX +52</option>
+            <option value="+54">AR +54</option><option value="+57">CO +57</option><option value="+56">CL +56</option>
+            <option value="+51">PE +51</option><option value="+593">EC +593</option><option value="+507">PA +507</option>
+            <option value="+502">GT +502</option><option value="+503">SV +503</option><option value="+504">HN +504</option>
+            <option value="+505">NI +505</option><option value="+58">VE +58</option><option value="+591">BO +591</option>
+            <option value="+595">PY +595</option><option value="+34">ES +34</option><option value="+1">US/CA/RD +1</option>
+            <option value="">Otro (escribe +código)</option>
+          </select>
+          <input id="songPhone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Tu número" maxlength="24">
+        </div>
+        <p class="song-fine">Solo usaré tu número para escribirte por WhatsApp con tu muestra. No lo comparto ni te enviaré otra cosa.</p>
+        <button type="submit" id="btnSongSend" class="song-go">Quiero mi canción</button>
+        <p id="songError" class="song-error is-hidden" role="alert"></p>
+        <p class="song-fine"><a id="songWhatsapp" href="https://wa.me/50687772993" target="_blank" rel="noopener">¿Prefieres escribirme tú? Abre WhatsApp</a></p>
+      </form>
+      <div id="songDone" class="song-done is-hidden" role="status">
+        <p class="song-title display">¡Listo!</p>
+        <p id="songDoneText"></p>
+      </div>
+    </div>
+
     <div class="reveal-actions" style="margin-top:26px;">
       <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);">Compartir mi arquetipo</button>
     </div>
@@ -401,7 +490,7 @@
   </section>
 </div>
 
+<div style="position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:.7rem;color:#8a7343;background:rgba(22,17,31,.92);padding:5px 8px;z-index:50;">Modo prueba · respuestas de ejemplo · no se registran eventos · el pago y la canción son reales · <a href="" style="color:#c6a358;">generar de nuevo</a></div>
 <script src="app.js"></script>
-<div style="position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:.7rem;color:#8a7343;background:rgba(22,17,31,.92);padding:5px 8px;z-index:50;">Modo prueba · respuestas de ejemplo · no se registran eventos · <a href="" style="color:#c6a358;">generar de nuevo</a></div>
 </body>
 </html>

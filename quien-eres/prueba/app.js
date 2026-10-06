@@ -1,5 +1,6 @@
-// MODO PRUEBA: respuestas de ejemplo ya cargadas; al abrir la página se genera directo,
-// como lo vería una persona al terminar el cuestionario. No registra eventos.
+// MODO PRUEBA (generado desde quien-eres/app.js con tools/build_prueba.py — no editar a mano):
+// respuestas de ejemplo ya cargadas; al abrir la página se genera directo, como lo vería una persona
+// al terminar el cuestionario. No registra eventos. El pago, la redirección y la oferta de canción SON REALES.
 const TEST_MODE = true;
 // ==========================================
 // "¿QUIÉN ERES EN REALIDAD?" — cuestionario + lectura generada + paywall
@@ -13,7 +14,8 @@ const TEST_MODE = true;
 // (ver netlify/functions/_lib/readings-store.js).
 
 // --- Datos del cuestionario -------------------------------------------
-// Mezcla a propósito tres formatos (elección única, respuesta corta,
+// Arranca con 3 preguntas de elegir una opción (calentamiento de un toque; ahí se perdía más gente
+// al principio) y sigue con respuesta corta. Soporta tres formatos (elección única, respuesta corta,
 // palabra-a-partir-de-una-imagen) para que se sienta como una conversación
 // variada y no como un formulario largo y repetitivo. Las preguntas buscan
 // un ángulo concreto (qué haces sin que nadie mire, qué proteges, cómo te
@@ -77,14 +79,14 @@ const BLOT_D = `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/
 // (qué haces sin que nadie mire, qué proteges, cómo te ven vs. cómo te ves)
 // para que se siga sintiendo como una conversación y no como una encuesta.
 const QUESTIONS = [
+  { id: 'c1', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?", options: ["Sonrío y hablo más de lo normal", "Me quedo callado/a y observo", "Busco a alguien conocido y me quedo cerca", "Actúo con seguridad aunque por dentro no la sienta"] },
+  { id: 'c2', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué haces con más frecuencia solo para quedar bien con alguien?", options: ["Digo que sí aunque quiero decir que no", "Me río de algo que no me da risa", "Me guardo mi opinión para no discutir", "Hago favores que no me tocaban"] },
+  { id: 'c3', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "¿De qué cosa de tu vida hablas como si ya estuviera resuelta, aunque no lo esté?", options: ["De una relación o de mi familia", "Del trabajo o del dinero", "De mi salud o de mi ánimo", "De lo que quiero para mi futuro"] },
   { id: 'q3', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Cuál es la mentira que más te repites a ti?", placeholder: "La que casi nunca dices en voz alta" },
-  { id: 'q5', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué hiciste esta semana solo para quedar bien con alguien?", placeholder: "Aunque parezca pequeño" },
   { id: 'q7', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué opinión tuya nunca dices en voz alta?", placeholder: "Esa que te guardas" },
   { id: 'q4', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué parte de ti se nota menos de lo que quisieras?", placeholder: "Lo que los demás casi no ven" },
   { id: 'q2', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando alguien te pregunta \"¿cómo estás?\" y contestas \"bien\", ¿qué es lo que de verdad querrías decir?", placeholder: "Dilo como lo sientes" },
-  { id: 'q9', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?", placeholder: "Lo que haces sin darte cuenta" },
   { id: 'q6', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Describe la sonrisa que pones cuando no tienes ganas de sonreír. ¿Qué esconde?", placeholder: "Descríbela con detalle" },
-  { id: 'q10', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿De qué cosa de tu vida hablas como si ya estuviera resuelta, aunque no lo esté?", placeholder: "Lo que dices que ya pasó" },
   { id: 'q8', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué personaje de película, serie o cuento se parece más a ti? ¿Qué parte suya te incomoda reconocer?", placeholder: "El personaje y la parte incómoda" },
   { id: 'q1', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Termina la frase: \"La gente cree que soy..., pero en realidad soy...\"", placeholder: "Las dos partes, aunque no calcen" },
   { id: 'q11', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "Completa sin pensarlo mucho: \"Lo que más me cuesta perdonar en alguien es...\"", placeholder: "Lo primero que se te venga" },
@@ -201,8 +203,8 @@ track('landing_viewed', {
 // así que si vuelves dentro de esas 24h, retomas justo donde quedaste —
 // viendo el inicio gratis y con el botón de pago listo — sin repetir las
 // 16 preguntas.
-const PENDING_KEY = 'qer_pending_read_prueba'; // clave propia: no pisa la lectura pendiente de la versión de texto
-const PENDING_MAX_AGE_MS = 23 * 60 * 60 * 1000; // un poco menos que el TTL del servidor (24h)
+const PENDING_KEY = 'qer_pending_read'; // clave propia: no pisa la lectura pendiente de la versión de texto
+const PENDING_MAX_AGE_MS = 71 * 60 * 60 * 1000; // un poco menos que el TTL del servidor (72h)
 
 function savePendingReading(data) {
   try {
@@ -269,6 +271,10 @@ function renderQuestion(index) {
         wrap.querySelectorAll('.option').forEach(o => o.classList.remove('is-selected'));
         btn.classList.add('is-selected');
         btnNext.disabled = false;
+        // Un solo toque por pregunta: avanza solo (con un instante para ver la selección).
+        // "Atrás" sigue disponible para corregir.
+        const idxAtClick = currentIndex;
+        setTimeout(() => { if (currentIndex === idxAtClick && !btnNext.disabled && currentScreenName === 'quiz') btnNext.click(); }, 380);
       });
       wrap.appendChild(btn);
     });
@@ -298,7 +304,7 @@ function renderQuestion(index) {
   if (q.type === 'short') {
     const hint = document.createElement('p');
     hint.className = 'short-hint';
-    hint.textContent = 'Escribe con libertad. Si prefieres no responder, escribe "paso".';
+    hint.textContent = 'Escribe con libertad. Si prefieres no responder, escribe "paso" y sigues.';
     inputWrap.appendChild(hint);
   }
   qBodyEl.appendChild(inputWrap);
@@ -350,7 +356,7 @@ btnBack.addEventListener('click', () => {
 
 // --- Guardar el avance (son 50 preguntas: perder lo escrito por un cierre accidental
 // de la pestaña sería muy frustrante) ------------------------------------------
-const PROGRESS_KEY = 'qer_quiz_progress_prueba';
+const PROGRESS_KEY = 'qer_quiz_progress_v4'; // v4: las 3 primeras preguntas pasaron a ser de elegir (orden distinto)
 function saveQuizProgress() {
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, currentIndex: currentIndex + 1, savedAt: Date.now() })); } catch { /* no crítico */ }
 }
@@ -372,7 +378,7 @@ document.getElementById('btnStart').addEventListener('click', () => {
   showScreen('quiz');
 });
 const btnResume = document.getElementById('btnResume');
-const savedProgress = null;
+const savedProgress = loadQuizProgress();
 if (btnResume && savedProgress) {
   btnResume.textContent = `Continuar donde quedaste (pregunta ${Math.min(savedProgress.currentIndex + 1, QUESTIONS.length)} de ${QUESTIONS.length})`;
   btnResume.classList.remove('is-hidden');
@@ -498,6 +504,7 @@ function renderReveal(data, { skipPaywall } = {}) {
   document.getElementById('fullContainer').classList.add('is-hidden');
   drawChapters();
   showScreen('reveal');
+  setupSongOffer(data.readingId, data.archetypeName);
 
   if (skipPaywall) {
     document.getElementById('paywall').classList.add('is-hidden');
@@ -508,18 +515,136 @@ function renderReveal(data, { skipPaywall } = {}) {
   savePendingReading({ readingId: data.readingId, format: 'reading', archetypeName: data.archetypeName, hookLine: data.hookLine, nodes: chapters, stats: readingStats });
 
   document.getElementById('paywall').classList.remove('is-hidden');
-  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION });
+  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION, freeChapters: chapters.filter(c => c.text).length, totalChapters: chapters.length });
   watchPaywallInView();
+  setupAltPay(readingId, data.archetypeName);
   initPaywall(readingId);
 }
 
+// --- Oferta de canción: estilo + teléfono; el servidor escribe la letra y te la manda por correo (LEEME 53) ---
+let songStyle = 'Sorpréndeme';
+let songObserver = null;
+const SONG_TZ_DIAL = { 'America/Costa_Rica': '+506', 'America/Montevideo': '+598', 'America/Mexico_City': '+52', 'America/Cancun': '+52', 'America/Monterrey': '+52', 'America/Tijuana': '+52', 'America/Argentina/Buenos_Aires': '+54', 'America/Bogota': '+57', 'America/Santiago': '+56', 'America/Lima': '+51', 'America/Guayaquil': '+593', 'America/Panama': '+507', 'America/Guatemala': '+502', 'America/El_Salvador': '+503', 'America/Tegucigalpa': '+504', 'America/Managua': '+505', 'America/Caracas': '+58', 'America/La_Paz': '+591', 'America/Asuncion': '+595', 'Europe/Madrid': '+34' };
+function guessDialCode() {
+  try { return SONG_TZ_DIAL[Intl.DateTimeFormat().resolvedOptions().timeZone] || ''; } catch { return ''; }
+}
+// Une el código de país con el número local; devuelve "+59899123456" o '' si no parece válido.
+function buildSongPhone(dial, raw) {
+  let n = String(raw || '').replace(/[\s().\-]/g, '');
+  if (!n) return '';
+  if (n.startsWith('00')) n = '+' + n.slice(2);
+  if (n.startsWith('+')) return /^\+[1-9]\d{7,14}$/.test(n) ? n : '';
+  if (!dial) return '';
+  n = n.replace(/^0+/, '');
+  const full = dial + n;
+  return /^\+[1-9]\d{7,14}$/.test(full) ? full : '';
+}
+
+function setupSongOffer(forReadingId, archetype) {
+  const box = document.getElementById('songOffer');
+  if (!box) return;
+  box.classList.remove('is-hidden');
+  const teaser = document.getElementById('songTeaser'), form = document.getElementById('songForm'), done = document.getElementById('songDone');
+  teaser.classList.remove('is-hidden'); form.classList.add('is-hidden'); done.classList.add('is-hidden');
+  const err = document.getElementById('songError'), send = document.getElementById('btnSongSend');
+  err.classList.add('is-hidden'); send.disabled = false;
+  const dial = document.getElementById('songDial'), phone = document.getElementById('songPhone');
+  const guess = guessDialCode();
+  if (guess) dial.value = guess;
+  document.getElementById('btnSongOpen').onclick = () => {
+    track('song_cta_clicked', {});
+    teaser.classList.add('is-hidden'); form.classList.remove('is-hidden');
+    try { phone.focus({ preventScroll: true }); form.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
+  };
+  box.querySelectorAll('.song-chip').forEach(chip => {
+    chip.setAttribute('aria-pressed', chip.dataset.style === songStyle ? 'true' : 'false');
+    chip.onclick = () => {
+      songStyle = chip.dataset.style;
+      box.querySelectorAll('.song-chip').forEach(c => c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'));
+      track('song_style_chosen', { style: songStyle });
+    };
+  });
+  const wa = document.getElementById('songWhatsapp');
+  const msg = `Hola, quiero mi canción. Mi código es: ${forReadingId}${archetype ? ` (${archetype})` : ''}.`;
+  wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+  wa.onclick = () => track('song_whatsapp_clicked', {});
+  const fail = (t) => { err.textContent = t; err.classList.remove('is-hidden'); };
+  form.onsubmit = async (ev) => {
+    ev.preventDefault();
+    err.classList.add('is-hidden');
+    const full = buildSongPhone(dial.value, phone.value);
+    if (!full) { track('song_phone_invalid', {}); fail('Revisa tu número: pon el código de tu país y el número, por ejemplo 99 123 456.'); phone.focus(); return; }
+    send.disabled = true; send.textContent = 'Enviando…';
+    track('song_request_submitted', { style: songStyle });
+    try {
+      const res = await fetch('/.netlify/functions/qer-song-request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readingId: forReadingId, style: songStyle, phone: full, consent: true })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        track('song_request_failed', { status: res.status });
+        fail(data.error || 'No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.');
+        send.disabled = false; send.textContent = 'Quiero mi canción';
+        return;
+      }
+      track('song_request_confirmed', { style: songStyle });
+      document.getElementById('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de tu canción. Revisa tus mensajes pronto.`;
+      form.classList.add('is-hidden'); done.classList.remove('is-hidden');
+      try { done.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
+    } catch {
+      track('song_request_failed', { status: 0 });
+      fail('Sin conexión. Inténtalo de nuevo.');
+      send.disabled = false; send.textContent = 'Quiero mi canción';
+    }
+  };
+  track('song_offer_shown', {});
+  try {
+    if (songObserver) songObserver.disconnect();
+    songObserver = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting && e.intersectionRatio >= 0.5)) { track('song_offer_in_view', {}); songObserver.disconnect(); }
+    }, { threshold: 0.5 });
+    songObserver.observe(box);
+  } catch (_e) { /* no crítico */ }
+}
+
+// Contacto directo como alternativa de pago: el mensaje ya lleva el código de la lectura para poder
+// desbloquearla a mano (ver LEEME, sección 51).
+const CONTACT_WHATSAPP = '50687772993';
+const CONTACT_EMAIL = 'bonillapretiz@gmail.com';
+function setupAltPay(forReadingId, archetype) {
+  const priceEl = document.getElementById('priceLabel'), altPrice = document.getElementById('altPayPrice');
+  if (altPrice && priceEl) altPrice.textContent = priceEl.textContent;
+  track('altpay_shown', { paywallVersion: PAYWALL_VERSION });
+  const msg = `Hola, quiero desbloquear el resto de mi lectura${archetype ? ` "${archetype}"` : ''}. Mi código es: ${forReadingId}. ¿Qué métodos de pago tienes?`;
+  const waHref = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+  const emHref = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Desbloquear mi lectura')}&body=${encodeURIComponent(msg)}`;
+  ['altWhatsapp', 'altWhatsapp2'].forEach(id => { const el = document.getElementById(id); if (el) { el.href = waHref; el.onclick = () => track('contact_whatsapp_clicked', { paywallVersion: PAYWALL_VERSION, from: id }); } });
+  ['altEmail', 'altEmail2'].forEach(id => { const el = document.getElementById(id); if (el) { el.href = emHref; el.onclick = () => track('contact_email_clicked', { paywallVersion: PAYWALL_VERSION, from: id }); } });
+}
+
+// Si el pago no se completa (cancelado, error, PayPal no disponible), se les recuerda que pueden escribir.
+function nudgeAltPay(reason) {
+  const box = document.getElementById('altPay'), lead = document.getElementById('altPayLead');
+  if (!box || !lead) return;
+  lead.textContent = reason === 'cancelled'
+    ? 'Parece que el pago no se completó. No pasa nada: escríbeme por WhatsApp o correo y te ayudo a pagar de otra forma.'
+    : 'No se pudo completar el pago con PayPal. Escríbeme por WhatsApp o correo y lo resolvemos de otra forma; tu lectura sigue guardada.';
+  box.classList.add('is-nudged');
+  try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
+  track('altpay_nudged', { reason, paywallVersion: PAYWALL_VERSION });
+}
+
+let paypalFailReason = '';
+let paypalCfg = null; // respuesta de qer-paypal-config (clientId, precio, correo del botón clásico)
 async function loadPaypalSdk() {
   if (window.paypal) return true;
   try {
     const res = await fetch('/.netlify/functions/qer-paypal-config');
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.clientId) return false;
-    if (data.priceUsd) document.getElementById('priceLabel').textContent = `$${data.priceUsd}`;
+    if (!res.ok || !data.clientId) { paypalFailReason = !res.ok ? `config HTTP ${res.status}` : 'config sin clientId'; return false; }
+    paypalCfg = data;
+    if (data.priceUsd) { document.getElementById('priceLabel').textContent = `$${data.priceUsd}`; const ap = document.getElementById('altPayPrice'); if (ap) ap.textContent = `$${data.priceUsd}`; }
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(data.clientId)}&currency=USD`;
@@ -527,23 +652,47 @@ async function loadPaypalSdk() {
       s.onerror = () => reject(new Error('No se pudo cargar el SDK de PayPal.'));
       document.head.appendChild(s);
     });
+    if (!window.paypal) paypalFailReason = 'script cargó pero window.paypal no existe';
     return !!window.paypal;
   } catch (err) {
+    paypalFailReason = String(err?.message || err).slice(0, 200);
     console.error('[paypal] no se pudo cargar el SDK', err);
     return false;
   }
+}
+
+// Botón principal de pago: abre el enlace de pago de PayPal (acepta tarjeta como invitado, a diferencia de los
+// botones del SDK). Ese enlace redirige a /quien-eres/?pagado=<clave> al terminar y qer-claim-paid.js abre la
+// lectura (ver LEEME 52b). El precio lo fija el propio enlace: debe ser igual a READING_PRICE_USD.
+// (Alternativa más estricta, sin usar este enlace: formulario con IPN, ver qer-paypal-ipn.js y LEEME 52.)
+const PAYPAL_PAY_LINK = 'https://www.paypal.com/ncp/payment/VTF7CY432WXJ8';
+function setupClassicPay(_forReadingId) {
+  const wrap = document.getElementById('classicPay'), btn = document.getElementById('btnClassicPay');
+  if (!wrap || !btn) return;
+  wrap.classList.remove('is-hidden');
+  btn.onclick = () => {
+    track('classic_pay_clicked', { paywallVersion: PAYWALL_VERSION });
+    setTimeout(() => { location.href = PAYPAL_PAY_LINK; }, 150); // deja salir el evento antes de cambiar de página
+  };
+  track('classic_pay_shown', { paywallVersion: PAYWALL_VERSION });
 }
 
 async function initPaywall(forReadingId) {
   const container = document.getElementById('paypal-button-container');
   container.innerHTML = '';
   const loaded = await loadPaypalSdk();
+  setupClassicPay(forReadingId);
   if (!loaded) {
+    track('paypal_sdk_failed', { reason: paypalFailReason, paywallVersion: PAYWALL_VERSION });
+    nudgeAltPay('error');
     container.innerHTML = '<p style="color:#e9c9ba; font-size:0.85rem; text-align:center;">No se pudo cargar el pago. Revisa tu conexión y recarga la página.</p>';
     return;
   }
-  window.paypal.Buttons({
+  track('paypal_sdk_loaded', { paywallVersion: PAYWALL_VERSION });
+  const payButtons = window.paypal.Buttons({
     style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay' },
+    onInit: () => track('paypal_buttons_ready', { paywallVersion: PAYWALL_VERSION }),
+    onClick: () => track('paypal_button_clicked', { paywallVersion: PAYWALL_VERSION }),
     createOrder: async () => {
       const res = await fetch('/.netlify/functions/qer-paypal-create-order', {
         method: 'POST',
@@ -567,6 +716,7 @@ async function initPaywall(forReadingId) {
       const result = await res.json().catch(() => ({}));
       if (!res.ok) {
         track('payment_captured_failed', { reason: result.error || `HTTP ${res.status}` });
+        nudgeAltPay('error');
         alert(result.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos.');
         return;
       }
@@ -574,11 +724,17 @@ async function initPaywall(forReadingId) {
       unlockReading(result);
     },
     onError: (err) => {
-      track('payment_captured_failed', { reason: String(err?.message || err).slice(0, 300) });
+      const reason = String(err?.message || err).slice(0, 300);
+      track('paypal_error', { reason, paywallVersion: PAYWALL_VERSION });
       console.error('[paypal]', err);
+      nudgeAltPay('error');
     },
-    onCancel: () => track('payment_cancelled', {})
-  }).render('#paypal-button-container');
+    onCancel: () => { track('payment_cancelled', {}); nudgeAltPay('cancelled'); }
+  });
+  if (!payButtons.isEligible()) { track('paypal_not_eligible', { paywallVersion: PAYWALL_VERSION }); nudgeAltPay('error'); return; }
+  payButtons.render('#paypal-button-container')
+    .then(() => track('paypal_buttons_rendered', { visible: container.offsetHeight > 20, height: container.offsetHeight, paywallVersion: PAYWALL_VERSION }))
+    .catch(err => { track('paypal_render_failed', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }); nudgeAltPay('error'); });
 }
 
 // Aplica los capítulos que el servidor entrega SOLO después de confirmar el pago.
@@ -665,9 +821,59 @@ document.getElementById('btnRestartFromSkip').addEventListener('click', restartQ
 // --- Retomar una lectura pendiente (o ya pagada) ----------------------------------
 // Antes de mostrar el pago se le pregunta al SERVIDOR si ya está pagada (por si
 // pagó y perdió la conexión justo después).
+// Al volver de la página de PayPal (?pago=ok) el aviso del servidor (IPN) puede tardar unos segundos:
+// se consulta al servidor cada 3 s hasta 90 s.
+const RETURN_FLAG = new URLSearchParams(location.search).get('pago');
+// Regreso desde el enlace de pago de PayPal (?pagado=<clave>): ver netlify/functions/qer-claim-paid.js
+const CLAIM_TOKEN = new URLSearchParams(location.search).get('pagado');
+if (RETURN_FLAG || CLAIM_TOKEN) { try { history.replaceState(null, '', location.pathname); } catch { /* no crítico */ } }
+
+async function waitForPaidAfterReturn(pending) {
+  const note = document.getElementById('payWait');
+  if (note) { note.textContent = 'Confirmando tu pago… esto toma unos segundos.'; note.classList.remove('is-hidden'); }
+  const started = Date.now();
+  while (Date.now() - started < 90000) {
+    try {
+      const res = await fetch('/.netlify/functions/qer-get-reading', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readingId: pending.readingId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.paid && data.mapTexts) {
+        track('payment_return_confirmed', { seconds: Math.round((Date.now() - started) / 1000), paywallVersion: PAYWALL_VERSION });
+        if (note) note.classList.add('is-hidden');
+        unlockReading({ mapTexts: data.mapTexts, closingLine: data.closingLine });
+        return true;
+      }
+    } catch { /* se reintenta */ }
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  track('payment_return_timeout', { paywallVersion: PAYWALL_VERSION });
+  if (note) note.textContent = 'Aún no vemos tu pago. Si ya pagaste, escríbeme por WhatsApp o correo (abajo) y lo desbloqueo a mano; tu lectura sigue guardada.';
+  nudgeAltPay('error');
+  return false;
+}
+
 async function resumePendingReadingIfAny() {
   const pending = loadPendingReading();
   if (!pending || !Array.isArray(pending.nodes) || pending.format !== 'reading') return;
+  if (RETURN_FLAG === 'ok') track('payment_return', { paywallVersion: PAYWALL_VERSION });
+  if (CLAIM_TOKEN) {
+    track('payment_return', { via: 'redirect', paywallVersion: PAYWALL_VERSION });
+    try {
+      const res = await fetch('/.netlify/functions/qer-claim-paid', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readingId: pending.readingId, token: CLAIM_TOKEN })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.paid && data.mapTexts) {
+        track('payment_captured_success', { via: 'redirect', paywallVersion: PAYWALL_VERSION });
+        renderReveal(pending, { skipPaywall: true });
+        unlockReading({ mapTexts: data.mapTexts, closingLine: data.closingLine });
+        return;
+      }
+      track('payment_redirect_failed', { status: res.status });
+    } catch { /* se sigue con el flujo normal */ }
+  }
   try {
     const res = await fetch('/.netlify/functions/qer-get-reading', {
       method: 'POST',
@@ -682,8 +888,10 @@ async function resumePendingReadingIfAny() {
     }
   } catch { /* sin conexión: se muestra el pago normal */ }
   renderReveal(pending);
+  if (RETURN_FLAG === 'ok') waitForPaidAfterReturn(pending);
+  else if (RETURN_FLAG === 'cancel') { track('payment_cancelled', { via: 'classic' }); setTimeout(() => nudgeAltPay('cancelled'), 1500); }
 }
-// (prueba) sin retomar lecturas guardadas: cada visita genera una nueva.
+if (!TEST_MODE) resumePendingReadingIfAny();
 
 document.getElementById('btnShare').addEventListener('click', async () => {
   const shareText = archetypeNameForShare
@@ -696,7 +904,6 @@ document.getElementById('btnShare').addEventListener('click', async () => {
   catch { alert(url); }
 });
 
-// --- Arranque automático de la prueba ---
 const DEFAULT_ANSWERS = [
  "Que todo está bien.",
  "Dije que sí a ayudar con algo de un familiar cuando lo único que quería era dormir.",
