@@ -2797,3 +2797,9 @@ Casilla "Quiero que la canción lleve mi nombre" → aparece un campo de nombre.
 
 ### 54c. Teclado en el celular
 Al abrir el formulario de la canción ya no se enfoca ningún campo (el teclado no sale solo). Cuando la persona toca el teléfono o el nombre, `bindSongViewportFit` (app.js) usa `visualViewport` para subir la hoja por encima del teclado y limitar su alto; mientras el teclado está abierto se oculta la letra pequeña. Probado con un `visualViewport` simulado; conviene confirmarlo en un celular real (Android y iPhone).
+
+### 54d. Menos deserción (6 oct)
+- **Orden de la parte 1:** después de las 3 de elegir ahora van las más ligeras (personaje de película, sonrisa, "¿cómo estás?", parte de ti que no se nota, "La gente cree que soy…") y las más íntimas pasaron a las posiciones 9 y 10 ("la mentira que más te repites", "opinión que nunca dices"). Motivo: en los datos del 6 oct, la pregunta 4 (la mentira) y la 5 eran donde más gente abandonaba (10–13 % de quienes llegaban).
+- **IMPORTANTE para analizar datos:** `questionIndex` ya no equivale a la misma pregunta que antes en las posiciones 4–10. Para comparar con exportaciones anteriores usa `questionId` (q3 = la mentira, etc.). `PROGRESS_KEY` pasó a v5 (el avance guardado de antes se descarta).
+- **Salida anticipada:** desde las 25 respuestas aparece "Ya tengo suficiente: ver mi lectura ahora" (eventos `finish_early_offered`, `quiz_finished_early`). El servidor ignora las preguntas sin respuesta (`sanitizeAnswers`), así que la lectura se arma con lo contestado. Dato que la justifica poco: de quienes pasaban la 25, el 75–77 % ya terminaba; el beneficio máximo son los ~10–14 % que abandonaban entre la 26 y la 49.
+- Medir: tasa de abandono en las posiciones 4–10 (antes ≈ 10–13 % en la 4 y 8–10 % en la 5) y cuántos usan la salida anticipada.

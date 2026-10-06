@@ -240,6 +240,10 @@
   .map-pulse{ animation: pulseRing 1.6s ease-out 2; }
   @keyframes pulseRing{ 0%{ box-shadow:0 0 0 0 rgba(242,236,223,.5);} 100%{ box-shadow:0 0 0 18px rgba(242,236,223,0);} }
 
+  .finish-early{ margin-top: 18px; text-align:center; }
+  .finish-early.is-hidden{ display:none; }
+  .finish-early p{ margin: 0 0 6px; font-size: .8rem; line-height:1.45; color: var(--muted); }
+  .finish-early .btn-ghost{ color: var(--parchment); font-size: .9rem; text-decoration: underline; text-decoration-color: var(--brass-dim); text-underline-offset: 3px; padding: 8px 6px; }
   .btn-ghost{ appearance:none; border:none; cursor:pointer; font-family:'Work Sans', sans-serif; }
   /* Hoja inferior: lo que se abre al tocar un punto. */
   .sheet-backdrop{ position:fixed; inset:0; background: rgba(8,5,14,.62); opacity:0; pointer-events:none; transition: opacity .25s ease; z-index: 20; }
@@ -337,6 +341,10 @@
     </div>
     <div class="quiz-bottom">
       <button id="btnNext" class="btn btn-primary" disabled>Siguiente</button>
+      <div id="finishEarly" class="finish-early is-hidden">
+        <p>Cada respuesta más hace tu lectura más profunda. Si prefieres, puedes verla ya.</p>
+        <button type="button" id="btnFinishEarly" class="btn-ghost">Ya tengo suficiente: ver mi lectura ahora</button>
+      </div>
     </div>
   </section>
 

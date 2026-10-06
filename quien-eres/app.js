@@ -73,13 +73,13 @@ const QUESTIONS = [
   { id: 'c1', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?", options: ["Sonrío y hablo más de lo normal", "Me quedo callado/a y observo", "Busco a alguien conocido y me quedo cerca", "Actúo con seguridad aunque por dentro no la sienta"] },
   { id: 'c2', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué haces con más frecuencia solo para quedar bien con alguien?", options: ["Digo que sí aunque quiero decir que no", "Me río de algo que no me da risa", "Me guardo mi opinión para no discutir", "Hago favores que no me tocaban"] },
   { id: 'c3', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "¿De qué cosa de tu vida hablas como si ya estuviera resuelta, aunque no lo esté?", options: ["De una relación o de mi familia", "Del trabajo o del dinero", "De mi salud o de mi ánimo", "De lo que quiero para mi futuro"] },
+  { id: 'q8', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué personaje de película, serie o cuento se parece más a ti? ¿Qué parte suya te incomoda reconocer?", placeholder: "El personaje y la parte incómoda" },
+  { id: 'q6', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Describe la sonrisa que pones cuando no tienes ganas de sonreír. ¿Qué esconde?", placeholder: "Descríbela con detalle" },
+  { id: 'q2', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando alguien te pregunta \"¿cómo estás?\" y contestas \"bien\", ¿qué es lo que de verdad querrías decir?", placeholder: "Dilo como lo sientes" },
+  { id: 'q4', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué parte de ti se nota menos de lo que quisieras?", placeholder: "Lo que los demás casi no ven" },
+  { id: 'q1', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Termina la frase: \"La gente cree que soy..., pero en realidad soy...\"", placeholder: "Las dos partes, aunque no calcen" },
   { id: 'q3', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Cuál es la mentira que más te repites a ti?", placeholder: "La que casi nunca dices en voz alta" },
   { id: 'q7', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué opinión tuya nunca dices en voz alta?", placeholder: "Esa que te guardas" },
-  { id: 'q4', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué parte de ti se nota menos de lo que quisieras?", placeholder: "Lo que los demás casi no ven" },
-  { id: 'q2', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando alguien te pregunta \"¿cómo estás?\" y contestas \"bien\", ¿qué es lo que de verdad querrías decir?", placeholder: "Dilo como lo sientes" },
-  { id: 'q6', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Describe la sonrisa que pones cuando no tienes ganas de sonreír. ¿Qué esconde?", placeholder: "Descríbela con detalle" },
-  { id: 'q8', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué personaje de película, serie o cuento se parece más a ti? ¿Qué parte suya te incomoda reconocer?", placeholder: "El personaje y la parte incómoda" },
-  { id: 'q1', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Termina la frase: \"La gente cree que soy..., pero en realidad soy...\"", placeholder: "Las dos partes, aunque no calcen" },
   { id: 'q11', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "Completa sin pensarlo mucho: \"Lo que más me cuesta perdonar en alguien es...\"", placeholder: "Lo primero que se te venga" },
   { id: 'q12', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "Piensa en la última vez que alguien te falló de verdad. ¿Qué fue lo que más te dolió?", placeholder: "Escribe solo lo que quieras compartir" },
   { id: 'q13', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "¿Qué palabra, frase o gesto de alguien te dolió hace años y todavía recuerdas exacto?", placeholder: "Tal como lo recuerdas" },
@@ -237,6 +237,25 @@ const btnNext = document.getElementById('btnNext');
 const btnBack = document.getElementById('btnBack');
 const progressFill = document.getElementById('progressFill');
 
+// Salida anticipada: desde las 25 respuestas se puede pedir la lectura ya. El servidor ignora las preguntas sin
+// respuesta, así que la lectura se arma con lo contestado (algo menos profunda que con las 50).
+const FINISH_EARLY_AFTER = 25;
+const btnFinishEarly = document.getElementById('btnFinishEarly');
+const finishEarlyBox = document.getElementById('finishEarly');
+function updateFinishEarly(index) {
+  const answered = answers.filter(Boolean).length;
+  const show = answered >= FINISH_EARLY_AFTER && index < QUESTIONS.length - 1;
+  finishEarlyBox.classList.toggle('is-hidden', !show);
+  if (show && !updateFinishEarly.shown) { updateFinishEarly.shown = true; track('finish_early_offered', { answered }); }
+}
+btnFinishEarly.addEventListener('click', () => {
+  const value = collectAnswer(currentIndex);
+  if (value && value.length >= 2) answers[currentIndex] = value; // si ya escribió algo en la pregunta actual, cuenta
+  track('quiz_finished_early', { answered: answers.filter(Boolean).length, atIndex: currentIndex + 1 });
+  saveQuizProgress();
+  submitQuiz();
+});
+
 function renderQuestion(index) {
   const q = QUESTIONS[index];
   progressFill.style.width = `${Math.round((index / QUESTIONS.length) * 100)}%`;
@@ -246,6 +265,7 @@ function renderQuestion(index) {
   if (actEl) actEl.textContent = `Parte ${q.act} de 5 · ${q.actTitle}`;
   qBodyEl.innerHTML = '';
   btnNext.disabled = true;
+  updateFinishEarly(index);
 
   const existing = answers[index];
 
@@ -347,7 +367,7 @@ btnBack.addEventListener('click', () => {
 
 // --- Guardar el avance (son 50 preguntas: perder lo escrito por un cierre accidental
 // de la pestaña sería muy frustrante) ------------------------------------------
-const PROGRESS_KEY = 'qer_quiz_progress_v4'; // v4: las 3 primeras preguntas pasaron a ser de elegir (orden distinto)
+const PROGRESS_KEY = 'qer_quiz_progress_v5'; // v5: la parte 1 cambió de orden (las más íntimas pasaron a las posiciones 9 y 10); v4: las 3 primeras son de elegir
 function saveQuizProgress() {
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, currentIndex: currentIndex + 1, savedAt: Date.now() })); } catch { /* no crítico */ }
 }
