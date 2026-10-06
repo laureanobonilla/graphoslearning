@@ -2782,3 +2782,15 @@ Debajo de la lectura (siempre visible, pague o no) aparece "¿Y si tu lectura fu
 **Si falla algo:** si Gemini falla o tarda (>17 s) el correo sale igual, sin letra (no se pierde el contacto). Si el correo falla, la persona ve un error y puede reintentar (nunca se le dice que quedó listo si no llegó). Límite: 2 solicitudes por hora por lectura.
 **Eventos:** `song_offer_shown`, `song_offer_in_view`, `song_cta_clicked`, `song_style_chosen`, `song_phone_invalid`, `song_request_submitted`, `song_request_confirmed`, `song_request_failed`, `song_whatsapp_clicked` (el enlace "escríbeme tú") y del servidor `song_request_sent` (con estilo, `hasLyrics` y país) o `song_request_failed`.
 **Qué mirar:** vieron la oferta → tocaron el botón (`song_cta_clicked`) → enviaron (`song_request_confirmed`) → te llegó el correo.
+
+## 54. Lectura 100 % gratis + canción en columna fija (6 oct)
+
+- La lectura ya no tiene paywall ni PayPal en la página. `qer-map-core.js`: `READING_ALL_FREE` (por defecto activo) entrega los 10 capítulos completos y quita el "suspenso" del capítulo 5. Para volver al modelo de pago: `READING_ALL_FREE=false` en Netlify (el código de pago de las funciones sigue ahí, pero la página ya no lo usa).
+- `qer-generate-map-finalize.js` devuelve también `closingLine` cuando todo es gratis.
+- La oferta de canción es un `<aside id="songOffer">`: columna fija (sticky) a la derecha del texto en pantallas ≥ 960 px, con el formulario ya abierto; en celular, barra fija abajo que se abre como hoja (× para cerrarla).
+- Eventos nuevos: `reading_shown` (paywallVersion `free1`), `song_closed`. `page_hidden` trae `songSeen` en vez de `paywallSeen`.
+- La lectura se guarda en el navegador (localStorage) para sobrevivir a una recarga; las lecturas viejas con capítulos cerrados se descartan.
+- `quien-eres/prueba/` se regenera con `python3 tools/build_prueba.py quien-eres/ <app.js viejo de prueba>` cada vez que cambie `app.js` o `index.html`.
+
+### 54b. Nombre opcional en la canción
+Casilla "Quiero que la canción lleve mi nombre" → aparece un campo de nombre. Se envía como `name` a `qer-song-request`, que lo valida (`cleanName` en `_lib/qer-song.js`: solo letras, espacios, ' y -, máx. 30), lo pide en el prompt de la letra (2–3 veces, sin deducir género) y lo pone en el correo ("Nombre en la canción"). No se guarda en la base: los eventos solo llevan `hasName`. Eventos nuevos: `song_name_toggled`, `song_name_invalid`.

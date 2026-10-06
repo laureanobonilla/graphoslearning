@@ -1,17 +1,12 @@
 // MODO PRUEBA (generado desde quien-eres/app.js con tools/build_prueba.py — no editar a mano):
 // respuestas de ejemplo ya cargadas; al abrir la página se genera directo, como lo vería una persona
-// al terminar el cuestionario. No registra eventos. El pago, la redirección y la oferta de canción SON REALES.
+// al terminar el cuestionario. No registra eventos. La solicitud de canción SÍ se envía de verdad (correo real).
 const TEST_MODE = true;
 // ==========================================
-// "¿QUIÉN ERES EN REALIDAD?" — cuestionario + lectura generada + paywall
+// "¿QUIÉN ERES EN REALIDAD?" — cuestionario + lectura generada (gratis y completa) + oferta de canción
 // ==========================================
-// Reutiliza, de la app de esquemas conceptuales (Graphikosmos): el patrón
-// de cobro con PayPal (crear orden en el servidor → aprobar en el cliente →
-// capturar y verificar en el servidor, nunca confiar en el navegador) y el
-// patrón de llamar a Gemini con una lista de modelos de reintento. Lo nuevo
-// de esta app es el cuestionario, la interpretación y que, en vez de login +
-// saldo de nodos, cada lectura se paga una sola vez sin necesidad de cuenta
-// (ver netlify/functions/_lib/readings-store.js).
+// Sin login: cada lectura se identifica por su readingId (ver netlify/functions/_lib/qer-readings-store.js).
+// La lectura es gratis; la monetización es la canción (qer-song-request.js, LEEME sección 54).
 
 // --- Datos del cuestionario -------------------------------------------
 // Arranca con 3 preguntas de elegir una opción (calentamiento de un toque; ahí se perdía más gente
@@ -236,6 +231,7 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('is-active'));
   document.getElementById(`screen-${name}`).classList.add('is-active');
   document.getElementById('progress').classList.toggle('is-hidden', name !== 'quiz');
+  const shell = document.querySelector('.shell'); if (shell) shell.classList.toggle('is-reveal', name === 'reveal');
   window.scrollTo(0, 0);
 }
 
@@ -395,14 +391,9 @@ if (btnResume && savedProgress) {
 // ==========================================
 // LECTURA EN CAPÍTULOS
 // ==========================================
-// La lectura son 10 capítulos: los 5 primeros llegan completos y de los 5 últimos
-// el navegador recibe ÚNICAMENTE título, gancho y cuántas palabras tienen. El
-// texto cerrado vive en el servidor y solo sale por qer-paypal-capture-order /
-// qer-get-reading cuando el pago está confirmado (ver qer-generate-map*.js).
-const PAYWALL_VERSION = 'read1'; // read1 = lectura de 50 preguntas en capítulos, $9.99, "No desbloquear por ahora" y "¿Qué te frena?" visibles
+// La lectura son 10 capítulos y llegan todos completos (READING_ALL_FREE, ver _lib/qer-map-core.js).
+const PAYWALL_VERSION = 'free1'; // free1 = lectura completa gratis + canción en columna fija (antes read1: paywall de $9.99).
 let chapters = [];          // [{id,label,hook,free,words,text?}]
-let readingStats = null;    // {freeWords, hiddenWords, hiddenCount}
-let readUnlocked = false;
 
 // --- Envío del cuestionario y generación (3 pasos, cada uno una llamada propia) ---
 async function postFn(name, payload) {
@@ -466,59 +457,23 @@ function paragraphsHtml(text) {
 }
 
 function drawChapters() {
-  const open = chapters.filter(c => c.text);
-  const closed = chapters.filter(c => !c.text);
   const box = document.getElementById('chapters');
-  box.innerHTML = open.map((c, i) => `<article class="chapter"><h3 class="chapter-title display">${escapeHtml(c.label)}</h3>${paragraphsHtml(c.text)}</article>`).join('');
-
-  const list = document.getElementById('lockedList');
-  if (!closed.length) { list.innerHTML = ''; list.classList.add('is-hidden'); }
-  else {
-    list.classList.remove('is-hidden');
-    list.innerHTML = `<p class="locked-intro">Tu lectura sigue aquí. Esto es lo que viene:</p>` + closed.map(c => `
-      <div class="locked-item">
-        <svg class="lock-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-        <div>
-          <p class="locked-title display">${escapeHtml(c.label)}</p>
-          <p class="locked-hook">${escapeHtml(c.hook)}</p>
-          <p class="locked-words">${c.words ? `${fmtInt(c.words)} palabras` : ''}</p>
-        </div>
-      </div>`).join('');
-  }
-
+  box.innerHTML = chapters.filter(c => c.text).map(c => `<article class="chapter"><h3 class="chapter-title display">${escapeHtml(c.label)}</h3>${paragraphsHtml(c.text)}</article>`).join('');
 }
 
-function renderReveal(data, { skipPaywall } = {}) {
+function renderReveal(data) {
   readingId = data.readingId;
   archetypeNameForShare = data.archetypeName || '';
-  chapters = (data.nodes || []).map(n => ({ id: n.id, label: n.label, hook: n.hook, free: !!n.free, words: n.words || 0, text: n.text || null }));
-  readingStats = data.stats || null;
-  readUnlocked = false;
+  chapters = (data.nodes || []).map(n => ({ id: n.id, label: n.label, hook: n.hook, words: n.words || 0, text: n.text || null }));
   document.getElementById('archetypeName').textContent = data.archetypeName || '';
   document.getElementById('hookLine').textContent = data.hookLine || '';
-  document.getElementById('paywallCommitment').textContent = `Ya respondiste ${QUESTIONS.length} preguntas sobre ti`;
-  const closed = chapters.filter(c => !c.text).length;
-  document.getElementById('paywallHook').textContent = closed ? `${closed} capítulos de tu lectura siguen cerrados` : 'Tu lectura continúa';
-  document.getElementById('skippedNote').classList.add('is-hidden');
-  document.getElementById('payBlock').classList.remove('is-hidden');
-  document.getElementById('fullContainer').classList.add('is-hidden');
+  document.getElementById('closingLine').textContent = data.closingLine || '';
   drawChapters();
   showScreen('reveal');
+  // Se guarda en este navegador para no perder la lectura si se recarga la página (ya no hay nada que pagar).
+  savePendingReading({ readingId: data.readingId, format: 'reading', archetypeName: data.archetypeName, hookLine: data.hookLine, closingLine: data.closingLine, nodes: chapters });
+  track('reading_shown', { archetypeName: data.archetypeName || '', chapters: chapters.length, openChapters: chapters.filter(c => c.text).length, paywallVersion: PAYWALL_VERSION });
   setupSongOffer(data.readingId, data.archetypeName);
-
-  if (skipPaywall) {
-    document.getElementById('paywall').classList.add('is-hidden');
-    return;
-  }
-
-  // Lo que se guarda para "retomar" NUNCA incluye texto cerrado (esos capítulos no lo traen).
-  savePendingReading({ readingId: data.readingId, format: 'reading', archetypeName: data.archetypeName, hookLine: data.hookLine, nodes: chapters, stats: readingStats });
-
-  document.getElementById('paywall').classList.remove('is-hidden');
-  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION, freeChapters: chapters.filter(c => c.text).length, totalChapters: chapters.length });
-  watchPaywallInView();
-  setupAltPay(readingId, data.archetypeName);
-  initPaywall(readingId);
 }
 
 // --- Oferta de canción: estilo + teléfono; el servidor escribe la letra y te la manda por correo (LEEME 53) ---
@@ -545,15 +500,25 @@ function setupSongOffer(forReadingId, archetype) {
   if (!box) return;
   box.classList.remove('is-hidden');
   const teaser = document.getElementById('songTeaser'), form = document.getElementById('songForm'), done = document.getElementById('songDone');
+  box.classList.remove('is-open');
+  const tt = document.getElementById('songTeaserText');
+  if (tt) tt.textContent = `Con lo que descubrimos de ti escribo la letra${archetype ? ` de «${archetype}»` : ''} y te hago una muestra para que la escuches. Sin compromiso: hablamos de precio solo después de que la oigas.`;
   teaser.classList.remove('is-hidden'); form.classList.add('is-hidden'); done.classList.add('is-hidden');
   const err = document.getElementById('songError'), send = document.getElementById('btnSongSend');
   err.classList.add('is-hidden'); send.disabled = false;
+  const wantName = document.getElementById('songWantName'), nameIn = document.getElementById('songName');
+  wantName.checked = false; nameIn.value = ''; nameIn.classList.add('is-hidden');
+  wantName.onchange = () => {
+    nameIn.classList.toggle('is-hidden', !wantName.checked);
+    track('song_name_toggled', { on: wantName.checked });
+    if (wantName.checked) { try { nameIn.focus({ preventScroll: true }); } catch (_e) { /* no crítico */ } }
+  };
   const dial = document.getElementById('songDial'), phone = document.getElementById('songPhone');
   const guess = guessDialCode();
   if (guess) dial.value = guess;
   document.getElementById('btnSongOpen').onclick = () => {
     track('song_cta_clicked', {});
-    teaser.classList.add('is-hidden'); form.classList.remove('is-hidden');
+    teaser.classList.add('is-hidden'); form.classList.remove('is-hidden'); box.classList.add('is-open');
     try { phone.focus({ preventScroll: true }); form.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
   };
   box.querySelectorAll('.song-chip').forEach(chip => {
@@ -564,6 +529,15 @@ function setupSongOffer(forReadingId, archetype) {
       track('song_style_chosen', { style: songStyle });
     };
   });
+  // En el celular la oferta es una barra fija abajo: "×" la vuelve a cerrar (si ya pidió la canción, la quita).
+  const closeBtn = document.getElementById('songClose');
+  if (closeBtn) closeBtn.onclick = () => {
+    track('song_closed', { done: !done.classList.contains('is-hidden') });
+    if (!done.classList.contains('is-hidden')) { box.classList.add('is-hidden'); return; }
+    box.classList.remove('is-open'); form.classList.add('is-hidden'); teaser.classList.remove('is-hidden');
+  };
+  // En pantalla ancha la columna ya muestra el formulario abierto: cero clics antes de poder pedirla.
+  try { if (window.matchMedia('(min-width: 960px)').matches) { teaser.classList.add('is-hidden'); form.classList.remove('is-hidden'); } } catch (_e) { /* no crítico */ }
   const wa = document.getElementById('songWhatsapp');
   const msg = `Hola, quiero mi canción. Mi código es: ${forReadingId}${archetype ? ` (${archetype})` : ''}.`;
   wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(msg)}`;
@@ -572,14 +546,16 @@ function setupSongOffer(forReadingId, archetype) {
   form.onsubmit = async (ev) => {
     ev.preventDefault();
     err.classList.add('is-hidden');
+    const songNameVal = wantName.checked ? nameIn.value.replace(/\s+/g, ' ').trim() : '';
+    if (wantName.checked && !/^[\p{L}][\p{L} '’-]{0,29}$/u.test(songNameVal)) { track('song_name_invalid', {}); fail('Escribe solo tu nombre (letras, hasta 30), o desmarca la casilla.'); nameIn.focus(); return; }
     const full = buildSongPhone(dial.value, phone.value);
     if (!full) { track('song_phone_invalid', {}); fail('Revisa tu número: pon el código de tu país y el número, por ejemplo 99 123 456.'); phone.focus(); return; }
     send.disabled = true; send.textContent = 'Enviando…';
-    track('song_request_submitted', { style: songStyle });
+    track('song_request_submitted', { style: songStyle, hasName: !!songNameVal });
     try {
       const res = await fetch('/.netlify/functions/qer-song-request', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ readingId: forReadingId, style: songStyle, phone: full, consent: true })
+        body: JSON.stringify({ readingId: forReadingId, style: songStyle, phone: full, consent: true, ...(songNameVal ? { name: songNameVal } : {}) })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
@@ -590,7 +566,7 @@ function setupSongOffer(forReadingId, archetype) {
       }
       track('song_request_confirmed', { style: songStyle });
       document.getElementById('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de tu canción. Revisa tus mensajes pronto.`;
-      form.classList.add('is-hidden'); done.classList.remove('is-hidden');
+      form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
       try { done.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
     } catch {
       track('song_request_failed', { status: 0 });
@@ -602,195 +578,19 @@ function setupSongOffer(forReadingId, archetype) {
   try {
     if (songObserver) songObserver.disconnect();
     songObserver = new IntersectionObserver((entries) => {
-      if (entries.some(e => e.isIntersecting && e.intersectionRatio >= 0.5)) { track('song_offer_in_view', {}); songObserver.disconnect(); }
+      if (entries.some(e => e.isIntersecting && e.intersectionRatio >= 0.5)) { track('song_offer_in_view', {}); songSeen = true; songObserver.disconnect(); }
     }, { threshold: 0.5 });
     songObserver.observe(box);
   } catch (_e) { /* no crítico */ }
 }
 
-// Contacto directo como alternativa de pago: el mensaje ya lleva el código de la lectura para poder
-// desbloquearla a mano (ver LEEME, sección 51).
 const CONTACT_WHATSAPP = '50687772993';
 const CONTACT_EMAIL = 'bonillapretiz@gmail.com';
-function setupAltPay(forReadingId, archetype) {
-  const priceEl = document.getElementById('priceLabel'), altPrice = document.getElementById('altPayPrice');
-  if (altPrice && priceEl) altPrice.textContent = priceEl.textContent;
-  track('altpay_shown', { paywallVersion: PAYWALL_VERSION });
-  const msg = `Hola, quiero desbloquear el resto de mi lectura${archetype ? ` "${archetype}"` : ''}. Mi código es: ${forReadingId}. ¿Qué métodos de pago tienes?`;
-  const waHref = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(msg)}`;
-  const emHref = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Desbloquear mi lectura')}&body=${encodeURIComponent(msg)}`;
-  ['altWhatsapp', 'altWhatsapp2'].forEach(id => { const el = document.getElementById(id); if (el) { el.href = waHref; el.onclick = () => track('contact_whatsapp_clicked', { paywallVersion: PAYWALL_VERSION, from: id }); } });
-  ['altEmail', 'altEmail2'].forEach(id => { const el = document.getElementById(id); if (el) { el.href = emHref; el.onclick = () => track('contact_email_clicked', { paywallVersion: PAYWALL_VERSION, from: id }); } });
-}
-
-// Si el pago no se completa (cancelado, error, PayPal no disponible), se les recuerda que pueden escribir.
-function nudgeAltPay(reason) {
-  const box = document.getElementById('altPay'), lead = document.getElementById('altPayLead');
-  if (!box || !lead) return;
-  lead.textContent = reason === 'cancelled'
-    ? 'Parece que el pago no se completó. No pasa nada: escríbeme por WhatsApp o correo y te ayudo a pagar de otra forma.'
-    : 'No se pudo completar el pago con PayPal. Escríbeme por WhatsApp o correo y lo resolvemos de otra forma; tu lectura sigue guardada.';
-  box.classList.add('is-nudged');
-  try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
-  track('altpay_nudged', { reason, paywallVersion: PAYWALL_VERSION });
-}
-
-let paypalFailReason = '';
-let paypalCfg = null; // respuesta de qer-paypal-config (clientId, precio, correo del botón clásico)
-async function loadPaypalSdk() {
-  if (window.paypal) return true;
-  try {
-    const res = await fetch('/.netlify/functions/qer-paypal-config');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.clientId) { paypalFailReason = !res.ok ? `config HTTP ${res.status}` : 'config sin clientId'; return false; }
-    paypalCfg = data;
-    if (data.priceUsd) { document.getElementById('priceLabel').textContent = `$${data.priceUsd}`; const ap = document.getElementById('altPayPrice'); if (ap) ap.textContent = `$${data.priceUsd}`; }
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(data.clientId)}&currency=USD`;
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('No se pudo cargar el SDK de PayPal.'));
-      document.head.appendChild(s);
-    });
-    if (!window.paypal) paypalFailReason = 'script cargó pero window.paypal no existe';
-    return !!window.paypal;
-  } catch (err) {
-    paypalFailReason = String(err?.message || err).slice(0, 200);
-    console.error('[paypal] no se pudo cargar el SDK', err);
-    return false;
-  }
-}
-
-// Botón principal de pago: abre el enlace de pago de PayPal (acepta tarjeta como invitado, a diferencia de los
-// botones del SDK). Ese enlace redirige a /quien-eres/?pagado=<clave> al terminar y qer-claim-paid.js abre la
-// lectura (ver LEEME 52b). El precio lo fija el propio enlace: debe ser igual a READING_PRICE_USD.
-// (Alternativa más estricta, sin usar este enlace: formulario con IPN, ver qer-paypal-ipn.js y LEEME 52.)
-const PAYPAL_PAY_LINK = 'https://www.paypal.com/ncp/payment/VTF7CY432WXJ8';
-function setupClassicPay(_forReadingId) {
-  const wrap = document.getElementById('classicPay'), btn = document.getElementById('btnClassicPay');
-  if (!wrap || !btn) return;
-  wrap.classList.remove('is-hidden');
-  btn.onclick = () => {
-    track('classic_pay_clicked', { paywallVersion: PAYWALL_VERSION });
-    setTimeout(() => { location.href = PAYPAL_PAY_LINK; }, 150); // deja salir el evento antes de cambiar de página
-  };
-  track('classic_pay_shown', { paywallVersion: PAYWALL_VERSION });
-}
-
-async function initPaywall(forReadingId) {
-  const container = document.getElementById('paypal-button-container');
-  container.innerHTML = '';
-  const loaded = await loadPaypalSdk();
-  setupClassicPay(forReadingId);
-  if (!loaded) {
-    track('paypal_sdk_failed', { reason: paypalFailReason, paywallVersion: PAYWALL_VERSION });
-    nudgeAltPay('error');
-    container.innerHTML = '<p style="color:#e9c9ba; font-size:0.85rem; text-align:center;">No se pudo cargar el pago. Revisa tu conexión y recarga la página.</p>';
-    return;
-  }
-  track('paypal_sdk_loaded', { paywallVersion: PAYWALL_VERSION });
-  const payButtons = window.paypal.Buttons({
-    style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay' },
-    onInit: () => track('paypal_buttons_ready', { paywallVersion: PAYWALL_VERSION }),
-    onClick: () => track('paypal_button_clicked', { paywallVersion: PAYWALL_VERSION }),
-    createOrder: async () => {
-      const res = await fetch('/.netlify/functions/qer-paypal-create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ readingId: forReadingId })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        track('payment_order_create_failed', { reason: data.error || `HTTP ${res.status}` });
-        throw new Error(data.error || 'No se pudo iniciar el pago.');
-      }
-      track('payment_order_created', {});
-      return data.orderID;
-    },
-    onApprove: async (data) => {
-      const res = await fetch('/.netlify/functions/qer-paypal-capture-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderID: data.orderID, readingId: forReadingId })
-      });
-      const result = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        track('payment_captured_failed', { reason: result.error || `HTTP ${res.status}` });
-        nudgeAltPay('error');
-        alert(result.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos.');
-        return;
-      }
-      track('payment_captured_success', { paywallVersion: PAYWALL_VERSION });
-      unlockReading(result);
-    },
-    onError: (err) => {
-      const reason = String(err?.message || err).slice(0, 300);
-      track('paypal_error', { reason, paywallVersion: PAYWALL_VERSION });
-      console.error('[paypal]', err);
-      nudgeAltPay('error');
-    },
-    onCancel: () => { track('payment_cancelled', {}); nudgeAltPay('cancelled'); }
-  });
-  if (!payButtons.isEligible()) { track('paypal_not_eligible', { paywallVersion: PAYWALL_VERSION }); nudgeAltPay('error'); return; }
-  payButtons.render('#paypal-button-container')
-    .then(() => track('paypal_buttons_rendered', { visible: container.offsetHeight > 20, height: container.offsetHeight, paywallVersion: PAYWALL_VERSION }))
-    .catch(err => { track('paypal_render_failed', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }); nudgeAltPay('error'); });
-}
-
-// Aplica los capítulos que el servidor entrega SOLO después de confirmar el pago.
-function unlockReading({ mapTexts, closingLine }) {
-  clearPendingReading();
-  readUnlocked = true;
-  const byId = new Map((mapTexts || []).map(t => [t.id, t.text]));
-  chapters.forEach(c => { if (byId.has(c.id)) c.text = byId.get(c.id); });
-  document.getElementById('paywall').classList.add('is-hidden');
-  document.getElementById('skippedNote').classList.add('is-hidden');
-  drawChapters();
-  document.getElementById('closingLine').textContent = closingLine || '';
-  document.getElementById('fullContainer').classList.remove('is-hidden');
-  const firstNew = document.querySelectorAll('#chapters .chapter')[5];
-  setTimeout(() => (firstNew || document.getElementById('chapters')).scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-}
-
-document.getElementById('btnSkipPaywall').addEventListener('click', () => {
-  track('paywall_skipped', { paywallVersion: PAYWALL_VERSION });
-  document.getElementById('payBlock').classList.add('is-hidden');
-  document.getElementById('skippedNote').classList.remove('is-hidden');
-});
-document.getElementById('btnShowPay').addEventListener('click', () => {
-  track('paywall_reopened', { paywallVersion: PAYWALL_VERSION });
-  document.getElementById('skippedNote').classList.add('is-hidden');
-  document.getElementById('payBlock').classList.remove('is-hidden');
-});
-
-// "¿Qué te frena?": siempre visible, un toque, se registra una sola vez.
-document.querySelectorAll('.skip-reason').forEach(btn => {
-  btn.addEventListener('click', () => {
-    track('paywall_skip_reason', { reason: btn.dataset.reason, paywallVersion: PAYWALL_VERSION });
-    document.getElementById('skipReasonBox').classList.add('is-hidden');
-    document.getElementById('skipReasonThanks').classList.remove('is-hidden');
-  });
-});
 
 // --- Medición de lo que pasa DESPUÉS de mostrar el paywall ---------------------
 const pageStartedAt = Date.now();
-let paywallObserver = null;
-let paywallSeen = false;
 let scrollMaxPct = 0;
-function watchPaywallInView() {
-  paywallSeen = false;
-  const el = document.getElementById('paywall');
-  if (paywallObserver) paywallObserver.disconnect();
-  if (!('IntersectionObserver' in window)) return;
-  paywallObserver = new IntersectionObserver((entries) => {
-    if (entries.some(e => e.isIntersecting) && !paywallSeen) {
-      paywallSeen = true;
-      track('paywall_in_view', { secondsSinceLoad: Math.round((Date.now() - pageStartedAt) / 1000), paywallVersion: PAYWALL_VERSION });
-      paywallObserver.disconnect();
-    }
-  }, { threshold: 0.4 });
-  paywallObserver.observe(el);
-}
+let songSeen = false;
 window.addEventListener('scroll', () => {
   if (currentScreenName !== 'reveal') return;
   const h = document.documentElement.scrollHeight - window.innerHeight;
@@ -799,7 +599,7 @@ window.addEventListener('scroll', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'hidden') return;
   try {
-    const payload = { event: 'page_hidden', anonId, metadata: { variant: 'reading', screen: currentScreenName, seconds: Math.round((Date.now() - pageStartedAt) / 1000), paywallSeen, scrollMaxPct, questionsAnswered: answers.filter(Boolean).length, unlocked: readUnlocked } };
+    const payload = { event: 'page_hidden', anonId, metadata: { variant: 'reading', screen: currentScreenName, seconds: Math.round((Date.now() - pageStartedAt) / 1000), songSeen, scrollMaxPct, questionsAnswered: answers.filter(Boolean).length } };
     if (!TEST_MODE) navigator.sendBeacon('/.netlify/functions/qer-track-event', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
   } catch { /* no crítico */ }
 });
@@ -816,80 +616,17 @@ function restartQuiz() {
   showScreen('quiz');
 }
 document.getElementById('btnRestart').addEventListener('click', restartQuiz);
-document.getElementById('btnRestartFromSkip').addEventListener('click', restartQuiz);
 
-// --- Retomar una lectura pendiente (o ya pagada) ----------------------------------
-// Antes de mostrar el pago se le pregunta al SERVIDOR si ya está pagada (por si
-// pagó y perdió la conexión justo después).
-// Al volver de la página de PayPal (?pago=ok) el aviso del servidor (IPN) puede tardar unos segundos:
-// se consulta al servidor cada 3 s hasta 90 s.
-const RETURN_FLAG = new URLSearchParams(location.search).get('pago');
-// Regreso desde el enlace de pago de PayPal (?pagado=<clave>): ver netlify/functions/qer-claim-paid.js
-const CLAIM_TOKEN = new URLSearchParams(location.search).get('pagado');
-if (RETURN_FLAG || CLAIM_TOKEN) { try { history.replaceState(null, '', location.pathname); } catch { /* no crítico */ } }
-
-async function waitForPaidAfterReturn(pending) {
-  const note = document.getElementById('payWait');
-  if (note) { note.textContent = 'Confirmando tu pago… esto toma unos segundos.'; note.classList.remove('is-hidden'); }
-  const started = Date.now();
-  while (Date.now() - started < 90000) {
-    try {
-      const res = await fetch('/.netlify/functions/qer-get-reading', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readingId: pending.readingId })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.paid && data.mapTexts) {
-        track('payment_return_confirmed', { seconds: Math.round((Date.now() - started) / 1000), paywallVersion: PAYWALL_VERSION });
-        if (note) note.classList.add('is-hidden');
-        unlockReading({ mapTexts: data.mapTexts, closingLine: data.closingLine });
-        return true;
-      }
-    } catch { /* se reintenta */ }
-    await new Promise(r => setTimeout(r, 3000));
-  }
-  track('payment_return_timeout', { paywallVersion: PAYWALL_VERSION });
-  if (note) note.textContent = 'Aún no vemos tu pago. Si ya pagaste, escríbeme por WhatsApp o correo (abajo) y lo desbloqueo a mano; tu lectura sigue guardada.';
-  nudgeAltPay('error');
-  return false;
-}
-
-async function resumePendingReadingIfAny() {
+// --- Retomar la lectura si se recarga la página ------------------------------------
+// La lectura es gratis y completa: se guarda en este navegador (savePendingReading). Si falta texto en
+// algún capítulo (lectura de la época del paywall) se descarta y se empieza de nuevo.
+// Los parámetros ?pago / ?pagado de la época del pago ya no hacen nada; solo se limpian de la URL.
+if (/[?&](pago|pagado)=/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch { /* no crítico */ } }
+function resumePendingReadingIfAny() {
   const pending = loadPendingReading();
-  if (!pending || !Array.isArray(pending.nodes) || pending.format !== 'reading') return;
-  if (RETURN_FLAG === 'ok') track('payment_return', { paywallVersion: PAYWALL_VERSION });
-  if (CLAIM_TOKEN) {
-    track('payment_return', { via: 'redirect', paywallVersion: PAYWALL_VERSION });
-    try {
-      const res = await fetch('/.netlify/functions/qer-claim-paid', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ readingId: pending.readingId, token: CLAIM_TOKEN })
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.paid && data.mapTexts) {
-        track('payment_captured_success', { via: 'redirect', paywallVersion: PAYWALL_VERSION });
-        renderReveal(pending, { skipPaywall: true });
-        unlockReading({ mapTexts: data.mapTexts, closingLine: data.closingLine });
-        return;
-      }
-      track('payment_redirect_failed', { status: res.status });
-    } catch { /* se sigue con el flujo normal */ }
-  }
-  try {
-    const res = await fetch('/.netlify/functions/qer-get-reading', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ readingId: pending.readingId })
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.paid && data.mapTexts) {
-      renderReveal(pending, { skipPaywall: true });
-      unlockReading({ mapTexts: data.mapTexts, closingLine: data.closingLine });
-      return;
-    }
-  } catch { /* sin conexión: se muestra el pago normal */ }
+  if (!pending) return;
+  if (pending.format !== 'reading' || !Array.isArray(pending.nodes) || !pending.nodes.length || !pending.nodes.every(n => n && n.text)) { clearPendingReading(); return; }
   renderReveal(pending);
-  if (RETURN_FLAG === 'ok') waitForPaidAfterReturn(pending);
-  else if (RETURN_FLAG === 'cancel') { track('payment_cancelled', { via: 'classic' }); setTimeout(() => nudgeAltPay('cancelled'), 1500); }
 }
 if (!TEST_MODE) resumePendingReadingIfAny();
 

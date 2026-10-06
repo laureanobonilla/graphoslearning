@@ -17,14 +17,14 @@ app = sub1("    navigator.sendBeacon(", "    if (!TEST_MODE) navigator.sendBeaco
 app = sub1("\nresumePendingReadingIfAny();", "\nif (!TEST_MODE) resumePendingReadingIfAny();", app)
 header = ("// MODO PRUEBA (generado desde quien-eres/app.js con tools/build_prueba.py — no editar a mano):\n"
           "// respuestas de ejemplo ya cargadas; al abrir la página se genera directo, como lo vería una persona\n"
-          "// al terminar el cuestionario. No registra eventos. El pago, la redirección y la oferta de canción SON REALES.\n"
+          "// al terminar el cuestionario. No registra eventos. La solicitud de canción SÍ se envía de verdad (correo real).\n"
           "const TEST_MODE = true;\n")
 footer = "\n" + answers_block + "\nDEFAULT_ANSWERS.forEach((a, i) => { answers[i] = a; });\nsubmitQuiz();\n"
 (root / 'prueba' / 'app.js').write_text(header + app + footer)
 
 html = (root / 'index.html').read_text()
 html = sub1("<title>¿Quién eres en realidad?</title>", "<title>Prueba — ¿Quién eres en realidad?</title>\n<meta name=\"robots\" content=\"noindex, nofollow\">", html)
-banner = '<div style="position:fixed;left:0;right:0;bottom:0;text-align:center;font-size:.7rem;color:#8a7343;background:rgba(22,17,31,.92);padding:5px 8px;z-index:50;">Modo prueba · respuestas de ejemplo · no se registran eventos · el pago y la canción son reales · <a href="" style="color:#c6a358;">generar de nuevo</a></div>\n'
+banner = '<div style="position:fixed;left:0;right:0;top:0;text-align:center;font-size:.7rem;color:#8a7343;background:rgba(22,17,31,.92);padding:5px 8px;z-index:50;">Modo prueba · respuestas de ejemplo · no se registran eventos · la canción sí se envía de verdad · <a href="" style="color:#c6a358;">generar de nuevo</a></div>\n'
 html = sub1('<script src="app.js"></script>', banner + '<script src="app.js"></script>', html)
 (root / 'prueba' / 'index.html').write_text(html)
 print('ok')

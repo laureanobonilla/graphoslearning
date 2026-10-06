@@ -6,7 +6,8 @@ const { json, UUID_RE, CHUNKS, formatOf, wordCount, publicNodes } = require('./_
 function payloadOf(readingId, base, nodes) {
     const freeWords = nodes.filter(n => n.free).reduce((a, n) => a + wordCount(n.text), 0);
     const hiddenWords = nodes.filter(n => !n.free).reduce((a, n) => a + wordCount(n.text), 0) + wordCount(base.closingLine);
-    return { readingId, format: base.format || 'map', archetypeName: base.archetypeName, hookLine: base.hookLine, nodes: publicNodes(nodes), stats: { freeWords, hiddenWords, hiddenCount: nodes.filter(n => !n.free).length } };
+    const allOpen = nodes.every(n => n.free);
+    return { readingId, format: base.format || 'map', archetypeName: base.archetypeName, hookLine: base.hookLine, ...(allOpen ? { closingLine: base.closingLine } : {}), nodes: publicNodes(nodes), stats: { freeWords, hiddenWords, hiddenCount: nodes.filter(n => !n.free).length } };
 }
 
 exports.handler = async (event) => {

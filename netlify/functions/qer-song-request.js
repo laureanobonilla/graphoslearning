@@ -1,6 +1,7 @@
 // "Quiero mi canción": la persona deja su teléfono (con código de país) y su estilo preferido. Aquí se escribe la
 // letra con Gemini y se manda TODO a tu correo con Resend (teléfono, enlace directo a WhatsApp, estilo, código de
 // lectura y letra). Después tú le escribes con una muestra parcial y, si le gusta, cobras la versión completa.
+// - Nombre opcional (body.name): si viene, la letra lo incluye; no se guarda en la base de datos, solo en el correo.
 // - El teléfono NO se guarda en la base de datos (ni en `events`): solo viaja en el correo.
 // - Si Gemini falla o tarda, el correo sale igual (sin letra): nunca se pierde un contacto por eso.
 // - Si el correo falla, se responde error para que la persona pueda reintentar (no se le dice que quedó listo).
@@ -10,7 +11,7 @@ const store = require('./_lib/store');
 const { getReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const { json, UUID_RE } = require('./_lib/qer-map-core');
-const { STYLES, normalizePhone, LYRICS_SCHEMA, validLyrics, lyricsPrompt } = require('./_lib/qer-song');
+const { STYLES, normalizePhone, cleanName, LYRICS_SCHEMA, validLyrics, lyricsPrompt } = require('./_lib/qer-song');
 
 const FALLBACK_TO_EMAIL = 'bonillapretiz@gmail.com';
 const MAX_PER_HOUR = 2;
@@ -35,6 +36,9 @@ exports.handler = async (event) => {
     const readingId = String(body.readingId || '');
     const style = STYLES.includes(body.style) ? body.style : 'Sorpréndeme';
     const phone = normalizePhone(body.phone);
+    const wantsName = String(body.name || '').trim() !== '';
+    const name = cleanName(body.name);
+    if (wantsName && !name) return json(400, { error: 'Escribe solo tu nombre (letras, hasta 30).' });
     if (!UUID_RE.test(readingId)) return json(400, { error: 'Solicitud inválida' });
     if (!phone) return json(400, { error: 'Revisa tu número: incluye el código de tu país, por ejemplo +598 99 123 456.' });
     if (body.consent !== true) return json(400, { error: 'Falta tu permiso para que te escriba.' });
@@ -54,7 +58,7 @@ exports.handler = async (event) => {
         let lyrics = null;
         if (freeNodes.length) {
             try {
-                lyrics = await generateWithRetries(lyricsPrompt(base, freeNodes, style), LYRICS_SCHEMA, validLyrics,
+                lyrics = await generateWithRetries(lyricsPrompt(base, freeNodes, style, name), LYRICS_SCHEMA, validLyrics,
                     { tag: 'song-request', maxOutputTokens: 1600, temperature: 0.9, deadline: t0 + LYRICS_BUDGET_MS });
             } catch (err) { console.error('[qer-song-request] letra falló:', err.message); }
         }
@@ -71,6 +75,7 @@ exports.handler = async (event) => {
             `Teléfono: ${phone}`,
             `WhatsApp (toca para escribirle con el mensaje listo): ${waLink}`,
             `Estilo: ${style}`,
+            `Nombre en la canción: ${name || '(no quiere nombre)'}`,
             `País (aprox.): ${country || 'desconocido'}`,
             `Arquetipo: ${base.archetypeName}`,
             `Código de lectura: ${readingId}`,
@@ -95,7 +100,7 @@ exports.handler = async (event) => {
             try { await store.logEvent(readingId, 'anon', readingId, 'song_request_failed', { reason: `resend_${res.status}`, country, source: 'server' }, null, 'quien-eres'); } catch (_e) { /* no crítico */ }
             return json(502, { error: 'No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.' });
         }
-        try { await store.logEvent(readingId, 'anon', readingId, 'song_request_sent', { style, hasLyrics: !!letra, country, source: 'server' }, null, 'quien-eres'); }
+        try { await store.logEvent(readingId, 'anon', readingId, 'song_request_sent', { style, hasLyrics: !!letra, hasName: !!name, country, source: 'server' }, null, 'quien-eres'); }
         catch (e) { console.error('[qer-song-request] evento', e.message); }
         return json(200, { ok: true });
     } catch (err) {

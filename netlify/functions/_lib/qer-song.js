@@ -11,6 +11,14 @@ function normalizePhone(raw) {
     return s;
 }
 
+// Nombre opcional que la persona quiere en la letra: solo letras (cualquier idioma), espacios, apóstrofo y guion,
+// máx. 30 caracteres. Nada más pasa: así no puede colarse texto que le dé órdenes al modelo.
+function cleanName(raw) {
+    const s = String(raw || '').normalize('NFC').replace(/\s+/g, ' ').trim();
+    if (!s || s.length > 30) return '';
+    return /^[\p{L}][\p{L} '’-]*$/u.test(s) ? s : '';
+}
+
 const LYRICS_SCHEMA = {
     type: 'OBJECT',
     properties: {
@@ -21,7 +29,7 @@ const LYRICS_SCHEMA = {
 };
 const validLyrics = d => d && d.title && d.lyrics && String(d.lyrics).length > 250 && String(d.lyrics).length < 2200;
 
-function lyricsPrompt(base, freeNodes, style) {
+function lyricsPrompt(base, freeNodes, style, name) {
     const chapters = freeNodes.map(n => `- ${n.label}: ${String(n.text).replace(/\s+/g, ' ').slice(0, 520)}`).join('\n');
     return `Eres letrista. Escribe la letra de una canción en español para una persona, inspirada en su "lectura" simbólica de autoconocimiento (no es un diagnóstico).
 
@@ -33,12 +41,12 @@ ${chapters}
 Estilo musical pedido: ${style === 'Sorpréndeme' ? 'elige tú el estilo que mejor le quede a esta historia' : style}.
 
 Reglas:
-- Segunda persona ("tú") o primera persona cantada, a tu elección, pero íntima y concreta; usa las imágenes de la lectura (puertas, espejos, cuartos, agua…), no explicaciones.
+${name ? `- La persona pidió que la canción lleve su nombre: «${name}». Inclúyelo tal cual está escrito, de forma natural, 2 o 3 veces (por ejemplo en el estribillo). Úsalo solo como nombre: no deduzcas su género ni inventes nada a partir de él.\n` : ''}- Segunda persona ("tú") o primera persona cantada, a tu elección, pero íntima y concreta; usa las imágenes de la lectura (puertas, espejos, cuartos, agua…), no explicaciones.
 - NO asumas el género de la persona: evita adjetivos y participios con marca de género dirigidos a ella.
-- NO inventes nombres, edades, lugares ni hechos personales. Nada de diagnósticos ni palabras clínicas.
+- NO inventes nombres (salvo el que se te dio arriba), edades, lugares ni hechos personales. Nada de diagnósticos ni palabras clínicas.
 - Si aparece duelo, abuso o daño, trátalo con respeto; que la canción termine en alivio y permiso, nunca en culpa.
 - Palabras sencillas y cantables, versos cortos, rima natural (no forzada). Un estribillo fácil de recordar.
 - Estructura con marcas entre corchetes en líneas propias: [Verso 1], [Estribillo], [Verso 2], [Estribillo], [Puente], [Estribillo].`;
 }
 
-module.exports = { STYLES, normalizePhone, LYRICS_SCHEMA, validLyrics, lyricsPrompt };
+module.exports = { STYLES, normalizePhone, cleanName, LYRICS_SCHEMA, validLyrics, lyricsPrompt };

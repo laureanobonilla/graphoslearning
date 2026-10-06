@@ -117,6 +117,12 @@ Cada revelación debe poder leerse sola, usar un símbolo DISTINTO a las demás 
 // variable de entorno READING_FREE_COUNT en Netlify (1 a 9); si no está, son 5. Solo afecta a las
 // lecturas que se generen a partir de ahora: las ya generadas conservan lo que se les dio.
 const READING_FREE_COUNT = Math.min(9, Math.max(1, parseInt(process.env.READING_FREE_COUNT, 10) || 5));
+// LECTURA 100% GRATIS (por defecto): todos los capítulos se entregan completos, sin pago. La monetización
+// pasa a ser la canción (qer-song-request). Para volver al modelo con paywall: READING_ALL_FREE=false en Netlify.
+// READING_FREE_COUNT sigue marcando el largo de los capítulos (los primeros más cortos) y, con el paywall
+// activo, cuántos se leen gratis.
+const READING_ALL_FREE = String(process.env.READING_ALL_FREE || '').toLowerCase() !== 'false';
+const READING_OPEN_COUNT = READING_ALL_FREE ? TOTAL_NODES : READING_FREE_COUNT;
 const READING_THEMES = [
     'LO PRIMERO QUE SE NOTA: la contradicción central entre lo que la persona dice de sí misma y lo que sus otras respuestas dejan ver. Es el corazón de la lectura; abre con una imagen potente.',
     'LA MÁSCARA: la versión de sí misma que muestra a los demás, a quién protege de verdad y cuánto cuesta sostenerla.',
@@ -182,7 +188,7 @@ function readingChunkPrompt(transcript, axis, indexes) {
         const words = idx < READING_FREE_COUNT ? '120 a 150 palabras' : '150 a 190 palabras';
         // El último capítulo que se lee completo sin pagar cierra con una pregunta abierta (suspenso narrativo):
         // la última frase deja pendiente algo concreto sobre ESA persona, sin responderlo.
-        const cliff = idx === READING_FREE_COUNT - 1
+        const cliff = !READING_ALL_FREE && idx === READING_FREE_COUNT - 1
             ? ' ÚLTIMA FRASE OBLIGATORIA: termina este capítulo con una sola frase que deje abierta una pregunta concreta sobre ESTA persona, basada en algo que escribió (algo que el capítulo no resuelve ni explica). No la respondas, no menciones capítulos siguientes, lectura, pago ni desbloqueo.'
             : '';
         return `${k + 1}. (${words}) ${READING_THEMES[idx]}${cliff}`;
@@ -206,7 +212,7 @@ Cada capítulo debe poder leerse solo, usar imágenes DISTINTAS a las de los dem
 
 const FORMATS = {
     map:     { freeCount: FREE_COUNT,         themes: THEMES,         chunkPrompt, axisPrompt,                   nodesSchema: NODES_SCHEMA,         minChars: () => 250 },
-    reading: { freeCount: READING_FREE_COUNT, themes: READING_THEMES, chunkPrompt: readingChunkPrompt, axisPrompt: readingAxisPrompt, nodesSchema: READING_NODES_SCHEMA, minChars: (idx) => (idx < READING_FREE_COUNT ? 500 : 650) }
+    reading: { freeCount: READING_OPEN_COUNT, themes: READING_THEMES, chunkPrompt: readingChunkPrompt, axisPrompt: readingAxisPrompt, nodesSchema: READING_NODES_SCHEMA, minChars: (idx) => (idx < READING_FREE_COUNT ? 500 : 650) }
 };
 const formatOf = (name) => FORMATS[name] || FORMATS.map;
 
