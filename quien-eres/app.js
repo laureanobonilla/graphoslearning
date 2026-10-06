@@ -509,12 +509,13 @@ function renderReveal(data, { skipPaywall } = {}) {
   initPaywall(readingId);
 }
 
+let paypalFailReason = '';
 async function loadPaypalSdk() {
   if (window.paypal) return true;
   try {
     const res = await fetch('/.netlify/functions/qer-paypal-config');
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.clientId) return false;
+    if (!res.ok || !data.clientId) { paypalFailReason = !res.ok ? `config HTTP ${res.status}` : 'config sin clientId'; return false; }
     if (data.priceUsd) document.getElementById('priceLabel').textContent = `$${data.priceUsd}`;
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -523,8 +524,10 @@ async function loadPaypalSdk() {
       s.onerror = () => reject(new Error('No se pudo cargar el SDK de PayPal.'));
       document.head.appendChild(s);
     });
+    if (!window.paypal) paypalFailReason = 'script cargó pero window.paypal no existe';
     return !!window.paypal;
   } catch (err) {
+    paypalFailReason = String(err?.message || err).slice(0, 200);
     console.error('[paypal] no se pudo cargar el SDK', err);
     return false;
   }
@@ -535,11 +538,16 @@ async function initPaywall(forReadingId) {
   container.innerHTML = '';
   const loaded = await loadPaypalSdk();
   if (!loaded) {
+    track('paypal_sdk_failed', { reason: paypalFailReason, paywallVersion: PAYWALL_VERSION });
     container.innerHTML = '<p style="color:#e9c9ba; font-size:0.85rem; text-align:center;">No se pudo cargar el pago. Revisa tu conexión y recarga la página.</p>';
     return;
   }
-  window.paypal.Buttons({
+  track('paypal_sdk_loaded', { paywallVersion: PAYWALL_VERSION });
+  const payButtons = window.paypal.Buttons({
     style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay' },
+    onInit: () => track('paypal_buttons_ready', { paywallVersion: PAYWALL_VERSION }),
+    onClick: () => track('paypal_button_clicked', { paywallVersion: PAYWALL_VERSION }),
+    onError: (err) => track('paypal_error', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }),
     createOrder: async () => {
       const res = await fetch('/.netlify/functions/qer-paypal-create-order', {
         method: 'POST',
@@ -574,7 +582,11 @@ async function initPaywall(forReadingId) {
       console.error('[paypal]', err);
     },
     onCancel: () => track('payment_cancelled', {})
-  }).render('#paypal-button-container');
+  });
+  if (!payButtons.isEligible()) { track('paypal_not_eligible', { paywallVersion: PAYWALL_VERSION }); return; }
+  payButtons.render('#paypal-button-container')
+    .then(() => track('paypal_buttons_rendered', { visible: container.offsetHeight > 20, height: container.offsetHeight, paywallVersion: PAYWALL_VERSION }))
+    .catch(err => track('paypal_render_failed', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }));
 }
 
 // Aplica los capítulos que el servidor entrega SOLO después de confirmar el pago.
