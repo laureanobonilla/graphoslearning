@@ -10,7 +10,8 @@
 // (ver netlify/functions/_lib/readings-store.js).
 
 // --- Datos del cuestionario -------------------------------------------
-// Mezcla a propósito tres formatos (elección única, respuesta corta,
+// Arranca con 3 preguntas de elegir una opción (calentamiento de un toque; ahí se perdía más gente
+// al principio) y sigue con respuesta corta. Soporta tres formatos (elección única, respuesta corta,
 // palabra-a-partir-de-una-imagen) para que se sienta como una conversación
 // variada y no como un formulario largo y repetitivo. Las preguntas buscan
 // un ángulo concreto (qué haces sin que nadie mire, qué proteges, cómo te
@@ -74,14 +75,14 @@ const BLOT_D = `<svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/
 // (qué haces sin que nadie mire, qué proteges, cómo te ven vs. cómo te ves)
 // para que se siga sintiendo como una conversación y no como una encuesta.
 const QUESTIONS = [
+  { id: 'c1', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?", options: ["Sonrío y hablo más de lo normal", "Me quedo callado/a y observo", "Busco a alguien conocido y me quedo cerca", "Actúo con seguridad aunque por dentro no la sienta"] },
+  { id: 'c2', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué haces con más frecuencia solo para quedar bien con alguien?", options: ["Digo que sí aunque quiero decir que no", "Me río de algo que no me da risa", "Me guardo mi opinión para no discutir", "Hago favores que no me tocaban"] },
+  { id: 'c3', type: 'choice', act: 1, actTitle: "Lo que muestras", prompt: "¿De qué cosa de tu vida hablas como si ya estuviera resuelta, aunque no lo esté?", options: ["De una relación o de mi familia", "Del trabajo o del dinero", "De mi salud o de mi ánimo", "De lo que quiero para mi futuro"] },
   { id: 'q3', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Cuál es la mentira que más te repites a ti?", placeholder: "La que casi nunca dices en voz alta" },
-  { id: 'q5', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué hiciste esta semana solo para quedar bien con alguien?", placeholder: "Aunque parezca pequeño" },
   { id: 'q7', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué opinión tuya nunca dices en voz alta?", placeholder: "Esa que te guardas" },
   { id: 'q4', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué parte de ti se nota menos de lo que quisieras?", placeholder: "Lo que los demás casi no ven" },
   { id: 'q2', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando alguien te pregunta \"¿cómo estás?\" y contestas \"bien\", ¿qué es lo que de verdad querrías decir?", placeholder: "Dilo como lo sientes" },
-  { id: 'q9', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?", placeholder: "Lo que haces sin darte cuenta" },
   { id: 'q6', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Describe la sonrisa que pones cuando no tienes ganas de sonreír. ¿Qué esconde?", placeholder: "Descríbela con detalle" },
-  { id: 'q10', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿De qué cosa de tu vida hablas como si ya estuviera resuelta, aunque no lo esté?", placeholder: "Lo que dices que ya pasó" },
   { id: 'q8', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "¿Qué personaje de película, serie o cuento se parece más a ti? ¿Qué parte suya te incomoda reconocer?", placeholder: "El personaje y la parte incómoda" },
   { id: 'q1', type: 'short', act: 1, actTitle: "Lo que muestras", prompt: "Termina la frase: \"La gente cree que soy..., pero en realidad soy...\"", placeholder: "Las dos partes, aunque no calcen" },
   { id: 'q11', type: 'short', act: 2, actTitle: "Lo que callas", prompt: "Completa sin pensarlo mucho: \"Lo que más me cuesta perdonar en alguien es...\"", placeholder: "Lo primero que se te venga" },
@@ -265,6 +266,10 @@ function renderQuestion(index) {
         wrap.querySelectorAll('.option').forEach(o => o.classList.remove('is-selected'));
         btn.classList.add('is-selected');
         btnNext.disabled = false;
+        // Un solo toque por pregunta: avanza solo (con un instante para ver la selección).
+        // "Atrás" sigue disponible para corregir.
+        const idxAtClick = currentIndex;
+        setTimeout(() => { if (currentIndex === idxAtClick && !btnNext.disabled && currentScreenName === 'quiz') btnNext.click(); }, 380);
       });
       wrap.appendChild(btn);
     });
@@ -294,7 +299,7 @@ function renderQuestion(index) {
   if (q.type === 'short') {
     const hint = document.createElement('p');
     hint.className = 'short-hint';
-    hint.textContent = 'Escribe con libertad. Si prefieres no responder, escribe "paso".';
+    hint.textContent = 'Escribe con libertad. Si prefieres no responder, escribe "paso" y sigues.';
     inputWrap.appendChild(hint);
   }
   qBodyEl.appendChild(inputWrap);
@@ -346,7 +351,7 @@ btnBack.addEventListener('click', () => {
 
 // --- Guardar el avance (son 50 preguntas: perder lo escrito por un cierre accidental
 // de la pestaña sería muy frustrante) ------------------------------------------
-const PROGRESS_KEY = 'qer_quiz_progress_v3';
+const PROGRESS_KEY = 'qer_quiz_progress_v4'; // v4: las 3 primeras preguntas pasaron a ser de elegir (orden distinto)
 function saveQuizProgress() {
   try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, currentIndex: currentIndex + 1, savedAt: Date.now() })); } catch { /* no crítico */ }
 }
