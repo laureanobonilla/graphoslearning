@@ -170,6 +170,13 @@
   .paywall-price b{ color:#fff; font-size: 1.15rem; }
   #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
   .paywall-note{ text-align:center; color: #d8a79d; font-size: 0.74rem; margin-bottom: 4px; }
+  /* Alternativa al pago con PayPal: contacto directo (WhatsApp / correo) para coordinar otro método. */
+  .alt-pay{ margin: 14px 0 6px; padding: 12px 14px; border: 1px dashed rgba(233,201,186,0.35); border-radius: 12px; text-align:center; }
+  .alt-pay.is-nudged{ border-style: solid; border-color:#f2c9a8; background: rgba(242,201,168,0.12); }
+  .alt-pay p{ margin: 0 0 10px; font-size: 0.82rem; line-height: 1.45; color: #e9c9ba; }
+  .alt-pay .alt-links{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .alt-pay a{ display:inline-block; padding: 9px 14px; border-radius: 999px; border:1px solid rgba(233,201,186,0.55); color:#f6e7de; font-size:0.82rem; text-decoration:none; }
+  .alt-pay a:hover, .alt-pay a:focus-visible{ background: rgba(233,201,186,0.14); }
   /* Botón de "seguir sin pagar": sigue ahí, siempre disponible y legible
      (no es un patrón oscuro ocultarlo), pero con más distancia del bloque
      de pago y menos peso visual, para que no compita al mismo nivel que el
@@ -364,11 +371,21 @@
         <p class="paywall-price">Desbloquea los capítulos que faltan por <b id="priceLabel">$9.99</b></p>
         <div id="paypal-button-container"></div>
         <p class="paywall-note">Pago seguro con PayPal · sin crear cuenta</p>
+        <div class="alt-pay" id="altPay">
+          <p id="altPayLead">¿No puedes o no quieres pagar con PayPal? Escríbeme y te paso otro método de pago (precio: <b id="altPayPrice">$9.99</b>). Tu lectura queda guardada mientras tanto.</p>
+          <div class="alt-links">
+            <a id="altWhatsapp" href="https://wa.me/50687772993" target="_blank" rel="noopener">Escribir por WhatsApp</a>
+            <a id="altEmail" href="mailto:bonillapretiz@gmail.com">Enviar un correo</a>
+          </div>
+        </div>
         <button id="btnSkipPaywall" class="btn-outline">No desbloquear por ahora</button>
       </div>
 
       <div id="skippedNote" class="is-hidden">
         <p class="skipped-text">Está bien. Puedes seguir leyendo los capítulos que ya están abiertos.</p>
+        <p class="skipped-text" style="font-size:0.85rem">Si lo que te frenó fue el pago, escríbeme y lo resolvemos:
+          <a id="altWhatsapp2" href="https://wa.me/50687772993" target="_blank" rel="noopener" style="color:#f6e7de">WhatsApp</a> ·
+          <a id="altEmail2" href="mailto:bonillapretiz@gmail.com" style="color:#f6e7de">correo</a></p>
         <div id="reasonBlock" class="reason-block">
           <p class="reason-title">¿Qué te frena? Elige una — nos ayuda mucho</p>
           <div id="skipReasonBox" class="reason-list">

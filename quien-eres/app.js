@@ -199,7 +199,7 @@ track('landing_viewed', {
 // viendo el inicio gratis y con el botón de pago listo — sin repetir las
 // 16 preguntas.
 const PENDING_KEY = 'qer_pending_read'; // clave propia: no pisa la lectura pendiente de la versión de texto
-const PENDING_MAX_AGE_MS = 23 * 60 * 60 * 1000; // un poco menos que el TTL del servidor (24h)
+const PENDING_MAX_AGE_MS = 71 * 60 * 60 * 1000; // un poco menos que el TTL del servidor (72h)
 
 function savePendingReading(data) {
   try {
@@ -511,7 +511,35 @@ function renderReveal(data, { skipPaywall } = {}) {
   document.getElementById('paywall').classList.remove('is-hidden');
   track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION, freeChapters: chapters.filter(c => c.text).length, totalChapters: chapters.length });
   watchPaywallInView();
+  setupAltPay(readingId, data.archetypeName);
   initPaywall(readingId);
+}
+
+// Contacto directo como alternativa de pago: el mensaje ya lleva el código de la lectura para poder
+// desbloquearla a mano (ver LEEME, sección 51).
+const CONTACT_WHATSAPP = '50687772993';
+const CONTACT_EMAIL = 'bonillapretiz@gmail.com';
+function setupAltPay(forReadingId, archetype) {
+  const priceEl = document.getElementById('priceLabel'), altPrice = document.getElementById('altPayPrice');
+  if (altPrice && priceEl) altPrice.textContent = priceEl.textContent;
+  track('altpay_shown', { paywallVersion: PAYWALL_VERSION });
+  const msg = `Hola, quiero desbloquear el resto de mi lectura${archetype ? ` "${archetype}"` : ''}. Mi código es: ${forReadingId}. ¿Qué métodos de pago tienes?`;
+  const waHref = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+  const emHref = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Desbloquear mi lectura')}&body=${encodeURIComponent(msg)}`;
+  ['altWhatsapp', 'altWhatsapp2'].forEach(id => { const el = document.getElementById(id); if (el) { el.href = waHref; el.onclick = () => track('contact_whatsapp_clicked', { paywallVersion: PAYWALL_VERSION, from: id }); } });
+  ['altEmail', 'altEmail2'].forEach(id => { const el = document.getElementById(id); if (el) { el.href = emHref; el.onclick = () => track('contact_email_clicked', { paywallVersion: PAYWALL_VERSION, from: id }); } });
+}
+
+// Si el pago no se completa (cancelado, error, PayPal no disponible), se les recuerda que pueden escribir.
+function nudgeAltPay(reason) {
+  const box = document.getElementById('altPay'), lead = document.getElementById('altPayLead');
+  if (!box || !lead) return;
+  lead.textContent = reason === 'cancelled'
+    ? 'Parece que el pago no se completó. No pasa nada: escríbeme por WhatsApp o correo y te ayudo a pagar de otra forma.'
+    : 'No se pudo completar el pago con PayPal. Escríbeme por WhatsApp o correo y lo resolvemos de otra forma; tu lectura sigue guardada.';
+  box.classList.add('is-nudged');
+  try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
+  track('altpay_nudged', { reason, paywallVersion: PAYWALL_VERSION });
 }
 
 let paypalFailReason = '';
@@ -521,7 +549,7 @@ async function loadPaypalSdk() {
     const res = await fetch('/.netlify/functions/qer-paypal-config');
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.clientId) { paypalFailReason = !res.ok ? `config HTTP ${res.status}` : 'config sin clientId'; return false; }
-    if (data.priceUsd) document.getElementById('priceLabel').textContent = `$${data.priceUsd}`;
+    if (data.priceUsd) { document.getElementById('priceLabel').textContent = `$${data.priceUsd}`; const ap = document.getElementById('altPayPrice'); if (ap) ap.textContent = `$${data.priceUsd}`; }
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
       s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(data.clientId)}&currency=USD`;
@@ -544,6 +572,7 @@ async function initPaywall(forReadingId) {
   const loaded = await loadPaypalSdk();
   if (!loaded) {
     track('paypal_sdk_failed', { reason: paypalFailReason, paywallVersion: PAYWALL_VERSION });
+    nudgeAltPay('error');
     container.innerHTML = '<p style="color:#e9c9ba; font-size:0.85rem; text-align:center;">No se pudo cargar el pago. Revisa tu conexión y recarga la página.</p>';
     return;
   }
@@ -552,7 +581,6 @@ async function initPaywall(forReadingId) {
     style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay' },
     onInit: () => track('paypal_buttons_ready', { paywallVersion: PAYWALL_VERSION }),
     onClick: () => track('paypal_button_clicked', { paywallVersion: PAYWALL_VERSION }),
-    onError: (err) => track('paypal_error', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }),
     createOrder: async () => {
       const res = await fetch('/.netlify/functions/qer-paypal-create-order', {
         method: 'POST',
@@ -576,6 +604,7 @@ async function initPaywall(forReadingId) {
       const result = await res.json().catch(() => ({}));
       if (!res.ok) {
         track('payment_captured_failed', { reason: result.error || `HTTP ${res.status}` });
+        nudgeAltPay('error');
         alert(result.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos.');
         return;
       }
@@ -583,15 +612,17 @@ async function initPaywall(forReadingId) {
       unlockReading(result);
     },
     onError: (err) => {
-      track('payment_captured_failed', { reason: String(err?.message || err).slice(0, 300) });
+      const reason = String(err?.message || err).slice(0, 300);
+      track('paypal_error', { reason, paywallVersion: PAYWALL_VERSION });
       console.error('[paypal]', err);
+      nudgeAltPay('error');
     },
-    onCancel: () => track('payment_cancelled', {})
+    onCancel: () => { track('payment_cancelled', {}); nudgeAltPay('cancelled'); }
   });
-  if (!payButtons.isEligible()) { track('paypal_not_eligible', { paywallVersion: PAYWALL_VERSION }); return; }
+  if (!payButtons.isEligible()) { track('paypal_not_eligible', { paywallVersion: PAYWALL_VERSION }); nudgeAltPay('error'); return; }
   payButtons.render('#paypal-button-container')
     .then(() => track('paypal_buttons_rendered', { visible: container.offsetHeight > 20, height: container.offsetHeight, paywallVersion: PAYWALL_VERSION }))
-    .catch(err => track('paypal_render_failed', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }));
+    .catch(err => { track('paypal_render_failed', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }); nudgeAltPay('error'); });
 }
 
 // Aplica los capítulos que el servidor entrega SOLO después de confirmar el pago.
