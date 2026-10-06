@@ -543,12 +543,14 @@ function nudgeAltPay(reason) {
 }
 
 let paypalFailReason = '';
+let paypalCfg = null; // respuesta de qer-paypal-config (clientId, precio, correo del botón clásico)
 async function loadPaypalSdk() {
   if (window.paypal) return true;
   try {
     const res = await fetch('/.netlify/functions/qer-paypal-config');
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.clientId) { paypalFailReason = !res.ok ? `config HTTP ${res.status}` : 'config sin clientId'; return false; }
+    paypalCfg = data;
     if (data.priceUsd) { document.getElementById('priceLabel').textContent = `$${data.priceUsd}`; const ap = document.getElementById('altPayPrice'); if (ap) ap.textContent = `$${data.priceUsd}`; }
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -566,10 +568,27 @@ async function loadPaypalSdk() {
   }
 }
 
+// Botón principal de pago: abre el enlace de pago de PayPal (acepta tarjeta como invitado, a diferencia de los
+// botones del SDK). Ese enlace redirige a /quien-eres/?pagado=<clave> al terminar y qer-claim-paid.js abre la
+// lectura (ver LEEME 52b). El precio lo fija el propio enlace: debe ser igual a READING_PRICE_USD.
+// (Alternativa más estricta, sin usar este enlace: formulario con IPN, ver qer-paypal-ipn.js y LEEME 52.)
+const PAYPAL_PAY_LINK = 'https://www.paypal.com/ncp/payment/VTF7CY432WXJ8';
+function setupClassicPay(_forReadingId) {
+  const wrap = document.getElementById('classicPay'), btn = document.getElementById('btnClassicPay');
+  if (!wrap || !btn) return;
+  wrap.classList.remove('is-hidden');
+  btn.onclick = () => {
+    track('classic_pay_clicked', { paywallVersion: PAYWALL_VERSION });
+    setTimeout(() => { location.href = PAYPAL_PAY_LINK; }, 150); // deja salir el evento antes de cambiar de página
+  };
+  track('classic_pay_shown', { paywallVersion: PAYWALL_VERSION });
+}
+
 async function initPaywall(forReadingId) {
   const container = document.getElementById('paypal-button-container');
   container.innerHTML = '';
   const loaded = await loadPaypalSdk();
+  setupClassicPay(forReadingId);
   if (!loaded) {
     track('paypal_sdk_failed', { reason: paypalFailReason, paywallVersion: PAYWALL_VERSION });
     nudgeAltPay('error');
@@ -709,9 +728,59 @@ document.getElementById('btnRestartFromSkip').addEventListener('click', restartQ
 // --- Retomar una lectura pendiente (o ya pagada) ----------------------------------
 // Antes de mostrar el pago se le pregunta al SERVIDOR si ya está pagada (por si
 // pagó y perdió la conexión justo después).
+// Al volver de la página de PayPal (?pago=ok) el aviso del servidor (IPN) puede tardar unos segundos:
+// se consulta al servidor cada 3 s hasta 90 s.
+const RETURN_FLAG = new URLSearchParams(location.search).get('pago');
+// Regreso desde el enlace de pago de PayPal (?pagado=<clave>): ver netlify/functions/qer-claim-paid.js
+const CLAIM_TOKEN = new URLSearchParams(location.search).get('pagado');
+if (RETURN_FLAG || CLAIM_TOKEN) { try { history.replaceState(null, '', location.pathname); } catch { /* no crítico */ } }
+
+async function waitForPaidAfterReturn(pending) {
+  const note = document.getElementById('payWait');
+  if (note) { note.textContent = 'Confirmando tu pago… esto toma unos segundos.'; note.classList.remove('is-hidden'); }
+  const started = Date.now();
+  while (Date.now() - started < 90000) {
+    try {
+      const res = await fetch('/.netlify/functions/qer-get-reading', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readingId: pending.readingId })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.paid && data.mapTexts) {
+        track('payment_return_confirmed', { seconds: Math.round((Date.now() - started) / 1000), paywallVersion: PAYWALL_VERSION });
+        if (note) note.classList.add('is-hidden');
+        unlockReading({ mapTexts: data.mapTexts, closingLine: data.closingLine });
+        return true;
+      }
+    } catch { /* se reintenta */ }
+    await new Promise(r => setTimeout(r, 3000));
+  }
+  track('payment_return_timeout', { paywallVersion: PAYWALL_VERSION });
+  if (note) note.textContent = 'Aún no vemos tu pago. Si ya pagaste, escríbeme por WhatsApp o correo (abajo) y lo desbloqueo a mano; tu lectura sigue guardada.';
+  nudgeAltPay('error');
+  return false;
+}
+
 async function resumePendingReadingIfAny() {
   const pending = loadPendingReading();
   if (!pending || !Array.isArray(pending.nodes) || pending.format !== 'reading') return;
+  if (RETURN_FLAG === 'ok') track('payment_return', { paywallVersion: PAYWALL_VERSION });
+  if (CLAIM_TOKEN) {
+    track('payment_return', { via: 'redirect', paywallVersion: PAYWALL_VERSION });
+    try {
+      const res = await fetch('/.netlify/functions/qer-claim-paid', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readingId: pending.readingId, token: CLAIM_TOKEN })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.paid && data.mapTexts) {
+        track('payment_captured_success', { via: 'redirect', paywallVersion: PAYWALL_VERSION });
+        renderReveal(pending, { skipPaywall: true });
+        unlockReading({ mapTexts: data.mapTexts, closingLine: data.closingLine });
+        return;
+      }
+      track('payment_redirect_failed', { status: res.status });
+    } catch { /* se sigue con el flujo normal */ }
+  }
   try {
     const res = await fetch('/.netlify/functions/qer-get-reading', {
       method: 'POST',
@@ -726,6 +795,8 @@ async function resumePendingReadingIfAny() {
     }
   } catch { /* sin conexión: se muestra el pago normal */ }
   renderReveal(pending);
+  if (RETURN_FLAG === 'ok') waitForPaidAfterReturn(pending);
+  else if (RETURN_FLAG === 'cancel') { track('payment_cancelled', { via: 'classic' }); setTimeout(() => nudgeAltPay('cancelled'), 1500); }
 }
 resumePendingReadingIfAny();
 

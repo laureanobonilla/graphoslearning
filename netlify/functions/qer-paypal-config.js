@@ -29,5 +29,8 @@ exports.handler = async (event) => {
     // Se manda también el precio (igual que paypal-create-order.js lo lee de
     // _lib/pricing.js) para que el cliente muestre siempre la cifra real,
     // sin tener que mantenerla a mano y sincronizada en el HTML.
-    return json(200, { clientId, priceUsd: READING_PRICE_USD });
+    // `classicBusiness`: correo de la cuenta que cobra, para el botón que abre la página de PayPal (acepta
+    // tarjeta como invitado y avisa por IPN, ver qer-paypal-ipn.js). Si no está definido, ese botón no se muestra.
+    const classicBusiness = String(process.env.PAYPAL_RECEIVER_EMAIL || '').trim() || undefined;
+    return json(200, { clientId, priceUsd: READING_PRICE_USD, classicBusiness });
 };

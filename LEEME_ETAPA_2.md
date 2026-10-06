@@ -2729,3 +2729,47 @@ Cabecera → 📄 Informe. Descarga un .rtf del esquema actual (se rearma cada v
 **Al añadir un texto nuevo:** poner la clave en AMBOS catálogos. Prueba rápida: abrir `/?lang=en` y buscar español.
 
 **Subir a GitHub:** `_redirects` y la carpeta `i18n/` en la RAÍZ del repo (junto a `index.html`), más `index.html`, `app.js` y `netlify/functions/gemini.js` actualizados.
+
+## 49. Logs del pago (¿Quién eres? y Vestirte)
+
+Eventos nuevos (tabla `events`, se leen igual que los demás): `paypal_sdk_loaded` / `paypal_sdk_failed` (con `reason`: `config HTTP 500`, `config sin clientId`, error de carga del script), `paypal_buttons_ready`, `paypal_buttons_rendered` (`visible`, `height`), `paypal_not_eligible`, `paypal_render_failed`, `paypal_button_clicked`, `paypal_error`, además de los que ya existían (`payment_order_created`, `payment_captured_success`, `payment_cancelled`…).
+
+Cómo leerlos tras `paywall_shown`: sin `paypal_sdk_loaded` → no cargó el pago; con `buttons_rendered` pero sin `button_clicked` → lo vieron y no quisieron pagar (oferta/precio); `button_clicked` sin `order_created` → falla al crear la orden; `order_created` sin `captured_success` → falla o abandono dentro de PayPal.
+
+## 50. ¿Quién eres?: arranque más fácil (datos del 5-6 oct)
+
+Con 39 personas que contestaron la pregunta 1, se perdían 4 en la pregunta 2 ("¿Qué hiciste esta semana solo para quedar bien con alguien?") y 3 en la 8 ("¿De qué cosa de tu vida hablas como si ya estuviera resuelta…?"); de la 10 en adelante casi nadie se iba. Cambio: las 3 primeras preguntas pasan a ser de elegir (`c1`, `c2`, `c3`, versiones de las antiguas q9, q5 y q10) y las opciones avanzan solas a los 380 ms (Atrás sigue disponible). Siguen siendo 50 preguntas; el avance guardado pasa a `qer_quiz_progress_v4` (quien estaba a medias empieza de nuevo). Para medir: comparar con el embudo anterior (39 → 24 en la pregunta 10); los eventos `question_answered` de esas tres traen `questionType: 'choice'`.
+
+## 51. ¿Quién eres?: pago alternativo por WhatsApp / correo + país en los eventos
+
+En el muro de pago, debajo de PayPal, hay un recuadro "¿No puedes o no quieres pagar con PayPal?…" con botones de **WhatsApp (+506 8777-2993)** y **correo (bonillapretiz@gmail.com)**. El mensaje ya lleva el nombre del arquetipo y el **código de la lectura** (UUID) y el precio se muestra en el recuadro (se sincroniza con `READING_PRICE_USD`). Eventos: `contact_whatsapp_clicked`, `contact_email_clicked`.
+
+**Para desbloquear a mano** cuando alguien te pague por otro medio (en Supabase → SQL Editor):
+```sql
+update qer_readings set paid = true where id = 'CÓDIGO-QUE-TE-ENVIÓ';
+```
+La persona abre de nuevo la página **desde el mismo navegador** y su lectura aparece completa (se retoma sola). Una lectura sin pagar se conserva **72 h** (antes 24 h) y una pagada no caduca; en el navegador se recuerda hasta 71 h.
+
+**País:** `qer-track-event.js` añade `metadata.country` (código de 2 letras, de la cabecera `x-nf-geo` de Netlify) a cada evento nuevo.
+
+**Recordatorio si el pago falla.** PayPal sigue siendo la vía principal y el recuadro de contacto está visible desde el inicio. Si el pago se cancela, da error, PayPal no carga/no es elegible o falla la confirmación, el recuadro se resalta, cambia su texto ("el pago no se completó… escríbeme") y la pantalla se desplaza hasta él. También hay enlaces de contacto en el aviso de "no ahora" (`#skippedNote`).
+
+**Eventos registrados (todo queda en `events`):** `altpay_shown` (se mostró el recuadro), `altpay_nudged` (`reason`: `cancelled` | `error`), `contact_whatsapp_clicked` y `contact_email_clicked` (`from`: `altWhatsapp`/`altEmail` = recuadro principal, `altWhatsapp2`/`altEmail2` = aviso de "no ahora"), además de `paypal_button_clicked`, `paypal_error`, `payment_cancelled`, `payment_captured_failed`, `paypal_not_eligible`, `paypal_render_failed`, `paypal_sdk_failed`.
+
+## 52. ¿Quién eres?: botón de pago "clásico" (tarjeta como invitado) + aviso automático IPN
+
+**Por qué:** el pago con tarjeta de los botones inteligentes (API) falla con "no se pudo agregar la tarjeta" (ver 11e). El botón clásico abre la página de PayPal, donde sí se puede pagar con tarjeta como invitado.
+
+**Cómo funciona:** el botón amarillo "Pagar con tarjeta o PayPal" envía a PayPal el código de la lectura en `custom`. Al pagar, PayPal llama a `netlify/functions/qer-paypal-ipn.js`, que (1) pide a PayPal confirmar que el aviso es auténtico, (2) exige estado Completed, USD, monto >= `READING_PRICE_USD` y que el dinero entró a `PAYPAL_RECEIVER_EMAIL`, (3) comprueba que la lectura exista, y recién entonces pone `paid = true`. La persona vuelve a `/quien-eres/?pago=ok`, y la página consulta cada 3 s (hasta 90 s) si el servidor ya la marcó pagada. Si no llega, se resalta el contacto por WhatsApp/correo. Nunca se confía en `?pago=ok`: es solo un aviso de que la persona volvió.
+
+**Configuración en Netlify (variables de entorno):** `PAYPAL_RECEIVER_EMAIL` = el correo PRINCIPAL de la cuenta de PayPal que cobra (si falta, el botón clásico no aparece y el IPN rechaza todo). `READING_PRICE_USD` = el precio. Opcional: `PAYPAL_ENV=sandbox` para pruebas. Después, nuevo deploy.
+En PayPal (opcional, refuerzo): Perfil → Configuración de la cuenta → Notificaciones → Notificaciones instantáneas de pago, URL `https://graphoslearning.netlify.app/.netlify/functions/qer-paypal-ipn`. Y revisar "PayPal Account Optional" (pago sin cuenta) en Preferencias de pagos del sitio web.
+
+**Eventos nuevos:** `classic_pay_shown`, `classic_pay_clicked`, `payment_return`, `payment_return_confirmed` (con segundos), `payment_return_timeout`, `payment_cancelled` (via `classic`), `payment_ipn_rejected` (con `reason`: no_verificado, monto, moneda, receptor, estado_*, sin_codigo_de_lectura, lectura_no_existe) y `payment_captured_success` con `via: ipn`. Los eventos del IPN usan el código de la lectura como `anon_id`.
+**Si alguien pagó y no se desbloqueó:** busca `payment_ipn_rejected` con su código y mira `reason`; si el pago es válido, desbloquea con el SQL de la sección 51. Reembolsos o contracargos NO revocan el acceso automáticamente.
+
+### 52b. Desbloqueo por redirección (enlace de pago de PayPal, sin verificar)
+El enlace de pago de PayPal (paypal.com/ncp/links) no puede llevar el código de la lectura ni avisar por IPN. Opción pragmática: en ese enlace, "URL de redireccionamiento automático" = `https://graphoslearning.netlify.app/quien-eres/?pagado=TU_CLAVE`. La clave por defecto está en el código (`graphos-7k2m9x4q`, en `qer-claim-paid.js`), así que no hace falta configurar nada; si defines `PAYPAL_RETURN_TOKEN` en Netlify, esa tiene prioridad (útil para cambiarla sin tocar código; mínimo 8 caracteres). La página manda la clave a `qer-claim-paid.js`; si coincide, la lectura de ese navegador se marca pagada y se abre sola.
+**Límite conocido:** no verifica el pago contra PayPal; quien conozca la clave (la ve cualquiera que pague) o comparta esa dirección puede abrir lecturas. Cada desbloqueo queda en `events` como `payment_unlocked_by_redirect` (y los intentos con clave mala como `payment_redirect_rejected`): compara su cantidad con los pagos del panel de PayPal. Si cambia la clave, cámbiala en las dos partes (PayPal y Netlify). Solo funciona en el mismo navegador donde se hizo el cuestionario.
+
+**Estado actual del botón amarillo (decisión del 6-oct):** abre directamente el enlace de pago `https://www.paypal.com/ncp/payment/VTF7CY432WXJ8` (constante `PAYPAL_PAY_LINK` en `quien-eres/app.js`) y el desbloqueo es por redirección (52b), no por IPN. El precio lo fija ese enlace en PayPal: debe coincidir con `READING_PRICE_USD`. El formulario con IPN (`qer-paypal-ipn.js`, sección 52) quedó como alternativa más estricta, sin uso por ahora; no hace falta `PAYPAL_RECEIVER_EMAIL`.

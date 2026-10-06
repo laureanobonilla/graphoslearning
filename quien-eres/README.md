@@ -203,7 +203,7 @@ Supabase) con el mismo patrón de pago único sin cuenta.
 
 ## Actualización 2026-10-04: estructura actual
 
-- `/quien-eres/` es la **lectura en capítulos** con **50 preguntas** (todas de texto, en 5 partes): `index.html` + `app.js`. 10 capítulos: los 5 primeros gratis y completos, los 5 últimos cerrados (se ve título, gancho y cuántas palabras tienen; lo cerrado es siempre más de la mitad del texto). Se retoma donde se quedó si cierra la pestaña (localStorage).
+- `/quien-eres/` es la **lectura en capítulos** con **50 preguntas** (las 3 primeras son de elegir una opción y avanzan solas con un toque, para bajar la fricción del inicio; las otras 47 son de texto, en 5 partes): `index.html` + `app.js`. 10 capítulos: los 5 primeros gratis y completos, los 5 últimos cerrados (se ve título, gancho y cuántas palabras tienen; lo cerrado es siempre más de la mitad del texto). Se retoma donde se quedó si cierra la pestaña (localStorage).
 - `/quien-eres/mapa/` es la variante **mapa** SVG (10 puntos, 3 gratis).
 - `/quien-eres/texto/` es la versión original de 16 preguntas (respaldo).
 - Generación (lectura y mapa) en 3 llamadas: `qer-generate-map` (eje; recibe `format:'reading'|'map'`), `qer-generate-map-part` x5 en paralelo y `qer-generate-map-finalize`; piezas compartidas en `_lib/qer-map-core.js` y `_lib/qer-gemini.js`.

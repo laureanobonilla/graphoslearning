@@ -171,6 +171,13 @@
   #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
   .paywall-note{ text-align:center; color: #d8a79d; font-size: 0.74rem; margin-bottom: 4px; }
   /* Alternativa al pago con PayPal: contacto directo (WhatsApp / correo) para coordinar otro método. */
+  .classic-pay{ margin: 0 0 14px; text-align:center; }
+  .classic-pay.is-hidden{ display:none; }
+  .btn-classic-pay{ appearance:none; width:100%; border:none; cursor:pointer; border-radius:999px; padding:15px 20px; background:#ffc439; color:#1a1a1a; font-family:'Work Sans',sans-serif; font-size:1rem; font-weight:600; }
+  .btn-classic-pay:active{ background:#f2b72e; }
+  .classic-pay-note{ margin:8px 0 0; font-size:0.74rem; color:#d8a79d; }
+  .pay-wait{ margin: 14px 0; padding: 12px 14px; border-radius: 12px; text-align:center; font-size:0.9rem; color:#f2e3d6; background: rgba(255,255,255,0.08); }
+  .pay-wait.is-hidden{ display:none; }
   .alt-pay{ margin: 14px 0 6px; padding: 12px 14px; border: 1px dashed rgba(233,201,186,0.35); border-radius: 12px; text-align:center; }
   .alt-pay.is-nudged{ border-style: solid; border-color:#f2c9a8; background: rgba(242,201,168,0.12); }
   .alt-pay p{ margin: 0 0 10px; font-size: 0.82rem; line-height: 1.45; color: #e9c9ba; }
@@ -368,7 +375,12 @@
       <div id="payBlock">
         <p id="paywallCommitment" class="paywall-commitment"></p>
         <p id="paywallHook" class="paywall-label display">Tu lectura continúa</p>
+        <p id="payWait" class="pay-wait is-hidden" role="status"></p>
         <p class="paywall-price">Desbloquea los capítulos que faltan por <b id="priceLabel">$9.99</b></p>
+        <div id="classicPay" class="classic-pay is-hidden">
+          <button type="button" id="btnClassicPay" class="btn-classic-pay">Pagar con tarjeta o PayPal</button>
+          <p class="classic-pay-note">Te llevamos a la página segura de PayPal y vuelves aquí automáticamente. No necesitas cuenta.</p>
+        </div>
         <div id="paypal-button-container"></div>
         <p class="paywall-note">Pago seguro con PayPal · sin crear cuenta</p>
         <div class="alt-pay" id="altPay">
