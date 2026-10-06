@@ -22,7 +22,9 @@
 // misma firma que antes, así que qer-generate-reading.js,
 // qer-paypal-create-order.js y qer-paypal-capture-order.js no necesitaron
 // ningún cambio.
-const TTL_MS = 24 * 60 * 60 * 1000;
+// Una lectura SIN pagar se puede recuperar durante 72 h (antes 24 h): hay pagos que se coordinan por
+// WhatsApp/correo y pueden tardar un día. Una lectura YA PAGADA no caduca nunca.
+const TTL_MS = 72 * 60 * 60 * 1000;
 
 function cfg() {
     const url = process.env.SUPABASE_URL;
@@ -62,7 +64,7 @@ async function saveReading(id, reading) {
 async function getReading(id) {
     const row = await selectOne('qer_readings', 'id', id);
     if (!row) return null;
-    if (Date.now() - new Date(row.created_at).getTime() > TTL_MS) return null;
+    if (!row.paid && Date.now() - new Date(row.created_at).getTime() > TTL_MS) return null;
     return { ...row.reading, paid: row.paid };
 }
 

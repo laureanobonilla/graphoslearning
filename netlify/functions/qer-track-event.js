@@ -48,6 +48,15 @@ exports.handler = async (event) => {
         metadata = { truncated: true };
     }
 
+    // País de la visita (solo el código de 2 letras, p. ej. MX, UY, CR): Netlify lo manda en la cabecera
+    // x-nf-geo (JSON en base64). Sirve para comparar el rendimiento del anuncio por país. Si no viene, no se añade.
+    try {
+        const h = event.headers || {};
+        const raw = h['x-nf-geo'] || h['X-Nf-Geo'];
+        const code = raw ? JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))?.country?.code : (h['x-country'] || h['X-Country']);
+        if (code && /^[A-Za-z]{2}$/.test(String(code)) && !metadata.country) metadata = { ...metadata, country: String(code).toUpperCase() };
+    } catch (_e) { /* el país es un extra: nunca debe romper el registro */ }
+
     try {
         // Sin cuentas ni invitados con saldo en esta app: el anon_id hace
         // también de actor_id, con actor_kind = 'anon' (ver el ajuste al
