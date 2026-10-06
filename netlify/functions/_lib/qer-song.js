@@ -1,0 +1,44 @@
+// Piezas compartidas de la oferta de canción: estilos permitidos, validación de teléfono y el prompt de la letra.
+// La letra se escribe SOLO con el arquetipo, el gancho y los capítulos ya abiertos (gratis): nunca con los
+// capítulos cerrados ni con las respuestas literales del cuestionario.
+const STYLES = ['Balada suave', 'Pop', 'Acústica', 'Rock suave', 'Bolero', 'Urbano suave', 'Sorpréndeme'];
+
+// Acepta "+598 99 123 456", "+598-99123456", "00598 99123456"… y devuelve "+59899123456" (E.164) o null.
+function normalizePhone(raw) {
+    let s = String(raw || '').trim().replace(/[\s().\-]/g, '');
+    if (s.startsWith('00')) s = '+' + s.slice(2);
+    if (!/^\+[1-9]\d{7,14}$/.test(s)) return null;
+    return s;
+}
+
+const LYRICS_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        title: { type: 'STRING', description: 'Título de la canción: 2 a 6 palabras, sin comillas.' },
+        lyrics: { type: 'STRING', description: 'La letra completa con marcas entre corchetes en líneas propias: [Verso 1], [Estribillo], [Verso 2], [Estribillo], [Puente], [Estribillo]. Entre 16 y 28 líneas cantables, rima sencilla, sin pasar de 1100 caracteres en total.' }
+    },
+    required: ['title', 'lyrics']
+};
+const validLyrics = d => d && d.title && d.lyrics && String(d.lyrics).length > 250 && String(d.lyrics).length < 2200;
+
+function lyricsPrompt(base, freeNodes, style) {
+    const chapters = freeNodes.map(n => `- ${n.label}: ${String(n.text).replace(/\s+/g, ' ').slice(0, 520)}`).join('\n');
+    return `Eres letrista. Escribe la letra de una canción en español para una persona, inspirada en su "lectura" simbólica de autoconocimiento (no es un diagnóstico).
+
+Arquetipo de la persona: ${base.archetypeName}
+Frase que la presenta: ${base.hookLine}
+Fragmentos de su lectura:
+${chapters}
+
+Estilo musical pedido: ${style === 'Sorpréndeme' ? 'elige tú el estilo que mejor le quede a esta historia' : style}.
+
+Reglas:
+- Segunda persona ("tú") o primera persona cantada, a tu elección, pero íntima y concreta; usa las imágenes de la lectura (puertas, espejos, cuartos, agua…), no explicaciones.
+- NO asumas el género de la persona: evita adjetivos y participios con marca de género dirigidos a ella.
+- NO inventes nombres, edades, lugares ni hechos personales. Nada de diagnósticos ni palabras clínicas.
+- Si aparece duelo, abuso o daño, trátalo con respeto; que la canción termine en alivio y permiso, nunca en culpa.
+- Palabras sencillas y cantables, versos cortos, rima natural (no forzada). Un estribillo fácil de recordar.
+- Estructura con marcas entre corchetes en líneas propias: [Verso 1], [Estribillo], [Verso 2], [Estribillo], [Puente], [Estribillo].`;
+}
+
+module.exports = { STYLES, normalizePhone, LYRICS_SCHEMA, validLyrics, lyricsPrompt };

@@ -499,6 +499,7 @@ function renderReveal(data, { skipPaywall } = {}) {
   document.getElementById('fullContainer').classList.add('is-hidden');
   drawChapters();
   showScreen('reveal');
+  setupSongOffer(data.readingId, data.archetypeName);
 
   if (skipPaywall) {
     document.getElementById('paywall').classList.add('is-hidden');
@@ -513,6 +514,93 @@ function renderReveal(data, { skipPaywall } = {}) {
   watchPaywallInView();
   setupAltPay(readingId, data.archetypeName);
   initPaywall(readingId);
+}
+
+// --- Oferta de canción: estilo + teléfono; el servidor escribe la letra y te la manda por correo (LEEME 53) ---
+let songStyle = 'Sorpréndeme';
+let songObserver = null;
+const SONG_TZ_DIAL = { 'America/Costa_Rica': '+506', 'America/Montevideo': '+598', 'America/Mexico_City': '+52', 'America/Cancun': '+52', 'America/Monterrey': '+52', 'America/Tijuana': '+52', 'America/Argentina/Buenos_Aires': '+54', 'America/Bogota': '+57', 'America/Santiago': '+56', 'America/Lima': '+51', 'America/Guayaquil': '+593', 'America/Panama': '+507', 'America/Guatemala': '+502', 'America/El_Salvador': '+503', 'America/Tegucigalpa': '+504', 'America/Managua': '+505', 'America/Caracas': '+58', 'America/La_Paz': '+591', 'America/Asuncion': '+595', 'Europe/Madrid': '+34' };
+function guessDialCode() {
+  try { return SONG_TZ_DIAL[Intl.DateTimeFormat().resolvedOptions().timeZone] || ''; } catch { return ''; }
+}
+// Une el código de país con el número local; devuelve "+59899123456" o '' si no parece válido.
+function buildSongPhone(dial, raw) {
+  let n = String(raw || '').replace(/[\s().\-]/g, '');
+  if (!n) return '';
+  if (n.startsWith('00')) n = '+' + n.slice(2);
+  if (n.startsWith('+')) return /^\+[1-9]\d{7,14}$/.test(n) ? n : '';
+  if (!dial) return '';
+  n = n.replace(/^0+/, '');
+  const full = dial + n;
+  return /^\+[1-9]\d{7,14}$/.test(full) ? full : '';
+}
+
+function setupSongOffer(forReadingId, archetype) {
+  const box = document.getElementById('songOffer');
+  if (!box) return;
+  box.classList.remove('is-hidden');
+  const teaser = document.getElementById('songTeaser'), form = document.getElementById('songForm'), done = document.getElementById('songDone');
+  teaser.classList.remove('is-hidden'); form.classList.add('is-hidden'); done.classList.add('is-hidden');
+  const err = document.getElementById('songError'), send = document.getElementById('btnSongSend');
+  err.classList.add('is-hidden'); send.disabled = false;
+  const dial = document.getElementById('songDial'), phone = document.getElementById('songPhone');
+  const guess = guessDialCode();
+  if (guess) dial.value = guess;
+  document.getElementById('btnSongOpen').onclick = () => {
+    track('song_cta_clicked', {});
+    teaser.classList.add('is-hidden'); form.classList.remove('is-hidden');
+    try { phone.focus({ preventScroll: true }); form.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
+  };
+  box.querySelectorAll('.song-chip').forEach(chip => {
+    chip.setAttribute('aria-pressed', chip.dataset.style === songStyle ? 'true' : 'false');
+    chip.onclick = () => {
+      songStyle = chip.dataset.style;
+      box.querySelectorAll('.song-chip').forEach(c => c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'));
+      track('song_style_chosen', { style: songStyle });
+    };
+  });
+  const wa = document.getElementById('songWhatsapp');
+  const msg = `Hola, quiero mi canción. Mi código es: ${forReadingId}${archetype ? ` (${archetype})` : ''}.`;
+  wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(msg)}`;
+  wa.onclick = () => track('song_whatsapp_clicked', {});
+  const fail = (t) => { err.textContent = t; err.classList.remove('is-hidden'); };
+  form.onsubmit = async (ev) => {
+    ev.preventDefault();
+    err.classList.add('is-hidden');
+    const full = buildSongPhone(dial.value, phone.value);
+    if (!full) { track('song_phone_invalid', {}); fail('Revisa tu número: pon el código de tu país y el número, por ejemplo 99 123 456.'); phone.focus(); return; }
+    send.disabled = true; send.textContent = 'Enviando…';
+    track('song_request_submitted', { style: songStyle });
+    try {
+      const res = await fetch('/.netlify/functions/qer-song-request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ readingId: forReadingId, style: songStyle, phone: full, consent: true })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        track('song_request_failed', { status: res.status });
+        fail(data.error || 'No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.');
+        send.disabled = false; send.textContent = 'Quiero mi canción';
+        return;
+      }
+      track('song_request_confirmed', { style: songStyle });
+      document.getElementById('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de tu canción. Revisa tus mensajes pronto.`;
+      form.classList.add('is-hidden'); done.classList.remove('is-hidden');
+      try { done.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
+    } catch {
+      track('song_request_failed', { status: 0 });
+      fail('Sin conexión. Inténtalo de nuevo.');
+      send.disabled = false; send.textContent = 'Quiero mi canción';
+    }
+  };
+  track('song_offer_shown', {});
+  try {
+    if (songObserver) songObserver.disconnect();
+    songObserver = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting && e.intersectionRatio >= 0.5)) { track('song_offer_in_view', {}); songObserver.disconnect(); }
+    }, { threshold: 0.5 });
+    songObserver.observe(box);
+  } catch (_e) { /* no crítico */ }
 }
 
 // Contacto directo como alternativa de pago: el mensaje ya lleva el código de la lectura para poder

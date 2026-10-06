@@ -25,13 +25,16 @@ const PHOTOS = [
     tip: 'Luz natural, sin filtros, sin gafas de sol y con el cabello recogido si puedes.' },
   { slot: 'frente', title: 'Cuerpo entero, de frente', guide: 'img/guia-frente.png',
     why: 'Muestra tus proporciones: hombros, cintura, caderas y largo de piernas. Con eso elegimos los cortes, largos y alturas de cintura que te favorecen.',
-    tip: 'De pie, brazos relajados y el cuerpo completo dentro del cuadro.' },
+    tip: 'Ropa algo ajustada (no holgada), de pie, brazos relajados y el cuerpo completo dentro del cuadro.' },
   { slot: 'espalda', title: 'Cuerpo entero, de espaldas', guide: 'img/guia-espalda.png',
     why: 'La espalda y los hombros cambian cómo cae una chaqueta o un vestido. Con esta foto vemos el ancho de tus hombros y la línea de tu espalda.',
-    tip: 'De pie y derecho/a, con el cuerpo completo dentro del cuadro.' },
+    tip: 'Ropa algo ajustada, de pie y derecho/a, con el cuerpo completo dentro del cuadro.' },
+  { slot: 'perfil', title: 'Cuerpo entero, de perfil', guide: 'img/guia-perfil.png',
+    why: 'El perfil muestra tu postura y cómo caen las telas por delante y por detrás. Ayuda a elegir largos y qué tanta estructura necesita una prenda.',
+    tip: 'Ropa algo ajustada, mirando hacia un lado, brazos relajados y el cuerpo completo dentro del cuadro.' },
   { slot: 'torso', title: 'De la cintura para arriba, de frente', guide: 'img/guia-torso.png',
-    why: 'Hombros, cuello y forma del busto deciden qué escotes, cuellos y mangas te quedan mejor.',
-    tip: 'De frente medio cuerpo' }
+    why: 'Hombros, cuello y largo del torso deciden qué escotes, cuellos y mangas te quedan mejor.',
+    tip: 'Con camiseta o top liso puesto, de frente. No hace falta ninguna foto sin ropa: si una foto muestra desnudez, se descarta.' }
 ];
 
 const STEPS = [...QUESTIONS.map(q => ({ kind: 'q', q })), ...PHOTOS.map(p => ({ kind: 'photo', p }))]; // 15
@@ -149,10 +152,10 @@ function renderPhotoStep(p, help) {
     const c = document.createElement('div'); c.className = 'consent';
     c.innerHTML = `<p><b>Antes de subir fotos</b></p>
       <label><input type="checkbox" id="chkAdult"${adultOk ? ' checked' : ''}><span>Tengo 18 años o más.</span></label>
-      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Entiendo que puedo borrar las fotos cuando tenga mi resultado.</span></label>`;      
+      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Acepto que cada foto se suba a un espacio privado en cuanto la elija, se use solo para armar mi recomendación y se conserven hasta 30 días. Puedo borrarlas cuando quiera desde mi resultado.</span></label>`;
     wrap.appendChild(c);
-    c.querySelector('#chkAdult').addEventListener('change', e => { adultOk = e.target.checked; if (adultOk) track('adult_confirmed', {}); refreshNext(); });
-    c.querySelector('#chkConsent').addEventListener('change', e => { consentOk = e.target.checked; if (consentOk) track('consent_given', {}); refreshNext(); });
+    c.querySelector('#chkAdult').addEventListener('change', e => { adultOk = e.target.checked; if (adultOk) track('adult_confirmed', {}); refreshNext(); if (photos[p.slot] && !uploaded[p.slot]) upload(); });
+    c.querySelector('#chkConsent').addEventListener('change', e => { consentOk = e.target.checked; if (consentOk) track('consent_given', {}); refreshNext(); if (photos[p.slot] && !uploaded[p.slot]) upload(); });
   }
 
   const frame = document.createElement('div'); frame.className = 'frame';
@@ -211,6 +214,8 @@ function renderPhotoStep(p, help) {
   }
   async function upload() {
     if (!photos[p.slot]) return;
+    if (!(consentOk && adultOk)) { status.textContent = 'Marca las dos casillas de arriba para guardar tu foto.'; refreshNext(); return; }
+    if (uploading) return;
     uploading = true; err.textContent = ''; status.textContent = 'Guardando tu foto…'; refreshNext();
     try {
       const r = await postWithOneRetry('vst-upload-photo', {
@@ -445,21 +450,29 @@ function renderReveal(data, { skipPaywall } = {}) {
   watchPaywallInView(); initPaywall(readingId);
 }
 
+let paypalFailReason = '';
 async function loadPaypalSdk() {
   if (window.paypal) return true;
   try {
     const res = await fetch('/.netlify/functions/qer-paypal-config'); const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.clientId) return false;
+    if (!res.ok || !data.clientId) { paypalFailReason = !res.ok ? `config HTTP ${res.status}` : 'config sin clientId'; return false; }
     if (data.priceUsd) $('priceLabel').textContent = `$${data.priceUsd}`;
     await new Promise((resolve, reject) => { const s = document.createElement('script'); s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(data.clientId)}&currency=USD`; s.onload = resolve; s.onerror = () => reject(new Error('No se pudo cargar PayPal.')); document.head.appendChild(s); });
+    if (!window.paypal) paypalFailReason = 'script cargó pero window.paypal no existe';
     return !!window.paypal;
-  } catch { return false; }
+  } catch (err) { paypalFailReason = String(err?.message || err).slice(0, 200); return false; }
 }
 async function initPaywall(forId) {
   const container = $('paypal-button-container'); container.innerHTML = '';
-  if (!(await loadPaypalSdk())) { container.innerHTML = '<p style="color:#f3c6cc;font-size:.88rem">No se pudo cargar el pago. Revisa tu conexión y recarga la página.</p>'; return; }
-  window.paypal.Buttons({
+  if (!(await loadPaypalSdk())) {
+    track('paypal_sdk_failed', { reason: paypalFailReason, paywallVersion: PAYWALL_VERSION });
+    container.innerHTML = '<p style="color:#f3c6cc;font-size:.88rem">No se pudo cargar el pago. Revisa tu conexión y recarga la página.</p>'; return;
+  }
+  track('paypal_sdk_loaded', { paywallVersion: PAYWALL_VERSION });
+  const payButtons = window.paypal.Buttons({
     style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay' },
+    onInit: () => track('paypal_buttons_ready', { paywallVersion: PAYWALL_VERSION }),
+    onClick: () => track('paypal_button_clicked', { paywallVersion: PAYWALL_VERSION }),
     createOrder: async () => {
       const res = await fetch('/.netlify/functions/qer-paypal-create-order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ readingId: forId }) });
       const data = await res.json().catch(() => ({}));
@@ -472,9 +485,13 @@ async function initPaywall(forId) {
       if (!res.ok) { track('payment_captured_failed', { reason: result.error || `HTTP ${res.status}` }); alert(result.error || 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos.'); return; }
       track('payment_captured_success', { paywallVersion: PAYWALL_VERSION }); unlockReading(result);
     },
-    onError: (e) => { track('payment_captured_failed', { reason: String(e?.message || e).slice(0, 300) }); },
+    onError: (e) => { track('paypal_error', { reason: String(e?.message || e).slice(0, 300), paywallVersion: PAYWALL_VERSION }); track('payment_captured_failed', { reason: String(e?.message || e).slice(0, 300) }); },
     onCancel: () => track('payment_cancelled', {})
-  }).render('#paypal-button-container');
+  });
+  if (!payButtons.isEligible()) { track('paypal_not_eligible', { paywallVersion: PAYWALL_VERSION }); return; }
+  payButtons.render('#paypal-button-container')
+    .then(() => track('paypal_buttons_rendered', { visible: container.offsetHeight > 20, height: container.offsetHeight, paywallVersion: PAYWALL_VERSION }))
+    .catch(err => track('paypal_render_failed', { reason: String(err?.message || err).slice(0, 300), paywallVersion: PAYWALL_VERSION }));
 }
 function unlockReading({ mapTexts, closingLine }) {
   clearPending(); readUnlocked = true;
@@ -494,14 +511,16 @@ document.querySelectorAll('.skip-reason').forEach(btn => btn.addEventListener('c
 
 // Borrar fotos a petición
 $('btnDeletePhotos').addEventListener('click', async () => {
-  if (!readingId || !confirm('Se borrarán tus 5 fotos. Tu guía no cambia. ¿Continuar?')) return;
+  if (!readingId || !confirm('Se borrarán tus 5 fotos del espacio privado. Tu guía no cambia. ¿Continuar?')) return;
   const b = $('btnDeletePhotos'); b.disabled = true;
   try {
-
+    await postFn('vst-delete-photos', { readingId });
+    photosDeleted = true; track('photos_deleted_by_user', {});
     $('photosStatus').textContent = 'Tus fotos fueron borradas.'; b.classList.add('is-hidden');
-  } catch (e) { alert(e.message || 'Tus fotos fueron borradas.'); }
+  } catch (e) { alert(e.message || 'No se pudieron borrar ahora. Inténtalo de nuevo.'); }
   b.disabled = false;
 });
+
 // --- Medición después del paywall ----------------------------------------------------------------------
 const pageStartedAt = Date.now(); let paywallObserver = null, paywallSeen = false, scrollMaxPct = 0;
 function watchPaywallInView() {
