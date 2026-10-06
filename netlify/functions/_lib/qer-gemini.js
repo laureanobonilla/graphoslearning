@@ -10,19 +10,20 @@ const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.8-fla
 // Los modelos "flash" recientes "piensan" antes de responder, y ese pensamiento
 // cuenta como tiempo (y como tokens de salida) aunque no se vea: en una tarea
 // que solo redacta, eso volvía tardías hasta las llamadas cortas. Se intenta
-// primero apagar/reducir el pensamiento; si el modelo rechaza ese parámetro
+// primero reducirlo al mínimo con thinkingLevel (thinkingBudget quedó obsoleto y los modelos nuevos lo rechazan
+// con 400; tampoco se mandan temperature/topP/topK: Google los fija por defecto); si el modelo rechaza ese parámetro
 // (400), se prueba el siguiente y se recuerda el que funcionó.
-const THINKING_LADDER = [{ thinkingBudget: 0 }, { thinkingLevel: 'low' }, null];
+const THINKING_LADDER = [{ thinkingLevel: 'minimal' }, { thinkingLevel: 'low' }, null];
 let thinkingIdx = 0;
 const isThinkingConfigError = (err) => /thinking|budget|level/i.test(err.message || '') && /(400|invalid|not supported|unsupported)/i.test(err.message || '');
 
-async function callOnce(model, prompt, schema, temperature, maxOutputTokens, timeoutMs) {
+async function callOnce(model, prompt, schema, maxOutputTokens, timeoutMs) {
     for (; thinkingIdx < THINKING_LADDER.length; thinkingIdx++) {
         const thinking = THINKING_LADDER[thinkingIdx];
         const call = ai.models.generateContent({
             contents: prompt,
             model,
-            config: { responseMimeType: 'application/json', responseSchema: schema, temperature, maxOutputTokens, ...(thinking ? { thinkingConfig: thinking } : {}) }
+            config: { responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens, ...(thinking ? { thinkingConfig: thinking } : {}) }
         });
         try {
             if (!timeoutMs) return await call;
@@ -42,7 +43,7 @@ async function callOnce(model, prompt, schema, temperature, maxOutputTokens, tim
     throw new Error('Ninguna configuración de pensamiento fue aceptada');
 }
 
-async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, temperature = 0.85, deadline = null, attemptMs = 24000 } = {}) {
+async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, deadline = null, attemptMs = 24000 } = {}) {
     let lastError = null;
     for (let attempt = 0; attempt < FALLBACK_MODELS.length; attempt++) {
         // `deadline` (ms epoch): Netlify corta la función a los ~26 s y devuelve un
@@ -56,7 +57,7 @@ async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini
         const t0 = Date.now();
         let response;
         try {
-            response = await callOnce(FALLBACK_MODELS[attempt], prompt, schema, temperature, maxOutputTokens, timeoutMs);
+            response = await callOnce(FALLBACK_MODELS[attempt], prompt, schema, maxOutputTokens, timeoutMs);
         } catch (err) {
             lastError = err;
             const msg = (err.message || '').toLowerCase();

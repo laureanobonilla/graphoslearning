@@ -2803,3 +2803,34 @@ Al abrir el formulario de la canción ya no se enfoca ningún campo (el teclado 
 - **IMPORTANTE para analizar datos:** `questionIndex` ya no equivale a la misma pregunta que antes en las posiciones 4–10. Para comparar con exportaciones anteriores usa `questionId` (q3 = la mentira, etc.). `PROGRESS_KEY` pasó a v5 (el avance guardado de antes se descarta).
 - **Salida anticipada:** desde las 25 respuestas aparece "Ya tengo suficiente: ver mi lectura ahora" (eventos `finish_early_offered`, `quiz_finished_early`). El servidor ignora las preguntas sin respuesta (`sanitizeAnswers`), así que la lectura se arma con lo contestado. Dato que la justifica poco: de quienes pasaban la 25, el 75–77 % ya terminaba; el beneficio máximo son los ~10–14 % que abandonaban entre la 26 y la 49.
 - Medir: tasa de abandono en las posiciones 4–10 (antes ≈ 10–13 % en la 4 y 8–10 % en la 5) y cuántos usan la salida anticipada.
+
+### 54e. Botón principal "Pedirla por WhatsApp" (6 oct)
+Motivo: en los datos, 3 de 7 personas tocaron "Quiero mi canción" pero 2 de las 3 dejaron el formulario (pide teléfono). Ahora el botón principal abre WhatsApp con el mensaje ya escrito (estilo, nombre opcional y código de lectura) hacia el número del dueño: la persona no deja ningún dato, solo envía. El formulario con teléfono queda como segunda opción ("o prefieres que te escriba yo").
+- Al tocar el botón, la página avisa en segundo plano a `qer-song-request` con `via: 'whatsapp'` (sin teléfono): llega el correo "Canción (WhatsApp): …" con la letra, el estilo, el nombre y el código; cuando la persona envíe su mensaje, el código identifica a cuál corresponde. Si nunca lo envía, no hay forma de contactarla (es el costo de quitar la barrera del teléfono).
+- Eventos: `song_whatsapp_clicked` (style, hasName; `again: true` si usa "Abrir WhatsApp otra vez"). En la tabla `events` del servidor, `song_request_sent` trae `via: 'whatsapp' | 'form'`.
+- Medir: de quienes tocan "Quiero mi canción", cuántos usan WhatsApp vs formulario, y cuántos mensajes llegan realmente a tu WhatsApp frente a los correos "(WhatsApp)".
+
+## 55. Nueva app: "Si fueras una canción" (`/si-fueras-cancion/`, 6 oct)
+App independiente de "¿Quién eres en realidad?" (esa sigue igual y con su propio enfoque). Misma plataforma (Supabase, Gemini, Resend, mismo número de WhatsApp), pero **carpeta, funciones, claves de localStorage y `app` de eventos propios**.
+
+**Qué hace:** 15 preguntas de elegir (8 opciones cada una, se pueden marcar varias; "Ninguna de estas me calza"; "+ Escribir la mía" con texto libre de hasta 140 caracteres; la 15 es abierta y opcional: una frase/apodo/palabra propia) → la letra de una canción, completa y gratis → oferta de que **suene** (muestra cantada por WhatsApp; el precio se habla después de que la persona la oiga), con estilo, nombre opcional, botón de WhatsApp y formulario de teléfono, igual que en quien-eres.
+
+**Para que la persona *quiera* oírla (no solo leerla):**
+- Reproductor "mudo" arriba de la letra (onda vacía, "0:00 · sin voz"). Al tocar ▶ dice "Todavía no suena. La letra está lista; falta cantarla." y abre la oferta (evento `player_tapped`).
+- Bloque "Esto es solo la letra. Todavía no suena…" debajo de la letra (celular) y la columna fija a un lado (pantalla ancha ≥ 960 px; mismo patrón sticky/hoja inferior que quien-eres, con `visualViewport` para el teclado).
+- Los colores que la persona eligió en la pregunta 5 tiñen la franja de la hoja, el estribillo y la onda. El estilo sugerido sale de la pregunta 10 ("¿qué ritmo tiene tu vida?").
+
+**Archivos nuevos:** `si-fueras-cancion/index.html` y `app.js`; funciones `sfc-generate-song.js`, `sfc-song-request.js`, `sfc-track-event.js`; `_lib/sfc-song.js` (preguntas ya limpias, schema y prompt de la letra). No hay tablas nuevas: la canción se guarda en `qer_readings` con `format:'song'` (72 h) y los eventos en `events` con `app = 'si-fueras-cancion'`. Variables: las mismas (GEMINI_API_KEY, SUPABASE_*, RESEND_API_KEY, FEEDBACK_TO_EMAIL).
+
+**Seguridad/privacidad:** las respuestas del cliente se limpian y acotan en el servidor (máx. 20 preguntas, 8 opciones de 90 caracteres, texto libre de 140; sin `<>`, comillas invertidas ni llaves) y el prompt las trata como datos, no como instrucciones. La letra se pinta con `textContent` (nunca `innerHTML`). Los eventos NO llevan lo que la persona eligió ni escribió (el servidor descarta `answer/other/picks/name/phone`): solo avance. Las respuestas completas viven únicamente en `qer_readings` 72 h, para rehacer la letra con el nombre. Límite de generación: 4/hora por navegador y 10/hora por IP (hash corto, no la IP). Solicitudes de canción: 2/hora por canción.
+
+**Nombre en la canción:** la letra que ve la persona NO lleva nombre; si lo pide, `sfc-song-request` rehace la letra con él y el correo trae las dos versiones ("LETRA CON SU NOMBRE" y "LETRA QUE VIO EN PANTALLA"). Si Gemini falla, sale la original y el correo avisa.
+
+**Avance y recarga:** el avance se guarda en el navegador (3 días) y, si lo hay, el botón principal de la portada es **Continuar** (con "Empezar de nuevo" aparte); la canción lista se guarda 71 h y se muestra otra vez si recarga.
+
+**Eventos (app `si-fueras-cancion`):** `landing_viewed`, `quiz_started`, `quiz_resumed`, `question_answered` (questionId, picks = cuántas, usedNone, wrote, seconds), `write_own_opened`, `quiz_submitted`, `song_generated` / `song_generate_failed`, `song_shown`, `player_tapped`, `next_step_clicked`, `copy_lyrics`, `share_clicked`, `restart_clicked`, y los de la oferta de siempre (`song_offer_shown`, `song_offer_in_view`, `song_cta_clicked`, `song_style_chosen`, `song_name_toggled`, `song_whatsapp_clicked`, `song_request_submitted`/`confirmed`/`failed`, `song_closed`), más `page_hidden`.
+**Qué mirar:** empezaron → llegaron a la 5/10/15 → letra generada → tocaron ▶ o "Quiero que suene" → pidieron. Compara con quien-eres (hoy ≈ 2 pedidos de ~16 que vieron la oferta).
+**Pendiente conocido (en quien-eres):** si alguien con avance guardado recarga, el botón principal "Empezar" borra el avance (el de "Continuar" es secundario); en esta app nueva ya está resuelto.
+
+## 56. Aviso de Google: thinking_budget y parámetros de muestreo (6 oct)
+Google avisó que los modelos nuevos rechazarán con 400 `thinking_budget` y `temperature`/`top_p`/`top_k`. Cambios: `_lib/qer-gemini.js` ya no manda `thinkingBudget` (la escalera ahora es `thinkingLevel: 'minimal'` → `'low'` → sin parámetro; si un modelo rechaza un escalón, pasa al siguiente y recuerda el que funcionó) y se quitó `temperature` de TODAS las llamadas (`gemini.js`, `qer-generate-reading.js`, `qer-generate-map*.js`, `qer-song-request.js`, `sfc-*.js`, `vst-generate-*.js`). Con los modelos actuales (3.6/3.8 flash) el muestreo ya estaba fijo, así que la salida no cambia. No hay cambios en el navegador.

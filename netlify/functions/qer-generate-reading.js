@@ -44,7 +44,6 @@ async function generateReadingWithRetries(prompt, schema) {
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema,
-                    temperature: 0.85,
                     maxOutputTokens: 4096
                 }
             });

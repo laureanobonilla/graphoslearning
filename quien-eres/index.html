@@ -173,6 +173,12 @@
   .song-name{ width:100%; margin: 0 0 14px; appearance:none; border:1px solid var(--line); background: rgba(0,0,0,0.25); color:#f4efe2; border-radius:12px; padding:12px; font-family:'Work Sans',sans-serif; font-size:1rem; }
   .song-name.is-hidden{ display:none; }
   .song-go{ appearance:none; width:100%; border:none; cursor:pointer; border-radius: 999px; padding: 14px 18px; background: var(--brass); color:#211a0c; font-family:'Work Sans',sans-serif; font-size: 0.98rem; font-weight: 600; }
+  .song-wa{ display:block; text-align:center; text-decoration:none; color:#211a0c; }
+  .song-wa:visited{ color:#211a0c; }
+  .song-go-alt{ background: transparent; border: 1px solid var(--brass); color:#f4e9c9; }
+  .song-go-alt:disabled{ background: transparent; border-color:#4a4436; }
+  .song-offer .song-or{ margin: 14px 0 10px; text-align:center; font-size:.8rem; color: var(--muted); }
+  #songWaAgain.is-hidden{ display:none; }
   .song-go:disabled{ background:#4a4436; color:#8a8575; cursor:default; }
   .song-form.is-hidden, .song-teaser.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden{ display:none; }
   .song-offer .song-title{ margin: 2px 0 8px; font-size: 1.3rem; line-height: 1.25; color:#f4e9c9; }
@@ -409,6 +415,9 @@
         </div>
         <label class="song-check"><input type="checkbox" id="songWantName"> <span>Quiero que la canción lleve mi nombre</span></label>
         <input id="songName" class="song-name is-hidden" type="text" enterkeyhint="next" autocomplete="given-name" placeholder="Tu nombre" maxlength="30" aria-label="Tu nombre">
+        <a id="songWaBtn" class="song-go song-wa" href="https://wa.me/50687772993" target="_blank" rel="noopener">Pedirla por WhatsApp</a>
+        <p class="song-fine song-wa-note">Se abre WhatsApp con el mensaje ya escrito: solo tienes que enviarlo y te respondo ahí con tu muestra.</p>
+        <p class="song-or">o prefieres que te escriba yo</p>
         <p class="song-label"><label for="songPhone">Tu WhatsApp, para enviarte la muestra</label></p>
         <div class="song-phone">
           <select id="songDial" aria-label="Código de país">
@@ -423,13 +432,13 @@
           <input id="songPhone" type="tel" inputmode="tel" enterkeyhint="send" autocomplete="tel-national" placeholder="Tu número" maxlength="24">
         </div>
         <p class="song-fine">Solo usaré tu número para escribirte por WhatsApp con tu muestra. No lo comparto ni te enviaré otra cosa.</p>
-        <button type="submit" id="btnSongSend" class="song-go">Quiero mi canción</button>
+        <button type="submit" id="btnSongSend" class="song-go song-go-alt">Que me escriban a mi número</button>
         <p id="songError" class="song-error is-hidden" role="alert"></p>
-        <p class="song-fine"><a id="songWhatsapp" href="https://wa.me/50687772993" target="_blank" rel="noopener">¿Prefieres escribirme tú? Abre WhatsApp</a></p>
       </form>
       <div id="songDone" class="song-done is-hidden" role="status">
         <p class="song-title display">¡Listo!</p>
         <p id="songDoneText"></p>
+        <p class="song-fine"><a id="songWaAgain" class="is-hidden" href="https://wa.me/50687772993" target="_blank" rel="noopener">Abrir WhatsApp otra vez</a></p>
       </div>
     </aside>
     </div>

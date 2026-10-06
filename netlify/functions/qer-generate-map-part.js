@@ -31,7 +31,7 @@ exports.handler = async (event) => {
             fmt.nodesSchema,
             d => d && Array.isArray(d.nodes) && d.nodes.length === idxs.length &&
                 d.nodes.every((n, k) => n && n.label && n.hook && n.text && String(n.text).length > fmt.minChars(idxs[k])),
-            { tag: `map-part-${part}`, maxOutputTokens: 2048, temperature: 0.85, deadline: t0 + TIME_BUDGET_MS }
+            { tag: `map-part-${part}`, maxOutputTokens: 2048, deadline: t0 + TIME_BUDGET_MS }
         );
         await saveReading(`${readingId}-p${part}`, { part, nodes: result.nodes, full: [] });
         console.log(`[generate-map-part] parte ${part} lista en ${Date.now() - t0} ms`);

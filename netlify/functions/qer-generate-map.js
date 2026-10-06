@@ -19,7 +19,7 @@ exports.handler = async (event) => {
     const t0 = Date.now();
     try {
         const axis = await generateWithRetries(formatOf(format).axisPrompt(transcript), AXIS_SCHEMA, validAxis,
-            { tag: 'map-axis', maxOutputTokens: 1024, temperature: 0.85, deadline: t0 + TIME_BUDGET_MS });
+            { tag: 'map-axis', maxOutputTokens: 1024, deadline: t0 + TIME_BUDGET_MS });
         console.log(`[generate-map] eje listo en ${Date.now() - t0} ms`);
 
         const readingId = crypto.randomUUID();

@@ -128,8 +128,7 @@ async function rawHandler(event, context) {
                 ${curiosityInstruction}`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: { type: 'OBJECT', properties: schemaProperties, required: requiredFields },
-                    temperature: 0.25
+                    responseSchema: { type: 'OBJECT', properties: schemaProperties, required: requiredFields }
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -200,8 +199,7 @@ async function rawHandler(event, context) {
                 5. "synergy.label" debe ser un TÍTULO corto (2-5 palabras): va solo en el nodo del mapa. "synergy.explanation" lleva la explicación completa aparte.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.3
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -244,8 +242,7 @@ async function rawHandler(event, context) {
                 3. "relationship": Conector de 1 o 2 palabras (ej: "ejemplo de", "aplicado en").`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -277,8 +274,7 @@ async function rawHandler(event, context) {
                 Genera un concepto puente intermedio concreto (no genérico). Conectores de 1 a 3 palabras.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -336,7 +332,7 @@ async function rawHandler(event, context) {
                 1. Redacta 1 o 2 párrafos concisos, precisos y sustanciales.
                 2. PROHIBIDO redactar definiciones vacías o genéricas. Explica qué es exactamente.
                 ${interactiveRule}`,
-                config: { temperature: 0.2 }
+                config: {}
             });
             return { statusCode: 200, body: JSON.stringify({ definition: response.text, source: 'gemini' }) };
         }
@@ -373,8 +369,7 @@ async function rawHandler(event, context) {
                 4. Tono cercano y claro, como explicándole a un amigo curioso, no como un libro de texto.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.3
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -475,8 +470,7 @@ async function rawHandler(event, context) {
                 6. "gaps": revisa el texto/tema una vez armado el esquema y detecta qué conceptos se mencionan de paso (una referencia, un nombre, un término técnico) pero NO llegaron a tener su propio nodo — esos son los huecos. Máximo 5, y solo los genuinamente relevantes para entender el tema a fondo. Si no hay ninguno real, "gaps" debe ser un array vacío.${focusHint}`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.15
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -565,8 +559,7 @@ async function rawHandler(event, context) {
                 6. "sourceQuote": cita literal y breve (máx. 15 palabras), copiada EXACTAMENTE tal como aparece en el texto original, como evidencia de cada nodo. Nunca inventes ni parafrasees la cita.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -592,8 +585,7 @@ async function rawHandler(event, context) {
                 contents: `Lee el siguiente texto y extrae los términos o frases clave (sustantivos o expresiones cortas, de 1 a 4 palabras) que mejor representan sus ideas centrales. Cada término DEBE aparecer copiado literalmente (exactamente igual, incluyendo mayúsculas/minúsculas) en el texto, para que pueda ser localizado con una búsqueda exacta de substring.\n\nTEXTO:\n"""${text.slice(0, 12000)}"""\n\nDevuelve entre 6 y 14 términos, sin duplicados, priorizando los más relevantes y distribuidos a lo largo del texto.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -642,8 +634,7 @@ async function rawHandler(event, context) {
                 4. "relationship" debe tener de 1 a 3 palabras conectando el nodo origen con cada resultado.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.25
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -679,8 +670,7 @@ async function rawHandler(event, context) {
                 "label" es solo el título corto de esa teoría/autor/fenómeno; "explanation" lleva el desarrollo completo de la crítica, aparte.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.25
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -692,7 +682,7 @@ async function rawHandler(event, context) {
         if (action === 'socratic_question') {
             const response = await generateWithFallback({
                 contents: `Formula UNA pregunta socrática breve, desafiante y fascinante (máximo 2 oraciones) sobre "${topic}" (en el contexto de "${contextPath}") para poner a prueba la comprensión profunda del usuario. No hagas preguntas de memoria básica, sino de causa, implicación o aplicación.`,
-                config: { temperature: 0.4 }
+                config: {}
             });
             return { statusCode: 200, body: JSON.stringify({ question: response.text }) };
         }
@@ -715,8 +705,7 @@ async function rawHandler(event, context) {
                 Evalúa con rigor intelectual pero tono motivador la respuesta del usuario, señala qué acertó o qué matiz importante puede sumar, y otorga un título de síntesis para su nuevo Nodo de Dominio.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.3
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -763,7 +752,7 @@ INSTRUCCIONES:
 5. NO inventes citas textuales, referencias bibliográficas, estudios, cifras ni fechas dudosas. Si algo es debatido o incierto, dilo claramente en vez de afirmarlo.
 6. Es un texto para estudiar y para que se pueda convertir en un esquema conceptual: cada párrafo debe desarrollar una idea distinta y clara, con términos bien definidos.
 7. Tono académico pero claro, en segunda persona del plural o impersonal; nada de saludos, ni "en este texto veremos".`,
-                config: { responseMimeType: 'application/json', responseSchema: schema, temperature: 0.5 }
+                config: { responseMimeType: 'application/json', responseSchema: schema }
             });
             return { statusCode: 200, body: response.text };
         }

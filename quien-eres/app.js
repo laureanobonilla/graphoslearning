@@ -577,11 +577,38 @@ function setupSongOffer(forReadingId, archetype) {
   };
   // En pantalla ancha la columna ya muestra el formulario abierto: cero clics antes de poder pedirla.
   try { if (window.matchMedia('(min-width: 960px)').matches) { teaser.classList.add('is-hidden'); form.classList.remove('is-hidden'); } } catch (_e) { /* no crítico */ }
-  const wa = document.getElementById('songWhatsapp');
-  const msg = `Hola, quiero mi canción. Mi código es: ${forReadingId}${archetype ? ` (${archetype})` : ''}.`;
-  wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(msg)}`;
-  wa.onclick = () => track('song_whatsapp_clicked', {});
   const fail = (t) => { err.textContent = t; err.classList.remove('is-hidden'); };
+  // Botón principal: abre WhatsApp con el mensaje ya escrito (estilo, nombre y código). No pide ningún dato; la persona
+  // solo envía. Al tocarlo se avisa al servidor (sin teléfono) para que te llegue por correo la letra y el código.
+  const waBtn = document.getElementById('songWaBtn'), waAgain = document.getElementById('songWaAgain');
+  const nameRe = /^[\p{L}][\p{L} '’-]{0,29}$/u;
+  const typedName = () => (wantName.checked ? nameIn.value.replace(/\s+/g, ' ').trim() : '');
+  const waHref = () => {
+    const n = typedName();
+    const text = `Hola, quiero mi canción 🎵\nEstilo: ${songStyle}\n${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${forReadingId}${archetype ? ` (${archetype})` : ''}`;
+    return `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(text)}`;
+  };
+  waBtn.href = waHref();
+  waAgain.classList.add('is-hidden');
+  waBtn.onclick = (ev) => {
+    err.classList.add('is-hidden');
+    const n = typedName();
+    if (wantName.checked && !nameRe.test(n)) { ev.preventDefault(); track('song_name_invalid', {}); fail('Escribe solo tu nombre (letras, hasta 30), o desmarca la casilla.'); nameIn.focus(); return; }
+    waBtn.href = waHref();
+    track('song_whatsapp_clicked', { style: songStyle, hasName: !!n });
+    try {
+      fetch('/.netlify/functions/qer-song-request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+        body: JSON.stringify({ readingId: forReadingId, style: songStyle, via: 'whatsapp', consent: true, ...(n ? { name: n } : {}) })
+      }).catch(() => { /* el aviso es un extra: si falla, igual se abre WhatsApp */ });
+    } catch (_e) { /* no crítico */ }
+    setTimeout(() => {
+      document.getElementById('songDoneText').textContent = 'Se abrió WhatsApp con tu mensaje: solo falta enviarlo. Te respondo ahí con tu muestra.';
+      waAgain.href = waBtn.href; waAgain.classList.remove('is-hidden');
+      form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
+    }, 500);
+  };
+  waAgain.onclick = () => track('song_whatsapp_clicked', { again: true });
   form.onsubmit = async (ev) => {
     ev.preventDefault();
     err.classList.add('is-hidden');
@@ -604,6 +631,7 @@ function setupSongOffer(forReadingId, archetype) {
         return;
       }
       track('song_request_confirmed', { style: songStyle });
+      waAgain.classList.add('is-hidden');
       document.getElementById('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de tu canción. Revisa tus mensajes pronto.`;
       form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
       try { done.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }

@@ -18,7 +18,7 @@ exports.handler = async (event) => {
         const result = await generateWithRetries(
             chunkPrompt(base.transcript || '', base.profile, idxs), NODES_SCHEMA,
             d => d && Array.isArray(d.nodes) && d.nodes.length === idxs.length && d.nodes.every(validNode),
-            { tag: `vst-part-${part}`, maxOutputTokens: 4096, temperature: 0.8, deadline: t0 + TIME_BUDGET_MS });
+            { tag: `vst-part-${part}`, maxOutputTokens: 4096, deadline: t0 + TIME_BUDGET_MS });
         await saveReading(`${readingId}-p${part}`, { part, nodes: result.nodes.map(packNode), full: [] });
         console.log(`[vst-part] parte ${part} lista en ${Date.now() - t0} ms`);
         return json(200, { ok: true, part });

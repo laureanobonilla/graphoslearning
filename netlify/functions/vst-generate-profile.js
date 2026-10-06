@@ -35,7 +35,7 @@ exports.handler = async (event) => {
         ];
         const profile = await generateWithRetries([{ role: 'user', parts }], PROFILE_SCHEMA,
             d => d && d.safety && d.styleName && d.hookLine && d.summary && Array.isArray(d.bestColors) && d.bestColors.length >= 3 && d.closingLine,
-            { tag: 'vst-profile', maxOutputTokens: 2048, temperature: 0.7, deadline: t0 + TIME_BUDGET_MS });
+            { tag: 'vst-profile', maxOutputTokens: 2048, deadline: t0 + TIME_BUDGET_MS });
 
         const sf = profile.safety || {};
         const unusable = (Array.isArray(sf.unusableSlots) ? sf.unusableSlots : []).filter(s => SLOTS.includes(s));
