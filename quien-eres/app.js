@@ -509,7 +509,7 @@ function renderReveal(data, { skipPaywall } = {}) {
   savePendingReading({ readingId: data.readingId, format: 'reading', archetypeName: data.archetypeName, hookLine: data.hookLine, nodes: chapters, stats: readingStats });
 
   document.getElementById('paywall').classList.remove('is-hidden');
-  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION });
+  track('paywall_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION, freeChapters: chapters.filter(c => c.text).length, totalChapters: chapters.length });
   watchPaywallInView();
   initPaywall(readingId);
 }

@@ -113,7 +113,10 @@ Cada revelación debe poder leerse sola, usar un símbolo DISTINTO a las demás 
 // y los 5 últimos cerrados — de los cerrados solo se ve título, gancho y cuántas
 // palabras tienen. Los capítulos cerrados son más largos, para que lo oculto
 // sea siempre más de la mitad del texto y nadie pague por "lo que faltaba poco".
-const READING_FREE_COUNT = 5;
+// Cuántos capítulos (de 10) se leen completos sin pagar. Se puede cambiar SIN tocar código con la
+// variable de entorno READING_FREE_COUNT en Netlify (1 a 9); si no está, son 5. Solo afecta a las
+// lecturas que se generen a partir de ahora: las ya generadas conservan lo que se les dio.
+const READING_FREE_COUNT = Math.min(9, Math.max(1, parseInt(process.env.READING_FREE_COUNT, 10) || 5));
 const READING_THEMES = [
     'LO PRIMERO QUE SE NOTA: la contradicción central entre lo que la persona dice de sí misma y lo que sus otras respuestas dejan ver. Es el corazón de la lectura; abre con una imagen potente.',
     'LA MÁSCARA: la versión de sí misma que muestra a los demás, a quién protege de verdad y cuánto cuesta sostenerla.',
@@ -177,7 +180,12 @@ Ahora define SOLO el eje de la lectura. Busca UNA contradicción real entre lo q
 function readingChunkPrompt(transcript, axis, indexes) {
     const list = indexes.map((idx, k) => {
         const words = idx < READING_FREE_COUNT ? '120 a 150 palabras' : '150 a 190 palabras';
-        return `${k + 1}. (${words}) ${READING_THEMES[idx]}`;
+        // El último capítulo que se lee completo sin pagar cierra con una pregunta abierta (suspenso narrativo):
+        // la última frase deja pendiente algo concreto sobre ESA persona, sin responderlo.
+        const cliff = idx === READING_FREE_COUNT - 1
+            ? ' ÚLTIMA FRASE OBLIGATORIA: termina este capítulo con una sola frase que deje abierta una pregunta concreta sobre ESTA persona, basada en algo que escribió (algo que el capítulo no resuelve ni explica). No la respondas, no menciones capítulos siguientes, lectura, pago ni desbloqueo.'
+            : '';
+        return `${k + 1}. (${words}) ${READING_THEMES[idx]}${cliff}`;
     }).join('\n');
     return `Eres quien escribe "¿Quién eres en realidad?", una experiencia de autoconocimiento. La lectura es un texto largo en 10 capítulos; tú escribes SOLO los capítulos que se te piden ahora.
 
