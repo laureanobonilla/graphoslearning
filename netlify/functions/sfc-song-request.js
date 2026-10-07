@@ -75,8 +75,8 @@ exports.handler = async (event) => {
             `Nueva solicitud de canción · ${kind === 'pareja' ? 'PAREJA (regalo)' : 'Si fueras una canción'}`,
             ``,
             ...(viaWhatsapp
-                ? [`PIDIÓ POR EL BOTÓN DE WHATSAPP (no dejó teléfono).`,
-                   `Espera su mensaje en tu WhatsApp: traerá el código ${songId}. Si no lo envía, no hay forma de contactarla.`]
+                ? [`SOLO ABRIÓ WHATSAPP (no dejó teléfono): es una INTENCIÓN, no un pedido confirmado.`,
+                   `Solo cuenta si te llega su mensaje con el código ${songId}. Muchas personas abren WhatsApp y no lo envían; si no llega, no hay forma de contactarla.`]
                 : [`Teléfono: ${phone}`,
                    `WhatsApp (toca para escribirle con el mensaje listo): ${waLink}`]),
             `Estilo pedido: ${style}${style === 'Sorpréndeme' ? ` (la letra sugiere: ${finalStyle})` : ''}`,
@@ -99,7 +99,7 @@ exports.handler = async (event) => {
             body: JSON.stringify({
                 from: 'Graphikosmos <onboarding@resend.dev>',
                 to: [process.env.FEEDBACK_TO_EMAIL || FALLBACK_TO_EMAIL],
-                subject: `Canción (${kind === 'pareja' ? 'Pareja' : 'Si fueras…'})${viaWhatsapp ? ' WhatsApp' : ''}: ${base.title} · ${finalStyle}${phone ? ' · ' + phone : ''}`,
+                subject: `Canción (${kind === 'pareja' ? 'Pareja' : 'Si fueras…'})${viaWhatsapp ? ' (clic WhatsApp, sin número)' : ''}: ${base.title} · ${finalStyle}${phone ? ' · ' + phone : ''}`,
                 text
             })
         });

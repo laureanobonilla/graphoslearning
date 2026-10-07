@@ -2853,3 +2853,9 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 ### 58b. Primera persona solo sin nombre; dedicatoria con nombre; que sea suya desde el primer verso (6 oct)
 - **Sin nombre:** la letra va en primera persona ("yo", "me", "mi"), como si la persona misma la cantara. **Con nombre:** es una DEDICATORIA: el primer verso empieza nombrándola y la canción se le dirige en segunda persona ("tú"), como una carta cantada (`lyricsPrompt` en `_lib/qer-song.js`, `songPrompt` en `_lib/sfc-song.js`).
 - **No genérica:** las dos primeras líneas (y el título) deben llevar algo que solo esa persona reconocería (arquetipo/gancho en quien-eres; algo que eligió o escribió en las otras); en la de pareja, el nombre y algo propio de esa pareja. Prueba incluida en el prompt: "si esas dos líneas sirven igual para otra persona, reescríbelas". Es una instrucción al modelo, no una garantía: **revisa las dos primeras líneas del correo antes de grabar la muestra**.
+
+## 59. pareja-cancion: el número va primero (correos sin contacto)
+- Problema: el botón de WhatsApp avisaba al correo al hacer clic, pero mucha gente abre WhatsApp y no envía el mensaje: llegaba un correo sin forma de contactarla.
+- Ahora el botón principal es "Que me escriban a mi número" (CR +506 por defecto) y WhatsApp quedó como opción secundaria con aviso de que hay que enviar el mensaje.
+- Tras abrir WhatsApp, la pantalla final ofrece "¿No pudiste enviarlo? Déjame tu número" (evento `song_back_to_phone`).
+- El correo de clic en WhatsApp ahora dice INTENCIÓN (asunto "clic WhatsApp, sin número"): solo cuenta si te llega el mensaje con el código.
