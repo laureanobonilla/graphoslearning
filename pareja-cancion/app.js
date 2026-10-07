@@ -470,7 +470,7 @@ function setupSongOffer() {
   bindViewportFit(box);
   const teaser = $('songTeaser'), form = $('songForm'), done = $('songDone'), err = $('songError'), send = $('btnSongSend');
   teaser.classList.remove('is-hidden'); form.classList.add('is-hidden'); done.classList.add('is-hidden');
-  err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Que me escriban a mi número';
+  err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Quiero mi muestra';
   $('songOfferTitle').textContent = `Ya tienes la letra. Falta que suene para ${song.partner || 'tu pareja'}.`;
   $('songTeaserText').textContent = `Te hago una muestra cantada de «${song.title}» para que la escuches. Si te gusta, la terminamos y se la das a ${song.partner || 'tu pareja'}. Sin compromiso: el precio lo hablamos solo después de que la oigas.`;
 
@@ -493,7 +493,7 @@ function setupSongOffer() {
 
   const wide = () => window.matchMedia('(min-width: 960px)').matches;
   const open = () => { teaser.classList.add('is-hidden'); if (done.classList.contains('is-hidden')) form.classList.remove('is-hidden'); box.classList.add('is-open'); box.scrollTop = 0; };
-  offerApi = { open: () => { if (form.classList.contains('is-hidden') && done.classList.contains('is-hidden')) { track('song_cta_clicked', {}); open(); } else box.classList.add('is-open'); } };
+  offerApi = { open: () => { if (form.classList.contains('is-hidden') && done.classList.contains('is-hidden')) { track('song_cta_clicked', {}); open(); } else { box.classList.remove('is-hidden'); box.classList.add('is-open'); } } };
   $('btnSongOpen').onclick = () => { track('song_cta_clicked', {}); open(); };   // sin enfocar campos: si el teclado se abre solo, tapa el formulario
   const closeBtn = $('songClose');
   closeBtn.onclick = () => {
@@ -506,33 +506,14 @@ function setupSongOffer() {
   const fail = (t) => { err.textContent = t; err.classList.remove('is-hidden'); };
   const nameRe = /^[\p{L}][\p{L} '’-]{0,29}$/u;
   const typedName = () => (wantName.checked ? nameIn.value.replace(/\s+/g, ' ').trim() : '');
-  const waBtn = $('songWaBtn'), waAgain = $('songWaAgain'), backPhone = $('songBackToPhone');
+  const waAgain = $('songWaAgain');
   const waHref = () => {
     const n = typedName();
     const text = `Hola, quiero que suene la canción para ${song.partner || 'mi pareja'} 🎵\n«${song.title}»\nEstilo: ${songStyle}\n${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${song.songId}`;
     return `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(text)}`;
   };
-  waBtn.href = waHref(); waAgain.classList.add('is-hidden');
-  waBtn.onclick = (ev) => {
-    err.classList.add('is-hidden');
-    const n = typedName();
-    if (wantName.checked && !nameRe.test(n)) { ev.preventDefault(); track('song_name_invalid', {}); fail('Escribe solo tu nombre (letras, hasta 30), o desmarca la casilla.'); nameIn.focus(); return; }
-    waBtn.href = waHref();
-    track('song_whatsapp_clicked', { style: songStyle, hasName: !!n });
-    try {
-      fetch('/.netlify/functions/sfc-song-request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
-        body: JSON.stringify({ songId: song.songId, style: songStyle, via: 'whatsapp', consent: true, ...(n ? { name: n } : {}) })
-      }).catch(() => { /* el aviso es un extra: si falla, igual se abre WhatsApp */ });
-    } catch (_e) { /* no crítico */ }
-    setTimeout(() => {
-      $('songDoneText').textContent = 'Se abrió WhatsApp con tu mensaje: solo falta enviarlo. Te respondo ahí con tu muestra. Si no se envió, no me llega nada.';
-      waAgain.href = waBtn.href; waAgain.classList.remove('is-hidden'); backPhone.classList.remove('is-hidden');
-      form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
-    }, 500);
-  };
-  backPhone.onclick = () => { track('song_back_to_phone', {}); done.classList.add('is-hidden'); form.classList.remove('is-hidden'); try { phone.focus(); } catch (_e) { /* no crítico */ } };
-  waAgain.onclick = () => track('song_whatsapp_clicked', { again: true });
+  waAgain.classList.add('is-hidden');
+  waAgain.onclick = () => track('song_whatsapp_clicked', { after_form: true });
 
   form.onsubmit = async (ev) => {
     ev.preventDefault(); err.classList.add('is-hidden');
@@ -546,14 +527,14 @@ function setupSongOffer() {
       const data = await postFn('sfc-song-request', { songId: song.songId, style: songStyle, phone: full, consent: true, ...(n ? { name: n } : {}) });
       if (!data.ok) throw new Error('fallo');
       track('song_request_confirmed', { style: songStyle });
-      waAgain.classList.add('is-hidden'); backPhone.classList.add('is-hidden');
+      waAgain.href = waHref(); waAgain.classList.remove('is-hidden');
       $('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de la canción para ${song.partner || 'tu pareja'}. Revisa tus mensajes pronto.`;
       form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
       try { done.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
     } catch (e) {
       track('song_request_failed', { status: e.status || 0 });
       fail(e.status ? (e.message || 'No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.') : 'Sin conexión. Inténtalo de nuevo.');
-      send.disabled = false; send.textContent = 'Que me escriban a mi número';
+      send.disabled = false; send.textContent = 'Quiero mi muestra';
     }
   };
 

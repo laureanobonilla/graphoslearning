@@ -469,7 +469,7 @@ function setupSongOffer() {
 
   const wide = () => window.matchMedia('(min-width: 960px)').matches;
   const open = () => { teaser.classList.add('is-hidden'); if (done.classList.contains('is-hidden')) form.classList.remove('is-hidden'); box.classList.add('is-open'); box.scrollTop = 0; };
-  offerApi = { open: () => { if (form.classList.contains('is-hidden') && done.classList.contains('is-hidden')) { track('song_cta_clicked', {}); open(); } else box.classList.add('is-open'); } };
+  offerApi = { open: () => { if (form.classList.contains('is-hidden') && done.classList.contains('is-hidden')) { track('song_cta_clicked', {}); open(); } else { box.classList.remove('is-hidden'); box.classList.add('is-open'); } } };
   $('btnSongOpen').onclick = () => { track('song_cta_clicked', {}); open(); };   // sin enfocar campos: si el teclado se abre solo, tapa el formulario
   const closeBtn = $('songClose');
   closeBtn.onclick = () => {

@@ -2859,3 +2859,10 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 - Ahora el botón principal es "Que me escriban a mi número" (CR +506 por defecto) y WhatsApp quedó como opción secundaria con aviso de que hay que enviar el mensaje.
 - Tras abrir WhatsApp, la pantalla final ofrece "¿No pudiste enviarlo? Déjame tu número" (evento `song_back_to_phone`).
 - El correo de clic en WhatsApp ahora dice INTENCIÓN (asunto "clic WhatsApp, sin número"): solo cuenta si te llega el mensaje con el código.
+
+## 60. Reabrir la oferta tras cerrar la pantalla "¡Listo!"
+- Una clienta tocó "siguiente paso" 6 veces seguidas y no pasaba nada: al cerrar la pantalla final la oferta quedaba oculta y el botón solo le ponía la clase de abierta. Ahora también la muestra de nuevo (pareja-cancion y si-fueras-cancion).
+
+## 61. pareja-cancion: un solo botón ("Quiero mi muestra")
+- Se quitó el botón de WhatsApp del formulario. Ahora hay UN botón: pide el número (CR +506 por defecto), manda el correo con el número y la letra, y la pantalla final ofrece "¿Quieres adelantarte? Escríbeme tú por WhatsApp" (opcional, evento `song_whatsapp_clicked` con `after_form`).
+- Motivo: abrir WhatsApp a la vez no garantiza que envíen el mensaje, y con el número tú siempre puedes escribirles primero.
