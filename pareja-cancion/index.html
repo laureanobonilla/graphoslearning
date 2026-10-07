@@ -158,12 +158,18 @@
   .song-go{ appearance:none; width:100%; border:none; cursor:pointer; border-radius:999px; padding:14px 18px; background:var(--magenta); color:#fff; font-size:1rem; font-weight:700; }
   .song-wa{ display:block; text-align:center; text-decoration:none; color:#fff; }
   .song-wa:visited{ color:#fff; }
+  .song-wa{ display:block; box-sizing:border-box; text-align:center; text-decoration:none; background:#1f8f4e; color:#fff; }
+  .song-link{ appearance:none; background:none; border:none; padding:0; color:var(--muted); text-decoration:underline; font:inherit; font-size:.84rem; cursor:pointer; }
+  .song-back{ margin:14px 0; padding:12px; border-radius:12px; background:rgba(0,0,0,.05); }
+  .song-back .song-label{ margin:0 0 10px; }
+  .song-back-row{ display:flex; gap:8px; }
+  .song-back-row .song-go{ padding:11px 8px; font-size:.9rem; }
   .song-go-alt{ background:transparent; border:1.5px solid var(--ink); color:var(--ink); }
   .song-go-alt:disabled{ border-color:#bdbcd8; color:#9a98bd; }
   .song-offer .song-or{ margin:14px 0 10px; text-align:center; font-size:.82rem; }
   .song-go:disabled{ cursor:default; }
   .song-linkbtn{ appearance:none; background:none; border:none; padding:6px 0; color:var(--ink); text-decoration:underline; font:inherit; cursor:pointer; }
-  .song-form.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden, #songWaAgain.is-hidden, #songWaFallback.is-hidden, #songBackToPhone.is-hidden{ display:none; }
+  .song-form.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden, #songWaAgain.is-hidden, #songBack.is-hidden, #songPhoneBox.is-hidden, #songBackToPhone.is-hidden{ display:none; }
   .song-offer .song-done-title{ margin:2px 0 8px; font-size:1.5rem; }
   .song-offer.is-flash{ animation:flash 1.2s ease 1; }
   @keyframes flash{ 0%,100%{ box-shadow:5px 5px 0 var(--ink); } 35%{ box-shadow:5px 5px 0 var(--magenta), 0 0 0 5px var(--mango); } }
@@ -301,6 +307,14 @@
             <button type="button" class="song-chip" data-style="Cumbia" aria-pressed="false">Cumbia</button>
             <button type="button" class="song-chip" data-style="Sorpréndeme" aria-pressed="false">Sorpréndeme</button>
           </div>
+          <a id="btnSongWa" class="song-go song-wa" href="https://wa.me/50687772993" target="_blank" rel="noopener">Pedir mi muestra por WhatsApp</a>
+          <p class="song-fine">Se abre WhatsApp con el mensaje ya escrito. Solo tienes que enviarlo.</p>
+          <div id="songBack" class="song-back is-hidden" role="status">
+            <p class="song-label">¿Alcanzaste a enviar el mensaje por WhatsApp?</p>
+            <div class="song-back-row"><button type="button" id="songBackYes" class="song-go song-go-alt">Sí, ya lo envié</button><button type="button" id="songBackNo" class="song-go song-go-alt">No, escríbeme tú</button></div>
+          </div>
+          <p class="song-fine"><button type="button" id="songShowPhone" class="song-link">¿Prefieres que te escriba yo? Deja tu número</button></p>
+          <div id="songPhoneBox" class="is-hidden">
           <p class="song-label"><label for="songPhone">Tu WhatsApp, para enviarte la muestra</label></p>
           <div class="song-phone">
             <select id="songDial" aria-label="Código de país">
@@ -315,9 +329,9 @@
             <input id="songPhone" type="tel" inputmode="tel" enterkeyhint="send" autocomplete="tel-national" placeholder="Ej. 8888 1234" maxlength="24">
           </div>
           <p class="song-fine">Te escribo por WhatsApp a este número con tu muestra. No lo comparto ni te envío otra cosa.</p>
-          <button type="submit" id="btnSongSend" class="song-go">Quiero mi muestra</button>
+          <button type="submit" id="btnSongSend" class="song-go">Enviar mi número</button>
+          </div>
           <p id="songError" class="song-error is-hidden" role="alert"></p>
-          <p class="song-fine"><a id="songWaFallback" class="is-hidden" href="https://wa.me/50687772993" target="_blank" rel="noopener">¿Prefieres no dejar el número? Escríbeme tú por WhatsApp</a></p>
         </form>
         <div id="songDone" class="song-done is-hidden" role="status">
           <p class="song-done-title display">¡Listo!</p>

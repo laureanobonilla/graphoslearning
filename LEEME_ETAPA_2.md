@@ -2892,3 +2892,14 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 - Mensajes de error específicos según la causa, y debajo aparece "¿Prefieres no dejar el número? Escríbeme tú por WhatsApp" para no perder a quien no quiere dar el número.
 - `song_phone_invalid` ahora guarda `reason`, `len` (cantidad de dígitos, no el número) y `dial`. Nuevo `song_whatsapp_clicked` con `after_invalid:true`.
 - El placeholder pasó a "Ej. 8888 1234".
+
+## 66. couple-song: errores de correo específicos
+- No usa teléfono (usa correo), así que el arreglo de la sección 65 no aplica tal cual. Se aplicó el equivalente: mensajes específicos (falta @, dominio incompleto, vacío) y `song_email_invalid` ahora guarda `reason` y `len` (nunca el correo).
+
+## 67. WhatsApp primero + recuperar a quien no envió (pareja-cancion y cumple-cancion)
+- El formulario ahora tiene un botón verde grande "Pedir mi muestra por WhatsApp" (abre el chat con el mensaje listo: título, estilo y código). Registra `song_whatsapp_clicked {primary:true}` y manda la solicitud `via:'whatsapp'` (correo de INTENCIÓN) una sola vez.
+- El campo de teléfono quedó escondido detrás de "¿Prefieres que te escriba yo? Deja tu número" (`song_phone_form_opened`).
+- Cuando la persona vuelve a la página tras tocar el botón (`visibilitychange`), aparece "¿Alcanzaste a enviar el mensaje?": **Sí** (`song_wa_confirmed`, pantalla de Listo) o **No** (`song_wa_not_sent`, se abre el campo del número). También se registra `song_wa_return`.
+- Reemplaza el enlace de WhatsApp tras el error de teléfono (sección 65); los mensajes de error del teléfono siguen igual.
+- `couple-song` (inglés) NO cambia: sigue con un solo campo de correo.
+- Pruebas: Playwright (camino No, camino Sí, error de campo vacío, envío con número) en pareja y cumple; `t_sfc_srv.js` sigue en OK.

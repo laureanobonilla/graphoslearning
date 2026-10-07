@@ -504,7 +504,12 @@ function setupSongOffer() {
   form.onsubmit = async (ev) => {
     ev.preventDefault(); err.classList.add('is-hidden');
     const email = emailIn.value.trim();
-    if (!EMAIL_RE.test(email) || email.length > 120) { track('song_email_invalid', {}); fail('Please check your email address.'); emailIn.focus(); return; }
+    if (!EMAIL_RE.test(email) || email.length > 120) {
+      const reason = !email ? 'empty' : !email.includes('@') ? 'no_at' : !/@[^\s@]+\.[^\s@]{2,}$/.test(email) ? 'no_domain' : email.length > 120 ? 'long' : 'format';
+      track('song_email_invalid', { reason, len: email.length });
+      fail(reason === 'empty' ? 'Add your email so we can send you the sample, for example name@gmail.com.' : reason === 'no_at' ? 'Your email is missing the @, for example name@gmail.com.' : reason === 'no_domain' ? 'Your email looks incomplete after the @, for example name@gmail.com.' : 'Please check your email address.');
+      emailIn.focus(); return;
+    }
     send.disabled = true; send.textContent = 'Sending…';
     track('song_request_submitted', { style: songStyle });
     try {

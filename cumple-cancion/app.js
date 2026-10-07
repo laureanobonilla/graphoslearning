@@ -478,7 +478,8 @@ function bindViewportFit(box) {
   vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
 }
 
-let songStyle = 'Sorpréndeme', songObserver = null, offerApi = null;
+let songStyle = 'Sorpréndeme', songObserver = null, offerApi = null, waPending = false, waReturn = null;
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && waReturn) waReturn(); });
 function openSongOffer(fromUser) {
   const box = $('songOffer');
   if (!box || box.classList.contains('is-hidden')) return;
@@ -494,7 +495,7 @@ function setupSongOffer() {
   bindViewportFit(box);
   const teaser = $('songTeaser'), form = $('songForm'), done = $('songDone'), err = $('songError'), send = $('btnSongSend');
   teaser.classList.remove('is-hidden'); form.classList.add('is-hidden'); done.classList.add('is-hidden');
-  err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Quiero mi muestra';
+  err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Enviar mi número';
   $('songOfferTitle').textContent = `Ya tienes la letra. Falta que suene para ${song.partner || 'esa persona'}.`;
   $('songTeaserText').textContent = `Te hago una muestra cantada de «${song.title}» para que la escuches. Si te gusta, la terminamos y se la das de cumpleaños a ${song.partner || 'esa persona'}. Sin compromiso: el precio lo hablamos solo después de que la oigas.`;
 
@@ -531,7 +532,6 @@ function setupSongOffer() {
   const nameRe = /^[\p{L}][\p{L} '’-]{0,29}$/u;
   const typedName = () => (wantName.checked ? nameIn.value.replace(/\s+/g, ' ').trim() : '');
   const waAgain = $('songWaAgain'); let phoneFails = 0;
-  $('songWaFallback').classList.add('is-hidden'); $('songWaFallback').onclick = () => track('song_whatsapp_clicked', { after_invalid: true });
   const waHref = () => {
     const n = typedName();
     const text = `Hola, quiero que suene la canción para ${song.partner || 'esa persona'} 🎵\n«${song.title}»\nEstilo: ${songStyle}\n${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${song.songId}`;
@@ -540,8 +540,31 @@ function setupSongOffer() {
   waAgain.classList.add('is-hidden');
   waAgain.onclick = () => track('song_whatsapp_clicked', { after_form: true });
 
+  // WhatsApp primero: un toque abre el chat con el mensaje listo. Si la persona vuelve sin haberlo enviado, se le ofrece dejar el número.
+  const waBtn = $('btnSongWa'), back = $('songBack'), phoneBox = $('songPhoneBox'), showPhone = $('songShowPhone');
+  back.classList.add('is-hidden'); phoneBox.classList.add('is-hidden'); showPhone.classList.remove('is-hidden');
+  waBtn.href = waHref(); let waPosted = false; waPending = false;
+  waBtn.onclick = () => {
+    waBtn.href = waHref();   // el estilo pudo cambiar desde que se dibujó
+    track('song_whatsapp_clicked', { primary: true, style: songStyle });
+    waPending = true;
+    if (!waPosted) {
+      waPosted = true;
+      postFn('sfc-song-request', { songId: song.songId, style: songStyle, via: 'whatsapp', consent: true }).catch(() => {});
+    }
+  };
+  waReturn = () => { if (!waPending) return; waPending = false; err.classList.add('is-hidden'); back.classList.remove('is-hidden'); track('song_wa_return', {}); try { back.scrollIntoView({ block: 'center' }); } catch (_e) { /* no crítico */ } };
+  const openPhone = () => { phoneBox.classList.remove('is-hidden'); showPhone.classList.add('is-hidden'); back.classList.add('is-hidden'); };
+  showPhone.onclick = () => { track('song_phone_form_opened', {}); openPhone(); };
+  $('songBackNo').onclick = () => { track('song_wa_not_sent', {}); openPhone(); };
+  $('songBackYes').onclick = () => {
+    track('song_wa_confirmed', {});
+    $('songDoneText').textContent = `Perfecto. Te respondo por WhatsApp con la muestra de la canción para ${song.partner || 'tu pareja'} apenas vea tu mensaje.`;
+    waAgain.classList.add('is-hidden'); form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
+  };
+
   form.onsubmit = async (ev) => {
-    ev.preventDefault(); err.classList.add('is-hidden'); $('songWaFallback').classList.add('is-hidden');
+    ev.preventDefault(); err.classList.add('is-hidden');
     const n = typedName();
     if (wantName.checked && !nameRe.test(n)) { track('song_name_invalid', {}); fail('Escribe solo tu nombre (letras, hasta 30), o desmarca la casilla.'); nameIn.focus(); return; }
     const pr = buildSongPhone(dial.value, phone.value), full = pr.phone;
@@ -549,7 +572,6 @@ function setupSongOffer() {
       phoneFails++;
       track('song_phone_invalid', { reason: pr.reason, len: String(phone.value || '').replace(/\D/g, '').length, dial: dial.value });
       fail(PHONE_MSG[pr.reason] || PHONE_MSG.short);
-      const fb = $('songWaFallback'); fb.href = waHref(); fb.classList.remove('is-hidden');
       phone.focus(); return;
     }
     send.disabled = true; send.textContent = 'Enviando…';
@@ -565,7 +587,7 @@ function setupSongOffer() {
     } catch (e) {
       track('song_request_failed', { status: e.status || 0 });
       fail(e.status ? (e.message || 'No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.') : 'Sin conexión. Inténtalo de nuevo.');
-      send.disabled = false; send.textContent = 'Quiero mi muestra';
+      send.disabled = false; send.textContent = 'Enviar mi número';
     }
   };
 
