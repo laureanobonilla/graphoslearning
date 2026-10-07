@@ -9,7 +9,7 @@ const store = require('./_lib/store');
 const { saveReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const { json } = require('./_lib/qer-map-core');
-const { appOf, sanitizeSongAnswers, SONG_SCHEMA, validSong, songPrompt, partnerPrompt, cleanName } = require('./_lib/sfc-song');
+const { appOf, kindOf, sanitizeSongAnswers, SONG_SCHEMA, validSong, songPrompt, partnerPrompt, birthdayPrompt, coupleEnPrompt, SONG_SCHEMA_EN, validSongEn, cleanName } = require('./_lib/sfc-song');
 
 const BUDGET_MS = 22000;
 const MAX_PER_HOUR_IP = 10;   // varias personas pueden compartir IP (redes móviles): holgado
@@ -35,13 +35,15 @@ exports.handler = async (event) => {
     let body;
     try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
 
+    const en = body.kind === 'couple';
     const answers = sanitizeSongAnswers(body.answers);
-    if (!answers) return json(400, { error: 'Faltan respuestas: contesta al menos 5 preguntas.' });
-    // kind 'pareja': el nombre de la pareja es obligatorio y va en la letra. Cualquier otro valor = versión para uno mismo.
-    const kind = body.kind === 'pareja' ? 'pareja' : 'self';
+    if (!answers) return json(400, { error: en ? 'Missing answers: please answer at least 5 questions.' : 'Faltan respuestas: contesta al menos 5 preguntas.' });
+    // kind 'pareja' o 'cumple' (regalos): el nombre es obligatorio y va en la letra. Cualquier otro valor = versión para uno mismo.
+    const kind = kindOf(body.kind);
+    const gift = kind !== 'self';
     const APP = appOf(kind);
-    const partner = kind === 'pareja' ? cleanName(body.partner) : '';
-    if (kind === 'pareja' && !partner) return json(400, { error: 'Escribe solo el nombre de tu pareja (letras, hasta 30).' });
+    const partner = gift ? cleanName(body.partner) : '';
+    if (gift && !partner) return json(400, { error: kind === 'couple' ? "Please type just your partner's first name (letters only, up to 30)." : kind === 'cumple' ? 'Escribe solo el nombre de quien cumple años (letras, hasta 30).' : 'Escribe solo el nombre de tu pareja (letras, hasta 30).' });
     const anonId = typeof body.anonId === 'string' ? body.anonId.slice(0, 64) : '';
     const t0 = Date.now();
     const ipKey = hashIp(ipOf(event));
@@ -54,10 +56,10 @@ exports.handler = async (event) => {
                 store.countEventsLastHour(ipKey, 'sfc_song_generated'),
                 anonId ? store.countEventsLastHour(anonId, 'sfc_song_generated') : 0
             ]);
-            if (byIp >= MAX_PER_HOUR_IP || byAnon >= MAX_PER_HOUR_ANON) return json(429, { error: 'Ya hiciste varias canciones en poco tiempo. Vuelve a intentarlo en un rato.' });
+            if (byIp >= MAX_PER_HOUR_IP || byAnon >= MAX_PER_HOUR_ANON) return json(429, { error: en ? 'You made several songs in a short time. Please try again in a little while.' : 'Ya hiciste varias canciones en poco tiempo. Vuelve a intentarlo en un rato.' });
         } catch (e) { console.error('[sfc-generate-song] conteo', e.message); }
 
-        const song = await generateWithRetries((kind === 'pareja' ? partnerPrompt(answers, 'Sorpréndeme', partner) : songPrompt(answers, 'Sorpréndeme', '')), SONG_SCHEMA, validSong,
+        const song = await generateWithRetries((kind === 'pareja' ? partnerPrompt(answers, 'Sorpréndeme', partner) : kind === 'cumple' ? birthdayPrompt(answers, 'Sorpréndeme', partner) : kind === 'couple' ? coupleEnPrompt(answers, 'Surprise me', partner) : songPrompt(answers, 'Sorpréndeme', '')), en ? SONG_SCHEMA_EN : SONG_SCHEMA, en ? validSongEn : validSong,
             { tag: 'sfc-generate-song', maxOutputTokens: 1800, deadline: t0 + BUDGET_MS });
         const clean = {
             format: 'song',
@@ -80,6 +82,6 @@ exports.handler = async (event) => {
         return json(200, { songId, title: clean.title, subtitle: clean.subtitle, style: clean.style, lyrics: clean.lyrics });
     } catch (err) {
         console.error('[sfc-generate-song]', err.message);
-        return json(502, { error: 'No pudimos escribir tu canción ahora. Tus respuestas siguen guardadas: inténtalo de nuevo.' });
+        return json(502, { error: en ? "We couldn't write your song right now. Your answers are still saved: please try again." : 'No pudimos escribir tu canción ahora. Tus respuestas siguen guardadas: inténtalo de nuevo.' });
     }
 };

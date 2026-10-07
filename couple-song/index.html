@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>A song for your partner</title>
+<meta name="description" content="Fifteen questions about the person you love, then the lyrics of a song written from the little things only you know. Hear a sample before you pay.">
+<meta property="og:title" content="What would your partner’s song sound like?">
+<meta property="og:description" content="Fifteen questions about the person you love, and lyrics made from their quirks. Free to try, no sign-up.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gloock&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg: #e7eaff;          /* papel carbón azul */
+    --paper: #fffdf8;       /* hoja de letra */
+    --ink: #1b1740;         /* tinta */
+    --muted: #5d5b88;
+    --line: rgba(27,23,64,.16);
+    --magenta: #e0246a;
+    --mango: #ffbf2e;
+    --c1: var(--magenta);   /* colores de la persona: se cambian al ver la letra */
+    --c2: var(--mango);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ background:var(--bg); color:var(--ink); font-family:'Figtree',-apple-system,sans-serif; min-height:100vh; -webkit-font-smoothing:antialiased; font-size:1rem; line-height:1.5; }
+  .display{ font-family:'Gloock',Georgia,serif; font-weight:400; }
+  .shell{ max-width:480px; margin:0 auto; min-height:100vh; padding:0 20px; display:flex; flex-direction:column; position:relative; overflow-x:clip; }
+  .screen{ display:none; flex:1; flex-direction:column; }
+  .screen.is-active{ display:flex; }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:3px solid var(--ink); outline-offset:2px; }
+
+  .btn{ appearance:none; border:none; cursor:pointer; font-weight:700; font-size:1rem; border-radius:999px; padding:16px 34px; transition:transform .12s ease, background .2s ease; }
+  .btn:active{ transform:scale(.97); }
+  .btn-primary{ background:var(--magenta); color:#fff; }
+  .btn-primary:hover{ background:#c91b5b; }
+  .btn-primary:disabled{ background:#c9c8e0; color:#7f7da8; cursor:default; transform:none; }
+  .btn-quiet{ appearance:none; border:none; background:none; cursor:pointer; color:var(--muted); font-size:.92rem; font-weight:500; padding:10px 12px; text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:3px; }
+  .is-hidden{ display:none !important; }
+
+  /* ===== Portada ===== */
+  #screen-cover{ align-items:center; justify-content:center; text-align:center; padding:40px 0 36px; }
+  #coverWave{ width:100%; max-width:340px; height:auto; margin:0 0 26px; }
+  #coverWave rect, #playerWave rect{ transform-box:fill-box; transform-origin:center; }
+  #coverWave rect{ animation:bar .8s cubic-bezier(.2,.8,.2,1) both; animation-delay:calc(var(--i) * 16ms); }
+  @keyframes bar{ from{ transform:scaleY(0); } to{ transform:scaleY(1); } }
+  #screen-cover h1{ font-size:clamp(2.1rem,9vw,2.7rem); line-height:1.08; margin:0 0 14px; max-width:15ch; }
+  #screen-cover .sub{ color:var(--muted); font-size:1.05rem; line-height:1.55; max-width:30ch; margin:0 0 10px; }
+  #screen-cover .meta{ color:var(--ink); font-size:.9rem; font-weight:600; margin:0 0 28px; }
+  #screen-cover .btn{ min-width:240px; }
+  #coverCont{ margin-top:6px; }
+
+  /* ===== Nombre de la pareja ===== */
+  .name-box{ padding:64px 0 0; }
+  .name-q{ font-size:1.9rem; line-height:1.15; margin:0 0 8px; }
+  .name-input{ width:100%; margin:6px 0 10px; background:var(--paper); border:1.5px solid var(--ink); border-radius:14px; padding:14px 16px; font-family:inherit; font-size:1.3rem; color:var(--ink); }
+  .name-error{ color:#b3261e; font-size:.9rem; font-weight:500; margin:0 0 10px; }
+  .name-box .btn{ width:100%; margin-top:10px; }
+
+  /* ===== Cuestionario ===== */
+  #screen-quiz{ padding-top:14px; }
+  .quiz-top{ display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+  #btnBack{ appearance:none; background:none; border:none; font-size:1.7rem; line-height:1; color:var(--ink); cursor:pointer; padding:2px 10px 6px 0; }
+  #btnBack.is-hidden{ display:block !important; visibility:hidden; }
+  .track{ flex:1; height:6px; background:rgba(27,23,64,.12); border-radius:99px; overflow:hidden; }
+  #fill{ height:100%; width:0; background:linear-gradient(90deg,var(--magenta),var(--mango)); border-radius:99px; transition:width .35s ease; }
+  #count{ font-size:.82rem; font-weight:600; color:var(--muted); min-width:3.4em; text-align:right; font-variant-numeric:tabular-nums; }
+  .q-prompt{ font-size:1.5rem; line-height:1.22; margin:10px 0 6px; }
+  .q-hint{ color:var(--muted); font-size:.9rem; margin:0 0 16px; }
+  .opts{ display:flex; flex-direction:column; gap:8px; }
+  .opt{ appearance:none; width:100%; text-align:left; display:flex; align-items:center; gap:12px; background:var(--paper); border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; font-size:1rem; line-height:1.3; color:var(--ink); cursor:pointer; transition:border-color .12s ease, background .12s ease; }
+  .opt .emo{ font-size:1.35rem; line-height:1; width:1.6rem; text-align:center; flex:0 0 auto; }
+  .opt .sw{ width:1.6rem; height:1.6rem; border-radius:50%; flex:0 0 auto; box-shadow:inset 0 0 0 2px rgba(255,255,255,.55); }
+  .opt .lbl{ flex:1; }
+  .opt .mark{ width:20px; height:20px; border-radius:6px; border:1.5px solid var(--line); flex:0 0 auto; display:grid; place-items:center; color:transparent; font-size:.8rem; font-weight:800; }
+  .opt[aria-checked="true"]{ border-color:var(--ink); background:#fff; box-shadow:3px 3px 0 var(--ink); }
+  .opt[aria-checked="true"] .mark{ background:var(--magenta); border-color:var(--magenta); color:#fff; }
+  .opt-none{ background:transparent; border-style:dashed; color:var(--muted); }
+  .opt-none[aria-checked="true"]{ background:#fff; color:var(--ink); }
+  .write-own{ margin:14px 0 0; }
+  .write-own textarea, .open-area textarea{ width:100%; background:var(--paper); border:1.5px solid var(--ink); border-radius:14px; padding:12px 14px; font-family:inherit; font-size:1rem; line-height:1.45; color:var(--ink); resize:none; min-height:4.6em; }
+  .quiz-bottom{ position:sticky; bottom:0; margin:14px -20px 0; padding:22px 20px calc(16px + env(safe-area-inset-bottom)); background:linear-gradient(to bottom, rgba(231,234,255,0), var(--bg) 38%); }
+  .quiz-bottom .btn{ width:100%; }
+  .open-area{ margin-top:8px; }
+  .open-area .why{ color:var(--muted); font-size:.88rem; margin:8px 0 0; }
+
+  /* ===== Cargando ===== */
+  #screen-loading{ align-items:center; justify-content:center; text-align:center; gap:20px; }
+  #loadWave{ width:150px; height:64px; }
+  #loadWave rect{ fill:var(--magenta); transform-box:fill-box; transform-origin:center; animation:eq 1s ease-in-out infinite; animation-delay:calc(var(--i) * 90ms); }
+  @keyframes eq{ 0%,100%{ transform:scaleY(.25); } 50%{ transform:scaleY(1); } }
+  #loadLabel{ font-size:1.25rem; max-width:20ch; }
+  .error-box{ text-align:center; padding:48px 4px; margin:auto 0; }
+  .error-box p{ color:var(--muted); line-height:1.5; margin:0 0 22px; }
+  #errorMsg{ color:var(--ink); font-size:1.35rem; }
+
+  /* ===== La letra ===== */
+  #screen-reveal{ padding:34px 0 60px; }
+  .song-title{ font-size:clamp(2rem,8.5vw,2.6rem); line-height:1.08; margin:0 0 8px; }
+  .song-sub{ color:var(--muted); font-size:1.02rem; margin:0 0 20px; max-width:34ch; }
+  .player{ display:flex; align-items:center; gap:12px; background:var(--paper); border:1.5px solid var(--line); border-radius:999px; padding:8px 16px 8px 8px; margin:0 0 6px; }
+  #playBtn{ appearance:none; border:none; cursor:pointer; flex:0 0 auto; width:46px; height:46px; border-radius:50%; background:var(--ink); color:#fff; display:grid; place-items:center; }
+  #playBtn svg{ width:18px; height:18px; margin-left:2px; fill:currentColor; }
+  #playerWave{ flex:1; height:34px; min-width:0; }
+  #playerWave rect{ fill:none; stroke:url(#waveGrad); stroke-width:1.5; vector-effect:non-scaling-stroke; }
+  #playerWave.is-try rect{ animation:tryFill 1.1s ease both; animation-delay:calc(var(--i) * 30ms); }
+  @keyframes tryFill{ 0%{ fill:var(--c1); } 55%{ fill:var(--c1); } 100%{ fill:transparent; } }
+  .player-time{ font-size:.78rem; font-weight:600; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .player-note{ font-size:.9rem; color:var(--muted); margin:0 0 22px 6px; min-height:1.4em; }
+  .player-note b{ color:var(--ink); }
+
+  .sheet{ background:var(--paper); border-radius:4px 4px 10px 10px; box-shadow:0 1px 0 rgba(27,23,64,.08), 0 18px 40px -18px rgba(27,23,64,.35); position:relative; padding:34px 26px 30px; overflow:hidden; }
+  .sheet::before{ content:''; position:absolute; left:0; right:0; top:0; height:10px; background:linear-gradient(90deg,var(--c1),var(--c2)); }
+  .part{ margin:0 0 22px; }
+  .part:last-child{ margin-bottom:0; }
+  .part h4{ margin:0 0 6px; font-size:.82rem; font-weight:600; color:var(--muted); letter-spacing:.01em; }
+  .part .ln{ font-size:1.08rem; line-height:1.62; margin:0; }
+  .part.chorus{ padding-left:16px; border-left:4px solid var(--c1); }
+  .part.chorus h4{ color:var(--ink); }
+  .part.chorus .ln{ font-family:'Gloock',Georgia,serif; font-size:1.2rem; line-height:1.5; }
+  .part.again .ln{ display:none; }
+  .part.again h4{ margin:0; color:var(--muted); font-weight:500; }
+  .part.again h4::after{ content:' · se repite'; }
+  .sheet-actions{ display:flex; flex-wrap:wrap; gap:6px 14px; margin:16px 0 0 2px; }
+
+  .next-step{ margin:38px 0 8px; padding:22px 20px; border-radius:18px; background:var(--ink); color:#fff; }
+  .next-step h3{ font-size:1.5rem; line-height:1.15; margin:0 0 8px; }
+  .next-step p{ margin:0 0 16px; color:#d9d7f3; font-size:.98rem; line-height:1.5; }
+  .next-step .btn{ background:var(--mango); color:var(--ink); padding:13px 26px; }
+  .disclaimer{ color:var(--muted); font-size:.76rem; line-height:1.5; margin:26px 2px 0; max-width:44ch; }
+
+  /* ===== Oferta de la canción: columna fija (ancho) / barra inferior (celular) ===== */
+  .song-offer{ position:relative; margin:26px 0 8px; padding:20px 18px; border-radius:18px; background:var(--paper); border:1.5px solid var(--ink); box-shadow:5px 5px 0 var(--ink); }
+  .song-offer h3{ margin:0 0 8px; font-size:1.35rem; line-height:1.15; }
+  .song-offer p{ margin:0 0 12px; font-size:.92rem; line-height:1.5; color:var(--muted); }
+  .song-offer .song-label{ margin:0 0 8px; color:var(--ink); font-weight:600; }
+  .song-offer .song-fine{ margin:8px 0 12px; font-size:.78rem; }
+  .song-offer .song-fine a{ color:var(--muted); }
+  .song-offer .song-error{ margin:10px 0 0; color:#b3261e; font-size:.88rem; font-weight:500; }
+  .song-suggest{ font-size:.86rem; color:var(--ink) !important; margin:0 0 10px !important; }
+  .song-styles{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
+  .song-chip{ appearance:none; cursor:pointer; border:1.5px solid var(--line); background:transparent; color:var(--ink); border-radius:999px; padding:7px 14px; font-size:.85rem; font-weight:500; }
+  .song-chip[aria-pressed="true"]{ border-color:var(--ink); background:var(--ink); color:#fff; }
+  .song-phone{ display:flex; gap:8px; }
+  .song-phone select, .song-phone input{ appearance:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:12px; font-size:1rem; min-width:0; font-family:inherit; }
+  .song-phone select{ flex:0 0 38%; font-size:.88rem; }
+  .song-phone input{ flex:1 1 auto; }
+  .song-check{ display:flex; align-items:center; gap:10px; margin:0 0 10px; font-size:.92rem; color:var(--ink); cursor:pointer; }
+  .song-check input{ width:18px; height:18px; accent-color:var(--magenta); flex:0 0 auto; }
+  .song-name{ width:100%; margin:0 0 6px; appearance:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:12px; font-size:1rem; font-family:inherit; }
+  .song-name.is-hidden, .song-name-note.is-hidden{ display:none; }
+  .song-name-note{ margin:0 0 14px !important; font-size:.82rem !important; }
+  .song-go{ appearance:none; width:100%; border:none; cursor:pointer; border-radius:999px; padding:14px 18px; background:var(--magenta); color:#fff; font-size:1rem; font-weight:700; }
+  .song-wa{ display:block; text-align:center; text-decoration:none; color:#fff; }
+  .song-wa:visited{ color:#fff; }
+  .song-go-alt{ background:transparent; border:1.5px solid var(--ink); color:var(--ink); }
+  .song-go-alt:disabled{ border-color:#bdbcd8; color:#9a98bd; }
+  .song-offer .song-or{ margin:14px 0 10px; text-align:center; font-size:.82rem; }
+  .song-go:disabled{ cursor:default; }
+  .song-email{ width:100%; border:1.5px solid var(--line); border-radius:12px; padding:13px 14px; font:inherit; font-size:1rem; background:#fff; color:var(--ink); }
+  .song-email:focus{ outline:2px solid var(--magenta); outline-offset:1px; }
+  .song-linkbtn{ appearance:none; background:none; border:none; padding:6px 0; color:var(--ink); text-decoration:underline; font:inherit; cursor:pointer; }
+  .song-form.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden, #songWaAgain.is-hidden, #songBackToPhone.is-hidden{ display:none; }
+  .song-offer .song-done-title{ margin:2px 0 8px; font-size:1.5rem; }
+  .song-offer.is-flash{ animation:flash 1.2s ease 1; }
+  @keyframes flash{ 0%,100%{ box-shadow:5px 5px 0 var(--ink); } 35%{ box-shadow:5px 5px 0 var(--magenta), 0 0 0 5px var(--mango); } }
+  .song-close{ display:none; position:absolute; top:6px; right:8px; appearance:none; border:none; background:none; color:var(--muted); font-size:1.6rem; line-height:1; cursor:pointer; padding:6px 10px; }
+  .song-offer.is-hidden{ display:none !important; }
+
+  @media (min-width:960px){
+    .shell.is-reveal{ max-width:1000px; overflow:visible; }
+    .reveal-layout{ display:grid; grid-template-columns:minmax(0,520px) 340px; gap:64px; justify-content:center; align-items:start; }
+    .reveal-layout .song-offer{ position:sticky; top:28px; margin:12px 0 0; }
+    .next-step{ display:none; }
+  }
+  @media (max-width:959px){
+    #screen-reveal{ padding-bottom:130px; }
+    .song-offer{ position:fixed; left:0; right:0; bottom:0; max-width:480px; margin:0 auto; z-index:15; border-radius:20px 20px 0 0; border:1.5px solid var(--ink); border-bottom:none; box-shadow:0 -10px 30px rgba(27,23,64,.3); padding:12px 16px calc(12px + env(safe-area-inset-bottom)); max-height:88vh; overflow-y:auto; }
+    .song-offer:not(.is-open){ display:flex; align-items:center; gap:12px; }
+    .song-offer:not(.is-open) h3{ flex:1 1 auto; margin:0; font-size:1.02rem; }
+    .song-offer:not(.is-open) #songTeaser{ flex:0 0 auto; }
+    .song-offer:not(.is-open) #songTeaser p{ display:none; }
+    .song-offer:not(.is-open) .song-go{ width:auto; padding:10px 16px; font-size:.9rem; white-space:nowrap; }
+    .song-offer.is-open{ padding-top:24px; }
+    .song-offer.kb-open{ padding-bottom:12px; }
+    .song-offer.kb-open .song-fine{ display:none; }
+    .song-offer.is-open .song-close{ display:block; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    #coverWave rect, #loadWave rect, #playerWave.is-try rect, .song-offer.is-flash{ animation:none !important; }
+    #loadWave rect{ transform:scaleY(.7); }
+    #fill{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+
+  <!-- ===================== PORTADA ===================== -->
+  <section id="screen-cover" class="screen is-active">
+    <svg id="coverWave" viewBox="0 0 320 92" role="img" aria-label="A sound wave"></svg>
+    <h1 class="display">What would your partner’s song sound like?</h1>
+    <p class="sub">Fifteen quick questions about the person you love. At the end, the lyrics of a song written from the little things only you know about them. Then hear it sung.</p>
+    <p class="meta">3 minutes · Free lyrics · Hear a sample before you pay</p>
+    <button id="btnStart" class="btn btn-primary">Start</button>
+    <div id="coverCont" class="is-hidden">
+      <button id="btnRestartCover" class="btn-quiet">Start over</button>
+    </div>
+  </section>
+
+  <!-- ===================== NOMBRE DE LA PAREJA ===================== -->
+  <section id="screen-name" class="screen">
+    <div class="name-box">
+      <h2 class="display name-q">What’s your partner’s name?</h2>
+      <p class="q-hint">First name only. It goes in the lyrics.</p>
+      <input id="partnerName" class="name-input" type="text" autocomplete="off" autocapitalize="words" maxlength="30" enterkeyhint="go" placeholder="Their name" aria-label="Your partner’s name">
+      <p id="nameError" class="name-error is-hidden" role="alert">Just a first name, please (letters only, up to 30).</p>
+      <button id="btnName" class="btn btn-primary" disabled>Continue</button>
+    </div>
+  </section>
+
+  <!-- ===================== CUESTIONARIO ===================== -->
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-top">
+      <button id="btnBack" aria-label="Previous question">‹</button>
+      <div class="track" aria-hidden="true"><div id="fill"></div></div>
+      <span id="count" aria-live="polite"></span>
+    </div>
+    <h2 id="qPrompt" class="q-prompt display"></h2>
+    <p id="qHint" class="q-hint"></p>
+    <div id="qBody"></div>
+    <div class="quiz-bottom">
+      <button id="btnNext" class="btn btn-primary" disabled>Next</button>
+    </div>
+  </section>
+
+  <!-- ===================== CARGANDO ===================== -->
+  <section id="screen-loading" class="screen">
+    <svg id="loadWave" viewBox="0 0 150 64" aria-hidden="true"></svg>
+    <p id="loadLabel" class="display">Listening to what you chose…</p>
+  </section>
+
+  <!-- ===================== ERROR ===================== -->
+  <section id="screen-error" class="screen">
+    <div class="error-box">
+      <p id="errorMsg" class="display"></p>
+      <p id="errorDetail"></p>
+      <button id="btnRetry" class="btn btn-primary">Try again</button>
+    </div>
+  </section>
+
+  <!-- ===================== LA LETRA ===================== -->
+  <section id="screen-reveal" class="screen">
+    <div class="reveal-layout">
+      <div class="reveal-main">
+        <h2 id="songTitle" class="song-title display"></h2>
+        <p id="songSub" class="song-sub"></p>
+
+        <div class="player">
+          <button id="playBtn" type="button" aria-label="Play the song"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg></button>
+          <svg id="playerWave" viewBox="0 0 220 34" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="waveGrad" x1="0" x2="1" y1="0" y2="0"><stop id="wg1" offset="0" stop-color="#e0246a"/><stop id="wg2" offset="1" stop-color="#ffbf2e"/></linearGradient></defs></svg>
+          <span class="player-time">0:00 · no voice yet</span>
+        </div>
+        <p id="playerNote" class="player-note" role="status"></p>
+
+        <article id="sheet" class="sheet" aria-label="Your song’s lyrics"></article>
+        <div class="sheet-actions">
+          <button id="btnCopy" class="btn-quiet" type="button">Copy lyrics</button>
+          <button id="btnShare" class="btn-quiet" type="button">Share</button>
+          <button id="btnRestart" class="btn-quiet" type="button">Make another</button>
+        </div>
+
+        <div class="next-step">
+          <h3 class="display">This is just the lyrics.</h3>
+          <p id="nextStepText">It doesn’t sound yet. The best part is still to come: music and a real voice, so you can give it to your partner.</p>
+          <button id="btnNextStep" class="btn" type="button">I want to hear it</button>
+        </div>
+        <p class="disclaimer">The lyrics are written by AI from the answers you picked. Your answers and your partner’s name are never published or shared.</p>
+      </div>
+
+      <aside id="songOffer" class="song-offer is-hidden" aria-label="Hear the song">
+        <button type="button" id="songClose" class="song-close" aria-label="Close">×</button>
+        <h3 id="songOfferTitle" class="display">You have the lyrics. Now let’s hear them.</h3>
+        <div id="songTeaser">
+          <p id="songTeaserText">I’ll make a sung sample for you to listen to. If you love it, we finish it. No obligation: we only talk price after you’ve heard it.</p>
+          <button type="button" id="btnSongOpen" class="song-go">I want to hear it</button>
+        </div>
+        <form id="songForm" class="song-form is-hidden" novalidate>
+          <p id="songSuggest" class="song-suggest is-hidden"></p>
+          <p class="song-label">Which style?</p>
+          <div class="song-styles" role="group" aria-label="Song style">
+            <button type="button" class="song-chip" data-style="Soft ballad" aria-pressed="false">Soft ballad</button>
+            <button type="button" class="song-chip" data-style="Pop" aria-pressed="false">Pop</button>
+            <button type="button" class="song-chip" data-style="Acoustic" aria-pressed="false">Acoustic</button>
+            <button type="button" class="song-chip" data-style="Soft rock" aria-pressed="false">Soft rock</button>
+            <button type="button" class="song-chip" data-style="Country" aria-pressed="false">Country</button>
+            <button type="button" class="song-chip" data-style="R&amp;B / Soul" aria-pressed="false">R&amp;B / Soul</button>
+            <button type="button" class="song-chip" data-style="Jazz" aria-pressed="false">Jazz</button>
+            <button type="button" class="song-chip" data-style="Surprise me" aria-pressed="false">Surprise me</button>
+          </div>
+          <p class="song-label"><label for="songEmail">Your email, so I can send you the sample</label></p>
+          <input id="songEmail" class="song-email" type="email" inputmode="email" autocomplete="email" enterkeyhint="send" placeholder="you@email.com" maxlength="120">
+          <p class="song-fine">I’ll only use your email to send you the sample. I won’t share it or send you anything else.</p>
+          <button type="submit" id="btnSongSend" class="song-go">Send me the sample</button>
+          <p id="songError" class="song-error is-hidden" role="alert"></p>
+        </form>
+        <div id="songDone" class="song-done is-hidden" role="status">
+          <p class="song-done-title display">Done!</p>
+          <p id="songDoneText"></p>
+                            </div>
+      </aside>
+    </div>
+  </section>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

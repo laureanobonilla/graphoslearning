@@ -2866,3 +2866,16 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 ## 61. pareja-cancion: un solo botón ("Quiero mi muestra")
 - Se quitó el botón de WhatsApp del formulario. Ahora hay UN botón: pide el número (CR +506 por defecto), manda el correo con el número y la letra, y la pantalla final ofrece "¿Quieres adelantarte? Escríbeme tú por WhatsApp" (opcional, evento `song_whatsapp_clicked` con `after_form`).
 - Motivo: abrir WhatsApp a la vez no garantiza que envíen el mensaje, y con el número tú siempre puedes escribirles primero.
+
+## 62. cumple-cancion (nueva): canción de cumpleaños para regalar
+- Carpeta `cumple-cancion/`: copia adaptada de pareja-cancion. Quien compra pone el nombre de quien cumple años y contesta 15 preguntas sobre esa persona (cumpleaño ideal, risa, olores, manías, lugar suyo, cómo es con los demás, lo que admira, un deseo para el año nuevo, ritmo, una frase/recuerdo libre). No asume qué es esa persona para quien regala (sirve para madre, amigo, hijo, pareja…).
+- Servidor: `kind:'cumple'` en sfc-generate-song / sfc-song-request / sfc-track-event; `birthdayPrompt` en `_lib/sfc-song.js` (celebra el cumpleaños, nunca dice la edad, no asume género ni parentesco, primer verso propio). Eventos con `app:'cumple-cancion'`; correo "CUMPLEAÑOS (regalo)", asunto "Canción (Cumpleaños)…". Claves localStorage `cc_*`.
+- Mismo flujo de oferta que pareja: UN botón con número (+506 por defecto), enlace opcional a WhatsApp después.
+- Pruebas: servidor 44 OK (t_sfc_srv.js, ya con los casos de cumple); página probada en móvil (preguntas, retomar, generación con kind cumple, evento sin nombre).
+
+## 63. couple-song (nueva): versión en inglés de pareja para EE. UU.
+- Carpeta `couple-song/` (inglés): mismas 15 preguntas adaptadas a EE. UU. (estilos Soft ballad, Pop, Acoustic, Soft rock, Country, R&B / Soul, Jazz, Surprise me; colores y frases en inglés, sin asumir género ni parentesco). Contacto por EMAIL (no WhatsApp ni teléfono): un solo botón "Send me the sample".
+- Servidor: `kind:'couple'` + `lang:'en'` en sfc-generate-song / sfc-song-request / sfc-track-event; `coupleEnPrompt`, `SONG_SCHEMA_EN`, `validSongEn`, `STYLES_EN` en `_lib/sfc-song.js`. Eventos con `app:'couple-song'` (el email NO se guarda en eventos; solo viaja en el correo hacia ti, con un enlace mailto para contestar).
+- Claves localStorage `ct_*`. Mensajes de error del servidor en inglés cuando `lang:'en'`.
+- Pruebas: servidor 55 OK (con casos couple); página probada en móvil (preguntas, email inválido/válido, sin fuga de nombre ni email en eventos).
+- El precio ($50–100) NO está en la página: se habla después de la muestra, igual que en las demás. Cobro por PayPal/Stripe/Zelle lo manejas tú.
