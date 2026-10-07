@@ -87,9 +87,20 @@ function ensureAnonId() {
   } catch { return `volatile-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 }
 const anonId = ensureAnonId();
+// Campaña de anuncios: ?utm_campaign=... y ?utm_content=... (o ?c= / ?ad=) se guardan la primera vez y viajan en cada evento.
+const UTM = (function () {
+  const clean = (v) => String(v || '').replace(/[^\w.\-]/g, '').slice(0, 40);
+  try {
+    const q = new URLSearchParams(location.search), k = APP_NAME + '_utm';
+    const c = clean(q.get('utm_campaign') || q.get('c')), a = clean(q.get('utm_content') || q.get('ad'));
+    if (c || a) { const v = { campaign: c, ad: a }; localStorage.setItem(k, JSON.stringify(v)); return v; }
+    const old = JSON.parse(localStorage.getItem(k) || 'null');
+    return old && typeof old === 'object' ? { campaign: clean(old.campaign), ad: clean(old.ad) } : { campaign: '', ad: '' };
+  } catch { return { campaign: '', ad: '' }; }
+})();
 function track(event, metadata) {
   try {
-    fetch(TRACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event, anonId, app: APP_NAME, metadata: metadata || {} }) }).catch(() => {});
+    fetch(TRACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event, anonId, app: APP_NAME, metadata: Object.assign({}, metadata || {}, UTM.campaign ? { campaign: UTM.campaign } : {}, UTM.ad ? { ad: UTM.ad } : {}) }) }).catch(() => {});
   } catch { /* no crítico */ }
 }
 track('landing_viewed', {
@@ -499,7 +510,7 @@ function setupSongOffer() {
     try {
       const data = await postFn('sfc-song-request', { songId: song.songId, style: songStyle, email, lang: 'en', consent: true });
       if (!data.ok) throw new Error('failed');
-      track('song_request_confirmed', { style: songStyle });
+      track('song_request_confirmed', { style: songStyle, songId: song.songId });
       $('songDoneText').textContent = `Thank you! I’ll email you at ${email} with a sung sample of “${song.title}” for ${song.partner || 'your partner'}. Keep an eye on your inbox (and your spam folder, just in case).`;
       form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
       try { done.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }

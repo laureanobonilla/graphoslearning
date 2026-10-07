@@ -163,7 +163,7 @@
   .song-offer .song-or{ margin:14px 0 10px; text-align:center; font-size:.82rem; }
   .song-go:disabled{ cursor:default; }
   .song-linkbtn{ appearance:none; background:none; border:none; padding:6px 0; color:var(--ink); text-decoration:underline; font:inherit; cursor:pointer; }
-  .song-form.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden, #songWaAgain.is-hidden, #songBackToPhone.is-hidden{ display:none; }
+  .song-form.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden, #songWaAgain.is-hidden, #songWaFallback.is-hidden, #songBackToPhone.is-hidden{ display:none; }
   .song-offer .song-done-title{ margin:2px 0 8px; font-size:1.5rem; }
   .song-offer.is-flash{ animation:flash 1.2s ease 1; }
   @keyframes flash{ 0%,100%{ box-shadow:5px 5px 0 var(--ink); } 35%{ box-shadow:5px 5px 0 var(--magenta), 0 0 0 5px var(--mango); } }
@@ -312,11 +312,12 @@
               <option value="+595">PY +595</option><option value="+34">ES +34</option><option value="+1">US/CA/RD +1</option>
               <option value="">Otro (escribe +código)</option>
             </select>
-            <input id="songPhone" type="tel" inputmode="tel" enterkeyhint="send" autocomplete="tel-national" placeholder="Tu número" maxlength="24">
+            <input id="songPhone" type="tel" inputmode="tel" enterkeyhint="send" autocomplete="tel-national" placeholder="Ej. 8888 1234" maxlength="24">
           </div>
           <p class="song-fine">Te escribo por WhatsApp a este número con tu muestra. No lo comparto ni te envío otra cosa.</p>
           <button type="submit" id="btnSongSend" class="song-go">Quiero mi muestra</button>
           <p id="songError" class="song-error is-hidden" role="alert"></p>
+          <p class="song-fine"><a id="songWaFallback" class="is-hidden" href="https://wa.me/50687772993" target="_blank" rel="noopener">¿Prefieres no dejar el número? Escríbeme tú por WhatsApp</a></p>
         </form>
         <div id="songDone" class="song-done is-hidden" role="status">
           <p class="song-done-title display">¡Listo!</p>

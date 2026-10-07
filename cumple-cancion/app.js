@@ -88,9 +88,20 @@ function ensureAnonId() {
   } catch { return `volatile-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 }
 const anonId = ensureAnonId();
+// Campaña de anuncios: ?utm_campaign=... y ?utm_content=... (o ?c= / ?ad=) se guardan la primera vez y viajan en cada evento.
+const UTM = (function () {
+  const clean = (v) => String(v || '').replace(/[^\w.\-]/g, '').slice(0, 40);
+  try {
+    const q = new URLSearchParams(location.search), k = APP_NAME + '_utm';
+    const c = clean(q.get('utm_campaign') || q.get('c')), a = clean(q.get('utm_content') || q.get('ad'));
+    if (c || a) { const v = { campaign: c, ad: a }; localStorage.setItem(k, JSON.stringify(v)); return v; }
+    const old = JSON.parse(localStorage.getItem(k) || 'null');
+    return old && typeof old === 'object' ? { campaign: clean(old.campaign), ad: clean(old.ad) } : { campaign: '', ad: '' };
+  } catch { return { campaign: '', ad: '' }; }
+})();
 function track(event, metadata) {
   try {
-    fetch(TRACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event, anonId, app: APP_NAME, metadata: metadata || {} }) }).catch(() => {});
+    fetch(TRACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event, anonId, app: APP_NAME, metadata: Object.assign({}, metadata || {}, UTM.campaign ? { campaign: UTM.campaign } : {}, UTM.ad ? { ad: UTM.ad } : {}) }) }).catch(() => {});
   } catch { /* no crítico */ }
 }
 track('landing_viewed', {
@@ -429,14 +440,27 @@ $('btnRestart').addEventListener('click', () => { track('restart_clicked', {}); 
 const SONG_TZ_DIAL = { 'America/Costa_Rica': '+506', 'America/Montevideo': '+598', 'America/Mexico_City': '+52', 'America/Cancun': '+52', 'America/Monterrey': '+52', 'America/Tijuana': '+52', 'America/Argentina/Buenos_Aires': '+54', 'America/Bogota': '+57', 'America/Santiago': '+56', 'America/Lima': '+51', 'America/Guayaquil': '+593', 'America/Panama': '+507', 'America/Guatemala': '+502', 'America/El_Salvador': '+503', 'America/Tegucigalpa': '+504', 'America/Managua': '+505', 'America/Caracas': '+58', 'America/La_Paz': '+591', 'America/Asuncion': '+595', 'Europe/Madrid': '+34' };
 function guessDialCode() { try { return SONG_TZ_DIAL[Intl.DateTimeFormat().resolvedOptions().timeZone] || ''; } catch { return ''; } }
 function buildSongPhone(dial, raw) {
+  // Devuelve { phone, reason }. reason: 'empty' | 'short' | 'long' | 'nodial' | ''.
   let n = String(raw || '').replace(/[\s().\-]/g, '');
-  if (!n) return '';
+  if (!n) return { phone: '', reason: 'empty' };
   if (n.startsWith('00')) n = '+' + n.slice(2);
-  if (n.startsWith('+')) return /^\+[1-9]\d{7,14}$/.test(n) ? n : '';
-  if (!dial) return '';
-  const full = dial + n.replace(/^0+/, '');
-  return /^\+[1-9]\d{7,14}$/.test(full) ? full : '';
+  const ok = (v) => /^\+[1-9]\d{7,14}$/.test(v);
+  if (n.startsWith('+')) return ok(n) ? { phone: n, reason: '' } : { phone: '', reason: n.length < 9 ? 'short' : 'long' };
+  if (/\D/.test(n)) return { phone: '', reason: 'short' };
+  if (!dial) return { phone: '', reason: 'nodial' };
+  const dd = dial.slice(1);
+  n = n.replace(/^0+/, '');
+  // Si ya escribió el código de país sin "+", no se duplica (ej. 50688881234 con CR +506).
+  if (n.startsWith(dd) && n.length >= dd.length + 8 && n.length <= 15 && ok('+' + n)) return { phone: '+' + n, reason: '' };
+  const full = dial + n;
+  return ok(full) ? { phone: full, reason: '' } : { phone: '', reason: n.length + dial.length < 9 ? 'short' : 'long' };
 }
+const PHONE_MSG = {
+  empty: 'Falta tu número de WhatsApp. Escríbelo arriba para que te llegue la muestra, por ejemplo 8888 1234.',
+  short: 'Al número le faltan dígitos. Escríbelo completo, por ejemplo 8888 1234.',
+  long: 'El número tiene demasiados dígitos. Revisa el código de país y vuelve a escribirlo.',
+  nodial: 'Elige tu país en la lista o escribe el número con + y el código, por ejemplo +506 8888 1234.'
+};
 // En el celular el teclado se dibuja ENCIMA de la página sin empujar lo fijo: se mide lo realmente visible y se sube la hoja.
 let vvBound = false;
 function bindViewportFit(box) {
@@ -506,7 +530,8 @@ function setupSongOffer() {
   const fail = (t) => { err.textContent = t; err.classList.remove('is-hidden'); };
   const nameRe = /^[\p{L}][\p{L} '’-]{0,29}$/u;
   const typedName = () => (wantName.checked ? nameIn.value.replace(/\s+/g, ' ').trim() : '');
-  const waAgain = $('songWaAgain');
+  const waAgain = $('songWaAgain'); let phoneFails = 0;
+  $('songWaFallback').classList.add('is-hidden'); $('songWaFallback').onclick = () => track('song_whatsapp_clicked', { after_invalid: true });
   const waHref = () => {
     const n = typedName();
     const text = `Hola, quiero que suene la canción para ${song.partner || 'esa persona'} 🎵\n«${song.title}»\nEstilo: ${songStyle}\n${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${song.songId}`;
@@ -516,17 +541,23 @@ function setupSongOffer() {
   waAgain.onclick = () => track('song_whatsapp_clicked', { after_form: true });
 
   form.onsubmit = async (ev) => {
-    ev.preventDefault(); err.classList.add('is-hidden');
+    ev.preventDefault(); err.classList.add('is-hidden'); $('songWaFallback').classList.add('is-hidden');
     const n = typedName();
     if (wantName.checked && !nameRe.test(n)) { track('song_name_invalid', {}); fail('Escribe solo tu nombre (letras, hasta 30), o desmarca la casilla.'); nameIn.focus(); return; }
-    const full = buildSongPhone(dial.value, phone.value);
-    if (!full) { track('song_phone_invalid', {}); fail('Revisa tu número: pon el código de tu país y el número, por ejemplo 99 123 456.'); phone.focus(); return; }
+    const pr = buildSongPhone(dial.value, phone.value), full = pr.phone;
+    if (!full) {
+      phoneFails++;
+      track('song_phone_invalid', { reason: pr.reason, len: String(phone.value || '').replace(/\D/g, '').length, dial: dial.value });
+      fail(PHONE_MSG[pr.reason] || PHONE_MSG.short);
+      const fb = $('songWaFallback'); fb.href = waHref(); fb.classList.remove('is-hidden');
+      phone.focus(); return;
+    }
     send.disabled = true; send.textContent = 'Enviando…';
     track('song_request_submitted', { style: songStyle, hasName: !!n });
     try {
       const data = await postFn('sfc-song-request', { songId: song.songId, style: songStyle, phone: full, consent: true, ...(n ? { name: n } : {}) });
       if (!data.ok) throw new Error('fallo');
-      track('song_request_confirmed', { style: songStyle });
+      track('song_request_confirmed', { style: songStyle, songId: song.songId });
       waAgain.href = waHref(); waAgain.classList.remove('is-hidden');
       $('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de la canción para ${song.partner || 'esa persona'}. Revisa tus mensajes pronto.`;
       form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');

@@ -23,14 +23,22 @@ exports.handler = async (event) => {
     const APP = APPS.has(body.app) ? body.app : 'si-fueras-cancion';
     let metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
     // Defensa extra: aunque el cliente no lo mande, aquí se descartan los campos que podrían traer texto de la persona.
-    delete metadata.answer; delete metadata.other; delete metadata.picks; delete metadata.name; delete metadata.phone; delete metadata.email;
+    delete metadata.answer; delete metadata.other; delete metadata.picks; delete metadata.name; delete metadata.phone; delete metadata.email; delete metadata.region; delete metadata.city;
     if (JSON.stringify(metadata).length > MAX_METADATA_JSON_LENGTH) metadata = { truncated: true };
 
     try {
         const h = event.headers || {};
         const raw = h['x-nf-geo'] || h['X-Nf-Geo'];
-        const code = raw ? JSON.parse(Buffer.from(raw, 'base64').toString('utf8'))?.country?.code : (h['x-country'] || h['X-Country']);
-        if (code && /^[A-Za-z]{2}$/.test(String(code)) && !metadata.country) metadata = { ...metadata, country: String(code).toUpperCase() };
+        const geo = raw ? JSON.parse(Buffer.from(raw, 'base64').toString('utf8')) : null;
+        const code = geo ? geo.country?.code : (h['x-country'] || h['X-Country']);
+        const extra = {};
+        if (code && /^[A-Za-z]{2}$/.test(String(code)) && !metadata.country) extra.country = String(code).toUpperCase();
+        // Región y ciudad aproximadas (de la IP, nunca la IP): sirven para comparar localidades en las pruebas de anuncios.
+        const region = geo && geo.subdivision && geo.subdivision.code;
+        if (region && /^[A-Za-z0-9-]{1,6}$/.test(String(region)) && !metadata.region) extra.region = String(region).toUpperCase();
+        const city = geo && geo.city;
+        if (city && /^[\p{L} .'’-]{1,40}$/u.test(String(city)) && !metadata.city) extra.city = String(city);
+        if (Object.keys(extra).length) metadata = { ...metadata, ...extra };
     } catch (_e) { /* el país es un extra */ }
 
     try { await store.logEvent(anonId, 'anon', anonId, eventName, metadata, null, APP); }

@@ -2879,3 +2879,16 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 - Claves localStorage `ct_*`. Mensajes de error del servidor en inglés cuando `lang:'en'`.
 - Pruebas: servidor 55 OK (con casos couple); página probada en móvil (preguntas, email inválido/válido, sin fuga de nombre ni email en eventos).
 - El precio ($50–100) NO está en la página: se habla después de la muestra, igual que en las demás. Cobro por PayPal/Stripe/Zelle lo manejas tú.
+
+## 64. Medir anuncios por campaña y localidad (pareja, cumple, couple)
+- Las tres apps de regalo guardan `campaign` y `ad` (de `?utm_campaign=` / `?utm_content=`, o `?c=` / `?ad=`) en cada evento (primera visita; se recuerda en el navegador). `song_request_confirmed` lleva además el `songId` para unir ventas con campaña.
+- `sfc-track-event` añade `region` (estado) y `city` desde la cabecera de geolocalización de Netlify (no la IP). El cliente no puede falsificarlos.
+- `tools/anuncios.sql`: 8 consultas listas para el SQL Editor (embudo por campaña, por estado/ciudad, costo por resultado, ventas por campaña, tráfico por hora, abandono por pregunta, pedidos, WhatsApp vs número).
+- Pruebas: servidor 57 OK; página couple-song probada con utm (campaña viaja y se recuerda).
+
+## 65. Teléfono más tolerante (pareja-cancion y cumple-cancion)
+- El 7 oct dos personas que terminaron el cuestionario eligieron estilo, recibieron `song_phone_invalid` y se fueron sin pedir.
+- `buildSongPhone` ahora devuelve `{phone, reason}` (`empty`, `short`, `long`, `nodial`). Acepta el código de país escrito sin "+" (50688881234 con CR) sin duplicarlo.
+- Mensajes de error específicos según la causa, y debajo aparece "¿Prefieres no dejar el número? Escríbeme tú por WhatsApp" para no perder a quien no quiere dar el número.
+- `song_phone_invalid` ahora guarda `reason`, `len` (cantidad de dígitos, no el número) y `dial`. Nuevo `song_whatsapp_clicked` con `after_invalid:true`.
+- El placeholder pasó a "Ej. 8888 1234".
