@@ -144,8 +144,8 @@
   .song-offer .song-error{ margin:10px 0 0; color:#b3261e; font-size:.88rem; font-weight:500; }
   .song-suggest{ font-size:.86rem; color:var(--ink) !important; margin:0 0 10px !important; }
   .song-styles{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
-  .song-chip{ appearance:none; cursor:pointer; border:1.5px solid var(--line); background:transparent; color:var(--ink); border-radius:999px; padding:7px 14px; font-size:.85rem; font-weight:500; }
-  .song-chip[aria-pressed="true"]{ border-color:var(--ink); background:var(--ink); color:#fff; }
+  .song-chip, .song-occ{ appearance:none; cursor:pointer; border:1.5px solid var(--line); background:transparent; color:var(--ink); border-radius:999px; padding:7px 14px; font-size:.85rem; font-weight:500; }
+  .song-chip[aria-pressed="true"], .song-occ[aria-pressed="true"]{ border-color:var(--ink); background:var(--ink); color:#fff; }
   .song-phone{ display:flex; gap:8px; }
   .song-phone select, .song-phone input{ appearance:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:12px; font-size:1rem; min-width:0; font-family:inherit; }
   .song-phone select{ flex:0 0 38%; font-size:.88rem; }
@@ -302,6 +302,15 @@
             <button type="button" class="song-chip" data-style="R&amp;B / Soul" aria-pressed="false">R&amp;B / Soul</button>
             <button type="button" class="song-chip" data-style="Jazz" aria-pressed="false">Jazz</button>
             <button type="button" class="song-chip" data-style="Surprise me" aria-pressed="false">Surprise me</button>
+          </div>
+          <p class="song-label">What's the occasion? <span class="song-opt">(optional)</span></p>
+          <div class="song-styles" role="group" aria-label="Occasion">
+            <button type="button" class="song-occ" data-occ="Anniversary" aria-pressed="false">Anniversary</button>
+            <button type="button" class="song-occ" data-occ="Birthday" aria-pressed="false">Birthday</button>
+            <button type="button" class="song-occ" data-occ="Proposal" aria-pressed="false">Proposal</button>
+            <button type="button" class="song-occ" data-occ="Wedding" aria-pressed="false">Wedding</button>
+            <button type="button" class="song-occ" data-occ="Valentine's Day" aria-pressed="false">Valentine's Day</button>
+            <button type="button" class="song-occ" data-occ="Just because" aria-pressed="false">Just because</button>
           </div>
           <p class="song-label"><label for="songEmail">Your email, so I can send you the sample</label></p>
           <input id="songEmail" class="song-email" type="email" inputmode="email" autocomplete="email" enterkeyhint="send" placeholder="you@email.com" maxlength="120">

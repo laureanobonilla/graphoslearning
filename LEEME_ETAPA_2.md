@@ -2903,3 +2903,11 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 - Reemplaza el enlace de WhatsApp tras el error de teléfono (sección 65); los mensajes de error del teléfono siguen igual.
 - `couple-song` (inglés) NO cambia: sigue con un solo campo de correo.
 - Pruebas: Playwright (camino No, camino Sí, error de campo vacío, envío con número) en pareja y cumple; `t_sfc_srv.js` sigue en OK.
+
+## 68. Ocasión (opcional) + precio recomendado en el correo
+- `pareja-cancion` y `couple-song`: grupo de botones "¿Para qué ocasión? (opcional)" en la oferta (Aniversario, Cumpleaños de mi pareja, Pedir matrimonio, Boda, San Valentín, Solo porque sí / en inglés: Anniversary, Birthday, Proposal, Wedding, Valentine's Day, Just because). Un toque selecciona, otro deselecciona. Evento `song_occasion_chosen`.
+- La ocasión viaja en el mensaje de WhatsApp, en la solicitud (`occasion`) y se guarda en el evento `song_request_sent` junto con el precio sugerido (`suggested`, `currency`). No se muestra ningún precio al cliente.
+- El correo trae "Ocasión: …" y un bloque **PRECIO RECOMENDADO** (también en el asunto: `· sug. ₡9,900`). Lógica en `netlify/functions/_lib/sfc-price.js`: tres niveles (precio base / fecha señalada / momento único) según la ocasión y mercado (CR en colones, resto de Latinoamérica y España en USD, inglés en USD).
+- **Los precios son hipótesis para empezar.** Edítalos en el objeto `PRICES` de `sfc-price.js`: CR ₡6,900 / 9,900 / 14,900; USD español 15 / 22 / 32; USD inglés 49 / 69 / 99.
+- `cumple-cancion` no tiene ocasión (siempre es cumpleaños): el correo muestra el precio base.
+- Pruebas: servidor 60 OK (ocasión inventada = base, niveles por país, correo y evento); Playwright en pareja (WhatsApp con ocasión y solicitud) y couple (solicitud con ocasión).

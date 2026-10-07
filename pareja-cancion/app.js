@@ -478,7 +478,7 @@ function bindViewportFit(box) {
   vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
 }
 
-let songStyle = 'Sorpréndeme', songObserver = null, offerApi = null, waPending = false, waReturn = null;
+let songOccasion = '', songStyle = 'Sorpréndeme', songObserver = null, offerApi = null, waPending = false, waReturn = null;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && waReturn) waReturn(); });
 function openSongOffer(fromUser) {
   const box = $('songOffer');
@@ -511,6 +511,16 @@ function setupSongOffer() {
     };
   });
 
+  songOccasion = '';
+  box.querySelectorAll('.song-occ').forEach(chip => {
+    chip.setAttribute('aria-pressed', 'false');
+    chip.onclick = () => {
+      songOccasion = songOccasion === chip.dataset.occ ? '' : chip.dataset.occ;
+      box.querySelectorAll('.song-occ').forEach(c => c.setAttribute('aria-pressed', c.dataset.occ === songOccasion ? 'true' : 'false'));
+      track('song_occasion_chosen', { occasion: songOccasion || null });
+    };
+  });
+
   // En esta versión el nombre de la pareja ya va en la letra: no hay casilla de nombre.
   const wantName = { checked: false }, nameIn = { value: '', focus() {} };
   const dial = $('songDial'), phone = $('songPhone'); phone.value = '';
@@ -534,7 +544,7 @@ function setupSongOffer() {
   const waAgain = $('songWaAgain'); let phoneFails = 0;
   const waHref = () => {
     const n = typedName();
-    const text = `Hola, quiero que suene la canción para ${song.partner || 'mi pareja'} 🎵\n«${song.title}»\nEstilo: ${songStyle}\n${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${song.songId}`;
+    const text = `Hola, quiero que suene la canción para ${song.partner || 'mi pareja'} 🎵\n«${song.title}»\nEstilo: ${songStyle}\n${songOccasion ? `Ocasión: ${songOccasion}\n` : ''}${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${song.songId}`;
     return `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(text)}`;
   };
   waAgain.classList.add('is-hidden');
@@ -550,7 +560,7 @@ function setupSongOffer() {
     waPending = true;
     if (!waPosted) {
       waPosted = true;
-      postFn('sfc-song-request', { songId: song.songId, style: songStyle, via: 'whatsapp', consent: true }).catch(() => {});
+      postFn('sfc-song-request', { songId: song.songId, style: songStyle, via: 'whatsapp', consent: true, ...(songOccasion ? { occasion: songOccasion } : {}) }).catch(() => {});
     }
   };
   waReturn = () => { if (!waPending) return; waPending = false; err.classList.add('is-hidden'); back.classList.remove('is-hidden'); track('song_wa_return', {}); try { back.scrollIntoView({ block: 'center' }); } catch (_e) { /* no crítico */ } };
@@ -577,7 +587,7 @@ function setupSongOffer() {
     send.disabled = true; send.textContent = 'Enviando…';
     track('song_request_submitted', { style: songStyle, hasName: !!n });
     try {
-      const data = await postFn('sfc-song-request', { songId: song.songId, style: songStyle, phone: full, consent: true, ...(n ? { name: n } : {}) });
+      const data = await postFn('sfc-song-request', { songId: song.songId, style: songStyle, phone: full, consent: true, ...(songOccasion ? { occasion: songOccasion } : {}), ...(n ? { name: n } : {}) });
       if (!data.ok) throw new Error('fallo');
       track('song_request_confirmed', { style: songStyle, songId: song.songId });
       waAgain.href = waHref(); waAgain.classList.remove('is-hidden');

@@ -453,7 +453,7 @@ function bindViewportFit(box) {
   vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit);
 }
 
-let songStyle = 'Surprise me', songObserver = null, offerApi = null;
+let songOccasion = '', songStyle = 'Surprise me', songObserver = null, offerApi = null;
 function openSongOffer(fromUser) {
   const box = $('songOffer');
   if (!box || box.classList.contains('is-hidden')) return;
@@ -485,6 +485,16 @@ function setupSongOffer() {
     };
   });
 
+  songOccasion = '';
+  box.querySelectorAll('.song-occ').forEach(chip => {
+    chip.setAttribute('aria-pressed', 'false');
+    chip.onclick = () => {
+      songOccasion = songOccasion === chip.dataset.occ ? '' : chip.dataset.occ;
+      box.querySelectorAll('.song-occ').forEach(c => c.setAttribute('aria-pressed', c.dataset.occ === songOccasion ? 'true' : 'false'));
+      track('song_occasion_chosen', { occasion: songOccasion || null });
+    };
+  });
+
     const emailIn = $('songEmail'); emailIn.value = '';
   const EMAIL_RE = /^[^\s@<>]{1,64}@[^\s@<>]{1,200}\.[^\s@<>]{2,}$/;
 
@@ -513,7 +523,7 @@ function setupSongOffer() {
     send.disabled = true; send.textContent = 'Sending…';
     track('song_request_submitted', { style: songStyle });
     try {
-      const data = await postFn('sfc-song-request', { songId: song.songId, style: songStyle, email, lang: 'en', consent: true });
+      const data = await postFn('sfc-song-request', { songId: song.songId, style: songStyle, email, lang: 'en', consent: true, ...(songOccasion ? { occasion: songOccasion } : {}) });
       if (!data.ok) throw new Error('failed');
       track('song_request_confirmed', { style: songStyle, songId: song.songId });
       $('songDoneText').textContent = `Thank you! I’ll email you at ${email} with a sung sample of “${song.title}” for ${song.partner || 'your partner'}. Keep an eye on your inbox (and your spam folder, just in case).`;

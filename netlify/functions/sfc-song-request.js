@@ -11,6 +11,7 @@ const store = require('./_lib/store');
 const { getReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const { json, UUID_RE } = require('./_lib/qer-map-core');
+const { suggestPrice, occasionOf } = require('./_lib/sfc-price');
 const { appOf, kindOf, STYLES, STYLES_EN, SONG_SCHEMA, validSong, songPrompt, cleanName, normalizePhone } = require('./_lib/sfc-song');
 
 const FALLBACK_TO_EMAIL = 'bonillapretiz@gmail.com';
@@ -76,6 +77,8 @@ exports.handler = async (event) => {
         }
         const finalStyle = style === surprise ? (named?.style || base.style || style) : style;
 
+        const occasion = occasionOf(kind, body.occasion);
+        const price = suggestPrice({ kind, country, occasion });
         const partner = gift ? String(base.partner || '') : '';
         const digits = phone ? phone.slice(1) : '';
         const firstMsg = kind === 'couple' ? `Hi! This is the sample for «${base.title}» (${finalStyle}) that you asked for. Tell me honestly what you feel when you hear it.` : `Hola, soy quien hizo ${kind === 'pareja' ? '"Si tu pareja fuera una canción"' : kind === 'cumple' ? '"Una canción para su cumpleaños"' : '"Si fueras una canción"'} y pediste que suene «${base.title}» (${finalStyle}). Ya tengo una primera muestra. ¿Te la envío por aquí?`;
@@ -89,12 +92,16 @@ exports.handler = async (event) => {
                 : [...(email ? [`EMAIL (responde aquí, en inglés): ${email}`, `Para contestar: mailto:${email}?subject=${encodeURIComponent('Your song «' + base.title + '»')}`] : []),
                    ...(phone ? [`Teléfono: ${phone}`,
                    `WhatsApp (toca para escribirle con el mensaje listo): ${waLink}`] : [])]),
+            ...(occasion ? [`Ocasión: ${occasion}`] : []),
             `Estilo pedido: ${style}${style === surprise ? ` (la letra sugiere: ${finalStyle})` : ''}`,
             ...(gift
                 ? [`${kind === 'cumple' ? 'Nombre de quien cumple años' : kind === 'couple' ? 'Partner name (en la letra)' : 'Nombre de la pareja'} (ya va en la letra): ${partner || '(no guardado)'}`, `Es un REGALO: quien la pide la va a dar. No hace falta rehacer la letra.`]
                 : []),
             ...(kind === 'self' ? [`Nombre en la canción: ${name ? name + (named ? '' : ' (NO se pudo rehacer la letra con el nombre: va la original, ponlo tú)') : '(no quiere nombre)'}`] : []),
             `País (aprox.): ${country || 'desconocido'}`,
+            ``,
+            price.text,
+            ``,
             `Código de canción: ${songId}`,
             ``,
             ...(named ? [`=== LETRA CON SU NOMBRE ===\nTítulo: ${String(named.title).replace(/["“”]/g, '').trim()}\n\n${String(named.lyrics).trim().slice(0, 2300)}\n`] : []),
@@ -109,7 +116,7 @@ exports.handler = async (event) => {
             body: JSON.stringify({
                 from: 'Graphikosmos <onboarding@resend.dev>',
                 to: [process.env.FEEDBACK_TO_EMAIL || FALLBACK_TO_EMAIL],
-                subject: `Canción (${kind === 'pareja' ? 'Pareja' : kind === 'cumple' ? 'Cumpleaños' : kind === 'couple' ? 'COUPLE EN' : 'Si fueras…'})${viaWhatsapp ? ' (clic WhatsApp, sin número)' : ''}: ${base.title} · ${finalStyle}${phone ? ' · ' + phone : ''}${email ? ' · ' + email : ''}`,
+                subject: `Canción (${kind === 'pareja' ? 'Pareja' : kind === 'cumple' ? 'Cumpleaños' : kind === 'couple' ? 'COUPLE EN' : 'Si fueras…'})${viaWhatsapp ? ' (clic WhatsApp, sin número)' : ''}: ${base.title} · ${finalStyle}${phone ? ' · ' + phone : ''}${email ? ' · ' + email : ''} · sug. ${price.short}`,
                 text
             })
         });
@@ -118,7 +125,7 @@ exports.handler = async (event) => {
             try { await store.logEvent(songId, 'anon', songId, 'song_request_failed', { reason: `resend_${res.status}`, country, source: 'server' }, null, APP); } catch (_e) { /* no crítico */ }
             return json(502, { error: T('No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.', "We couldn't register your request. Please try again.") });
         }
-        try { await store.logEvent(songId, 'anon', songId, 'song_request_sent', { style, kind, hasName: !!name || !!partner, nameApplied: !!named, via: viaWhatsapp ? 'whatsapp' : (email ? 'email' : 'form'), country, source: 'server' }, null, APP); }
+        try { await store.logEvent(songId, 'anon', songId, 'song_request_sent', { style, kind, hasName: !!name || !!partner, nameApplied: !!named, via: viaWhatsapp ? 'whatsapp' : (email ? 'email' : 'form'), occasion, suggested: price.amount, currency: price.currency, country, source: 'server' }, null, APP); }
         catch (e) { console.error('[sfc-song-request] evento', e.message); }
         return json(200, { ok: true });
     } catch (err) {

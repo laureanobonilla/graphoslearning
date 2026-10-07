@@ -144,8 +144,8 @@
   .song-offer .song-error{ margin:10px 0 0; color:#b3261e; font-size:.88rem; font-weight:500; }
   .song-suggest{ font-size:.86rem; color:var(--ink) !important; margin:0 0 10px !important; }
   .song-styles{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
-  .song-chip{ appearance:none; cursor:pointer; border:1.5px solid var(--line); background:transparent; color:var(--ink); border-radius:999px; padding:7px 14px; font-size:.85rem; font-weight:500; }
-  .song-chip[aria-pressed="true"]{ border-color:var(--ink); background:var(--ink); color:#fff; }
+  .song-chip, .song-occ{ appearance:none; cursor:pointer; border:1.5px solid var(--line); background:transparent; color:var(--ink); border-radius:999px; padding:7px 14px; font-size:.85rem; font-weight:500; }
+  .song-chip[aria-pressed="true"], .song-occ[aria-pressed="true"]{ border-color:var(--ink); background:var(--ink); color:#fff; }
   .song-phone{ display:flex; gap:8px; }
   .song-phone select, .song-phone input{ appearance:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:12px; font-size:1rem; min-width:0; font-family:inherit; }
   .song-phone select{ flex:0 0 38%; font-size:.88rem; }
@@ -306,6 +306,15 @@
             <button type="button" class="song-chip" data-style="Urbano suave" aria-pressed="false">Urbano suave</button>
             <button type="button" class="song-chip" data-style="Cumbia" aria-pressed="false">Cumbia</button>
             <button type="button" class="song-chip" data-style="Sorpréndeme" aria-pressed="false">Sorpréndeme</button>
+          </div>
+          <p class="song-label">¿Para qué ocasión? <span class="song-opt">(opcional)</span></p>
+          <div class="song-styles" role="group" aria-label="Ocasión">
+            <button type="button" class="song-occ" data-occ="Aniversario" aria-pressed="false">Aniversario</button>
+            <button type="button" class="song-occ" data-occ="Cumpleaños de mi pareja" aria-pressed="false">Cumpleaños de mi pareja</button>
+            <button type="button" class="song-occ" data-occ="Pedir matrimonio" aria-pressed="false">Pedir matrimonio</button>
+            <button type="button" class="song-occ" data-occ="Boda" aria-pressed="false">Boda</button>
+            <button type="button" class="song-occ" data-occ="San Valentín" aria-pressed="false">San Valentín</button>
+            <button type="button" class="song-occ" data-occ="Solo porque sí" aria-pressed="false">Solo porque sí</button>
           </div>
           <a id="btnSongWa" class="song-go song-wa" href="https://wa.me/50687772993" target="_blank" rel="noopener">Pedir mi muestra por WhatsApp</a>
           <p class="song-fine">Se abre WhatsApp con el mensaje ya escrito. Solo tienes que enviarlo.</p>
