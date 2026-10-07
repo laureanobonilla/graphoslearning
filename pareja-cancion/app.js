@@ -1,66 +1,69 @@
-// "Si fueras una canción": 15 preguntas de elegir (varias a la vez, o ninguna, o escribir lo propio) → la letra de una
-// canción hecha con esas respuestas → oferta de que esa letra SUENE (muestra cantada por WhatsApp; el precio se habla
-// después de que la persona la oiga). Independiente de "¿Quién eres en realidad?": claves de localStorage, funciones
-// (sfc-*) y `app` de los eventos propios. Los eventos NO llevan el texto ni las opciones elegidas: solo el avance.
+// "Si tu pareja fuera una canción": la persona que compra responde 15 preguntas de elegir sobre SU PAREJA (varias a la vez,
+// "ninguna" o escribir lo propio) → la letra de una canción para regalarle (la canta quien regala, con el nombre de la pareja)
+// → oferta de que esa letra SUENE (muestra cantada por WhatsApp; el precio se habla después de que la oiga).
+// Comparte funciones con "Si fueras una canción" (sfc-*, con kind:'pareja') pero tiene sus propias claves de localStorage
+// y su propio `app` de eventos ('pareja-cancion'). Los eventos NO llevan el nombre, el texto ni las opciones elegidas.
 'use strict';
 
 const CONTACT_WHATSAPP = '50687772993';
 const TRACK_URL = '/.netlify/functions/sfc-track-event';
+const APP_NAME = 'pareja-cancion';
+const NAME_RE = /^[\p{L}][\p{L} '’-]{0,29}$/u;
+let partner = '';
+const fill = (t) => String(t).replace(/\{n\}/g, partner || 'tu pareja');
 
 // --- Preguntas ---------------------------------------------------------------------------------
-// type 'multi': 8 opciones [emoji|color, texto]; se puede elegir varias, "ninguna" o escribir la propia.
-// type 'open': texto libre opcional. `style` (en una opción) la liga con un estilo musical.
+// {n} = nombre de la pareja. type 'multi': 8 opciones [emoji|color, texto(, estilo)]; type 'open': texto libre opcional.
 const COLOR_OPTS = [
   { color: '#d9402b', t: 'Rojo brasa' }, { color: '#2b3a9e', t: 'Azul medianoche' }, { color: '#f5b800', t: 'Amarillo mango' },
   { color: '#1f8a5b', t: 'Verde selva' }, { color: '#f07aa4', t: 'Rosa atardecer' }, { color: '#7d8aa0', t: 'Gris lluvia' },
   { color: '#f2802e', t: 'Naranja fogata' }, { color: '#7a4fd0', t: 'Violeta tormenta' }
 ];
 const QUESTIONS = [
-  { id: 'q1', type: 'multi', prompt: 'Sábado, 11 de la noche. ¿Dónde estás de verdad?', opts: [
-    ['🛋️', 'En el sofá, con una manta y cero planes'], ['🎉', 'En una fiesta, con la música muy alta'], ['🚗', 'Manejando sin rumbo, con la ventana abajo'],
-    ['🍳', 'Cocinando algo solo porque sí'], ['📱', 'En la cama, viendo videos hasta que se me cierren los ojos'], ['🫶', 'En casa de alguien que quiero'],
-    ['🎨', 'Creando algo: escribiendo, dibujando, tocando'], ['🌙', 'Caminando por la calle, pensando en mis cosas'] ] },
-  { id: 'q2', type: 'multi', prompt: '¿Qué sonido te devuelve la calma?', opts: [
-    ['🌧️', 'La lluvia sobre el techo'], ['🌊', 'El mar, de lejos'], ['🚙', 'Un carro pasando de noche'], ['🎸', 'Una guitarra suave'],
-    ['🤫', 'El silencio total'], ['🗣️', 'Voces de gente que quiero, en la sala'], ['☕', 'La cafetera empezando a burbujear'], ['🍃', 'El viento moviendo los árboles'] ] },
-  { id: 'q3', type: 'multi', prompt: 'Te mudas mañana y solo cabe una cosa pequeña en tu bolsillo. ¿Cuál?', opts: [
-    ['💌', 'Una carta o una nota vieja'], ['📷', 'Una foto'], ['🧸', 'Algo de cuando era niño'], ['📖', 'Un libro marcado y subrayado'],
-    ['🔑', 'La llave de un lugar que quiero'], ['🎧', 'Mis audífonos con mi música'], ['💍', 'Una joya o un amuleto'], ['📱', 'Mi teléfono, con todo lo que guarda'] ] },
-  { id: 'q4', type: 'multi', prompt: 'Tu mañana perfecta huele a…', opts: [
-    ['☕', 'Café recién hecho'], ['🍞', 'Pan caliente'], ['🌱', 'Tierra mojada'], ['🧼', 'Ropa limpia secada al sol'],
-    ['🌊', 'Mar y sal'], ['🍲', 'Comida de casa'], ['🌸', 'Un perfume que me recuerda a alguien'], ['🕯️', 'A cuarto cerrado y cobija'] ] },
-  { id: 'q5', type: 'multi', prompt: 'Si tu canción fuera de colores, ¿de cuáles?', colors: true, opts: COLOR_OPTS.map(c => [c.color, c.t]) },
-  { id: 'q6', type: 'multi', prompt: 'Cuando algo te sale mal, lo primero que haces es…', opts: [
-    ['😂', 'Reírme de lo absurdo'], ['🤐', 'Callarme y darle vueltas en silencio'], ['📝', 'Hacer un plan para arreglarlo'], ['😤', 'Enojarme (y que se me pase rápido)'],
-    ['📞', 'Llamar a alguien'], ['😭', 'Llorar un rato y seguir'], ['🙃', 'Fingir que no pasó'], ['🧹', 'Ocuparme en otra cosa hasta olvidarlo'] ] },
-  { id: 'q7', type: 'multi', prompt: 'Lo que más te dicen que tienes de más…', opts: [
-    ['❤️', 'Corazón'], ['⚡', 'Energía'], ['🧠', 'Cabeza: pienso demasiado'], ['😄', 'Risa'],
+  { id: 'q1', type: 'multi', prompt: 'Domingo por la tarde con {n}. ¿Qué están haciendo?', opts: [
+    ['🛋️', 'Pegados al sofá, sin salir'], ['🍳', 'Cocinando algo juntos (y ensuciando todo)'], ['🚗', 'Manejando sin rumbo'], ['🎬', 'Maratón de series o películas'],
+    ['🌳', 'Paseando sin prisa'], ['🛌', 'Durmiendo la siesta'], ['🎶', 'Con música puesta, cada quien en lo suyo'], ['🍦', 'Saliendo por algo rico'] ] },
+  { id: 'q2', type: 'multi', prompt: 'Cuando a {n} algo le sale mal, lo primero que hace es…', opts: [
+    ['😂', 'Reírse de lo absurdo'], ['🤐', 'Quedarse en silencio, dándole vueltas'], ['📝', 'Hacer un plan para arreglarlo'], ['😤', 'Enojarse (y que se le pase rápido)'],
+    ['📞', 'Llamar a alguien'], ['😭', 'Llorar un rato y seguir'], ['🙃', 'Fingir que no pasó'], ['🫂', 'Buscarte a ti'] ] },
+  { id: 'q3', type: 'multi', prompt: 'Algo de {n} que reconocerías con los ojos cerrados', opts: [
+    ['🗣️', 'Su risa'], ['🚶', 'Sus pasos llegando'], ['🔑', 'Las llaves en la puerta'], ['🎤', 'Cuando canta o tararea'],
+    ['😴', 'Su respiración al dormir'], ['📱', 'El sonido de sus mensajes'], ['🍳', 'Cómo se mueve en la cocina'], ['💬', 'Cómo dice tu nombre'] ] },
+  { id: 'q4', type: 'multi', prompt: '{n} huele a…', opts: [
+    ['☕', 'Café'], ['🧼', 'Ropa limpia'], ['🌸', 'Su perfume de siempre'], ['🌊', 'Mar y sal'],
+    ['🍞', 'Algo recién hecho'], ['🌱', 'Tierra mojada'], ['🧴', 'Su jabón o su crema'], ['🏡', 'A casa'] ] },
+  { id: 'q5', type: 'multi', prompt: 'Si la canción de {n} fuera de colores, ¿de cuáles?', colors: true, opts: COLOR_OPTS.map(c => [c.color, c.t]) },
+  { id: 'q6', type: 'multi', prompt: 'Lo que {n} tiene de más…', opts: [
+    ['❤️', 'Corazón'], ['⚡', 'Energía'], ['🧠', 'Cabeza: piensa demasiado'], ['😄', 'Risa'],
     ['🔥', 'Carácter'], ['🌿', 'Calma'], ['🔍', 'Curiosidad'], ['💡', 'Ideas'] ] },
-  { id: 'q8', type: 'multi', prompt: 'Un lugar al que volverías con los ojos cerrados', opts: [
-    ['🏡', 'La casa donde crecí'], ['🏖️', 'Una playa'], ['🌳', 'Una plaza o un parque'], ['👵', 'La casa de mis abuelos'],
-    ['⛰️', 'Una montaña o un río'], ['✈️', 'Un lugar de un viaje'], ['🛣️', 'Una calle que me sé de memoria'], ['🌍', 'Uno que todavía no conozco'] ] },
-  { id: 'q9', type: 'multi', prompt: 'Cuando termine tu canción, ¿qué quieres que se quede sintiendo quien la escuche?', opts: [
-    ['💃', 'Ganas de bailar'], ['🥺', 'Un nudo en la garganta, pero bonito'], ['😌', 'Calma'], ['💪', 'Fuerza'],
-    ['🍂', 'Nostalgia dulce'], ['😆', 'Risa'], ['🌅', 'Esperanza'], ['🤗', 'Ternura'] ] },
-  { id: 'q10', type: 'multi', prompt: '¿Qué ritmo tiene tu vida ahora mismo?', opts: [
-    ['🌹', 'Un bolero lento y con drama', 'Bolero'], ['🎹', 'Una balada con piano', 'Balada suave'], ['🎉', 'Un pop que levanta el ánimo', 'Pop'],
-    ['🪕', 'Guitarra y voz, sin adornos', 'Acústica'], ['🤘', 'Rock con ganas, pero sin gritar tanto', 'Rock suave'], ['🌃', 'Un ritmo urbano de noche', 'Urbano suave'],
+  { id: 'q7', type: 'multi', prompt: 'Algo de {n} que te saca de quicio… con cariño', opts: [
+    ['⏰', 'Se le pasa la hora y llega tarde'], ['📱', 'El teléfono siempre en la mesa'], ['🧦', 'El desorden'], ['🔊', 'Hablar o cantar muy alto'],
+    ['🤔', 'Tarda una eternidad en decidir'], ['🍽️', 'Roba comida de tu plato'], ['🛏️', 'Se queda con todas las cobijas'], ['😴', 'Se duerme en cualquier lado'] ] },
+  { id: 'q8', type: 'multi', prompt: 'Un lugar que es de ustedes', opts: [
+    ['🏡', 'Nuestra casa'], ['🏖️', 'Una playa'], ['🌳', 'Un parque o una plaza'], ['🍽️', 'Un restaurante o un cafecito'],
+    ['🚗', 'El carro'], ['✈️', 'Un lugar de un viaje'], ['🛣️', 'Una calle que recorren siempre'], ['🌍', 'Uno al que todavía no van'] ] },
+  { id: 'q9', type: 'multi', prompt: 'Cuando {n} escuche la canción, ¿qué quieres que sienta?', opts: [
+    ['🥹', 'Ternura, con un nudo en la garganta'], ['😆', 'Risa'], ['💃', 'Ganas de bailar'], ['😌', 'Calma'],
+    ['💪', 'Que puede contar contigo'], ['🌅', 'Esperanza por lo que viene'], ['🍂', 'Nostalgia dulce de lo vivido'], ['❤️', 'Que lo es todo para ti'] ] },
+  { id: 'q10', type: 'multi', prompt: '¿Qué ritmo tiene la historia de ustedes?', opts: [
+    ['🌹', 'Un bolero lento, de los de antes', 'Bolero'], ['🎹', 'Una balada con piano', 'Balada suave'], ['🎉', 'Un pop alegre', 'Pop'],
+    ['🪕', 'Guitarra y voz, íntimo', 'Acústica'], ['🤘', 'Rock con ganas, pero sin gritar tanto', 'Rock suave'], ['🌃', 'Un ritmo urbano de noche', 'Urbano suave'],
     ['🪘', 'Una cumbia que no deja sentarse', 'Cumbia'], ['🎲', 'Un poco de todo: sorpréndeme', 'Sorpréndeme'] ] },
-  { id: 'q11', type: 'multi', prompt: 'Tu superpoder más inútil (pero tuyo)', opts: [
-    ['🎂', 'Me acuerdo de todos los cumpleaños'], ['😴', 'Me duermo en cualquier lugar'], ['🫂', 'Hago reír a quien está triste'], ['🔎', 'Encuentro lo que otros pierden'],
-    ['🎬', 'Adivino el final de las películas'], ['🕵️', 'Noto cuando alguien miente'], ['🛒', 'Hago amistad en cualquier fila'], ['🥘', 'Cocino algo rico con lo que haya'] ] },
-  { id: 'q12', type: 'multi', prompt: 'Algo que te encanta aunque casi nadie lo sepa', opts: [
-    ['🚿', 'Cantar en la ducha como si fuera un concierto'], ['📺', 'Ver novelas o reality sin culpa'], ['🌙', 'Comer a medianoche'], ['🗣️', 'Hablar en voz alta cuando nadie está'],
-    ['📱', 'Releer mensajes viejos'], ['🧺', 'Coleccionar cosas inútiles'], ['🥹', 'Llorar con los comerciales'], ['🕺', 'Bailar cuando nadie me ve'] ] },
-  { id: 'q13', type: 'multi', prompt: '¿Qué te gustaría que dijeran de ti cuando no estás?', opts: [
-    ['😊', 'Que contigo todo se siente más ligero'], ['🤝', 'Que contigo se puede contar'], ['🪞', 'Que contigo se puede ser uno mismo'], ['😂', 'Que contigo nunca es aburrido'],
-    ['🕊️', 'Que contigo hay paz'], ['🚀', 'Que contigo dan ganas de intentarlo'], ['🫶', 'Que contigo nadie se siente solo'], ['🏠', 'Que contigo se siente como en casa'] ] },
-  { id: 'q14', type: 'multi', prompt: 'Si pudieras mandarle un mensaje a quien fuiste hace cinco años, sería…', opts: [
-    ['🌤️', '«Respira, sí sale bien»'], ['🦁', '«Atrévete más»'], ['🎈', '«Suelta eso, no te tocaba cargarlo»'], ['🌴', '«Disfruta más, hay tiempo»'],
-    ['🫶', '«Quiérete más»'], ['🆘', '«Pide ayuda, no pasa nada»'], ['🐢', '«No te apures»'], ['🙏', '«Gracias por aguantar»'] ] },
-  { id: 'q15', type: 'open', prompt: 'Para terminar: una frase que dices siempre, un apodo o una palabra que es solo tuya',
-    placeholder: 'Por ejemplo: «ya veremos», el apodo que te puso tu abuela, esa palabra rara que inventaste…',
-    why: 'Es opcional. Si la escribes, va casi tal cual en tu canción.' }
+  { id: 'q11', type: 'multi', prompt: '¿Cómo se conocieron?', opts: [
+    ['👀', 'Con un cruce de miradas'], ['👯', 'Por amigos en común'], ['💻', 'Por internet o una app'], ['💼', 'En el trabajo o el estudio'],
+    ['🎉', 'En una fiesta'], ['🏫', 'Se conocen desde hace muchos años'], ['🍀', 'Por pura casualidad'], ['📍', 'En un lugar muy especial'] ] },
+  { id: 'q12', type: 'multi', prompt: 'Algo que {n} hace o dice siempre', opts: [
+    ['🗨️', 'Una frase que repite'], ['🫶', 'Te abraza por la espalda'], ['🎶', 'Canta mal a propósito'], ['🍫', 'Te guarda un pedacito de lo rico'],
+    ['💌', 'Deja notas o mensajes'], ['😂', 'Hace siempre la misma broma'], ['🧣', 'Te cuida de todo: «abrígate»'], ['🌙', 'Te dice «descansa» por la noche'] ] },
+  { id: 'q13', type: 'multi', prompt: 'Estar con {n} te da…', opts: [
+    ['🏠', 'Sensación de hogar'], ['🪶', 'Ligereza'], ['🚀', 'Ganas de intentarlo'], ['🕊️', 'Paz'],
+    ['😂', 'Risa fácil'], ['🛡️', 'Seguridad'], ['✨', 'Ilusión'], ['🫶', 'Ganas de cuidar'] ] },
+  { id: 'q14', type: 'multi', prompt: 'Si pudieras decirle a {n} algo que a veces no dices, sería…', opts: [
+    ['🙏', '«Gracias por estar»'], ['🌱', '«Contigo soy mejor»'], ['🩹', '«Perdón por las veces que fallo»'], ['💍', '«Te elegiría otra vez»'],
+    ['😍', '«Me encanta cómo eres»'], ['🧭', '«No cambies»'], ['🚀', '«Vamos a lograrlo»'], ['❤️', '«Te quiero, aunque no lo diga tanto»'] ] },
+  { id: 'q15', type: 'open', prompt: 'Para terminar: una frase, un apodo o un chiste que solo ustedes entienden',
+    placeholder: 'Por ejemplo: cómo le dices de cariño, lo que se dicen al despedirse, esa palabra inventada…',
+    why: 'Es opcional. Si la escribes, va casi tal cual en la canción.' }
 ];
 const TOTAL = QUESTIONS.length;
 const MAX_OTHER = 140;
@@ -76,7 +79,7 @@ const $ = (id) => document.getElementById(id);
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 // --- Eventos (sin texto de la persona) ------------------------------------------------------------
-const ANON_KEY = 'sfc_anon_id';
+const ANON_KEY = 'pc_anon_id';
 function ensureAnonId() {
   try {
     let id = localStorage.getItem(ANON_KEY);
@@ -87,7 +90,7 @@ function ensureAnonId() {
 const anonId = ensureAnonId();
 function track(event, metadata) {
   try {
-    fetch(TRACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event, anonId, metadata: metadata || {} }) }).catch(() => {});
+    fetch(TRACK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event, anonId, app: APP_NAME, metadata: metadata || {} }) }).catch(() => {});
   } catch { /* no crítico */ }
 }
 track('landing_viewed', {
@@ -96,23 +99,23 @@ track('landing_viewed', {
 });
 
 // --- Guardado local: avance del cuestionario y canción lista ------------------------------------------
-const PROGRESS_KEY = 'sfc_progress_v1', SONG_KEY = 'sfc_song_v1';
+const PROGRESS_KEY = 'pc_progress_v1', SONG_KEY = 'pc_song_v1';
 const PROGRESS_MAX_AGE = 3 * 24 * 3600 * 1000, SONG_MAX_AGE = 71 * 3600 * 1000;
 const lsGet = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* no crítico */ } };
 const lsDel = (k) => { try { localStorage.removeItem(k); } catch { /* no crítico */ } };
 const hasContent = (s) => s.picks.length > 0 || s.other.trim().length > 0;
 const answeredCount = () => state.filter(hasContent).length;   // cuenta respuestas con contenido ("ninguna" no cuenta)
-function saveProgress(next) { lsSet(PROGRESS_KEY, { state, currentIndex: next === undefined ? currentIndex : next, savedAt: Date.now() }); }   // next = la pregunta en que retomar
+function saveProgress(next) { lsSet(PROGRESS_KEY, { state, currentIndex: next === undefined ? currentIndex : next, partner, savedAt: Date.now() }); }   // next = la pregunta en que retomar
 function loadProgress() {
   const p = lsGet(PROGRESS_KEY);
-  if (!p || !Array.isArray(p.state) || p.state.length !== TOTAL || Date.now() - (p.savedAt || 0) > PROGRESS_MAX_AGE) return null;
+  if (!p || !NAME_RE.test(String(p.partner || '')) || !Array.isArray(p.state) || p.state.length !== TOTAL || Date.now() - (p.savedAt || 0) > PROGRESS_MAX_AGE) return null;
   const cleaned = p.state.map((s, i) => ({
     picks: Array.isArray(s.picks) ? s.picks.filter(n => Number.isInteger(n) && QUESTIONS[i].opts && n >= 0 && n < QUESTIONS[i].opts.length) : [],
     none: !!s.none, other: String(s.other || '').slice(0, MAX_OTHER)
   }));
   const done = cleaned.filter((s) => s.picks.length || s.none || s.other).length;
-  return done > 0 && p.currentIndex > 0 && p.currentIndex < TOTAL ? { state: cleaned, currentIndex: p.currentIndex } : null;
+  return done > 0 && p.currentIndex > 0 && p.currentIndex < TOTAL ? { state: cleaned, currentIndex: p.currentIndex, partner: p.partner } : null;
 }
 
 // --- Pantallas --------------------------------------------------------------------------------------
@@ -170,19 +173,19 @@ function renderQuestion(i) {
   currentIndex = i;
   questionShownAt = Date.now();
   const q = QUESTIONS[i], s = state[i];
-  qPrompt.textContent = q.prompt;
-  qHint.textContent = q.type === 'open' ? '' : 'Elige todas las que quieras. Si ninguna te calza, dilo o escribe la tuya.';
+  qPrompt.textContent = fill(q.prompt);
+  qHint.textContent = q.type === 'open' ? '' : 'Elige todas las que quieras. Si ninguna calza, dilo o escribe la tuya.';
   qHint.classList.toggle('is-hidden', q.type === 'open');
   $('count').textContent = `${i + 1} de ${TOTAL}`;
   $('fill').style.width = `${(i / TOTAL) * 100}%`;
   btnBack.classList.toggle('is-hidden', i === 0);
-  btnNext.textContent = i === TOTAL - 1 ? 'Escribir mi canción' : 'Siguiente';
+  btnNext.textContent = i === TOTAL - 1 ? `Escribir la canción de ${partner}` : 'Siguiente';
   qBody.textContent = '';
 
   if (q.type === 'open') {
     const wrap = document.createElement('div'); wrap.className = 'open-area';
     const ta = document.createElement('textarea');
-    ta.maxLength = MAX_OTHER; ta.rows = 3; ta.placeholder = q.placeholder; ta.value = s.other; ta.setAttribute('aria-label', q.prompt);
+    ta.maxLength = MAX_OTHER; ta.rows = 3; ta.placeholder = q.placeholder; ta.value = s.other; ta.setAttribute('aria-label', fill(q.prompt));
     ta.addEventListener('input', () => { s.other = ta.value; });
     const why = document.createElement('p'); why.className = 'why'; why.textContent = q.why;
     wrap.append(ta, why); qBody.appendChild(wrap);
@@ -190,7 +193,7 @@ function renderQuestion(i) {
     return;
   }
 
-  const list = document.createElement('div'); list.className = 'opts'; list.setAttribute('role', 'group'); list.setAttribute('aria-label', q.prompt);
+  const list = document.createElement('div'); list.className = 'opts'; list.setAttribute('role', 'group'); list.setAttribute('aria-label', fill(q.prompt));
   const buttons = [];
   q.opts.forEach((o, idx) => {
     const b = document.createElement('button');
@@ -263,16 +266,36 @@ btnBack.addEventListener('click', () => { if (currentIndex > 0) { renderQuestion
 function resetState() { state.forEach(s => { s.picks = []; s.none = false; s.other = ''; }); }
 function startFresh() {
   lsDel(PROGRESS_KEY); lsDel(SONG_KEY); resetState(); song = null;
+  const inp = $('partnerName'); inp.value = partner = '';
+  $('btnName').disabled = true; $('nameError').classList.add('is-hidden');
   track('quiz_started', {});
+  showScreen('name');
+  try { inp.focus(); } catch (_e) { /* no crítico */ }
+}
+const nameInput = $('partnerName'), btnName = $('btnName');
+nameInput.addEventListener('input', () => {
+  const v = nameInput.value.replace(/\s+/g, ' ').trim();
+  btnName.disabled = !NAME_RE.test(v);
+  $('nameError').classList.toggle('is-hidden', !v || NAME_RE.test(v));
+});
+function submitName() {
+  const v = nameInput.value.replace(/\s+/g, ' ').trim();
+  if (!NAME_RE.test(v)) { $('nameError').classList.remove('is-hidden'); return; }
+  partner = v;
+  track('name_entered', {});
+  saveProgress();
   renderQuestion(0); showScreen('quiz');
 }
+btnName.addEventListener('click', submitName);
+nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); submitName(); } });
 const saved = loadProgress();
 if (saved) {
-  // Si hay un avance guardado, el botón principal es CONTINUAR (antes un botón secundario perdía el avance si tocaban "Empezar").
-  $('btnStart').textContent = `Continuar (pregunta ${saved.currentIndex + 1} de ${TOTAL})`;
+  // Si hay un avance guardado, el botón principal es CONTINUAR (un botón secundario perdía el avance si tocaban "Empezar").
+  $('btnStart').textContent = `Continuar con ${saved.partner} (pregunta ${saved.currentIndex + 1} de ${TOTAL})`;
   $('coverCont').classList.remove('is-hidden');
   $('btnStart').addEventListener('click', () => {
     track('quiz_resumed', { fromIndex: saved.currentIndex + 1 });
+    partner = saved.partner;
     saved.state.forEach((s, i) => { state[i] = s; });
     renderQuestion(Math.min(saved.currentIndex, TOTAL - 1)); showScreen('quiz');
   });
@@ -282,7 +305,7 @@ if (saved) {
 }
 
 // --- Enviar y generar ---------------------------------------------------------------------------------------
-const LOADING_STEPS = ['Escuchando lo que elegiste…', 'Buscando tu estribillo…', 'Rimando tus rarezas…', 'Casi lista…'];
+const LOADING_STEPS = () => [`Pensando en ${partner}…`, 'Buscando el estribillo…', 'Rimando sus manías…', 'Casi lista…'];
 async function postFn(name, payload) {
   const res = await fetch(`/.netlify/functions/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   const data = await res.json().catch(() => ({}));
@@ -292,7 +315,7 @@ async function postFn(name, payload) {
 function buildAnswers() {
   return QUESTIONS.map((q, i) => {
     const s = state[i];
-    return { q: q.prompt, picks: (q.opts || []).filter((_, idx) => s.picks.includes(idx)).map(o => o[1]), other: s.other.trim(), none: !!s.none };
+    return { q: fill(q.prompt), picks: (q.opts || []).filter((_, idx) => s.picks.includes(idx)).map(o => o[1]), other: s.other.trim(), none: !!s.none };
   });
 }
 function derivedFromAnswers() {
@@ -304,17 +327,17 @@ function derivedFromAnswers() {
 }
 let loadTimer = null;
 async function submitQuiz() {
-  lsSet(PROGRESS_KEY, { state, currentIndex: TOTAL - 1, savedAt: Date.now() });
+  lsSet(PROGRESS_KEY, { state, currentIndex: TOTAL - 1, partner, savedAt: Date.now() });
   track('quiz_submitted', { answered: answeredCount() });
   showScreen('loading');
-  let step = 0; $('loadLabel').textContent = LOADING_STEPS[0];
-  clearInterval(loadTimer); loadTimer = setInterval(() => { step = Math.min(step + 1, LOADING_STEPS.length - 1); $('loadLabel').textContent = LOADING_STEPS[step]; }, 4500);
+  let step = 0; $('loadLabel').textContent = LOADING_STEPS()[0];
+  clearInterval(loadTimer); loadTimer = setInterval(() => { step = Math.min(step + 1, 3); $('loadLabel').textContent = LOADING_STEPS()[step]; }, 4500);
   const t0 = Date.now();
   try {
-    const data = await postFn('sfc-generate-song', { anonId, answers: buildAnswers() });
+    const data = await postFn('sfc-generate-song', { anonId, kind: 'pareja', partner, answers: buildAnswers() });
     clearInterval(loadTimer);
     const d = derivedFromAnswers();
-    song = { songId: data.songId, title: data.title, subtitle: data.subtitle, style: data.style, lyrics: data.lyrics, colors: d.colors.slice(0, 2), suggested: d.suggested || data.style };
+    song = { partner, songId: data.songId, title: data.title, subtitle: data.subtitle, style: data.style, lyrics: data.lyrics, colors: d.colors.slice(0, 2), suggested: d.suggested || data.style };
     track('song_generated', { seconds: Math.round((Date.now() - t0) / 1000) });
     lsDel(PROGRESS_KEY);
     lsSet(SONG_KEY, { ...song, savedAt: Date.now() });
@@ -322,7 +345,7 @@ async function submitQuiz() {
   } catch (err) {
     clearInterval(loadTimer);
     track('song_generate_failed', { status: err.status || 0, seconds: Math.round((Date.now() - t0) / 1000) });
-    $('errorMsg').textContent = err.status === 429 ? 'Hiciste varias canciones seguidas' : 'No pudimos escribir tu canción';
+    $('errorMsg').textContent = err.status === 429 ? 'Hiciste varias canciones seguidas' : 'No pudimos escribir la canción';
     $('errorDetail').textContent = err.status === 429 ? err.message : 'Tus respuestas siguen guardadas. Inténtalo de nuevo en un momento.';
     showScreen('error');
   }
@@ -363,8 +386,9 @@ function renderReveal() {
   $('songTitle').textContent = song.title;
   $('songSub').textContent = song.subtitle || '';
   $('playerNote').textContent = '';
+  $('nextStepText').textContent = `Todavía no suena. Falta lo mejor: ponerle música y voz para que se la des a ${song.partner || 'tu pareja'}.`;
   renderSheet(song.lyrics);
-  document.title = `${song.title} · Si fueras una canción`;
+  document.title = `${song.title} · Si tu pareja fuera una canción`;
   showScreen('reveal');
   rendered = true;
   track('song_shown', { style: song.style, words: song.lyrics.split(/\s+/).length });
@@ -392,14 +416,14 @@ $('btnCopy').addEventListener('click', async () => {
 });
 $('btnShare').addEventListener('click', async () => {
   track('share_clicked', {});
-  const url = location.origin + '/si-fueras-cancion/';
-  const text = `Mi canción se llama «${song.title}»: ${song.subtitle}. Haz la tuya:`;
+  const url = location.origin + '/pareja-cancion/';
+  const text = 'Hice una canción para mi pareja con estas preguntas. Haz la de la tuya:';
   try { if (navigator.share) { await navigator.share({ title: song.title, text, url }); return; } } catch { /* canceló */ }
   const ok = await copyText(`${text} ${url}`);
   $('btnShare').textContent = ok ? 'Enlace copiado' : url;
   setTimeout(() => { $('btnShare').textContent = 'Compartir'; }, 2200);
 });
-$('btnRestart').addEventListener('click', () => { track('restart_clicked', {}); document.title = 'Si fueras una canción'; startFresh(); });
+$('btnRestart').addEventListener('click', () => { track('restart_clicked', {}); document.title = 'Si tu pareja fuera una canción'; startFresh(); });
 
 // --- Oferta: que la canción suene --------------------------------------------------------------------------------
 const SONG_TZ_DIAL = { 'America/Costa_Rica': '+506', 'America/Montevideo': '+598', 'America/Mexico_City': '+52', 'America/Cancun': '+52', 'America/Monterrey': '+52', 'America/Tijuana': '+52', 'America/Argentina/Buenos_Aires': '+54', 'America/Bogota': '+57', 'America/Santiago': '+56', 'America/Lima': '+51', 'America/Guayaquil': '+593', 'America/Panama': '+507', 'America/Guatemala': '+502', 'America/El_Salvador': '+503', 'America/Tegucigalpa': '+504', 'America/Managua': '+505', 'America/Caracas': '+58', 'America/La_Paz': '+591', 'America/Asuncion': '+595', 'Europe/Madrid': '+34' };
@@ -447,11 +471,12 @@ function setupSongOffer() {
   const teaser = $('songTeaser'), form = $('songForm'), done = $('songDone'), err = $('songError'), send = $('btnSongSend');
   teaser.classList.remove('is-hidden'); form.classList.add('is-hidden'); done.classList.add('is-hidden');
   err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Que me escriban a mi número';
-  $('songTeaserText').textContent = `Te hago una muestra cantada de «${song.title}» para que la escuches. Si te gusta, la terminamos. Sin compromiso: el precio lo hablamos solo después de que la oigas.`;
+  $('songOfferTitle').textContent = `Ya tienes la letra. Falta que suene para ${song.partner || 'tu pareja'}.`;
+  $('songTeaserText').textContent = `Te hago una muestra cantada de «${song.title}» para que la escuches. Si te gusta, la terminamos y se la das a ${song.partner || 'tu pareja'}. Sin compromiso: el precio lo hablamos solo después de que la oigas.`;
 
   songStyle = song.suggested || 'Sorpréndeme';
   const sug = $('songSuggest');
-  if (song.suggested && song.suggested !== 'Sorpréndeme') { sug.textContent = `Según tus respuestas te queda: ${song.suggested}.`; sug.classList.remove('is-hidden'); } else sug.classList.add('is-hidden');
+  if (song.suggested && song.suggested !== 'Sorpréndeme') { sug.textContent = `Por lo que contaste, le queda: ${song.suggested}.`; sug.classList.remove('is-hidden'); } else sug.classList.add('is-hidden');
   box.querySelectorAll('.song-chip').forEach(chip => {
     chip.setAttribute('aria-pressed', chip.dataset.style === songStyle ? 'true' : 'false');
     chip.onclick = () => {
@@ -461,9 +486,8 @@ function setupSongOffer() {
     };
   });
 
-  const wantName = $('songWantName'), nameIn = $('songName'), nameNote = $('songNameNote');
-  wantName.checked = false; nameIn.value = ''; nameIn.classList.add('is-hidden'); nameNote.classList.add('is-hidden');
-  wantName.onchange = () => { nameIn.classList.toggle('is-hidden', !wantName.checked); nameNote.classList.toggle('is-hidden', !wantName.checked); track('song_name_toggled', { on: wantName.checked }); };
+  // En esta versión el nombre de la pareja ya va en la letra: no hay casilla de nombre.
+  const wantName = { checked: false }, nameIn = { value: '', focus() {} };
   const dial = $('songDial'), phone = $('songPhone'); phone.value = '';
   const guess = guessDialCode(); if (guess) dial.value = guess;
 
@@ -485,7 +509,7 @@ function setupSongOffer() {
   const waBtn = $('songWaBtn'), waAgain = $('songWaAgain');
   const waHref = () => {
     const n = typedName();
-    const text = `Hola, quiero que suene mi canción 🎵\n«${song.title}»\nEstilo: ${songStyle}\n${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${song.songId}`;
+    const text = `Hola, quiero que suene la canción para ${song.partner || 'mi pareja'} 🎵\n«${song.title}»\nEstilo: ${songStyle}\n${n && nameRe.test(n) ? `Nombre en la canción: ${n}\n` : ''}Mi código es: ${song.songId}`;
     return `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(text)}`;
   };
   waBtn.href = waHref(); waAgain.classList.add('is-hidden');
@@ -522,7 +546,7 @@ function setupSongOffer() {
       if (!data.ok) throw new Error('fallo');
       track('song_request_confirmed', { style: songStyle });
       waAgain.classList.add('is-hidden');
-      $('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de tu canción. Revisa tus mensajes pronto.`;
+      $('songDoneText').textContent = `Te escribiré por WhatsApp al ${full} con una muestra de la canción para ${song.partner || 'tu pareja'}. Revisa tus mensajes pronto.`;
       form.classList.add('is-hidden'); done.classList.remove('is-hidden'); box.classList.add('is-open');
       try { done.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* no crítico */ }
     } catch (e) {
@@ -561,6 +585,6 @@ document.addEventListener('visibilitychange', () => {
 (function resumeSong() {
   const s = lsGet(SONG_KEY);
   if (!s || !s.songId || !s.lyrics || !s.title || Date.now() - (s.savedAt || 0) > SONG_MAX_AGE) { lsDel(SONG_KEY); return; }
-  song = { songId: s.songId, title: s.title, subtitle: s.subtitle || '', style: s.style, lyrics: s.lyrics, colors: Array.isArray(s.colors) ? s.colors.slice(0, 2) : [], suggested: s.suggested || s.style };
+  song = { partner: NAME_RE.test(String(s.partner || '')) ? s.partner : '', songId: s.songId, title: s.title, subtitle: s.subtitle || '', style: s.style, lyrics: s.lyrics, colors: Array.isArray(s.colors) ? s.colors.slice(0, 2) : [], suggested: s.suggested || s.style };
   renderReveal();
 })();

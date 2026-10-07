@@ -381,25 +381,32 @@ function loadQuizProgress() {
 }
 function clearQuizProgress() { try { localStorage.removeItem(PROGRESS_KEY); } catch { /* no crítico */ } }
 
-document.getElementById('btnStart').addEventListener('click', () => {
+function startFreshQuiz() {
   track('quiz_started', {});
   clearQuizProgress();
   currentIndex = 0;
   renderQuestion(0);
   showScreen('quiz');
-});
+}
+const btnStart = document.getElementById('btnStart');
 const btnResume = document.getElementById('btnResume');
 const savedProgress = loadQuizProgress();
 if (btnResume && savedProgress) {
-  btnResume.textContent = `Continuar donde quedaste (pregunta ${Math.min(savedProgress.currentIndex + 1, QUESTIONS.length)} de ${QUESTIONS.length})`;
-  btnResume.classList.remove('is-hidden');
-  btnResume.addEventListener('click', () => {
+  // Con avance guardado, el botón PRINCIPAL es "Continuar". Antes el principal era "Empezar", que borra el avance:
+  // quien volvía con 49 respuestas tocaba el botón grande y lo perdía todo.
+  btnStart.textContent = `Continuar donde quedaste (pregunta ${Math.min(savedProgress.currentIndex + 1, QUESTIONS.length)} de ${QUESTIONS.length})`;
+  btnStart.addEventListener('click', () => {
     track('quiz_resumed', { fromIndex: savedProgress.currentIndex + 1 });
     savedProgress.answers.forEach((v, i) => { answers[i] = v; });
     currentIndex = Math.min(savedProgress.currentIndex, QUESTIONS.length - 1);
     renderQuestion(currentIndex);
     showScreen('quiz');
   });
+  btnResume.textContent = 'Empezar de nuevo';
+  btnResume.classList.remove('is-hidden');
+  btnResume.addEventListener('click', startFreshQuiz);
+} else {
+  btnStart.addEventListener('click', startFreshQuiz);
 }
 
 

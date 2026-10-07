@@ -8,7 +8,7 @@ const store = require('./_lib/store');
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 const EVENT_NAME_RE = /^[a-z0-9_:]{1,60}$/;
 const MAX_METADATA_JSON_LENGTH = 1500;
-const APP = 'si-fueras-cancion';
+const APPS = new Set(['si-fueras-cancion', 'pareja-cancion']);   // cada versión escribe con su propio `app`
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -20,6 +20,7 @@ exports.handler = async (event) => {
     const anonId = typeof body.anonId === 'string' ? body.anonId.slice(0, 64) : null;
     if (!anonId) return json(400, { error: 'Falta anonId' });
 
+    const APP = APPS.has(body.app) ? body.app : 'si-fueras-cancion';
     let metadata = body.metadata && typeof body.metadata === 'object' ? body.metadata : {};
     // Defensa extra: aunque el cliente no lo mande, aquí se descartan los campos que podrían traer texto de la persona.
     delete metadata.answer; delete metadata.other; delete metadata.picks; delete metadata.name; delete metadata.phone;

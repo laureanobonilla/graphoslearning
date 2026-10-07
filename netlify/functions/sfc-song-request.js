@@ -11,7 +11,7 @@ const store = require('./_lib/store');
 const { getReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const { json, UUID_RE } = require('./_lib/qer-map-core');
-const { APP, STYLES, SONG_SCHEMA, validSong, songPrompt, cleanName, normalizePhone } = require('./_lib/sfc-song');
+const { appOf, STYLES, SONG_SCHEMA, validSong, songPrompt, cleanName, normalizePhone } = require('./_lib/sfc-song');
 
 const FALLBACK_TO_EMAIL = 'bonillapretiz@gmail.com';
 const MAX_PER_HOUR = 2;
@@ -50,13 +50,15 @@ exports.handler = async (event) => {
         const base = await getReading(songId);
         if (!base || base.format !== 'song' || !base.lyrics) return json(404, { error: 'Esa canción ya no está disponible. Escríbeme por WhatsApp y lo resolvemos.' });
 
+        const kind = base.kind === 'pareja' ? 'pareja' : 'self';
+        const APP = appOf(kind);
         let used = 0;
         try { used = await store.countEventsLastHour(songId, 'song_request_sent'); } catch (e) { console.error('[sfc-song-request] conteo', e.message); }
         if (used >= MAX_PER_HOUR) return json(429, { error: 'Ya recibí tu solicitud. Te escribo pronto por WhatsApp.' });
 
         // Con nombre: la letra se rehace con él. Si falla, se manda la original y se avisa en el correo.
         let named = null;
-        if (name && Array.isArray(base.answers) && base.answers.length) {
+        if (kind === 'self' && name && Array.isArray(base.answers) && base.answers.length) {
             try {
                 const wantedStyle = style === 'Sorpréndeme' ? base.style : style;
                 named = await generateWithRetries(songPrompt(base.answers, wantedStyle, name), SONG_SCHEMA, validSong,
@@ -65,11 +67,12 @@ exports.handler = async (event) => {
         }
         const finalStyle = style === 'Sorpréndeme' ? (named?.style || base.style || style) : style;
 
+        const partner = kind === 'pareja' ? String(base.partner || '') : '';
         const digits = phone ? phone.slice(1) : '';
-        const firstMsg = `Hola, soy quien hizo "Si fueras una canción" y pediste que suene «${base.title}» (${finalStyle}). Ya tengo una primera muestra. ¿Te la envío por aquí?`;
+        const firstMsg = `Hola, soy quien hizo ${kind === 'pareja' ? '"Si tu pareja fuera una canción"' : '"Si fueras una canción"'} y pediste que suene «${base.title}» (${finalStyle}). Ya tengo una primera muestra. ¿Te la envío por aquí?`;
         const waLink = `https://wa.me/${digits}?text=${encodeURIComponent(firstMsg)}`;
         const text = [
-            `Nueva solicitud de canción · Si fueras una canción`,
+            `Nueva solicitud de canción · ${kind === 'pareja' ? 'PAREJA (regalo)' : 'Si fueras una canción'}`,
             ``,
             ...(viaWhatsapp
                 ? [`PIDIÓ POR EL BOTÓN DE WHATSAPP (no dejó teléfono).`,
@@ -77,7 +80,10 @@ exports.handler = async (event) => {
                 : [`Teléfono: ${phone}`,
                    `WhatsApp (toca para escribirle con el mensaje listo): ${waLink}`]),
             `Estilo pedido: ${style}${style === 'Sorpréndeme' ? ` (la letra sugiere: ${finalStyle})` : ''}`,
-            `Nombre en la canción: ${name ? name + (named ? '' : ' (NO se pudo rehacer la letra con el nombre: va la original, ponlo tú)') : '(no quiere nombre)'}`,
+            ...(kind === 'pareja'
+                ? [`Nombre de la pareja (ya va en la letra): ${partner || '(no guardado)'}`, `Es un REGALO: quien la pide la va a dar. No hace falta rehacer la letra.`]
+                : []),
+            ...(kind === 'self' ? [`Nombre en la canción: ${name ? name + (named ? '' : ' (NO se pudo rehacer la letra con el nombre: va la original, ponlo tú)') : '(no quiere nombre)'}`] : []),
             `País (aprox.): ${country || 'desconocido'}`,
             `Código de canción: ${songId}`,
             ``,
@@ -93,7 +99,7 @@ exports.handler = async (event) => {
             body: JSON.stringify({
                 from: 'Graphikosmos <onboarding@resend.dev>',
                 to: [process.env.FEEDBACK_TO_EMAIL || FALLBACK_TO_EMAIL],
-                subject: `Canción (Si fueras…)${viaWhatsapp ? ' WhatsApp' : ''}: ${base.title} · ${finalStyle}${phone ? ' · ' + phone : ''}`,
+                subject: `Canción (${kind === 'pareja' ? 'Pareja' : 'Si fueras…'})${viaWhatsapp ? ' WhatsApp' : ''}: ${base.title} · ${finalStyle}${phone ? ' · ' + phone : ''}`,
                 text
             })
         });
@@ -102,7 +108,7 @@ exports.handler = async (event) => {
             try { await store.logEvent(songId, 'anon', songId, 'song_request_failed', { reason: `resend_${res.status}`, country, source: 'server' }, null, APP); } catch (_e) { /* no crítico */ }
             return json(502, { error: 'No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.' });
         }
-        try { await store.logEvent(songId, 'anon', songId, 'song_request_sent', { style, hasName: !!name, nameApplied: !!named, via: viaWhatsapp ? 'whatsapp' : 'form', country, source: 'server' }, null, APP); }
+        try { await store.logEvent(songId, 'anon', songId, 'song_request_sent', { style, kind, hasName: !!name || !!partner, nameApplied: !!named, via: viaWhatsapp ? 'whatsapp' : 'form', country, source: 'server' }, null, APP); }
         catch (e) { console.error('[sfc-song-request] evento', e.message); }
         return json(200, { ok: true });
     } catch (err) {

@@ -9,7 +9,7 @@ const store = require('./_lib/store');
 const { saveReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const { json } = require('./_lib/qer-map-core');
-const { APP, sanitizeSongAnswers, SONG_SCHEMA, validSong, songPrompt } = require('./_lib/sfc-song');
+const { appOf, sanitizeSongAnswers, SONG_SCHEMA, validSong, songPrompt, partnerPrompt, cleanName } = require('./_lib/sfc-song');
 
 const BUDGET_MS = 22000;
 const MAX_PER_HOUR_IP = 10;   // varias personas pueden compartir IP (redes móviles): holgado
@@ -37,6 +37,11 @@ exports.handler = async (event) => {
 
     const answers = sanitizeSongAnswers(body.answers);
     if (!answers) return json(400, { error: 'Faltan respuestas: contesta al menos 5 preguntas.' });
+    // kind 'pareja': el nombre de la pareja es obligatorio y va en la letra. Cualquier otro valor = versión para uno mismo.
+    const kind = body.kind === 'pareja' ? 'pareja' : 'self';
+    const APP = appOf(kind);
+    const partner = kind === 'pareja' ? cleanName(body.partner) : '';
+    if (kind === 'pareja' && !partner) return json(400, { error: 'Escribe solo el nombre de tu pareja (letras, hasta 30).' });
     const anonId = typeof body.anonId === 'string' ? body.anonId.slice(0, 64) : '';
     const t0 = Date.now();
     const ipKey = hashIp(ipOf(event));
@@ -52,10 +57,12 @@ exports.handler = async (event) => {
             if (byIp >= MAX_PER_HOUR_IP || byAnon >= MAX_PER_HOUR_ANON) return json(429, { error: 'Ya hiciste varias canciones en poco tiempo. Vuelve a intentarlo en un rato.' });
         } catch (e) { console.error('[sfc-generate-song] conteo', e.message); }
 
-        const song = await generateWithRetries(songPrompt(answers, 'Sorpréndeme', ''), SONG_SCHEMA, validSong,
+        const song = await generateWithRetries((kind === 'pareja' ? partnerPrompt(answers, 'Sorpréndeme', partner) : songPrompt(answers, 'Sorpréndeme', '')), SONG_SCHEMA, validSong,
             { tag: 'sfc-generate-song', maxOutputTokens: 1800, deadline: t0 + BUDGET_MS });
         const clean = {
             format: 'song',
+            kind,
+            ...(partner ? { partner } : {}),
             title: String(song.title).replace(/["“”]/g, '').trim().slice(0, 80),
             subtitle: String(song.subtitle).trim().slice(0, 140),
             style: song.style,
@@ -65,7 +72,7 @@ exports.handler = async (event) => {
         const songId = crypto.randomUUID();
         await saveReading(songId, clean);
         try {
-            const meta = { source: 'server', country, seconds: Math.round((Date.now() - t0) / 1000), answered: answers.length };
+            const meta = { source: 'server', kind, country, seconds: Math.round((Date.now() - t0) / 1000), answered: answers.length };
             // Dos filas: una por IP y otra por navegador, que son las claves del límite.
             await store.logEvent(ipKey, 'anon', anonId || null, 'sfc_song_generated', meta, null, APP);
             if (anonId) await store.logEvent(anonId, 'anon', anonId, 'sfc_song_generated', meta, null, APP);
