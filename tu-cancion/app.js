@@ -7,13 +7,16 @@ const $ = (id) => document.getElementById(id);
 
 // ---------- Ejemplos (pon los mp3 en tu-cancion/ejemplos/ con EXACTAMENTE estos nombres) ----------
 const EXAMPLES = [
-  { file: 'balada-lo-que-no-te-dije-a-tiempo.mp3', title: 'Lo que no te dije a tiempo', rhythm: 'Balada romántica', occ: 'una disculpa y un te quiero' },
-  { file: 'bachata-quedate-otra-vez.mp3', title: 'Quédate otra vez', rhythm: 'Bachata', occ: 'un aniversario' },
-  { file: 'cumbia-baila-conmigo-esta-noche.mp3', title: 'Baila conmigo esta noche', rhythm: 'Cumbia', occ: 'un cumpleaños' },
-  { file: 'salsa-mi-barrio-te-canta.mp3', title: 'Mi barrio te canta', rhythm: 'Salsa', occ: 'un amigo de toda la vida' },
-  { file: 'ranchera-brindo-por-ti-mama.mp3', title: 'Brindo por ti, mamá', rhythm: 'Ranchera / Mariachi', occ: 'el Día de la Madre' }
+  { file: 'balada-lo-que-no-te-dije-a-tiempo.mp3', title: 'Lo que no te dije a tiempo', rhythm: 'Balada romántica' },
+  { file: 'bachata-quedate-otra-vez.mp3', title: 'Quédate otra vez', rhythm: 'Bachata' },
+  { file: 'cumbia-baila-conmigo-esta-noche.mp3', title: 'Baila conmigo esta noche', rhythm: 'Cumbia' },
+  { file: 'alabanza-tu-fidelidad-me-sostiene.mp3', title: 'Tu fidelidad me sostiene', rhythm: 'Alabanza' },
+  { file: 'ranchera-brindo-por-ti-mama.mp3', title: 'Brindo por ti, mamá', rhythm: 'Ranchera / Mariachi' },
+  { file: 'rock-no-me-voy-a-rendir.mp3', title: 'No me voy a rendir', rhythm: 'Rock' },
+  { file: 'rnb-quedate-hasta-el-amanecer.mp3', title: 'Quédate hasta el amanecer', rhythm: 'R&B' },
+  { file: 'acustica-lo-simple-de-quererte.mp3', title: 'Lo simple de quererte', rhythm: 'Acústica' }
 ];
-const RHYTHMS = ['Balada romántica', 'Bachata', 'Cumbia', 'Salsa', 'Ranchera / Mariachi', 'Pop'];
+const RHYTHMS = ['Balada romántica', 'Bachata', 'Cumbia', 'Alabanza', 'Ranchera / Mariachi', 'Rock', 'R&B', 'Acústica', 'Pop'];
 const REASONS = [
   { label: 'Para mi pareja', person: true }, { label: 'Un cumpleaños', person: true }, { label: 'Para mi mamá o papá', person: true },
   { label: 'Para un hijo o hija', person: true }, { label: 'Para un amigo o amiga', person: true }, { label: 'Para mí', person: true, self: true }
@@ -92,7 +95,7 @@ function waveHeights(n, seed) { const o = []; for (let i = 0; i < n; i++) { cons
   EXAMPLES.forEach((ex, i) => {
     const el = document.createElement('div'); el.className = 'ex';
     el.innerHTML = '<button type="button" class="play" aria-label="Escuchar"><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button><div class="txt"><p class="t"></p><p class="m"></p><div class="bar"><i></i></div></div>';
-    el.querySelector('.t').textContent = ex.title; el.querySelector('.m').textContent = `${ex.rhythm} · para ${ex.occ}`;
+    el.querySelector('.t').textContent = ex.title; el.querySelector('.m').textContent = ex.rhythm;
     const url = `ejemplos/${ex.file}`, btn = el.querySelector('.play'), fillEl = el.querySelector('.bar i');
     fetch(url, { method: 'HEAD' }).then(r => { if (!r.ok || !/audio|mpeg|octet/i.test(r.headers.get('content-type') || '')) el.classList.add('soon'); }).catch(() => el.classList.add('soon'));
     btn.addEventListener('click', () => {
@@ -131,7 +134,10 @@ function pathOf() {
     if (S.aiStop >= 3) p.push('details');
     return p;
   }
-  if (S.reason) p.push('named', 'qualities', 'feeling');
+  if (S.reason) {   // persona: nombre, lo que la hace especial y 2 preguntas inteligentes de Gemini (si fallan, se omiten en silencio)
+    p.push('named', 'qualities');
+    for (let k = 0; k < Math.min(S.aiStop, 2); k++) p.push('ai' + k);
+  }
   p.push('rhythm', 'details');
   return p;
 }
@@ -181,11 +187,11 @@ function choiceList({ options, multi, selected, onChange, otherLabel = 'Otro', o
 // ---------- Definición de pasos ----------
 const STEPS = {
   price: {
-    title: 'Antes de empezar, lo importante', hint: '',
+    title: 'Tu canción, antes de empezar', hint: '',
     render(body) {
       const p = geo.price || {};
       body.innerHTML = `<div class="price-box"><p class="amt"></p><p class="lbl">Es lo que cuesta tu canción terminada.</p><ul>
-        <li>No pagas nada ahora.</li><li>Primero te enviamos una muestra para que la escuches.</li><li>Solo si te gusta, pagas y recibes tu canción completa.</li></ul></div>`;
+        <li>No pagas nada ahora.</li><li>Primero te enviamos una muestra para que la escuches.</li><li>Solo si te gusta, pagas y recibes tu canción completa.</li></ul><p class="inc"><b>Incluye:</b> la versión cantada y la pista instrumental.</p></div>`;
       body.querySelector('.amt').textContent = p.text || '';
       track('price_shown', { price: p.text || '', country: geo.country || '' });
     },
@@ -197,7 +203,8 @@ const STEPS = {
       body.appendChild(choiceList({ options: ['Sí, ya tengo la letra', 'No, ayúdame a crearla'], multi: false, selected: S.hasOwn === true ? 'Sí, ya tengo la letra' : S.hasOwn === false ? 'No, ayúdame a crearla' : '',
         onChange: (v) => { S.hasOwn = v === 'Sí, ya tengo la letra' ? true : v === 'No, ayúdame a crearla' ? false : null; track('has_lyrics_chosen', { hasOwn: S.hasOwn }); update(); } }));
     },
-    ok: () => S.hasOwn !== null
+    ok: () => S.hasOwn !== null,
+    nextLabel: 'Seguir'
   },
   paste: {
     title: 'Escribe tu letra o pégala aquí', hint: 'Puedes cambiarla después, antes de enviarla.',
@@ -297,14 +304,18 @@ const STEPS = {
   };
 });
 async function loadAi(i) {
-  const hist = S.extra.slice(0, i).filter(Boolean).map(e => ({ q: e.q, a: e.a, other: e.other }));
+  const person = S.reason !== 'Otro';
+  const hist = [];
+  if (person && (S.qualities.length || S.qualitiesOther.trim())) hist.push({ q: 'Lo que la hace especial', a: S.qualities, other: S.qualitiesOther.trim() });
+  S.extra.slice(0, i).filter(Boolean).forEach(e => hist.push({ q: e.q, a: e.a, other: e.other }));
   let d;
-  try { d = await postFn('tc-next-step', { reason: S.reasonOther, step: i + 1, history: hist }); }
+  try { d = await postFn('tc-next-step', { reason: person ? S.reason : S.reasonOther, person, step: i + 1, history: hist }); }
   catch { d = null; }
   if (!d || d.fallback || !Array.isArray(d.options) || d.options.length < 4) {
     // Contingencia silenciosa: sin error, la persona simplemente cuenta todo en un campo de texto.
     S.aiStop = i; track('ai_step_shown', { index: i + 1, fallback: true });
-    if (stepId === 'ai' + i) { stepId = 'free'; track('step_viewed', { step: 'free' }); renderStep(); } else saveState();
+    const nxtId = person ? 'rhythm' : 'free';   // persona: se omiten las preguntas inteligentes; otra razón: una caja de texto
+    if (stepId === 'ai' + i) { stepId = nxtId; track('step_viewed', { step: nxtId }); renderStep(); } else saveState();
     return;
   }
   aiMeta[i] = d; track('ai_step_shown', { index: i + 1, fallback: !!d.fallback });
@@ -352,7 +363,6 @@ function startFlow(from) {
   stepId = ''; goTo('price', false);
 }
 $('btnCta').addEventListener('click', () => startFlow('bar'));
-$('btnCtaEnd').addEventListener('click', () => startFlow('end'));
 const saved = loadState();
 if (saved) {
   $('btnResume').classList.remove('is-hidden');

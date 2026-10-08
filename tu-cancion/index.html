@@ -103,6 +103,8 @@
   .price-box .amt{ font-family:'Gloock',Georgia,serif; font-size:2.6rem; line-height:1; margin:0 0 4px; color:var(--mango); }
   .price-box .lbl{ margin:0 0 14px; color:#d9d7f3; font-size:.95rem; }
   .price-box ul{ margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:9px; }
+  .price-box .inc{ margin:16px 0 0; padding-top:14px; border-top:1px solid rgba(255,255,255,.22); font-size:.98rem; color:#fff; }
+  .price-box .inc b{ color:var(--mango); }
   .price-box li{ display:flex; gap:10px; font-size:.98rem; }
   .price-box li::before{ content:'✓'; color:var(--mango); font-weight:800; }
   .skeleton{ display:flex; flex-direction:column; gap:10px; margin-top:14px; }
@@ -197,9 +199,7 @@
       </ul>
     </div>
 
-    <div class="welcome-end">
-      <button type="button" class="btn btn-primary" id="btnCtaEnd">Quiero mi canción</button>
-    </div>
+    <div class="welcome-end" aria-hidden="true"></div>
   </section>
 
   <!-- ===================== FLUJO ===================== -->

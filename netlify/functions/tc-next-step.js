@@ -20,7 +20,7 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
     let body; try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
     const step = Math.min(3, Math.max(1, parseInt(body.step, 10) || 1));
-    const reason = scrubOne(body.reason, 200);
+    const reason = scrubOne(body.reason, 200), person = body.person === true;
     const history = (Array.isArray(body.history) ? body.history : []).slice(0, 4).map(h => ({ q: scrubOne(h && h.q, 160), a: list(h && h.a, 8, 100).join(', ') || scrubOne(h && h.other, 160) })).filter(h => h.q && h.a);
     if (!reason) return json(400, { error: 'Falta la razón.' });
     try {
@@ -28,7 +28,7 @@ exports.handler = async (event) => {
 - Razón: «${reason}»
 ${history.length ? 'Lo que ha contestado hasta ahora:\n' + history.map(h => `- ${h.q} → «${h.a}»`).join('\n') : ''}
 
-Diseña la pantalla ${step} de 3 del cuestionario: UNA pregunta con opciones para obtener el dato que más ayude a escribir una letra suya (${step === 1 ? 'lo que se quiere celebrar, recordar o expresar' : step === 2 ? 'qué detalles concretos o a quién va dirigida' : 'el tono y la emoción final'}). No repitas lo ya preguntado. Opciones concretas y cotidianas, en español neutro, sin asumir género. No incluyas la opción «Otro».`;
+Diseña la pantalla ${step} de ${person ? 2 : 3} del cuestionario: UNA pregunta con opciones para obtener el dato que más ayude a escribir una letra suya (${person ? (step === 1 ? 'un momento, recuerdo o rasgo concreto de esa persona que valga la pena contar en la canción, sin repetir lo ya dicho' : 'el tono y la emoción con que quiere que la reciba esa persona') : step === 1 ? 'lo que se quiere celebrar, recordar o expresar' : step === 2 ? 'qué detalles concretos o a quién va dirigida' : 'el tono y la emoción final'}). No repitas lo ya preguntado. Opciones concretas y cotidianas, en español neutro, sin asumir género. No incluyas la opción «Otro».`;
         const d = await generateWithRetries(prompt, SCHEMA, valid, { tag: 'tc-next-step', maxOutputTokens: 600, deadline: Date.now() + 9000, attemptMs: 6500 });
         return json(200, { question: scrubOne(d.question, 120), hint: scrubOne(d.hint, 120), multi: d.multi === true, options: d.options.map(o => scrubOne(o, 60)).filter(Boolean).slice(0, 8), step });
     } catch (err) {
