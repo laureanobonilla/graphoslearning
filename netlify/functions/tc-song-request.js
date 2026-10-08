@@ -59,6 +59,7 @@ exports.handler = async (event) => {
             ? [`SOLO ABRIÓ WHATSAPP (no dejó teléfono): es una INTENCIÓN, no un pedido confirmado.`, `Solo cuenta si te llega su mensaje con el código ${id.slice(0, 8)}. Todo lo que armó queda guardado igual (tabla tc_songs, id ${id}).`]
             : [`Teléfono: ${phone}`, `WhatsApp (toca para escribirle con el mensaje listo): https://wa.me/${digits}?text=${encodeURIComponent(firstMsg)}`]),
         ``,
+        `Aceptó el precio (casilla marcada): ${body.priceAck === true ? 'SÍ' : 'no consta'}`,
         `Precio que vio: ${price.text}${price.provisional ? ' (PRECIO PROVISIONAL de su país: revisa tc-core.js)' : ''} · País (aprox.): ${country || 'desconocido'}`,
         `Código: ${id}`,
         ``,

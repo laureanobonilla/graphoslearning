@@ -124,9 +124,9 @@ const isSelf = () => !!(reasonObj() && reasonObj().self);
 const rhythmLabel = () => (S.rhythm === 'Otro' ? S.rhythmOther : S.rhythm);
 
 function pathOf() {
-  if (S.hasOwn === true) return ['price', 'hasLyrics', 'paste', 'rhythm', 'notes'];
-  if (S.hasOwn === null) return ['price', 'hasLyrics'];
-  const p = ['price', 'hasLyrics', 'reason'];
+  if (S.hasOwn === true) return ['hasLyrics', 'paste', 'rhythm', 'notes'];
+  if (S.hasOwn === null) return ['hasLyrics'];
+  const p = ['hasLyrics', 'reason'];
   if (S.reason === 'Otro') {
     for (let k = 0; k < S.aiStop; k++) p.push('ai' + k);
     if (S.aiStop < 3) p.push('free');   // Gemini no respondió: una sola caja para contarlo todo (sin mostrar ningún error)
@@ -193,7 +193,6 @@ const STEPS = {
       body.innerHTML = `<div class="price-box"><p class="amt"></p><p class="lbl">Es lo que cuesta tu canción terminada.</p><ul>
         <li>No pagas nada ahora.</li><li>Primero te enviamos una muestra para que la escuches.</li><li>Solo si te gusta, pagas y recibes tu canción completa.</li></ul><p class="inc"><b>Incluye:</b> la versión cantada y la pista instrumental.</p></div>`;
       body.querySelector('.amt').textContent = p.text || '';
-      track('price_shown', { price: p.text || '', country: geo.country || '' });
     },
     ok: () => true, nextLabel: 'Entendido, empezar'
   },
@@ -338,7 +337,7 @@ function renderStep() {
   $('fill').style.width = `${Math.round(((idx + 1) / (path.length + 1)) * 100)}%`;
   btnNext.textContent = st.nextLabel || (last ? 'Ver mi letra' : 'Seguir');
   btnSkip.classList.toggle('is-hidden', !st.skippable);
-  btnBack.style.visibility = stack.length ? 'visible' : 'hidden';
+  btnBack.style.visibility = 'visible';
   update();
 }
 function goTo(id2, push = true) {
@@ -353,14 +352,14 @@ function advance() {
 }
 btnNext.addEventListener('click', () => { if (!btnNext.disabled) advance(); });
 btnSkip.addEventListener('click', () => { track('step_skipped', { step: stepId }); advance(); });
-btnBack.addEventListener('click', () => { if (!stack.length) return; track('back_clicked', { from: stepId }); stepId = stack.pop(); showScreen('flow'); renderStep(); });
+btnBack.addEventListener('click', () => { if (!stack.length) { track('back_clicked', { from: stepId, to: 'welcome' }); showScreen('welcome'); return; } track('back_clicked', { from: stepId }); stepId = stack.pop(); showScreen('flow'); renderStep(); });
 
 // ---------- CTA ----------
 function startFlow(from) {
   track('cta_clicked', { from });
   S = blank(); stack = []; aiMeta = []; id = crypto.randomUUID ? crypto.randomUUID() : id; lsDel('tc_song_v1');
   loadGeo().then(() => { if (stepId === 'price' && currentScreen === 'flow') renderStep(); });
-  stepId = ''; goTo('price', false);
+  stepId = ''; goTo('hasLyrics', false);
 }
 $('btnCta').addEventListener('click', () => startFlow('bar'));
 const saved = loadState();
@@ -471,15 +470,22 @@ const PHONE_MSG = { empty: 'Falta tu número de WhatsApp, por ejemplo 8888 1234.
 
 let waPending = false, waPosted = false, waReturn = null;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && waReturn) waReturn(); });
-function payload(via, extra) { return Object.assign({ id, anonId, via, brief: briefOf(), title: S.title, lyrics: S.lyrics, lyricsFinal: S.lyricsFinal, utm: UTM, consent: true }, extra || {}); }
+function payload(via, extra) { return Object.assign({ id, anonId, via, brief: briefOf(), title: S.title, lyrics: S.lyrics, lyricsFinal: S.lyricsFinal, utm: UTM, consent: true, priceAck: true }, extra || {}); }
 function setupSend() {
   waPending = false; waPosted = false;
-  $('sendReassure').textContent = geo.price && geo.price.text ? `Tu canción cuesta ${geo.price.text}, pero no pagas nada hasta escuchar tu muestra.` : 'No pagas nada hasta escuchar tu muestra.';
   const dial = $('songDial'), phone = $('songPhone'); phone.value = ''; const g = guessDial(); if (g) dial.value = g;
   $('waBack').classList.add('is-hidden'); $('phoneBox').classList.add('is-hidden'); $('btnShowPhone').classList.remove('is-hidden'); $('sendErr').classList.add('is-hidden');
-  const waText = () => `Hola, quiero que suene mi canción 🎵\n«${S.title}»\nRitmo: ${rhythmLabel() || '—'}\nMi código es: ${id.slice(0, 8)}`;
+  const ack = $('priceAck'), priceTxt = geo.price && geo.price.text ? geo.price.text : '';
+  $('priceAmt').textContent = priceTxt; $('priceLine').textContent = priceTxt ? `Tu canción terminada cuesta ${priceTxt} · no pagas hasta escucharla.` : 'No pagas nada hasta escuchar tu muestra.';
+  $('ackText').textContent = priceTxt ? `Entiendo que mi canción cuesta ${priceTxt} y que solo pago si me gusta la muestra.` : 'Entiendo que mi canción tiene un precio y que solo pago si me gusta la muestra.';
+  ack.checked = false;
+  const gate = () => { const on = ack.checked; $('btnWa').classList.toggle('is-disabled', !on); $('btnWa').setAttribute('aria-disabled', String(!on)); $('btnPhoneSend').disabled = !on; $('ackHint').classList.toggle('is-hidden', on); };
+  ack.onchange = () => { gate(); if (ack.checked) track('price_ack', { price: priceTxt, country: geo.country || '' }); };
+  gate(); track('price_shown', { price: priceTxt, country: geo.country || '', where: 'review' });
+  const waText = () => `Hola, quiero que suene mi canción 🎵\n«${S.title}»\nRitmo: ${rhythmLabel() || '—'}\nEntiendo que cuesta ${priceTxt || 'el precio indicado'} y que solo pago si me gusta la muestra.\nMi código es: ${id.slice(0, 8)}`;
   const wa = $('btnWa'); wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(waText())}`;
-  wa.onclick = () => {
+  wa.onclick = (ev) => {
+    if (!ack.checked) { ev.preventDefault(); $('ackHint').classList.remove('is-hidden'); try { $('ackRow').scrollIntoView({ block: 'center' }); } catch { /* ok */ } return; }
     wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(waText())}`;
     track('whatsapp_clicked', { primary: true }); waPending = true;
     if (!waPosted) { waPosted = true; postFn('tc-song-request', payload('whatsapp')).catch(() => {}); }
@@ -491,6 +497,7 @@ function setupSend() {
   $('waYes').onclick = () => { track('wa_confirmed', {}); $('sendDoneText').textContent = 'Perfecto. Te respondemos por WhatsApp con la muestra de tu canción apenas veamos tu mensaje.'; $('sendForm').classList.add('is-hidden'); $('sendDone').classList.remove('is-hidden'); };
   $('phoneBox').onsubmit = async (ev) => {
     ev.preventDefault(); const err = $('sendErr'); err.classList.add('is-hidden');
+    if (!ack.checked) { $('ackHint').classList.remove('is-hidden'); return; }
     const pr = buildPhone(dial.value, phone.value);
     if (!pr.phone) { track('phone_invalid', { reason: pr.reason, len: String(phone.value || '').replace(/\D/g, '').length, dial: dial.value }); err.textContent = PHONE_MSG[pr.reason] || PHONE_MSG.short; err.classList.remove('is-hidden'); phone.focus(); return; }
     const btn = $('btnPhoneSend'); btn.disabled = true; btn.textContent = 'Enviando…'; track('request_submitted', {});
@@ -523,7 +530,7 @@ document.addEventListener('visibilitychange', () => {
 (function resumeSong() {
   const s = lsGet('tc_song_v1');
   if (!s || !s.id || !s.S || !s.S.lyricsFinal || Date.now() - (s.savedAt || 0) > 20 * 3600 * 1000) { lsDel('tc_song_v1'); return; }
-  S = Object.assign(blank(), s.S); id = s.id; stepId = 'details'; stack = ['price'];
+  S = Object.assign(blank(), s.S); id = s.id; stepId = 'details'; stack = [];
   loadGeo().then(showReview);
 })();
 })();
