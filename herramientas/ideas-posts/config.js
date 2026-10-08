@@ -27,5 +27,5 @@ window.HF_CFG = {
     api.saveAi({ hooks: (data.posts || []).map(p => p.hook) });
   },
   fine: 'Revisa y ajusta cada texto antes de publicar: pon tus precios, datos y tu estilo.',
-  contact: { title: '¿Quieres que te avisemos cuando podamos hacer esto por ti cada semana?', text: 'Estamos creando una herramienta que prepara tus publicaciones sola. Si dejas tu correo o WhatsApp, te avisamos. Es opcional.', thanks: '¡Gracias! Te avisaremos cuando esté lista.' }
+  contact: { title: '¿Quieres que te avisemos cuando podamos hacer esto por ti cada semana?', text: 'Estamos creando una herramienta que prepara tus publicaciones sola. Si dejas tu correo o WhatsApp, te avisamos.', thanks: '¡Gracias! Te avisaremos cuando esté lista.' }
 };

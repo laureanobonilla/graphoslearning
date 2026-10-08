@@ -43,5 +43,5 @@ window.HF_CFG = {
     }).catch((e) => { fallback(); api.track('ai_failed', { mode: 'plan', status: e.status || 0 }); });
   },
   fine: 'Estimación: horas por semana × 52 × el valor de tu hora. Ajústala a tu realidad.',
-  contact: { title: '¿Quieres que te avisemos cuando exista una herramienta para esto?', text: 'Estamos creando herramientas para las tareas que más tiempo quitan. Si dejas tu correo o WhatsApp, te escribimos cuando una sirva para lo tuyo. Es opcional.', thanks: '¡Gracias! Te escribiremos cuando tengamos algo para tus tareas.' }
+  contact: { title: '¿Quieres que te avisemos cuando exista una herramienta para esto?', text: 'Estamos creando herramientas para las tareas que más tiempo quitan. Si dejas tu correo o WhatsApp, te escribimos cuando una sirva para lo tuyo.', thanks: '¡Gracias! Te escribiremos cuando tengamos algo para tus tareas.' }
 };

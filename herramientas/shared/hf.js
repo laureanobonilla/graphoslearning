@@ -42,7 +42,7 @@ function buildIntro() {
   if (C.intro.facts) { const ul = h('ul', 'facts'); C.intro.facts.forEach(f => ul.appendChild(h('li', '', f))); w.appendChild(ul); }
   const b = h('button', 'btn', C.intro.start || 'Empezar'); b.type = 'button'; b.addEventListener('click', () => { track('start_clicked', {}); stack.length = 0; goStep(0, false); });
   w.appendChild(b);
-  const n = h('p', 'note'); n.innerHTML = C.note || '<b>Es una encuesta rápida.</b> Tus respuestas, sin tu nombre, nos ayudan a entender qué herramientas necesita la gente y a crear mejores. Al final puedes dejar tu contacto, pero no es obligatorio.';
+  const n = h('p', 'note'); n.innerHTML = C.note || 'Gratis y sin registro. Guardamos tus respuestas sin tu nombre para mejorar estas herramientas.';
   w.appendChild(n); s.appendChild(w);
 }
 

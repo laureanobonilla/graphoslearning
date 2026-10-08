@@ -52,5 +52,5 @@ window.HF_CFG = {
     }).catch((e) => { fallback(); api.track('ai_failed', { mode: 'ia', status: e.status || 0 }); });
   },
   fine: 'Es un test orientativo de 6 preguntas, no una auditoría.',
-  contact: { title: '¿Quieres que te avisemos cuando tengamos una herramienta para tu cuello de botella?', text: 'Si dejas tu correo o WhatsApp, te escribimos cuando una herramienta sirva para lo tuyo. Es opcional.', thanks: '¡Gracias! Te escribiremos cuando tengamos algo para ti.' }
+  contact: { title: '¿Quieres que te avisemos cuando tengamos una herramienta para tu cuello de botella?', text: 'Si dejas tu correo o WhatsApp, te escribimos cuando una herramienta sirva para lo tuyo.', thanks: '¡Gracias! Te escribiremos cuando tengamos algo para ti.' }
 };
