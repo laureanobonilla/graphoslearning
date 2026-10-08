@@ -218,7 +218,7 @@ const FORMATS = {
 };
 // ---- Formatos CON MURO DE PAGO (3 de 10 capítulos abiertos), uno por app: quien-eres, who-are-you,
 // quien-es-tu-pareja, who-is-your-partner. Cada uno trae su propio idioma/tema de prompts. ----
-const PAID_FREE_COUNT = 3;
+const PAID_FREE_COUNT = 0; // todos los capítulos salen cerrados (solo se ve un adelanto de 10 palabras)
 const paidMin = (idx) => (idx < PAID_FREE_COUNT ? 500 : 650);
 const PAID_ES_NOTE = '\n\nNOTA SOBRE LAS RESPUESTAS: la mayoría son opciones elegidas de una lista (a veces escritas por la persona) más 5 respuestas abiertas, que pesan más. No cites ni repitas literalmente las opciones como si fueran frases suyas (nada de «elegiste…»): lee los PATRONES entre ellas y conviértelos en imágenes y metáforas sorprendentes. Cuando cites, usa sobre todo lo que la persona escribió.';
 FORMATS['paid-self-es'] = {

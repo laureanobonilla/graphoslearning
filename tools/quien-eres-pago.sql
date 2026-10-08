@@ -1,6 +1,7 @@
 -- =====================================================================================================
 -- APPS DE PAGO «¿Quién eres?»: quien-eres · who-are-you · quien-es-tu-pareja · who-is-your-partner
 -- Supabase → SQL Editor. El editor solo muestra la ÚLTIMA consulta: selecciona UNA (de "-- N)" hasta su ";") y Run.
+-- Las apps nuevas marcan variant='paid' en cada evento: los filtros lo usan para NO mezclar los datos viejos de quien-eres (versión de canciones).
 -- Cambia la app en "app = '...'" (o usa  app in (...)) y el periodo en  interval '3 days'.
 -- Todo sale de la tabla `events`; cada persona es un `anon_id` (navegador). Se excluyen bots (likelyBot).
 -- =====================================================================================================
@@ -12,11 +13,12 @@ select app,
   count(distinct anon_id) filter (where event_name='finish_early_offered')      as llegaron_a_15,
   count(distinct anon_id) filter (where event_name='quiz_finished_early')       as terminaron_en_15_a_24,
   count(distinct anon_id) filter (where event_name='reading_generated_success') as vieron_lectura_gratis,
+  count(distinct anon_id) filter (where event_name='read_more_clicked')         as tocaron_seguir_leyendo,
   count(distinct anon_id) filter (where event_name='paywall_in_view')           as vieron_el_pago,
   count(distinct anon_id) filter (where event_name in ('sinpe_upload_clicked','paypal_link_clicked','paypal_link_missing')) as intentaron_pagar,
   count(distinct anon_id) filter (where event_name='payment_unlocked_client')   as desbloquearon
 from public.events
-where app in ('quien-eres','who-are-you','quien-es-tu-pareja','who-is-your-partner')
+where app in ('quien-eres','who-are-you','quien-es-tu-pareja','who-is-your-partner') and metadata->>'variant'='paid'
   and created_at >= now() - interval '3 days'
 group by app order by app;
 
@@ -26,7 +28,7 @@ select (metadata->>'questionIndex')::int as pregunta,
        round(avg((metadata->>'seconds')::numeric),1) as seg_promedio,
        count(*) filter (where metadata->>'custom'='true') as respuestas_otra
 from public.events
-where app = 'quien-eres' and event_name = 'question_answered'
+where app = 'quien-eres' and metadata->>'variant'='paid' and event_name = 'question_answered'
   and created_at >= now() - interval '3 days'
 group by 1 order by 1;
 
@@ -75,7 +77,7 @@ group by 1,2 order by 1,2;
 -- 7) POR QUÉ NO PAGAN (botón «¿Qué te frena?») + quienes saltaron el pago ---------------------------------
 select app, coalesce(metadata->>'reason','(saltó sin elegir motivo)') as motivo, count(distinct anon_id) as personas
 from public.events
-where event_name in ('paywall_skip_reason','paywall_skipped') and created_at >= now() - interval '7 days'
+where event_name in ('paywall_skip_reason','paywall_skipped') and metadata->>'variant'='paid' and created_at >= now() - interval '7 days'
 group by 1,2 order by 1, 3 desc;
 
 -- 8) LÍNEA DE TIEMPO DE UNA PERSONA (pega su anon_id) -------------------------------------------------
@@ -88,12 +90,12 @@ order by created_at;
 -- 9) ARQUETIPOS Y LECTURAS que se generaron (para ver qué se le muestra a la gente) ----------------------
 select created_at at time zone 'America/Costa_Rica' as hora_cr, app, anon_id, metadata->>'archetypeName' as arquetipo,
        metadata->>'freeChapters' as capitulos_gratis
-from public.events where event_name = 'paywall_shown' and created_at >= now() - interval '3 days'
+from public.events where event_name = 'paywall_shown' and metadata->>'variant'='paid' and created_at >= now() - interval '3 days'
 order by created_at desc;
 
 -- 10) RESPUESTAS «OTRA» escritas por la gente en las preguntas de elegir (para mejorar las opciones) -----
 select (metadata->>'questionIndex')::int as pregunta, metadata->>'question' as texto_pregunta, metadata->>'answer' as escribio
 from public.events
-where event_name='question_answered' and metadata->>'custom'='true' and app='quien-eres'
+where event_name='question_answered' and metadata->>'custom'='true' and app='quien-eres' and metadata->>'variant'='paid'
   and created_at >= now() - interval '7 days'
 order by 1, created_at desc;

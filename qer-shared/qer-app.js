@@ -314,16 +314,24 @@ function drawChapters() {
   const list = $('lockedList');
   if (!closed.length) { list.innerHTML = ''; list.classList.add('is-hidden'); return; }
   list.classList.remove('is-hidden');
-  list.innerHTML = `<p class="locked-intro">${escapeHtml(tt('locked_intro'))}</p>` + closed.map(c => `
+  list.innerHTML = `<p class="locked-intro">${escapeHtml(tt('locked_intro'))}</p>` + closed.map((c, i) => `
     <div class="locked-item">
       <svg class="lock-ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-      <div><p class="locked-title display">${escapeHtml(c.label)}</p><p class="locked-hook">${escapeHtml(c.hook)}</p>
-      <p class="locked-words">${c.words ? escapeHtml(tt('words', { n: fmtInt(c.words) })) : ''}</p></div>
+      <div><p class="locked-title display">${escapeHtml(c.label)}</p>
+      <p class="locked-teaser">${escapeHtml(c.teaser || c.hook)}</p>
+      <button type="button" class="read-more" data-i="${i}">${escapeHtml(tt('read_more'))}</button></div>
     </div>`).join('');
+  list.querySelectorAll('.read-more').forEach(b => b.addEventListener('click', () => {
+    track('read_more_clicked', { chapterIndex: Number(b.dataset.i) + 1, paywallVersion: PAYWALL_VERSION });
+    const pw = $('paywall');
+    $('skippedNote').classList.add('is-hidden'); $('payBlock').classList.remove('is-hidden'); pw.classList.remove('is-hidden');
+    try { pw.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_e) { /* ok */ }
+    pw.classList.remove('pay-flash'); void pw.offsetWidth; pw.classList.add('pay-flash');
+  }));
 }
 function renderReveal(data, opts) {
   readingId = data.readingId; archetypeNameForShare = data.archetypeName || '';
-  chapters = (data.nodes || []).map(n => ({ id: n.id, label: n.label, hook: n.hook, free: !!n.free, words: n.words || 0, text: n.text || null }));
+  chapters = (data.nodes || []).map(n => ({ id: n.id, label: n.label, hook: n.hook, free: !!n.free, words: n.words || 0, teaser: n.teaser || '', text: n.text || null }));
   readUnlocked = false;
   $('archetypeName').textContent = data.archetypeName || '';
   $('hookLine').textContent = data.hookLine || '';

@@ -5,7 +5,7 @@ window.QER_CFG = {
  "locale": "es",
  "format": "paid-self-es",
  "kind": "self",
- "freeCount": 3,
+ "freeCount": 0,
  "totalChapters": 10,
  "acts": [
   "Lo que muestras",
@@ -35,7 +35,7 @@ window.QER_CFG = {
   "err_retry": "Intentar de nuevo",
   "err_title": "Tu lectura no pudo terminar de armarse.",
   "err_detail": "Intenta de nuevo en un momento.",
-  "locked_intro": "Tu lectura sigue aquí. Esto es lo que viene:",
+  "locked_intro": "Tu lectura está lista:",
   "words": "{n} palabras",
   "pay_commitment": "Ya respondiste {n} preguntas sobre ti",
   "pay_hook": "{n} capítulos de tu lectura siguen cerrados",
@@ -66,7 +66,7 @@ window.QER_CFG = {
   "help_wa_msg": "Hola, quiero desbloquear mi lectura{arch}. Mi código es: {id}.",
   "help_mail_subject": "Desbloquear mi lectura",
   "skip_btn": "No desbloquear por ahora",
-  "skipped_text": "Está bien. Puedes seguir leyendo los capítulos que ya están abiertos.",
+  "skipped_text": "Está bien. Tu lectura queda guardada aquí por 3 días por si cambias de idea.",
   "skipped_help": "Si lo que te frenó fue el pago, escríbeme y lo resolvemos:",
   "reason_title": "¿Qué te frena? Elige una — nos ayuda mucho",
   "reasons": {
@@ -88,7 +88,9 @@ window.QER_CFG = {
   "finish_early_note": "Ya llevas lo suficiente para una lectura. Pero cada respuesta más la hace más profunda y más tuya; te animo a llegar hasta el final.",
   "finish_early_btn": "Ya tengo suficiente: ver mi lectura ahora",
   "other_option": "Otra (escríbela)",
-  "other_placeholder": "Escribe lo tuyo"
+  "other_placeholder": "Escribe lo tuyo",
+  "pay_covers_all": "Un solo pago desbloquea todos los capítulos de tu lectura.",
+  "read_more": "Seguir leyendo…"
  },
  "questions": [
   {

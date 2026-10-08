@@ -3,7 +3,18 @@
 const { saveReading, getReading } = require('./_lib/qer-readings-store');
 const { json, UUID_RE, CHUNKS, formatOf, wordCount, publicNodes } = require('./_lib/qer-map-core');
 
+// Formatos de pago (paid-*): TODOS los capítulos salen cerrados; el navegador solo recibe título y las primeras
+// 10 palabras (`teaser`) terminadas en «…». El texto completo sale solo por qer-unlock / qer-get-reading.
+const TEASER_WORDS = 10;
+const teaserOf = (text) => { const w = String(text || '').trim().split(/\s+/); return w.slice(0, TEASER_WORDS).join(' ').replace(/[.,;:!?¡¿…\-–—]+$/, '') + '…'; };
+
 function payloadOf(readingId, base, nodes) {
+    if (String(base.format || '').startsWith('paid-')) {
+        const hidden = nodes.reduce((a, n) => a + wordCount(n.text), 0) + wordCount(base.closingLine);
+        return { readingId, format: base.format, archetypeName: base.archetypeName, hookLine: base.hookLine,
+            nodes: nodes.map(n => ({ id: n.id, label: n.label, hook: n.hook, free: false, words: wordCount(n.text), teaser: teaserOf(n.text) })),
+            stats: { freeWords: 0, hiddenWords: hidden, hiddenCount: nodes.length } };
+    }
     const freeWords = nodes.filter(n => n.free).reduce((a, n) => a + wordCount(n.text), 0);
     const hiddenWords = nodes.filter(n => !n.free).reduce((a, n) => a + wordCount(n.text), 0) + wordCount(base.closingLine);
     const allOpen = nodes.every(n => n.free);
