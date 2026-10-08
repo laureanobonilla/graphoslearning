@@ -19,6 +19,7 @@ const { Readability } = require('@mozilla/readability');
 
 const MAX_HTML_BYTES = 3 * 1024 * 1024; // 3 MB de HTML es más que suficiente para un artículo
 const MAX_TEXT_CHARS = 60000;           // mismo tope que LIMITS.text en _lib/billing.js
+const MAX_CONTENT_HTML_CHARS = 200000;  // el HTML con formato pesa más que el texto plano equivalente
 const FETCH_TIMEOUT_MS = 12000;
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
@@ -118,8 +119,20 @@ exports.handler = async (event) => {
         }
 
         const text = article.textContent.trim().slice(0, MAX_TEXT_CHARS);
+        // article.content es el HTML del cuerpo del artículo ya "limpiado" por
+        // Readability (sin menús/sidebars/ads, pero CONSERVANDO párrafos,
+        // encabezados, negrita/cursiva, listas, etc.) — se manda además del
+        // texto plano para poder traerlo al editor del lector con un formato
+        // parecido al de la página original. El cliente es quien decide si lo
+        // usa (y lo sanitiza de nuevo antes de insertarlo) o se queda con el
+        // texto plano de siempre; igual se recorta aquí por las dudas, para
+        // no mandar una respuesta enorme si un artículo viene con HTML inusual.
+        const contentHtml = typeof article.content === 'string'
+            ? article.content.slice(0, MAX_CONTENT_HTML_CHARS)
+            : null;
         return json(200, {
             text,
+            contentHtml,
             title: article.title || null,
             sourceUrl: target.toString()
         });

@@ -10,7 +10,7 @@ const FALLBACK_MODELS = [
     'gemini-3.6-flash'
 ];
 
-async function generateWithFallback(payload) {
+async function generateWithFallbackBase(payload) {
     let lastError = null;
 
     for (let i = 0; i < FALLBACK_MODELS.length; i++) {
@@ -46,13 +46,29 @@ async function generateWithFallback(payload) {
     throw lastError;
 }
 
+
+// Idioma de salida. Los prompts están escritos en español; para otros idiomas se antepone una
+// instrucción única (en vez de duplicar cada prompt). Las claves JSON y los valores enum no cambian.
+const LANG_DIRECTIVES = {
+    en: 'OUTPUT LANGUAGE: Write EVERY user-facing text value (titles, labels, definitions, explanations, questions, examples, feedback) in natural English, even though the instructions below are in Spanish. If the source text or topic is in another language, still answer in English. Keep JSON keys, field names and enum values exactly as specified, and keep any literal marker in the instructions that is not human-readable text.\n\n'
+};
+function normalizeLang(l) { return Object.prototype.hasOwnProperty.call(LANG_DIRECTIVES, l) ? l : 'es'; }
+function localizePayload(payload, lang) {
+    const d = LANG_DIRECTIVES[lang];
+    if (!d || typeof payload.contents !== 'string') return payload;
+    return { ...payload, contents: d + payload.contents };
+}
+
 async function rawHandler(event, context) {
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: 'Method Not Allowed' };
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext } = JSON.parse(event.body);
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, lang: rawLang } = JSON.parse(event.body);
+        const lang = normalizeLang(rawLang);
+        // Todas las llamadas de abajo pasan por aquí: añade la instrucción de idioma.
+        const generateWithFallback = (payload) => generateWithFallbackBase(localizePayload(payload, lang));
 
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
@@ -112,8 +128,7 @@ async function rawHandler(event, context) {
                 ${curiosityInstruction}`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: { type: 'OBJECT', properties: schemaProperties, required: requiredFields },
-                    temperature: 0.25
+                    responseSchema: { type: 'OBJECT', properties: schemaProperties, required: requiredFields }
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -184,8 +199,7 @@ async function rawHandler(event, context) {
                 5. "synergy.label" debe ser un TÍTULO corto (2-5 palabras): va solo en el nodo del mapa. "synergy.explanation" lleva la explicación completa aparte.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.3
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -228,8 +242,7 @@ async function rawHandler(event, context) {
                 3. "relationship": Conector de 1 o 2 palabras (ej: "ejemplo de", "aplicado en").`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -261,8 +274,7 @@ async function rawHandler(event, context) {
                 Genera un concepto puente intermedio concreto (no genérico). Conectores de 1 a 3 palabras.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -320,7 +332,7 @@ async function rawHandler(event, context) {
                 1. Redacta 1 o 2 párrafos concisos, precisos y sustanciales.
                 2. PROHIBIDO redactar definiciones vacías o genéricas. Explica qué es exactamente.
                 ${interactiveRule}`,
-                config: { temperature: 0.2 }
+                config: {}
             });
             return { statusCode: 200, body: JSON.stringify({ definition: response.text, source: 'gemini' }) };
         }
@@ -357,8 +369,7 @@ async function rawHandler(event, context) {
                 4. Tono cercano y claro, como explicándole a un amigo curioso, no como un libro de texto.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.3
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -367,7 +378,10 @@ async function rawHandler(event, context) {
 // ==========================================
         // 5. SINTETIZAR ESQUEMA INICIAL (3 NIVELES, SIN EJEMPLOS)
         // ==========================================
-        if (action === 'parse_text') {
+        // 'welcome_schema' = el primer esquema del asistente de bienvenida: se genera
+        // EXACTAMENTE igual que parse_text; solo cambia que billing.js lo deja gratis
+        // (una vez por persona).
+        if (action === 'parse_text' || action === 'welcome_schema') {
             const isShortTopic = text.trim().split(/\s+/).length < 25;
             const { focusTerms } = JSON.parse(event.body);
 
@@ -426,9 +440,22 @@ async function rawHandler(event, context) {
                             },
                             required: ["id", "label", "parentId", "relationship"]
                         }
+                    },
+                    gaps: {
+                        type: 'ARRAY',
+                        description: 'DETECCIÓN DE HUECOS: lista (máximo 5) de conceptos que el texto/tema MENCIONA de paso pero no desarrolla a fondo dentro de este esquema — cosas que quedaron fuera porque no alcanzaron a tener su propio nodo, pero que alguien que quiera entender el tema a fondo debería investigar después. Si no detectas ninguno genuino, devuelve un array vacío — nunca inventes huecos artificiales solo para llenar la lista.',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                term: { type: 'STRING', description: 'El concepto mencionado pero no desarrollado, en pocas palabras.' },
+                                relatedNodeId: { type: 'STRING', description: 'El "id" exacto (de root, branches o subBranches de este mismo esquema) del nodo donde se menciona este hueco o con el que está más relacionado.' },
+                                note: { type: 'STRING', description: 'Una sola oración breve explicando qué le falta cubrir a este concepto.' }
+                            },
+                            required: ["term", "relatedNodeId", "note"]
+                        }
                     }
                 },
-                required: ["root", "branches", "subBranches"]
+                required: ["root", "branches", "subBranches", "gaps"]
             };
 
             const response = await generateWithFallback({
@@ -439,18 +466,107 @@ async function rawHandler(event, context) {
                 2. CERO NODOS DE EJEMPLO: Está PROHIBIDO incluir nodos de "Ejemplo:" en este esquema inicial. Todos los nodos deben ser conceptos, fases, componentes o categorías teóricas/fácticas del tema.
                 3. PROHIBICIÓN DE PLACEHOLDERS: Nunca uses textos genéricos como "Subconcepto 1" o "Fase A". Usa los nombres reales.
                 4. "relationship": Usa conectores precisos de 1 a 3 palabras.
-                5. "sourceQuote":${sourceQuoteNote}${focusHint}`,
+                5. "sourceQuote":${sourceQuoteNote}
+                6. "gaps": revisa el texto/tema una vez armado el esquema y detecta qué conceptos se mencionan de paso (una referencia, un nombre, un término técnico) pero NO llegaron a tener su propio nodo — esos son los huecos. Máximo 5, y solo los genuinamente relevantes para entender el tema a fondo. Si no hay ninguno real, "gaps" debe ser un array vacío.${focusHint}`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.15
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
         }
 
         // ==========================================
-        // 5b. EXTRAER TÉRMINOS CLAVE DE UN TEXTO
+        // 5b. ANALIZAR UN TEXTO (distinto de parse_text: no estructura lo que
+        // el texto DICE, sino que lo analiza desde una lente específica —
+        // argumentativa, académica, literaria, etc. Cada nodo es una
+        // observación analítica, no un tema citado. Reutiliza el mismo
+        // schema de 3 niveles que parse_text a propósito, para que el
+        // frontend pueda renderizar el resultado con el mismo
+        // renderThreeLevelTree sin ningún cambio.
+        // ==========================================
+        if (action === 'analyze_text') {
+            const { analysisType, customType } = JSON.parse(event.body);
+
+            const ANALYSIS_LENSES = {
+                critico: `ANÁLISIS ARGUMENTATIVO/CRÍTICO: identifica la tesis central del texto, los argumentos principales que la sostienen, la evidencia o datos que usa el autor para respaldar cada argumento, los supuestos no declarados o posibles sesgos del autor, y las objeciones o puntos débiles que un lector crítico podría señalar. Usa estas categorías (o las que de verdad apliquen a este texto) como ramas de Nivel 2: Tesis, Argumentos clave, Evidencia, Supuestos/Sesgos, Objeciones o puntos débiles.`,
+                academico: `ANÁLISIS ACADÉMICO/DE INVESTIGACIÓN: identifica la pregunta o problema de investigación que aborda el texto, la metodología que emplea (si aplica), los principales hallazgos o resultados, las limitaciones que el propio texto reconoce o que se puedan inferir razonablemente, y las conclusiones o implicaciones que plantea. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Pregunta/Problema, Metodología, Hallazgos, Limitaciones, Conclusiones.`,
+                literario: `ANÁLISIS LITERARIO: identifica el tema central del texto, su estructura narrativa (planteamiento, desarrollo, desenlace, u otra que corresponda), el estilo y los recursos literarios o retóricos que usa el autor, la voz y perspectiva narrativa, y los símbolos o motivos recurrentes si los hay. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Tema central, Estructura, Estilo y recursos, Voz/Perspectiva, Símbolos/Motivos.`,
+                retorico: `ANÁLISIS RETÓRICO/PERSUASIVO: identifica el propósito comunicativo del texto, la audiencia a la que parece dirigirse, las estrategias retóricas que usa (apelación a la razón, a la emoción, a la credibilidad del autor, u otras), el tono y registro del texto, y las técnicas persuasivas específicas que emplea. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Propósito, Audiencia, Estrategias retóricas, Tono/Registro, Técnicas persuasivas.`,
+                comparativo: `ANÁLISIS COMPARATIVO DE POSTURAS: identifica las distintas posturas o posiciones que el texto presenta en tensión, los fundamentos o argumentos que sostienen a cada una, los puntos en que esas posturas coinciden, los puntos en que están en desacuerdo, y la tensión o pregunta que queda sin resolver. Usa estas categorías (o las que de verdad apliquen) como ramas de Nivel 2: Posturas identificadas, Fundamentos de cada postura, Puntos de acuerdo, Puntos de desacuerdo, Tensión sin resolver.`,
+                custom: `ANÁLISIS SEGÚN LO QUE PIDIÓ EL USUARIO: analiza el texto específicamente desde este ángulo, en sus propias palabras: "${String(customType || '').slice(0, 200)}". Deriva las categorías de Nivel 2 que mejor respondan a ese pedido, usando el texto como única fuente — nunca inventes categorías que el usuario no pidió.`
+            };
+            const lens = ANALYSIS_LENSES[analysisType] || ANALYSIS_LENSES.custom;
+
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    root: {
+                        type: 'OBJECT',
+                        description: 'Nivel 1: título del análisis (ej. "Análisis crítico de..." seguido de una referencia breve al texto o su tema).',
+                        properties: {
+                            id: { type: 'STRING' },
+                            label: { type: 'STRING' },
+                            sourceQuote: { type: 'STRING', description: 'Cadena vacía — no aplica al nodo raíz.' }
+                        },
+                        required: ["id", "label"]
+                    },
+                    branches: {
+                        type: 'ARRAY',
+                        description: 'Nivel 2: las categorías de análisis (ver instrucciones de la lente de análisis más abajo).',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' },
+                                sourceQuote: { type: 'STRING', description: 'Cita literal breve del texto que mejor representa esta categoría, o cadena vacía.' }
+                            },
+                            required: ["id", "label", "relationship"]
+                        }
+                    },
+                    subBranches: {
+                        type: 'ARRAY',
+                        description: 'Nivel 3: observaciones u elementos específicos encontrados en el texto para cada categoría de Nivel 2.',
+                        items: {
+                            type: 'OBJECT',
+                            properties: {
+                                id: { type: 'STRING' },
+                                label: { type: 'STRING' },
+                                parentId: { type: 'STRING', description: 'ID exacto del nodo en "branches" (Nivel 2) al que pertenece.' },
+                                relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' },
+                                sourceQuote: { type: 'STRING', description: 'Cita literal breve del texto, evidencia de este elemento específico, o cadena vacía.' }
+                            },
+                            required: ["id", "label", "parentId", "relationship"]
+                        }
+                    }
+                },
+                required: ["root", "branches", "subBranches"]
+            };
+
+            const response = await generateWithFallback({
+                contents: `Analiza minuciosamente el siguiente texto y estructura ESE ANÁLISIS (no un resumen ni una extracción de sus temas) en un mapa conceptual de 3 niveles:
+                """${text}"""
+
+                ${lens}
+
+                REGLAS ESTRICTAS:
+                1. Esto NO es extraer los temas que el texto menciona — es analizarlo desde la lente indicada arriba. Cada nodo debe ser una observación analítica (qué hace o cómo funciona el texto), no solo un tema citado de él.
+                2. ESTRUCTURA DE 3 NIVELES: nodo raíz (Nivel 1, el título del análisis), categorías de análisis (Nivel 2), y observaciones específicas encontradas en el texto para cada categoría (Nivel 3).
+                3. FIDELIDAD AL TEXTO: toda observación debe estar fundamentada en lo que el texto realmente dice o hace — nunca inventes argumentos, posturas o recursos que no estén ahí. Si el texto es corto o simple, no fuerces una estructura más compleja de lo que da el material.
+                4. Si alguna categoría de la lente no aplica a este texto en particular (ej. "Metodología" en un texto que no es un estudio), omítela en vez de forzarla con contenido vacío.
+                5. "relationship": conectores precisos de 1 a 3 palabras.
+                6. "sourceQuote": cita literal y breve (máx. 15 palabras), copiada EXACTAMENTE tal como aparece en el texto original, como evidencia de cada nodo. Nunca inventes ni parafrasees la cita.`,
+                config: {
+                    responseMimeType: 'application/json',
+                    responseSchema: schema
+                }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
+        // ==========================================
+        // 5c. EXTRAER TÉRMINOS CLAVE DE UN TEXTO
         // ==========================================
         if (action === 'extract_key_terms') {
             const schema = {
@@ -469,8 +585,7 @@ async function rawHandler(event, context) {
                 contents: `Lee el siguiente texto y extrae los términos o frases clave (sustantivos o expresiones cortas, de 1 a 4 palabras) que mejor representan sus ideas centrales. Cada término DEBE aparecer copiado literalmente (exactamente igual, incluyendo mayúsculas/minúsculas) en el texto, para que pueda ser localizado con una búsqueda exacta de substring.\n\nTEXTO:\n"""${text.slice(0, 12000)}"""\n\nDevuelve entre 6 y 14 términos, sin duplicados, priorizando los más relevantes y distribuidos a lo largo del texto.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.2
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -519,8 +634,7 @@ async function rawHandler(event, context) {
                 4. "relationship" debe tener de 1 a 3 palabras conectando el nodo origen con cada resultado.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.25
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -556,8 +670,7 @@ async function rawHandler(event, context) {
                 "label" es solo el título corto de esa teoría/autor/fenómeno; "explanation" lleva el desarrollo completo de la crítica, aparte.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.25
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
@@ -569,7 +682,7 @@ async function rawHandler(event, context) {
         if (action === 'socratic_question') {
             const response = await generateWithFallback({
                 contents: `Formula UNA pregunta socrática breve, desafiante y fascinante (máximo 2 oraciones) sobre "${topic}" (en el contexto de "${contextPath}") para poner a prueba la comprensión profunda del usuario. No hagas preguntas de memoria básica, sino de causa, implicación o aplicación.`,
-                config: { temperature: 0.4 }
+                config: {}
             });
             return { statusCode: 200, body: JSON.stringify({ question: response.text }) };
         }
@@ -592,12 +705,58 @@ async function rawHandler(event, context) {
                 Evalúa con rigor intelectual pero tono motivador la respuesta del usuario, señala qué acertó o qué matiz importante puede sumar, y otorga un título de síntesis para su nuevo Nodo de Dominio.`,
                 config: {
                     responseMimeType: 'application/json',
-                    responseSchema: schema,
-                    temperature: 0.3
+                    responseSchema: schema
                 }
             });
             return { statusCode: 200, body: response.text };
         }
+
+        // ==========================================
+        // 12. TEXTO DE BIENVENIDA (asistente de primera visita, GRATIS)
+        // ==========================================
+        // Genera un texto de lectura breve, alineado con los intereses
+        // académicos que la persona declaró en el asistente, con énfasis en las
+        // BASES del tema. Ese texto se usa luego como fuente del primer esquema,
+        // para mostrar el flujo "texto → esquema" de la herramienta.
+        if (action === 'onboarding_text') {
+            const ob = JSON.parse(event.body);
+            const clip = (v, n) => String(v || '').replace(/\s+/g, ' ').trim().slice(0, n);
+            const field = clip(topic, 200);
+            if (!field) return { statusCode: 400, body: JSON.stringify({ error: 'Falta el campo de estudio' }) };
+            const purpose = clip(ob.purpose, 60);
+            const level = clip(ob.level, 30);
+            const question = clip(ob.question, 400);
+            const areas = (Array.isArray(ob.areas) ? ob.areas : []).slice(0, 3).map(a => clip(a, 50)).filter(Boolean);
+
+            const schema = {
+                type: 'OBJECT',
+                properties: {
+                    title: { type: 'STRING', description: lang === 'en' ? 'Short title (max 8 words) of the text, in English.' : 'Título corto (máximo 8 palabras) del texto, en español.' },
+                    text: { type: 'STRING', description: lang === 'en' ? 'The full text, in English, 450 to 650 words, in paragraphs separated by a blank line. No markdown, no bullet lists, no headings with # or asterisks.' : 'El texto completo, en español, de 450 a 650 palabras, en párrafos separados por una línea en blanco. Sin markdown, sin listas con viñetas, sin encabezados con # ni asteriscos.' }
+                },
+                required: ['title', 'text']
+            };
+
+            const response = await generateWithFallback({
+                contents: `Escribe un texto de estudio en ${lang === 'en' ? 'inglés' : 'español'} para una persona que quiere explorar este campo: "${field}".
+${purpose ? `Lo estudia para: ${purpose}.` : ''}
+${areas.length ? `Sus intereses académicos relacionados son: ${areas.join(', ')}.` : ''}
+${level ? `Su nivel actual: ${level}.` : ''}
+${question ? `Una duda que le intriga: "${question}".` : ''}
+
+INSTRUCCIONES:
+1. Explora con profundidad las BASES del tema: qué es exactamente, de dónde surge, sus conceptos y distinciones fundamentales, los supuestos sobre los que se apoya y las principales corrientes o enfoques.
+2. Conecta el campo con los intereses académicos indicados (si hay): muestra cómo dialogan, qué se toman prestado y dónde chocan. Si no hay intereses, profundiza solo en el campo.
+3. Ajusta el nivel de dificultad al nivel indicado; si es principiante, define cada término técnico la primera vez que aparezca.
+4. Si hay una duda, respóndela dentro del texto de forma natural, sin hacer un apartado aparte.
+5. NO inventes citas textuales, referencias bibliográficas, estudios, cifras ni fechas dudosas. Si algo es debatido o incierto, dilo claramente en vez de afirmarlo.
+6. Es un texto para estudiar y para que se pueda convertir en un esquema conceptual: cada párrafo debe desarrollar una idea distinta y clara, con términos bien definidos.
+7. Tono académico pero claro, en segunda persona del plural o impersonal; nada de saludos, ni "en este texto veremos".`,
+                config: { responseMimeType: 'application/json', responseSchema: schema }
+            });
+            return { statusCode: 200, body: response.text };
+        }
+
         return { statusCode: 400, body: JSON.stringify({ error: 'Acción no válida' }) };
 
     } catch (error) {

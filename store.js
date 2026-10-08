@@ -53,9 +53,19 @@ module.exports = {
 
     // Registro de eventos de uso (ver track-event.js). El llamador decide si
     // espera esto o lo dispara sin esperar — nunca debe bloquear ni romper
-    // nada si Supabase está lento o falla.
-    logEvent: (actorId, actorKind, anonId, eventName, metadata) =>
-        rpc('log_event', { p_actor: actorId, p_kind: actorKind, p_anon: anonId || null, p_event: eventName, p_metadata: metadata || {} }),
+    // nada si Supabase está lento o falla. actorLabel es solo la etiqueta
+    // legible (correo, o nombre aleatorio de invitado) para no tener que leer
+    // actor_id a mano — ver columna actor_label en supabase/schema.sql.
+    //
+    // `app` es nuevo: identifica DE CUÁL app de la colección viene el evento
+    // ('graphikosmos', 'quien-eres', la que sigue...) — todas comparten esta
+    // misma tabla `events` de Supabase (mismo proyecto, mismas variables de
+    // entorno ya configuradas), así que esta columna es lo único que permite
+    // separar el embudo de una app del de otra en una misma consulta SQL. Es
+    // opcional y por defecto 'graphikosmos' — así ninguna llamada existente a
+    // logEvent(...) sin este parámetro se ve afectada.
+    logEvent: (actorId, actorKind, anonId, eventName, metadata, actorLabel, app) =>
+        rpc('log_event', { p_actor: actorId, p_kind: actorKind, p_anon: anonId || null, p_event: eventName, p_metadata: metadata || {}, p_label: actorLabel || null, p_app: app || 'graphikosmos' }),
 
     // --- Proyectos (siempre filtrados por owner=ownerId; nunca por el id que manda el cliente solo) ---
     async getProject(id, ownerId) {
@@ -81,5 +91,15 @@ module.exports = {
             body: JSON.stringify({ title, data, node_count: nodeCount, updated_at: new Date().toISOString() })
         });
         return rows && rows[0] ? rows[0] : null; // null => no existía o no era del dueño
+    },
+
+    // Tope sencillo contra spam para send-feedback.js: cuenta cuántos eventos
+    // con ese nombre (p. ej. "feedback_sent") registró este actor en la
+    // última hora, reutilizando la tabla `events` que ya existe en vez de
+    // crear una tabla/RPC aparte solo para esto.
+    async countEventsLastHour(actorId, eventName) {
+        const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const rows = await table(`events?actor_id=eq.${encodeURIComponent(actorId)}&event_name=eq.${encodeURIComponent(eventName)}&created_at=gt.${encodeURIComponent(since)}&select=id`);
+        return Array.isArray(rows) ? rows.length : 0;
     }
 };
