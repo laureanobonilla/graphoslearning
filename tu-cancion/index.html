@@ -47,6 +47,11 @@
   @keyframes bar{ from{ transform:scaleY(0); } to{ transform:scaleY(1); } }
   .hero h1{ font-size:clamp(2.2rem,9.5vw,2.8rem); line-height:1.06; margin:0 auto 14px; max-width:13ch; }
   .hero .sub{ color:var(--muted); font-size:1.08rem; line-height:1.55; max-width:32ch; margin:0 auto 18px; }
+  .hero-play{ appearance:none; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:10px; background:var(--ink); color:#fff; font-weight:700; font-size:1.02rem; padding:14px 24px 14px 18px; border-radius:999px; box-shadow:4px 4px 0 var(--magenta); transition:transform .12s ease; }
+  .hero-play:active{ transform:translate(2px,2px); box-shadow:2px 2px 0 var(--magenta); }
+  .hero-play svg{ width:20px; height:20px; fill:currentColor; } .hero-play .q{ display:none; } .hero-play.is-live .p{ display:none; } .hero-play.is-live .q{ display:inline; }
+  #coverWave.is-live rect{ animation:eq .9s ease-in-out infinite; animation-delay:calc(var(--i) * -70ms); }
+  .ex-sub{ margin:-4px 0 12px; color:var(--muted); font-size:.95rem; }
   .hero .hero-cta{ min-width:240px; }
   .sec{ padding:34px 0 0; }
   .sec h2{ font-size:1.7rem; line-height:1.12; margin:0 0 14px; }
@@ -158,7 +163,7 @@
   .done-title{ font-size:1.6rem; margin:2px 0 8px; }
   .disclaimer{ color:var(--muted); font-size:.76rem; line-height:1.5; margin:26px 2px 0; max-width:44ch; }
   @media (prefers-reduced-motion: reduce){
-    #coverWave rect, #loadWave rect, .cta-bar .btn, .skeleton i{ animation:none !important; }
+    #coverWave rect, #coverWave.is-live rect, #loadWave rect, .cta-bar .btn, .skeleton i{ animation:none !important; }
     #loadWave rect{ transform:scaleY(.7); } #fill{ transition:none; } html{ scroll-behavior:auto; }
   }
 </style>
@@ -175,8 +180,15 @@
     <div class="hero">
       <svg id="coverWave" viewBox="0 0 320 92" role="img" aria-label="Una onda de sonido"></svg>
       <h1 class="display">Tu canción, hecha solo para ti</h1>
-      <p class="sub">Cuéntanos para quién es o por qué la quieres. Nosotros la convertimos en letra y música, en el ritmo que tú elijas.</p>
+      <p class="sub">Cuéntanos para quién es y la convertimos en letra y música, en el ritmo que elijas.</p>
+      <button type="button" id="heroPlay" class="hero-play is-hidden"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="p" d="M7 4.5v15l13-7.5z"/><path class="q" d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg><span>Escucha cómo suena</span></button>
       <p><button type="button" id="btnResume" class="btn-quiet is-hidden">Continuar donde quedaste</button></p>
+    </div>
+
+    <div class="sec" id="ejemplos">
+      <h2 class="display">Así suena una canción tuya</h2>
+      <p class="ex-sub">Toca una y escúchala. Cada una se hizo con una historia distinta.</p>
+      <div class="ex-list" id="exList"></div>
     </div>
 
     <div class="sec">
@@ -186,11 +198,6 @@
         <li><span class="n">2</span><div><b>Revisa la letra</b><span>La ves completa, puedes cambiarla, ves el precio y recién entonces nos la envías.</span></div></li>
         <li><span class="n">3</span><div><b>Escucha tu canción primero</b><span>Te mandamos una muestra por WhatsApp. Si te gusta, la terminamos. Si no, no pagas nada.</span></div></li>
       </ol>
-    </div>
-
-    <div class="sec" id="ejemplos">
-      <h2 class="display">Ejemplos para escuchar</h2>
-      <div class="ex-list" id="exList"></div>
     </div>
 
     <div class="sec">

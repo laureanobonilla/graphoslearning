@@ -91,7 +91,10 @@ function waveHeights(n, seed) { const o = []; for (let i = 0; i < n; i++) { cons
 // ---------- Ejemplos ----------
 (function buildExamples() {
   const list = $('exList'); let current = null, audio = null;
-  const stop = () => { if (audio) { audio.pause(); } if (current) { current.classList.remove('is-playing'); current = null; } };
+  const heroBtn = $('heroPlay'), wave = $('coverWave');
+  const sync = () => { const on = !!current; wave.classList.toggle('is-live', on); heroBtn.classList.toggle('is-live', on); heroBtn.querySelector('span').textContent = on ? 'Pausar' : 'Escucha cómo suena'; };
+  const stop = () => { if (audio) { audio.pause(); } if (current) { current.classList.remove('is-playing'); current = null; } sync(); };
+  const playable = () => [...list.children].filter(e => !e.classList.contains('soon'));
   EXAMPLES.forEach((ex, i) => {
     const el = document.createElement('div'); el.className = 'ex';
     el.innerHTML = '<button type="button" class="play" aria-label="Escuchar"><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button><div class="txt"><p class="t"></p><p class="m"></p><div class="bar"><i></i></div></div>';
@@ -102,15 +105,18 @@ function waveHeights(n, seed) { const o = []; for (let i = 0; i < n; i++) { cons
       if (el.classList.contains('soon')) return;
       if (current === el) { stop(); return; }
       stop();
-      audio = new Audio(url); current = el; el.classList.add('is-playing');
+      audio = new Audio(url); current = el; el.classList.add('is-playing'); sync();
       audio.addEventListener('timeupdate', () => { if (audio.duration) fillEl.style.width = `${(audio.currentTime / audio.duration) * 100}%`; });
-      audio.addEventListener('ended', () => { el.classList.remove('is-playing'); fillEl.style.width = '0'; current = null; });
-      audio.addEventListener('error', () => { el.classList.remove('is-playing'); el.classList.add('soon'); current = null; });
+      audio.addEventListener('ended', () => { el.classList.remove('is-playing'); fillEl.style.width = '0'; current = null; sync(); const p = playable(), k = p.indexOf(el); if (p.length > 1 && k > -1) p[(k + 1) % p.length].querySelector('.play').click(); });
+      audio.addEventListener('error', () => { el.classList.remove('is-playing'); el.classList.add('soon'); current = null; sync(); });
       audio.play().catch(() => { el.classList.remove('is-playing'); });
       track('example_played', { index: i + 1, rhythm: ex.rhythm });
     });
     list.appendChild(el);
+    el._ready = fetch(url, { method: 'HEAD' }).then(r => r.ok && /audio|mpeg|octet/i.test(r.headers.get('content-type') || '')).catch(() => false);
   });
+  Promise.all([...list.children].map(e => e._ready)).then(r => { if (r.some(Boolean)) heroBtn.classList.remove('is-hidden'); });
+  heroBtn.addEventListener('click', () => { track('hero_play_clicked', {}); if (current) { stop(); return; } const p = playable(); if (p.length) p[0].querySelector('.play').click(); });
 })();
 $('btnExamplesTop').addEventListener('click', () => { track('examples_clicked', {}); $('ejemplos').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
