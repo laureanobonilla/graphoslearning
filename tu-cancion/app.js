@@ -121,7 +121,7 @@ function waveHeights(n, seed) { const o = []; for (let i = 0; i < n; i++) { cons
 $('btnExamplesTop').addEventListener('click', () => { track('examples_clicked', {}); $('ejemplos').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
 // ---------- Estado del cuestionario ----------
-const blank = () => ({ hasOwn: null, lyricsText: '', reason: '', reasonOther: '', named: null, name: '', qualities: [], qualitiesOther: '', feeling: '', feelingOther: '', extra: [], rhythm: '', rhythmOther: '', details: '', notes: '', aiStop: 3, title: '', lyrics: '', lyricsFinal: '', regen: 0 });
+const blank = () => ({ hasOwn: false, lyricsText: '', reason: '', reasonOther: '', named: null, name: '', qualities: [], qualitiesOther: '', feeling: '', feelingOther: '', extra: [], rhythm: '', rhythmOther: '', details: '', notes: '', aiStop: 3, title: '', lyrics: '', lyricsFinal: '', regen: 0 });
 let S = blank(), id = crypto.randomUUID ? crypto.randomUUID() : `00000000-0000-4000-8000-${String(Date.now()).padStart(12, '0')}`;
 let stack = [], stepId = 'price', aiMeta = [];   // aiMeta[i] = pantalla propuesta por Gemini para el paso i
 const reasonObj = () => REASONS.find(r => r.label === S.reason);
@@ -130,9 +130,8 @@ const isSelf = () => !!(reasonObj() && reasonObj().self);
 const rhythmLabel = () => (S.rhythm === 'Otro' ? S.rhythmOther : S.rhythm);
 
 function pathOf() {
-  if (S.hasOwn === true) return ['hasLyrics', 'paste', 'rhythm', 'notes'];
-  if (S.hasOwn === null) return ['hasLyrics'];
-  const p = ['hasLyrics', 'reason'];
+  if (S.hasOwn === true) return ['paste', 'rhythm', 'notes'];
+  const p = ['reason'];
   if (S.reason === 'Otro') {
     for (let k = 0; k < S.aiStop; k++) p.push('ai' + k);
     if (S.aiStop < 3) p.push('free');   // Gemini no respondió: una sola caja para contarlo todo (sin mostrar ningún error)
@@ -148,7 +147,7 @@ function pathOf() {
   return p;
 }
 function saveState() { lsSet('tc_state_v1', { id, S, stack, stepId, aiMeta, savedAt: Date.now() }); }
-function loadState() { const s = lsGet('tc_state_v1'); return s && s.S && s.id && Date.now() - (s.savedAt || 0) < 24 * 3600 * 1000 && s.stepId && s.stepId !== 'price' && s.stepId !== 'review' ? s : null; }
+function loadState() { const s = lsGet('tc_state_v1'); return s && s.S && s.id && Date.now() - (s.savedAt || 0) < 24 * 3600 * 1000 && s.stepId && s.stepId !== 'price' && s.stepId !== 'hasLyrics' && s.stepId !== 'review' ? s : null; }
 
 // ---------- Utilidades de pantalla de pasos ----------
 const stepTitle = $('stepTitle'), stepHint = $('stepHint'), stepBody = $('stepBody'), btnNext = $('btnNext'), btnSkip = $('btnSkip'), btnBack = $('btnBack');
@@ -225,6 +224,10 @@ const STEPS = {
       body.appendChild(choiceList({ options: REASONS.map(r => r.label), multi: false, selected: S.reason === 'Otro' ? 'Otro' : S.reason, otherLabel: 'Otro (cuéntanos)', otherValue: S.reasonOther, otherPlaceholder: 'Por ejemplo: una boda, un homenaje, mi negocio…',
         onChange: (v) => { if (v !== S.reason) { S.aiStop = 3; aiMeta = []; S.extra = []; } S.reason = v; if (v !== 'Otro') S.reasonOther = ''; track('reason_chosen', { reason: v === 'Otro' ? 'Otro' : v }); update(); },
         onOther: (t) => { S.reasonOther = t; } }));
+      const own = document.createElement('p'); own.className = 'own-link';
+      const ob = document.createElement('button'); ob.type = 'button'; ob.className = 'btn-quiet'; ob.textContent = '¿Ya tienes tu letra? Pégala aquí';
+      ob.addEventListener('click', () => { S.hasOwn = true; track('has_lyrics_chosen', { hasOwn: true }); goTo('paste'); });
+      own.appendChild(ob); body.appendChild(own);
     },
     ok: () => !!S.reason && (S.reason !== 'Otro' || S.reasonOther.trim().length >= 3)
   },
@@ -358,14 +361,14 @@ function advance() {
 }
 btnNext.addEventListener('click', () => { if (!btnNext.disabled) advance(); });
 btnSkip.addEventListener('click', () => { track('step_skipped', { step: stepId }); advance(); });
-btnBack.addEventListener('click', () => { if (!stack.length) { track('back_clicked', { from: stepId, to: 'welcome' }); showScreen('welcome'); return; } track('back_clicked', { from: stepId }); stepId = stack.pop(); showScreen('flow'); renderStep(); });
+btnBack.addEventListener('click', () => { if (stepId === 'paste') S.hasOwn = false; if (!stack.length) { track('back_clicked', { from: stepId, to: 'welcome' }); showScreen('welcome'); return; } track('back_clicked', { from: stepId }); stepId = stack.pop(); showScreen('flow'); renderStep(); });
 
 // ---------- CTA ----------
 function startFlow(from) {
   track('cta_clicked', { from });
   S = blank(); stack = []; aiMeta = []; id = crypto.randomUUID ? crypto.randomUUID() : id; lsDel('tc_song_v1');
   loadGeo().then(() => { if (stepId === 'price' && currentScreen === 'flow') renderStep(); });
-  stepId = ''; goTo('hasLyrics', false);
+  stepId = ''; goTo('reason', false);
 }
 $('btnCta').addEventListener('click', () => startFlow('bar'));
 const saved = loadState();
@@ -373,7 +376,7 @@ if (saved) {
   $('btnResume').classList.remove('is-hidden');
   $('btnResume').addEventListener('click', () => {
     track('resume_clicked', { step: saved.stepId });
-    S = Object.assign(blank(), saved.S); id = saved.id; stack = saved.stack || []; aiMeta = saved.aiMeta || []; stepId = saved.stepId;
+    S = Object.assign(blank(), saved.S); if (S.hasOwn === null) S.hasOwn = false; id = saved.id; stack = saved.stack || []; aiMeta = saved.aiMeta || []; stepId = saved.stepId;
     loadGeo(); showScreen('flow'); renderStep();
   });
 }
@@ -454,7 +457,7 @@ $('btnEdit').addEventListener('click', () => {
   else { const v = ta.value.trim(); if (v.length < 20) { const b = $('btnEdit'); b.textContent = 'Escribe al menos una estrofa'; setTimeout(() => { if (editing) b.textContent = 'Listo, guardar cambios'; }, 1800); return; } S.lyricsFinal = v; editing = false; ta.classList.add('is-hidden'); $('sheet').classList.remove('is-hidden'); $('btnEdit').textContent = 'Editar letra'; renderSheet(); lsSet('tc_song_v1', { id, S, savedAt: Date.now() }); track('edit_saved', { changed: S.lyricsFinal !== S.lyrics }); }
 });
 $('btnRegen').addEventListener('click', () => { track('regen_clicked', {}); generate(true); });
-$('btnAdjust').addEventListener('click', () => { track('adjust_clicked', {}); lsDel('tc_song_v1'); stack = []; const path = pathOf(); stepId = ''; goTo(S.hasOwn === true ? 'paste' : (path[2] || 'reason'), false); stack = ['price']; });
+$('btnAdjust').addEventListener('click', () => { track('adjust_clicked', {}); lsDel('tc_song_v1'); stack = []; const path = pathOf(); stepId = ''; goTo(S.hasOwn === true ? 'paste' : 'reason', false); stack = []; });
 $('btnCopy').addEventListener('click', async () => { let ok = false; try { await navigator.clipboard.writeText(`${S.title}\n\n${S.lyricsFinal}`); ok = true; } catch { /* ok */ } $('btnCopy').textContent = ok ? 'Copiada' : 'No se pudo copiar'; setTimeout(() => { $('btnCopy').textContent = 'Copiar letra'; }, 1800); });
 
 // Teléfono
