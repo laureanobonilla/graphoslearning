@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Herramientas gratis para tu negocio</title>
+<meta name="description" content="Tres herramientas gratuitas de 2 minutos: fuga de tiempo, nivel de IA e ideas para publicar.">
+<meta name="theme-color" content="#f2f5fa">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/hf.css?v=1">
+</head>
+<body>
+<div class="shell hub">
+  <h1>Herramientas gratis para tu negocio</h1>
+  <p style="margin:0 0 20px">Cada una toma unos 2 minutos. Tus respuestas nos ayudan a saber qué herramientas vale la pena construir.</p>
+  <a class="tool" data-p="fuga-de-tiempo/"><h2>¿Cuánto te cuesta repetir tareas?</h2><p>Calcula el dinero y los días que pierdes al año.</p></a>
+  <a class="tool" data-p="nivel-ia/"><h2>¿Qué tan listo está tu negocio para la IA?</h2><p>Test corto con puntaje y recomendaciones.</p></a>
+  <a class="tool" data-p="ideas-posts/"><h2>5 ideas de publicaciones para tu negocio</h2><p>Cuéntanos qué haces y recibe ideas listas para usar.</p></a>
+</div>
+<script>
+document.querySelectorAll('.tool').forEach(function(a){a.href=a.getAttribute('data-p')+location.search;});
+</script>
+</body>
+</html>

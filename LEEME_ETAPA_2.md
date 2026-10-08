@@ -2936,3 +2936,19 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 - Ejemplos: poner en `tu-cancion/ejemplos/` los 5 mp3 (nombres en `EXAMPLES` de app.js). Sin archivo, el ejemplo muestra «muy pronto».
 - Registro: cada borrador/intención/pedido queda en `tc_songs` y en `events`; el correo sale solo con WhatsApp-clic o teléfono.
 - Si Gemini falla en `tc-next-step`, la persona NO ve error: esa pantalla pasa a una caja de texto («Cuéntanos todo lo que quieres que lleve tu canción»; si falla más tarde, «¿Algo más…?»). El texto va en `details`. Camino «para una persona»: ya incluye detalles a mano (paso `details`, se puede saltar).
+- Ejemplos (8 mp3 en `tu-cancion/ejemplos/`): balada-lo-que-no-te-dije-a-tiempo, bachata-quedate-otra-vez, cumbia-baila-conmigo-esta-noche, alabanza-tu-fidelidad-me-sostiene, ranchera-brindo-por-ti-mama, rock-no-me-voy-a-rendir, rnb-quedate-hasta-el-amanecer, acustica-lo-simple-de-quererte (.mp3). Los ritmos del cuestionario incluyen estos mismos.
+- Camino «persona»: nombre → lo que la hace especial → 2 preguntas de Gemini (si fallan se omiten sin error) → ritmo → detalles.
+- El precio ya NO sale al empezar: sale en la pantalla de la letra, dentro de «Último paso», con casilla obligatoria («Entiendo que cuesta … y solo pago si me gusta la muestra»). Sin marcarla no se puede enviar por WhatsApp ni dejar teléfono. El correo indica si la marcó (eventos `price_shown` y `price_ack`).
+- Ajuste: sin tarjeta grande de precio; solo la casilla pequeña («Quiero recibir una muestra gratis y sin compromiso. Si me gusta, podré pagar ₡X por la canción completa, que incluye la versión cantada y la pista instrumental»).
+- Portada: botón «Escucha cómo suena» bajo el título (reproduce el primer ejemplo disponible; la onda baila mientras suena y al terminar pasa al siguiente) y los ejemplos van antes de «Así funciona». Evento nuevo: hero_play_clicked.
+- Primera pregunta ahora: «¿Para qué es tu canción?» (se asume que no hay letra). Quien ya la tiene usa el enlace «¿Ya tienes tu letra? Pégala aquí». Embudo: la columna es contestaron_primera_pregunta (reason_chosen o has_lyrics_chosen con hasOwn=true).
+- Cada vez que cambie app.js, subir también index.html: lleva app.js?v=... para que el navegador no use una copia vieja.
+
+## 71. herramientas (encuestas disfrazadas de utilidad, para descubrir qué software necesita la gente)
+- Carpeta `herramientas/`: `index.html` (menú), `fuga-de-tiempo/`, `nivel-ia/`, `ideas-posts/` y `shared/` (`hf.js`, `hf.css`; cada herramienta solo tiene su `config.js`). URLs: `/herramientas/fuga-de-tiempo/`, `/herramientas/nivel-ia/`, `/herramientas/ideas-posts/`.
+- Funciones nuevas: `hf-save` (guarda cada respuesta con un código por persona; correo a ti solo si deja contacto), `hf-ai` (Gemini: plan, consejos, 5 ideas de posts), `_lib/hf-core.js`. `sfc-track-event.js` se reemplaza (nuevas apps `hf-fuga-tiempo`, `hf-nivel-ia`, `hf-ideas-posts`).
+- UNA vez: correr `supabase/herramientas.sql` (tabla `hf_responses` + vista `hf_responses_friendly`). Si no existe, nada se pierde: queda como evento `hf_record_fallback`. Consultas en `tools/herramientas.sql`.
+- Se guarda al avanzar cada pregunta (no hace falta terminar). El contacto es opcional y va al final. La página dice claramente que es una encuesta.
+- Variables de Netlify: las mismas de siempre (SUPABASE_URL, SUPABASE_SERVICE_KEY, RESEND_API_KEY, FEEDBACK_TO_EMAIL, clave de Gemini).
+- Facebook: enlaza a cada herramienta directamente; la campaña y el anuncio se leen de `utm_campaign` / `utm_content` y salen en la consulta 11.
+- Si Gemini falla: fuga-de-tiempo y nivel-ia muestran un texto fijo (sin error); ideas-posts ofrece «Intentar de nuevo».
