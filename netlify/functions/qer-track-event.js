@@ -61,7 +61,9 @@ exports.handler = async (event) => {
         // Sin cuentas ni invitados con saldo en esta app: el anon_id hace
         // también de actor_id, con actor_kind = 'anon' (ver el ajuste al
         // check de la columna en supabase/schema.sql).
-        await store.logEvent(anonId, 'anon', anonId, eventName, metadata, null, 'quien-eres');
+        const APPS = ['quien-eres', 'who-are-you', 'quien-es-tu-pareja', 'who-is-your-partner', 'quien-eres-cancion'];
+        const app = APPS.includes(body.app) ? body.app : 'quien-eres';
+        await store.logEvent(anonId, 'anon', anonId, eventName, metadata, null, app);
     } catch (err) {
         console.error('[qer-track-event]', err.message);
     }

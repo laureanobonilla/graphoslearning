@@ -4,7 +4,7 @@
 const crypto = require('crypto');
 const { saveReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries, sanitizeAnswers } = require('./_lib/qer-gemini');
-const { json, TIME_BUDGET_MS, transcriptOf, AXIS_SCHEMA, validAxis, formatOf } = require('./_lib/qer-map-core');
+const { json, TIME_BUDGET_MS, transcriptOf, AXIS_SCHEMA, validAxis, formatOf, isKnownFormat } = require('./_lib/qer-map-core');
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -14,11 +14,12 @@ exports.handler = async (event) => {
     const answers = sanitizeAnswers(body.answers);
     if (!answers) return json(400, { error: 'Faltan las respuestas del cuestionario.' });
 
-    const format = body.format === 'reading' ? 'reading' : 'map';
-    const transcript = transcriptOf(answers);
+    const format = body.format === 'reading' ? 'reading' : (isKnownFormat(body.format) && String(body.format).startsWith('paid-') ? body.format : 'map');
+    const fmt = formatOf(format);
+    const transcript = (fmt.transcriptOf || transcriptOf)(answers);
     const t0 = Date.now();
     try {
-        const axis = await generateWithRetries(formatOf(format).axisPrompt(transcript), AXIS_SCHEMA, validAxis,
+        const axis = await generateWithRetries(fmt.axisPrompt(transcript), fmt.axisSchema || AXIS_SCHEMA, validAxis,
             { tag: 'map-axis', maxOutputTokens: 1024, deadline: t0 + TIME_BUDGET_MS });
         console.log(`[generate-map] eje listo en ${Date.now() - t0} ms`);
 

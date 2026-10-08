@@ -183,12 +183,14 @@ ${READING_RULES}
 Ahora define SOLO el eje de la lectura. Busca UNA contradicción real entre lo que la persona dice de sí misma y lo que sus otras respuestas dejan ver, y detecta los dos o tres temas que se repiten a lo largo de sus respuestas (por ejemplo la traición, la mentira, el cansancio de sostenerlo todo). Nunca inventes un "secreto". El nombre del arquetipo debe nacer de ESA contradicción específica y evitar por completo el campo guardián/vigilante/centinela/vigía/protector/pilar. La frase final debe ser catártica.`;
 }
 
-function readingChunkPrompt(transcript, axis, indexes) {
+function readingChunkPrompt(transcript, axis, indexes, opts) {
+    const freeCount = (opts && opts.freeCount) || READING_FREE_COUNT;
+    const paywall = opts && typeof opts.paywall === 'boolean' ? opts.paywall : !READING_ALL_FREE;
     const list = indexes.map((idx, k) => {
-        const words = idx < READING_FREE_COUNT ? '120 a 150 palabras' : '150 a 190 palabras';
+        const words = idx < freeCount ? '120 a 150 palabras' : '150 a 190 palabras';
         // El último capítulo que se lee completo sin pagar cierra con una pregunta abierta (suspenso narrativo):
         // la última frase deja pendiente algo concreto sobre ESA persona, sin responderlo.
-        const cliff = !READING_ALL_FREE && idx === READING_FREE_COUNT - 1
+        const cliff = paywall && idx === freeCount - 1
             ? ' ÚLTIMA FRASE OBLIGATORIA: termina este capítulo con una sola frase que deje abierta una pregunta concreta sobre ESTA persona, basada en algo que escribió (algo que el capítulo no resuelve ni explica). No la respondas, no menciones capítulos siguientes, lectura, pago ni desbloqueo.'
             : '';
         return `${k + 1}. (${words}) ${READING_THEMES[idx]}${cliff}`;
@@ -214,7 +216,31 @@ const FORMATS = {
     map:     { freeCount: FREE_COUNT,         themes: THEMES,         chunkPrompt, axisPrompt,                   nodesSchema: NODES_SCHEMA,         minChars: () => 250 },
     reading: { freeCount: READING_OPEN_COUNT, themes: READING_THEMES, chunkPrompt: readingChunkPrompt, axisPrompt: readingAxisPrompt, nodesSchema: READING_NODES_SCHEMA, minChars: (idx) => (idx < READING_FREE_COUNT ? 500 : 650) }
 };
+// ---- Formatos CON MURO DE PAGO (3 de 10 capítulos abiertos), uno por app: quien-eres, who-are-you,
+// quien-es-tu-pareja, who-is-your-partner. Cada uno trae su propio idioma/tema de prompts. ----
+const PAID_FREE_COUNT = 3;
+const paidMin = (idx) => (idx < PAID_FREE_COUNT ? 500 : 650);
+const PAID_ES_NOTE = '\n\nNOTA SOBRE LAS RESPUESTAS: la mayoría son opciones elegidas de una lista (a veces escritas por la persona) más 5 respuestas abiertas, que pesan más. No cites ni repitas literalmente las opciones como si fueran frases suyas (nada de «elegiste…»): lee los PATRONES entre ellas y conviértelos en imágenes y metáforas sorprendentes. Cuando cites, usa sobre todo lo que la persona escribió.';
+FORMATS['paid-self-es'] = {
+    freeCount: PAID_FREE_COUNT, themes: READING_THEMES, transcriptOf, axisSchema: AXIS_SCHEMA,
+    axisPrompt: (t) => readingAxisPrompt(t).replace(/\b50 respuestas/g, '25 respuestas') + PAID_ES_NOTE, nodesSchema: READING_NODES_SCHEMA, minChars: paidMin,
+    chunkPrompt: (t, a, i) => readingChunkPrompt(t, a, i, { freeCount: PAID_FREE_COUNT, paywall: true }) + PAID_ES_NOTE
+};
+function registerPaid(name, file) {
+    try {
+        const m = require(file);
+        FORMATS[name] = {
+            freeCount: PAID_FREE_COUNT, transcriptOf: m.transcriptOf, axisSchema: m.AXIS_SCHEMA,
+            axisPrompt: m.axisPrompt, nodesSchema: m.NODES_SCHEMA, minChars: paidMin,
+            chunkPrompt: (t, a, i) => m.chunkPrompt(t, a, i, { freeCount: PAID_FREE_COUNT })
+        };
+    } catch (err) { console.error('[qer-map-core] formato', name, 'no disponible:', err.message); }
+}
+registerPaid('paid-self-en', './qer-prompts/self-en');
+registerPaid('paid-partner-es', './qer-prompts/partner-es');
+registerPaid('paid-partner-en', './qer-prompts/partner-en');
 const formatOf = (name) => FORMATS[name] || FORMATS.map;
+const isKnownFormat = (name) => Object.prototype.hasOwnProperty.call(FORMATS, name);
 
 const wordCount = (t) => String(t || '').trim().split(/\s+/).filter(Boolean).length;
 
@@ -225,4 +251,4 @@ function publicNodes(nodes) {
         : { id: n.id, label: n.label, hook: n.hook, free: false, words: wordCount(n.text) });
 }
 
-module.exports = { formatOf, wordCount, READING_FREE_COUNT, FREE_COUNT, TIME_BUDGET_MS, TOTAL_NODES, UUID_RE, json, THEMES, CHUNKS, transcriptOf, AXIS_SCHEMA, validAxis, axisPrompt, NODES_SCHEMA, chunkPrompt, publicNodes };
+module.exports = { isKnownFormat, formatOf, wordCount, READING_FREE_COUNT, FREE_COUNT, TIME_BUDGET_MS, TOTAL_NODES, UUID_RE, json, THEMES, CHUNKS, transcriptOf, AXIS_SCHEMA, validAxis, axisPrompt, NODES_SCHEMA, chunkPrompt, publicNodes };

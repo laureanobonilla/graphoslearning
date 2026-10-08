@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{lang}}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>¿Quién eres en realidad?</title>
-<meta name="description" content="Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.">
+<title>{{title}}</title>
+<meta name="description" content="{{desc}}">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -330,140 +330,5 @@
   .other-wrap.is-hidden{ display:none; }
   .other-wrap .short-input{ min-height: 56px; }
   .options .option.is-other{ border-style: dashed; }
-  .finish-early{ margin-top: 18px; text-align:center; }
-  .finish-early.is-hidden{ display:none; }
-  .finish-early p{ margin: 0 0 6px; font-size: .8rem; line-height:1.45; color: var(--muted); }
-  .finish-early .btn-ghost{ color: var(--parchment); font-size: .9rem; text-decoration: underline; text-decoration-color: var(--brass-dim); text-underline-offset: 3px; padding: 8px 6px; }
 </style>
 </head>
-<body>
-<div class="shell">
-  <div id="progress" class="is-hidden"><div id="progressFill"></div></div>
-
-  <section id="screen-cover" class="screen is-active">
-    <div class="mask-wrap">
-      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4" opacity="0.9"/>
-        <path class="mask-crack" d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="34" cy="42" r="2.4" fill="#c6a358"/>
-        <circle cx="66" cy="42" r="2.4" fill="#c6a358"/>
-      </svg>
-    </div>
-    <h1 class="display" data-t="cover_title"></h1>
-    <p class="sub" data-t="cover_sub"></p>
-    <p class="meta-line" data-t="cover_meta"></p>
-    <button id="btnStart" class="btn btn-primary" data-t="btn_start"></button>
-    <button id="btnResume" class="btn-ghost is-hidden" style="margin-top:14px;"></button>
-  </section>
-
-  <section id="screen-quiz" class="screen">
-    <div class="quiz-top"><button id="btnBack" data-aria="back_aria">‹</button></div>
-    <div class="quiz-body">
-      <p id="qAct" class="q-act"></p>
-      <p id="qPrompt" class="q-prompt display"></p>
-      <div id="qBody"></div>
-    </div>
-    <div class="quiz-bottom">
-      <button id="btnNext" class="btn btn-primary" disabled data-t="btn_next"></button>
-      <div id="finishEarly" class="finish-early is-hidden">
-        <p data-t="finish_early_note"></p>
-        <button type="button" id="btnFinishEarly" class="btn-ghost" data-t="finish_early_btn"></button>
-      </div>
-    </div>
-  </section>
-
-  <section id="screen-loading" class="screen">
-    <svg class="pulse-mask" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4"/>
-      <path d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-    <p id="loadingLabel" class="display"></p>
-  </section>
-
-  <section id="screen-error" class="screen">
-    <div class="error-box">
-      <p id="errorMsg" class="display" style="font-size:1.2rem; color:var(--parchment);"></p>
-      <p id="errorDetail"></p>
-      <button id="btnRetry" class="btn btn-primary" data-t="err_retry"></button>
-    </div>
-  </section>
-
-  <section id="screen-reveal" class="screen">
-    <h2 id="archetypeName" class="archetype-name display"></h2>
-    <div class="rule"></div>
-    <p id="hookLine" class="hook-line" style="margin-bottom:20px;"></p>
-
-    <div id="chapters" class="chapters"></div>
-    <div id="lockedList" class="locked-list is-hidden"></div>
-
-    <div id="paywall" class="paywall">
-      <div id="payBlock">
-        <p id="paywallCommitment" class="paywall-commitment"></p>
-        <p id="paywallHook" class="paywall-label display"></p>
-        <p class="paywall-price"><span data-t="pay_price_pre"></span> <b id="priceLabel"></b></p>
-        <p id="payChecking" class="pay-note" data-t="pay_checking_country"></p>
-
-        <div id="payCR" class="pay-panel is-hidden">
-          <p class="pay-title display" data-t="sinpe_title"></p>
-          <ul class="pay-steps">
-            <li data-n="1" id="sinpeStep1"></li>
-            <li data-n="2" data-t="sinpe_step2"></li>
-            <li data-n="3" data-t="sinpe_step3"></li>
-          </ul>
-          <button type="button" id="btnCopyPhone" class="pay-copy" data-t="sinpe_copy"></button>
-          <input type="file" id="sinpeFile" accept="image/*" hidden>
-          <button type="button" id="btnSinpeUpload" class="pay-upload" data-t="sinpe_upload"></button>
-          <p id="sinpeMsg" class="pay-msg is-hidden" role="status"></p>
-          <p class="pay-note" data-t="sinpe_note"></p>
-        </div>
-
-        <div id="payIntl" class="pay-panel is-hidden">
-          <button type="button" id="btnPaypal" class="pay-upload"></button>
-          <p id="paypalMsg" class="pay-msg is-hidden" role="status"></p>
-          <p id="paypalNote" class="pay-note"></p>
-        </div>
-
-        <p class="pay-help"><span data-t="help_lead"></span><br><a id="helpWa" href="#" target="_blank" rel="noopener" data-t="help_wa"></a>·<a id="helpMail" href="#" data-t="help_mail"></a></p>
-        <button id="btnSkipPaywall" class="btn-outline" data-t="skip_btn"></button>
-      </div>
-
-      <div id="skippedNote" class="is-hidden">
-        <p class="skipped-text" data-t="skipped_text"></p>
-        <p class="skipped-text" style="font-size:0.85rem"><span data-t="skipped_help"></span>
-          <a id="helpWa2" href="#" target="_blank" rel="noopener" style="color:#f6e7de" data-t="help_wa"></a> ·
-          <a id="helpMail2" href="#" style="color:#f6e7de" data-t="help_mail"></a></p>
-        <div id="reasonBlock" class="reason-block">
-          <p class="reason-title" data-t="reason_title"></p>
-          <div id="skipReasonBox" class="reason-list">
-            <button class="reason-btn skip-reason" data-reason="precio"></button>
-            <button class="reason-btn skip-reason" data-reason="metodo_pago"></button>
-            <button class="reason-btn skip-reason" data-reason="solo_ver"></button>
-            <button class="reason-btn skip-reason" data-reason="sin_interes"></button>
-          </div>
-          <p id="skipReasonThanks" class="is-hidden reason-thanks" data-t="reason_thanks"></p>
-        </div>
-        <button id="btnShowPay" class="btn-outline" data-t="show_pay_btn"></button>
-        <button id="btnRestartFromSkip" class="btn-ghost" data-t="redo_btn"></button>
-      </div>
-    </div>
-
-    <div id="fullContainer" class="is-hidden">
-      <p class="unlocked-badge" data-t="unlocked_badge"></p>
-      <p id="closingLine" class="closing-line"></p>
-      <div class="reveal-actions">
-        <button id="btnRestart" class="btn-ghost" data-t="redo_btn"></button>
-      </div>
-    </div>
-
-    <div class="reveal-actions" style="margin-top:26px;">
-      <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);" data-t="share_btn"></button>
-    </div>
-    <p class="disclaimer" data-t="disclaimer"></p>
-  </section>
-</div>
-
-<script src="/qer-shared/qer-pay-config.js"></script>
-<script src="config.js"></script>
-<script src="/qer-shared/qer-app.js"></script>
-</body>
-</html>
