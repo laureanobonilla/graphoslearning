@@ -2918,9 +2918,21 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 - **Preguntas:** 25, en 5 actos de 5. Por acto, 4 de elegir (8–10 opciones cada una + «Otra (escríbela)» automática) y 1 abierta al final → 20 de elegir y 5 abiertas. Empiezan fáciles. Desde la 15 aparece «Ya tengo suficiente: ver mi lectura ahora» con un texto que anima a seguir (`finish_early_offered`, `quiz_finished_early`).
 - **Código compartido:** `qer-shared/qer-app.js` (cliente), `qer-shared/qer-pay-config.js` (cobro), `qer-shared/template.html`. Cada app solo tiene `config.js` (preguntas y textos) + `index.html` generado con `python3 tools/build_qer_apps.py`. Los prompts de lectura: `netlify/functions/_lib/qer-prompts/{self-en,partner-es,partner-en}.js` (el español sobre uno mismo sigue en `qer-map-core.js`, formato `paid-self-es`).
 - **Cobro:** el país sale de `qer-geo` (cabecera de Netlify; si falla, zona horaria; `?pais=XX` fuerza uno para probar).
-  - **Costa Rica:** instrucciones de SINPE Móvil ₡1.000 al 8777-2993 y botón «Subir foto del comprobante». **Cualquier imagen** desbloquea (un archivo que no es imagen se rechaza).
+  - **Costa Rica:** instrucciones de SINPE Móvil ₡500 al 8777-2993 y botón «Subir foto del comprobante». **Cualquier imagen** desbloquea (un archivo que no es imagen se rechaza).
   - **Resto del mundo:** botón de PayPal con el monto mostrado en moneda local (tipo de cambio de open.er-api.com, solo informativo; PayPal cobra US$2). **España:** 2 €.
   - **Los enlaces de PayPal van en `qer-shared/qer-pay-config.js`** (`usd.link`, `eur.link`). Mientras estén vacíos, el botón avisa «PayPal aún no disponible» y **no desbloquea**. Con enlace, tocar el botón abre PayPal en otra pestaña y desbloquea de inmediato, sin redirección.
   - El desbloqueo lo hace `qer-unlock` (no verifica el pago; registra `payment_unlocked_trust` con método, país y la «evidencia»).
 - **Seguimiento:** todo queda en `events` con `app` = la app. Para SINPE se guarda nombre, tipo, tamaño, dimensiones, antigüedad del archivo, segundos desde que vio el pago, intento y si copió el número (`sinpe_photo_selected`). La foto en sí **no se sube ni se guarda**. Script de consultas: `tools/quien-eres-pago.sql` (embudo, pregunta a pregunta, métodos, fotos sospechosas, PayPal, motivos de no pago, línea de tiempo por persona, respuestas «Otra»).
 - **Pruebas:** Playwright en las 4 apps (CR/SINPE con archivo inválido y válido, MX sin y con enlace, ES/US con enlace): 25 preguntas, salida anticipada en la 15, respuesta «Otra», desbloqueo y eventos con la app correcta.
+
+### 69b. Todos los capítulos con candado + «Seguir leyendo…»
+- En las 4 apps de pago ya no se abre ningún capítulo gratis: los 10 salen cerrados con candado, título y las **primeras 10 palabras terminadas en «…»** (`teaser`, calculado en `qer-generate-map-finalize.js`; el navegador nunca recibe más texto que eso). Cada uno trae «Seguir leyendo…», que baja al pago (con un destello) y evento `read_more_clicked {chapterIndex}`.
+- Sobre el pago se lee «Un solo pago desbloquea todos los capítulos…» (`pay_covers_all`). `PAID_FREE_COUNT = 0` en `qer-map-core.js`. `tools/quien-eres-pago.sql` cuenta `tocaron_seguir_leyendo` en el embudo.
+
+## 70. tu-cancion (canción por encargo, con precio por país)
+- Carpeta `tu-cancion/` (index.html + app.js + `ejemplos/`), funciones `tc-config`, `tc-next-step`, `tc-generate-song`, `tc-song-request`, librería `_lib/tc-core.js`.
+- UNA vez: correr `supabase/tu-cancion.sql` (tabla `tc_songs` + vista `tc_songs_friendly`). Consultas en `tools/tu-cancion.sql`.
+- Precios: `_lib/tc-core.js` → `PRICES` (CR ₡9.900; resto US$22 PROVISIONAL, el correo lo marca). Para probar otro país: `?pais=MX` en tc-config.
+- Ejemplos: poner en `tu-cancion/ejemplos/` los 5 mp3 (nombres en `EXAMPLES` de app.js). Sin archivo, el ejemplo muestra «muy pronto».
+- Registro: cada borrador/intención/pedido queda en `tc_songs` y en `events`; el correo sale solo con WhatsApp-clic o teléfono.
+- Si Gemini falla en `tc-next-step`, la persona NO ve error: esa pantalla pasa a una caja de texto («Cuéntanos todo lo que quieres que lleve tu canción»; si falla más tarde, «¿Algo más…?»). El texto va en `details`. Camino «para una persona»: ya incluye detalles a mano (paso `details`, se puede saltar).
