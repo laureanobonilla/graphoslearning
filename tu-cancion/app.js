@@ -476,13 +476,12 @@ function setupSend() {
   const dial = $('songDial'), phone = $('songPhone'); phone.value = ''; const g = guessDial(); if (g) dial.value = g;
   $('waBack').classList.add('is-hidden'); $('phoneBox').classList.add('is-hidden'); $('btnShowPhone').classList.remove('is-hidden'); $('sendErr').classList.add('is-hidden');
   const ack = $('priceAck'), priceTxt = geo.price && geo.price.text ? geo.price.text : '';
-  $('priceAmt').textContent = priceTxt; $('priceLine').textContent = priceTxt ? `Tu canción terminada cuesta ${priceTxt} · no pagas hasta escucharla.` : 'No pagas nada hasta escuchar tu muestra.';
-  $('ackText').textContent = priceTxt ? `Entiendo que mi canción cuesta ${priceTxt} y que solo pago si me gusta la muestra.` : 'Entiendo que mi canción tiene un precio y que solo pago si me gusta la muestra.';
+  $('ackText').textContent = priceTxt ? `Quiero recibir una muestra gratis y sin compromiso. Si me gusta, podré pagar ${priceTxt} por la canción completa, que incluye la versión cantada y la pista instrumental.` : 'Quiero recibir una muestra gratis y sin compromiso. Si me gusta, podré pagar por la canción completa, que incluye la versión cantada y la pista instrumental.';
   ack.checked = false;
   const gate = () => { const on = ack.checked; $('btnWa').classList.toggle('is-disabled', !on); $('btnWa').setAttribute('aria-disabled', String(!on)); $('btnPhoneSend').disabled = !on; $('ackHint').classList.toggle('is-hidden', on); };
   ack.onchange = () => { gate(); if (ack.checked) track('price_ack', { price: priceTxt, country: geo.country || '' }); };
   gate(); track('price_shown', { price: priceTxt, country: geo.country || '', where: 'review' });
-  const waText = () => `Hola, quiero que suene mi canción 🎵\n«${S.title}»\nRitmo: ${rhythmLabel() || '—'}\nEntiendo que cuesta ${priceTxt || 'el precio indicado'} y que solo pago si me gusta la muestra.\nMi código es: ${id.slice(0, 8)}`;
+  const waText = () => `Hola, quiero que suene mi canción 🎵\n«${S.title}»\nRitmo: ${rhythmLabel() || '—'}\nQuiero la muestra gratis y sin compromiso; si me gusta, la canción completa vale ${priceTxt || 'el precio indicado'}.\nMi código es: ${id.slice(0, 8)}`;
   const wa = $('btnWa'); wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(waText())}`;
   wa.onclick = (ev) => {
     if (!ack.checked) { ev.preventDefault(); $('ackHint').classList.remove('is-hidden'); try { $('ackRow').scrollIntoView({ block: 'center' }); } catch { /* ok */ } return; }

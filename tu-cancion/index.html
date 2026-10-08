@@ -142,10 +142,6 @@
   .send-box h3{ margin:0 0 8px; font-size:1.35rem; line-height:1.15; }
   .send-box p{ margin:0 0 12px; font-size:.93rem; line-height:1.5; color:var(--muted); }
   .send-box .reassure{ color:var(--ink); font-weight:600; }
-  .price-line{ margin:0 0 14px; font-weight:600; font-size:.93rem; color:var(--ink); }
-  .price-card{ background:var(--ink); color:#fff; border-radius:16px; padding:16px 16px 6px; margin:0 0 14px; }
-  .send-box .price-card .amt{ font-family:'Gloock',Georgia,serif; font-size:2.1rem; line-height:1; margin:0 0 6px; color:var(--mango); }
-  .send-box .price-card .lbl{ color:#e4e2f7; font-weight:400; font-size:.92rem; margin:0 0 10px; }
   .ack{ display:flex; gap:10px; align-items:flex-start; margin:0 0 10px; padding:12px; border:1.5px solid var(--line); border-radius:12px; background:#fff; font-size:.93rem; line-height:1.4; color:var(--ink); cursor:pointer; }
   .ack input{ width:22px; height:22px; flex:0 0 auto; margin:1px 0 0; accent-color:var(--magenta); }
   .btn-wa.is-disabled{ opacity:.45; }
@@ -242,7 +238,6 @@
   <section id="screen-review" class="screen">
     <h2 id="songTitle" class="song-title display"></h2>
     <p id="songSub" class="song-sub"></p>
-    <p id="priceLine" class="price-line"></p>
     <div class="act-row">
       <button type="button" class="btn btn-ghost" id="btnEdit">Editar letra</button>
       <button type="button" class="btn btn-primary" id="btnSendTop">Enviar mi canción</button>
@@ -258,11 +253,6 @@
     <div id="sendBox" class="send-box is-hidden" aria-label="Enviar">
       <div id="sendForm">
         <h3 class="display">Último paso</h3>
-        <div class="price-card">
-          <p class="amt" id="priceAmt"></p>
-          <p class="lbl">Precio de tu canción terminada. <b>Incluye</b> la versión cantada y la pista instrumental.</p>
-          <p class="lbl">No pagas nada hasta escuchar tu muestra.</p>
-        </div>
         <label class="ack" id="ackRow"><input type="checkbox" id="priceAck"><span id="ackText"></span></label>
         <p class="err is-hidden" id="ackHint" role="alert">Marca la casilla para continuar.</p>
         <p>Te escribimos por WhatsApp con una muestra de tu canción.</p>
