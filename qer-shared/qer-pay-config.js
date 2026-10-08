@@ -4,7 +4,7 @@
 //   eur.link → botón de 2,00 € (España)
 // Mientras un enlace esté vacío ('') la app muestra "PayPal aún no disponible" y NO desbloquea nada.
 window.QER_PAY = {
-  sinpe: { phone: '8777-2993', amountCRC: 1000 },
+  sinpe: { phone: '8777-2993', amountCRC: 500 },
   usd: { amount: 2, link: '' },
   eur: { amount: 2, link: '' },
   eurCountries: ['ES'],
