@@ -509,7 +509,7 @@ function setupSend() {
     } catch (e) {
       track('request_failed', { status: e.status || 0 });
       err.textContent = e.status ? (e.message || 'No pudimos registrar tu solicitud. Inténtalo de nuevo.') : 'Sin conexión. Inténtalo de nuevo.'; err.classList.remove('is-hidden');
-      btn.disabled = false; btn.textContent = 'Enviar mi canción';
+      btn.disabled = false; btn.textContent = 'Ponerle música';
     }
   };
 }

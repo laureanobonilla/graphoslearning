@@ -125,7 +125,7 @@
   #screen-review{ padding:30px 0 60px; }
   .song-title{ font-size:clamp(2rem,8.5vw,2.6rem); line-height:1.08; margin:0 0 6px; }
   .song-sub{ color:var(--muted); font-size:1rem; margin:0 0 16px; }
-  .act-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:0 0 16px; }
+  .act-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0 6px; }
   .act-row .btn{ padding:14px 10px; font-size:.98rem; }
   .sheet{ background:var(--paper); border-radius:4px 4px 10px 10px; box-shadow:0 1px 0 rgba(27,23,64,.08), 0 18px 40px -18px rgba(27,23,64,.35); position:relative; padding:34px 26px 30px; overflow:hidden; }
   .sheet::before{ content:''; position:absolute; left:0; right:0; top:0; height:10px; background:linear-gradient(90deg,var(--magenta),var(--mango)); }
@@ -238,12 +238,12 @@
   <section id="screen-review" class="screen">
     <h2 id="songTitle" class="song-title display"></h2>
     <p id="songSub" class="song-sub"></p>
-    <div class="act-row">
-      <button type="button" class="btn btn-ghost" id="btnEdit">Editar letra</button>
-      <button type="button" class="btn btn-primary" id="btnSendTop">Enviar mi canción</button>
-    </div>
     <article id="sheet" class="sheet" aria-label="Letra"></article>
     <textarea id="editArea" class="is-hidden" aria-label="Editar la letra" maxlength="2600"></textarea>
+    <div class="act-row">
+      <button type="button" class="btn btn-ghost" id="btnEdit">Editar letra</button>
+      <button type="button" class="btn btn-primary" id="btnSendTop">Ponerle música</button>
+    </div>
     <div class="sheet-tools">
       <button type="button" class="btn-quiet" id="btnRegen">Pedir otra versión</button>
       <button type="button" class="btn-quiet" id="btnAdjust">Cambiar mis respuestas</button>
@@ -278,7 +278,7 @@
             <input id="songPhone" type="tel" inputmode="tel" enterkeyhint="send" autocomplete="tel-national" placeholder="Ej. 8888 1234" maxlength="24">
           </div>
           <p class="fine">Solo lo usamos para enviarte la muestra. No lo compartimos.</p>
-          <button type="submit" id="btnPhoneSend" class="btn btn-primary">Enviar mi canción</button>
+          <button type="submit" id="btnPhoneSend" class="btn btn-primary">Ponerle música</button>
         </form>
         <p id="sendErr" class="err is-hidden" role="alert"></p>
       </div>
