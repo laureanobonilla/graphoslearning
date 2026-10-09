@@ -97,9 +97,9 @@ function backBtn(s) { const b = h('button', 'back', '‹ Volver'); b.type = 'but
 
 function intro() {
   idx = -1; setP(0); const s = scr();
-  s.appendChild(h('h1', '', 'Aprende lo difícil de otra forma: dentro de un mapa que puedes recorrer.'));
+  s.appendChild(h('h1', '', 'Estudia de otra forma'));
   s.appendChild(h('p', 'lead', 'Elige la materia que se te resiste. Te escribimos un texto a tu medida y lo convertimos en un mapa vivo: lees, y las ideas se iluminan y se conectan frente a ti.'));
-  const b = h('button', 'btn', 'Contar qué quiero entender'); b.type = 'button'; b.addEventListener('click', () => { track('start_clicked', {}); stack.length = 0; go(0, false); }); s.appendChild(b);
+  const b = h('button', 'btn', 'Empezar'); b.type = 'button'; b.addEventListener('click', () => { track('start_clicked', {}); stack.length = 0; go(0, false); }); s.appendChild(b);
   const f = h('ul', 'facts'); ['Gratis para probar', 'Unas 7 preguntas, 2 minutos', 'No necesitas cuenta para empezar'].forEach(t => f.appendChild(h('li', '', t))); s.appendChild(f);
   setTimeout(() => { try { b.focus({ preventScroll: true }); } catch { /* ok */ } }, 80);
 }
@@ -117,7 +117,7 @@ function advance() {
 
 function stepTema() {
   const s = scr(); backBtn(s);
-  s.appendChild(h('h2', '', '¿Qué quieres entender?'));
+  s.appendChild(h('h2', '', 'Danos un tema complejo que te interese'));
   s.appendChild(h('p', 'hint', 'Un tema, un concepto, una duda… como te salga.'));
   const ta = h('textarea', 'field'); ta.rows = 2; ta.maxLength = 200; ta.placeholder = 'Ej.: cómo funciona la inflación'; ta.value = A.tema || ''; s.appendChild(ta);
   const chips = h('div', 'chips'); EJEMPLOS.forEach(t => { const c = h('button', 'chip', t); c.type = 'button'; c.addEventListener('click', () => { ta.value = t; upd(); ta.focus(); }); chips.appendChild(c); }); s.appendChild(chips);

@@ -4,10 +4,11 @@
 // Lo llama app.js (maybeStartCoachTour) cuando termina el primer esquema del asistente de bienvenida o de /aprender/.
 (function () {
 'use strict';
-const KEY = 'gk_coach_seen';
+const KEY = 'gk_coach_seen2';
+const forced = () => !!window.__gkForceTour || /[?&]tour=1\b/.test(location.search);
 const T = (k, p) => (window.tr ? window.tr(k, p) : k);
 const RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const seen = () => { try { return !!localStorage.getItem(KEY); } catch { return false; } };
+const seen = () => { if (forced()) return false; try { return !!localStorage.getItem(KEY); } catch { return false; } };
 const markSeen = () => { try { localStorage.setItem(KEY, String(Date.now())); } catch { /* ok */ } };
 const trk = (e, m) => { try { if (typeof track === 'function') track(e, m || {}); } catch { /* ok */ } };
 
@@ -173,7 +174,7 @@ window.maybeStartCoachTour = function (origin) {
   try {
     if (window.innerWidth < 900 || seen() || S) return;
     const first = typeof isFirstTimeUser !== 'undefined' && isFirstTimeUser;
-    if (!(first || origin === 'aprende') || nodes.length < 2) return;
+    if (!(first || origin === 'aprende' || forced()) || nodes.length < 2) return;
     const t0 = Date.now(); const note = document.getElementById('onbExampleNote');
     const wait = () => { if (seen() || S) return; const noteOpen = note && !note.classList.contains('hidden'); if ((noteOpen && Date.now() - t0 < 25000) || menuVisible()) { setTimeout(wait, 600); return; } startCoach(origin || 'onboarding'); };
     setTimeout(wait, 1500);

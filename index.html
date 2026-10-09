@@ -18,12 +18,20 @@
          ese id — no uno en el servidor y otro distinto, a mano, aquí en el HTML. -->
     <style>
         /* Fondo blanco impecable para el área de texto del lector */
-        #readerTextMode {
-            background-color: #ffffff !important;
-            color: #1e293b !important;
-            padding: 1.5rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        /* Lector OSCURO (2026-10-08): mismo cosmos que el lienzo y que /aprender/, en vez de
+           una hoja blanca. Para volver a la hoja blanca basta borrar este bloque y el
+           bloque "LECTOR OSCURO — complemento" del final de este <style>. */
+        #readerTextMode, [data-role="textMode"] {
+            background-color: #121832 !important;
+            color: #dde2f3 !important;
+            padding: 1.5rem 1.6rem;
+            border-radius: 0.9rem;
+            border: 1px solid #232b4d;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 8px 30px -12px rgba(0,0,0,0.5);
+            font-family: Inter, system-ui, sans-serif;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            letter-spacing: 0.005em;
         }
 
         /* A propósito SIN whitespace-pre-wrap (se quitó de la clase del
@@ -68,11 +76,25 @@
         #readerTextMode ol { list-style: decimal; }
         #readerTextMode li { margin: 0.2em 0; }
         #readerTextMode blockquote {
-            border-left: 3px solid #cbd5e1;
+            border-left: 3px solid #3a4268;
             padding-left: 0.9em;
-            color: #475569;
+            color: #aab2d0;
         }
-        #readerTextMode a { color: #4f46e5; text-decoration: underline; }
+        #readerTextMode a { color: #8fb4ff; text-decoration: underline; }
+        /* ===== LECTOR OSCURO — complemento ===== */
+        #readerContentContainer, [data-role="contentContainer"] { background-color: #0b1022 !important; }
+        #readerTextMode h1, #readerTextMode h2, #readerTextMode h3, #readerTextMode h4,
+        [data-role="textMode"] h1, [data-role="textMode"] h2, [data-role="textMode"] h3 { color: #f1f4ff; }
+        #readerEmptyHint .text-slate-400, [data-role="emptyHint"] .text-slate-400 { color: #7d86a8 !important; }
+        #readerEmptyHint .text-indigo-600, [data-role="emptyHint"] .text-indigo-600 { color: #8b7cf6 !important; }
+        #readerTextMode ::selection, [data-role="textMode"] ::selection { background: rgba(79,209,197,.35); }
+        #readerContentContainer::-webkit-scrollbar, [data-role="contentContainer"]::-webkit-scrollbar { width: 10px; }
+        #readerContentContainer::-webkit-scrollbar-thumb, [data-role="contentContainer"]::-webkit-scrollbar-thumb { background: #2c3458; border-radius: 8px; border: 2px solid #0b1022; }
+        #readerContentContainer::-webkit-scrollbar-track, [data-role="contentContainer"]::-webkit-scrollbar-track { background: transparent; }
+        /* Selector "Modo" y campos de la cabecera: más finos */
+        #schemaLayoutMode { appearance: none; -webkit-appearance: none; padding-right: 1.6rem !important; cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a92b2' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right .5rem center; }
     </style>
     <!-- pdf.js: ya no dibuja páginas (ver la sección "IMPORTAR PDF" en
          app.js) — solo se usa para EXTRAER el texto (getTextContent) de las
@@ -1402,6 +1424,6 @@
     <script src="/i18n/en.js"></script>
     <script src="/i18n/core.js"></script>
     <script src="/app.js"></script>
-    <script src="/coach.js?v=2"></script>
+    <script src="/coach.js?v=3"></script>
 </body>
 </html>

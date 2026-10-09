@@ -129,17 +129,17 @@ let schemaLayoutMode = (() => {
 let sourceNodeForSynergy = null;
 const synergyBanner = document.getElementById('synergyBanner');
 
-// Paleta pensada para flotar sobre el lienzo oscuro ("cosmos"): tarjetas claras
-// que se leen como pequeñas fichas iluminadas, no el pastel tenue de antes
-// (que estaba calibrado para un fondo blanco).
+// Paleta (2026-10-08): tarjetas oscuras de cristal con borde luminoso, a juego con
+// el lienzo "cosmos" y con /aprender/. La letra clara es el default global; los
+// nodos de relleno claro (guardados de antes o recoloreados) reciben letra oscura
+// sola — ver fixNodeFontContrast.
 const elegantPalette = [
-    { background: '#fdfbf7', border: '#cbd5e1' }, // Crema / Marfil
-    { background: '#eef2ff', border: '#a5b4fc' }, // Lavanda-azul
-    { background: '#ecfeff', border: '#67e8f9' }, // Celeste cristal
-    { background: '#f5f3ff', border: '#c4b5fd' }, // Lavanda
-    { background: '#fffbeb', border: '#fcd34d' }, // Amarillo cálido
-    { background: '#ecfdf5', border: '#6ee7b7' }, // Menta
-    { background: '#fff1f2', border: '#fda4af' }  // Rosa
+    { background: '#1b2140', border: '#8b7cf6' }, // Violeta
+    { background: '#0f2f33', border: '#4fd1c5' }, // Turquesa
+    { background: '#2a2414', border: '#f2b366' }, // Ámbar
+    { background: '#2d1830', border: '#f472b6' }, // Rosa
+    { background: '#14301f', border: '#4ade80' }, // Verde
+    { background: '#162a44', border: '#60a5fa' }  // Azul
 ];
 
 function getRandomColor() {
@@ -152,12 +152,12 @@ function getRandomColor() {
 // nuevos ni al reabrir un proyecto), así lo que la persona cambie a mano se
 // queda como lo dejó.
 const LEVEL_PALETTE = [
-    { background: '#ccfbf1', border: '#14b8a6' }, // 0 raíz: turquesa
-    { background: '#e0e7ff', border: '#6366f1' }, // 1: índigo
-    { background: '#fef3c7', border: '#f59e0b' }, // 2: ámbar
-    { background: '#fce7f3', border: '#ec4899' }, // 3: rosa
-    { background: '#dcfce7', border: '#22c55e' }, // 4: verde
-    { background: '#ffedd5', border: '#f97316' }  // 5: naranja (luego vuelve a empezar)
+    { background: '#0f2f33', border: '#4fd1c5' }, // 0 raíz: turquesa
+    { background: '#1b2140', border: '#8b7cf6' }, // 1: violeta
+    { background: '#2a2414', border: '#f2b366' }, // 2: ámbar
+    { background: '#2d1830', border: '#f472b6' }, // 3: rosa
+    { background: '#14301f', border: '#4ade80' }, // 4: verde
+    { background: '#2f1f14', border: '#fb923c' }  // 5: naranja (luego vuelve a empezar)
 ];
 function colorForDepth(depth, parentColor) {
     const n = LEVEL_PALETTE.length;
@@ -225,8 +225,8 @@ let network = new vis.Network(container, { nodes, edges }, {
             multi: 'md',
             size: 16,
             face: 'Inter, sans-serif',
-            color: '#334155',
-            bold: { color: '#0f172a', size: 18, face: 'Inter, sans-serif' }
+            color: '#dfe4f6',
+            bold: { color: '#ffffff', size: 18, face: 'Sora, Inter, sans-serif' }
         },
         borderWidth: 1.5,
         // Sombra oscura clásica → resplandor: sobre fondo negro una sombra negra
@@ -2417,12 +2417,12 @@ const readerPanelRegistry = new Map(); // panelId -> { root, textEl, accent }
 // el color conecta visualmente un nodo con su fragmento de origen. Se repite
 // en ciclo si hay más nodos-con-cita que colores en la paleta.
 const highlightColorPalette = [
-    { mark: { bg: 'rgba(79, 209, 197, 0.32)', border: '#0d9488' }, node: { background: '#d4f6f1', border: '#0d9488' } },
-    { mark: { bg: 'rgba(250, 204, 21, 0.35)', border: '#ca8a04' }, node: { background: '#fef3c7', border: '#ca8a04' } },
-    { mark: { bg: 'rgba(129, 140, 248, 0.32)', border: '#4f46e5' }, node: { background: '#e0e7ff', border: '#4f46e5' } },
-    { mark: { bg: 'rgba(244, 114, 182, 0.30)', border: '#db2777' }, node: { background: '#fce7f3', border: '#db2777' } },
-    { mark: { bg: 'rgba(74, 222, 128, 0.30)', border: '#15803d' }, node: { background: '#dcfce7', border: '#15803d' } },
-    { mark: { bg: 'rgba(251, 146, 60, 0.32)', border: '#c2410c' }, node: { background: '#ffedd5', border: '#c2410c' } },
+    { mark: { bg: 'rgba(79, 209, 197, 0.28)', border: '#2dd4bf' }, node: { background: '#0f2f33', border: '#2dd4bf' } },
+    { mark: { bg: 'rgba(250, 204, 21, 0.26)', border: '#fbbf24' }, node: { background: '#2a2414', border: '#fbbf24' } },
+    { mark: { bg: 'rgba(129, 140, 248, 0.30)', border: '#818cf8' }, node: { background: '#1b2140', border: '#818cf8' } },
+    { mark: { bg: 'rgba(244, 114, 182, 0.28)', border: '#f472b6' }, node: { background: '#2d1830', border: '#f472b6' } },
+    { mark: { bg: 'rgba(74, 222, 128, 0.26)', border: '#4ade80' }, node: { background: '#14301f', border: '#4ade80' } },
+    { mark: { bg: 'rgba(251, 146, 60, 0.28)', border: '#fb923c' }, node: { background: '#2f1f14', border: '#fb923c' } },
 ];
 let highlightColorCounter = 0;
 function nextHighlightColor() {
@@ -5292,6 +5292,8 @@ async function runAprendeHandoff() {
     try {
         const qp = new URLSearchParams(location.search);
         sid = qp.get('aprende') || '';
+        if (qp.get('tour') === '1') window.__gkForceTour = true;   // para volver a ver el tour al probar
+        qp.delete('tour');
         fallbackTopic = (qp.get('t') || '').replace(/\s+/g, ' ').trim().slice(0, 120);
         if (sid) { qp.delete('aprende'); qp.delete('ref'); qp.delete('t'); const rest = qp.toString(); history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash); }
     } catch (_e) { /* ok */ }
@@ -6304,6 +6306,38 @@ function applyImportanceStyling() {
     });
     if (edgeUpdates.length) edges.update(edgeUpdates);
 }
+// Contraste automático del texto del nodo según su relleno (2026-10-08): los nodos
+// ahora son oscuros (letra clara por defecto), pero los guardados de antes o los
+// recoloreados a mano pueden tener relleno claro → esos llevan letra oscura. Solo
+// toca nodos sin color de letra propio y es idempotente (no se re-dispara solo).
+function fillLuminance(hex) {
+    if (typeof hex !== 'string' || hex[0] !== '#') return null;
+    const h = hex.slice(1), v = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h.slice(0, 6), 16);
+    if (Number.isNaN(v)) return null;
+    return (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255;
+}
+let fixingNodeFonts = false;
+function fixNodeFontContrast() {
+    if (fixingNodeFonts) return;
+    const ups = [];
+    nodes.get().forEach(n => {
+        if (n.shape === 'image') return;
+        const bg = n.color && (typeof n.color === 'string' ? n.color : n.color.background);
+        const lum = fillLuminance(bg);
+        if (lum === null || lum <= 0.6) return;          // relleno oscuro: letra clara (default global)
+        if (n.font && n.font.color) return;              // ya tiene color de letra propio
+        ups.push({ id: n.id, font: Object.assign({}, n.font || {}, { color: '#334155', bold: Object.assign({}, (n.font && n.font.bold) || {}, { color: '#0f172a' }) }) });
+    });
+    if (!ups.length) return;
+    fixingNodeFonts = true;
+    try { nodes.update(ups); } finally { fixingNodeFonts = false; }
+}
+let fontFixTimer = null;
+const scheduleFontFix = () => { clearTimeout(fontFixTimer); fontFixTimer = setTimeout(fixNodeFontContrast, 30); };
+nodes.on('add', scheduleFontFix);
+nodes.on('update', scheduleFontFix);
+fixNodeFontContrast();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { try { network.redraw(); } catch (_e) { /* ok */ } });
 nodes.on('add', scheduleImportanceStyling);
 nodes.on('remove', scheduleImportanceStyling);
 edges.on('add', scheduleImportanceStyling);
