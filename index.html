@@ -287,6 +287,14 @@
             box-shadow: 0 1px 0 rgba(79, 209, 197, 0.08);
         }
 
+        /* Flechita que une el menú contextual con su nodo (ver placeActionMenuAtNode en app.js).
+           Rombo del mismo color que el menú, con borde solo en los lados que miran afuera. */
+        .gk-menu-arrow { position: absolute; width: 12px; height: 12px; background: #11162b; transform: rotate(45deg); pointer-events: none; z-index: 1; }
+        .gk-menu-arrow[data-side="right"] { left: -6px; border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+        .gk-menu-arrow[data-side="left"]  { right: -6px; border-top: 1px solid var(--line); border-right: 1px solid var(--line); }
+        .gk-menu-arrow[data-side="below"] { top: -6px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+        .gk-menu-arrow[data-side="above"] { bottom: -6px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+
         .glass-dock {
             background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(24px);

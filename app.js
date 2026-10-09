@@ -920,7 +920,7 @@ function checkBalance(cost) {
 // que decanten a un acomodo natural. El listener global ya existente
 // (stopPhysicsAndUnlock, arriba) apaga la física y libera TODOS los nodos en
 // cuanto el motor se estabiliza, así que no hace falta duplicar esa lógica.
-function settleNewNodesOrganically(newIds) {
+function settleNewNodesOrganically(newIds, opts = {}) {
     if (!newIds || !newIds.length) return;
     // El "sonido al crear nodos" (toggle de la cabecera) solo sonaba para
     // creaciones de UN nodo a la vez (flashNewNode, usado por "Conceptos
@@ -930,7 +930,7 @@ function settleNewNodesOrganically(newIds) {
     // encendido "nunca sonaba nada" en el uso normal. Un "tin" por nodo, en
     // cascada (no los varios a la vez, que sonaría como un acorde feo), con
     // un tono levemente distinto cada vez para que no se sienta repetitivo.
-    newIds.forEach((id, i) => {
+    if (!opts.silent) newIds.forEach((id, i) => {
         setTimeout(() => playChime(600 + Math.random() * 200), i * 65);
     });
     const allIds = nodes.getIds();
@@ -2074,26 +2074,10 @@ network.on('click', async function (params) {
             btnMenuShowGaps.classList.toggle('hidden', !hasGaps);
             gapsBox?.classList.add('hidden'); gapsBox?.classList.remove('flex');
         }
-        const nodePosition = network.getPositions([selectedNodeId])[selectedNodeId];
-        const DOMCoords = network.canvasToDOM(nodePosition);
-        const containerRect = container.getBoundingClientRect();
-        
         actionMenu.style.visibility = 'hidden';
         actionMenu.classList.remove('hidden');
         actionMenuOpenedAt = Date.now();
-
-        const menuWidth = actionMenu.offsetWidth || 200;
-        const menuHeight = actionMenu.offsetHeight || 300;
-        
-        let topPos = containerRect.top + DOMCoords.y - menuHeight - 15;
-        let leftPos = containerRect.left + DOMCoords.x - (menuWidth / 2);
-        
-        if (topPos < 10) { topPos = containerRect.top + DOMCoords.y + 40; } // Desplegar debajo si no cabe arriba
-        if (leftPos < 10) leftPos = 10;
-        if (leftPos + menuWidth > window.innerWidth - 10) leftPos = window.innerWidth - menuWidth - 10;
-        
-        actionMenu.style.left = leftPos + 'px';
-        actionMenu.style.top = topPos + 'px';
+        placeActionMenuAtNode(selectedNodeId);
         actionMenu.style.visibility = 'visible';
         // "Ver definición" ya no alterna entre expandir-en-el-nodo y colapsar: siempre
         // abre (o enfoca) el panel flotante de este nodo, así que no necesita lógica
@@ -2112,6 +2096,43 @@ network.on('click', async function (params) {
         }
     }
 });
+
+// Ubica el menú contextual PEGADO al nodo (a su lado, no encima de su centro) y lo une
+// con una flechita que apunta al borde del nodo. Prefiere la derecha; si no cabe, la
+// izquierda; y si tampoco, abajo o arriba. La flecha se alinea con el centro del nodo.
+function placeActionMenuAtNode(nodeId) {
+    let arrow = document.getElementById('actionMenuArrow');
+    if (!arrow) { arrow = document.createElement('div'); arrow.id = 'actionMenuArrow'; arrow.className = 'gk-menu-arrow'; arrow.setAttribute('aria-hidden', 'true'); actionMenu.appendChild(arrow); }
+    const cr = container.getBoundingClientRect();
+    let nb;
+    try {
+        const bb = network.getBoundingBox(nodeId), a = network.canvasToDOM({ x: bb.left, y: bb.top }), z = network.canvasToDOM({ x: bb.right, y: bb.bottom });
+        nb = { l: cr.left + a.x, t: cr.top + a.y, r: cr.left + z.x, b: cr.top + z.y };
+    } catch (_e) {
+        const c = network.canvasToDOM(network.getPositions([nodeId])[nodeId]);
+        nb = { l: cr.left + c.x - 70, r: cr.left + c.x + 70, t: cr.top + c.y - 25, b: cr.top + c.y + 25 };
+    }
+    const w = actionMenu.offsetWidth || 220, h = actionMenu.offsetHeight || 300, M = 10, GAP = 16;
+    const cx = (nb.l + nb.r) / 2, cy = (nb.t + nb.b) / 2, vw = window.innerWidth, vh = window.innerHeight;
+    const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), Math.max(lo, hi));
+    let side, left, top;
+    if (nb.r + GAP + w <= vw - M) side = 'right';
+    else if (nb.l - GAP - w >= M) side = 'left';
+    else if (nb.b + GAP + h <= vh - M) side = 'below';
+    else side = 'above';
+    if (side === 'right' || side === 'left') {
+        left = side === 'right' ? nb.r + GAP : nb.l - GAP - w;
+        top = clamp(cy - h / 2, M, vh - h - M);
+    } else {
+        left = clamp(cx - w / 2, M, vw - w - M);
+        top = side === 'below' ? nb.b + GAP : Math.max(M, nb.t - GAP - h);
+    }
+    actionMenu.style.left = left + 'px';
+    actionMenu.style.top = top + 'px';
+    arrow.dataset.side = side;
+    if (side === 'right' || side === 'left') { arrow.style.top = clamp(cy - top, 24, h - 24) - 6 + 'px'; arrow.style.left = ''; }
+    else { arrow.style.left = clamp(cx - left, 24, w - 24) - 6 + 'px'; arrow.style.top = ''; }
+}
 
 network.on('zoom', () => { actionMenu.style.visibility = 'hidden'; actionMenu.classList.add('hidden'); });
 // Al arrastrar un nodo, toda su descendencia (hijos, nietos…) se mueve con él,
@@ -5431,8 +5452,10 @@ schemaLayoutSelectEl?.addEventListener('change', (e) => {
 // donde está y su descendencia se recoloca a su alrededor; los vínculos
 // 'relacionado' no cuentan como jerarquía. Los movimientos se animan y quedan
 // en el historial de deshacer como una sola acción.
+let relayoutToken = 0;
 function relayoutExistingMap(mode) {
     if (!network || nodes.length < 2) return;
+    const myToken = ++relayoutToken;
     const children = new Map(), hasParent = new Set();
     edges.get().forEach(e => {
         if (isRelatedEdgeLabel(e.label)) return;
@@ -5497,6 +5520,23 @@ function relayoutExistingMap(mode) {
         }
     });
 
+    // Varios esquemas en el mismo lienzo: cada uno conserva su raíz, pero si los reacomodados
+    // se pisarían entre sí, los siguientes se corren a la derecha del anterior.
+    if (roots.length > 1) {
+        const comps = roots.filter(r => target[r]).map(r => {
+            const members = [r, ...getHierarchyDescendants(r)].filter(id => target[id]);
+            const xs = members.map(id => target[id].x), ys = members.map(id => target[id].y);
+            return { members, left: Math.min(...xs) - 130, right: Math.max(...xs) + 130, top: Math.min(...ys) - 50, bottom: Math.max(...ys) + 50, rx: target[r].x };
+        }).sort((a, b) => a.rx - b.rx);
+        const placed = [];
+        comps.forEach(c => {
+            let dx = 0, guard = 0, hit;
+            while (guard++ < 50 && (hit = placed.find(q => c.left + dx < q.right + 60 && c.right + dx > q.left - 60 && c.top < q.bottom + 40 && c.bottom > q.top - 40))) dx = hit.right + 60 - c.left;
+            if (dx) c.members.forEach(id => { target[id].x += dx; });
+            placed.push({ left: c.left + dx, right: c.right + dx, top: c.top, bottom: c.bottom });
+        });
+    }
+
     const ids = Object.keys(target);
     if (!ids.length) return;
     network.setOptions({ physics: { enabled: false } });
@@ -5504,6 +5544,7 @@ function relayoutExistingMap(mode) {
     const t0 = performance.now(), DUR = 600;
     const ease = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     const step = (now) => {
+        if (myToken !== relayoutToken) return;   // llegó otro cambio de modo: este se descarta
         const k = Math.min(1, (now - t0) / DUR), e = ease(k);
         ids.forEach(id => {
             const a = from[id], b = target[id]; if (!a || !nodes.get(id)) return;
@@ -5513,7 +5554,12 @@ function relayoutExistingMap(mode) {
         else {
             // Guarda las posiciones finales en el dataset (persistencia + un paso de deshacer).
             nodes.update(ids.filter(id => nodes.get(id)).map(id => ({ id, x: target[id].x, y: target[id].y })));
-            network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+            // Mismo "asentado" breve que al generar un esquema: sin él, las flechas curvas
+            // ('dynamic' depende de la física) se quedan apuntando a donde estaban los nodos
+            // antes y las líneas se ven enredadas aunque los nodos estén bien ubicados. Además
+            // separa lo que haya quedado encimado. Silencioso (sin el "tin" por nodo).
+            settleNewNodesOrganically(nodes.getIds(), { silent: true });
+            setTimeout(() => { try { network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } }); } catch (_e) { /* ok */ } }, 1500);
         }
     };
     requestAnimationFrame(step);
@@ -6317,6 +6363,12 @@ function fillLuminance(hex) {
     return (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) / 255;
 }
 let fixingNodeFonts = false;
+// Mezcla un hex con blanco (t = 0..1) — para el relleno al pasar el cursor / seleccionar.
+function lightenHex(hex, t) {
+    const h = hex.slice(1), v = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h.slice(0, 6), 16);
+    const m = (c) => Math.round(c + (255 - c) * t).toString(16).padStart(2, '0');
+    return '#' + m((v >> 16) & 255) + m((v >> 8) & 255) + m(v & 255);
+}
 function fixNodeFontContrast() {
     if (fixingNodeFonts) return;
     const ups = [];
@@ -6324,6 +6376,19 @@ function fixNodeFontContrast() {
         if (n.shape === 'image') return;
         const bg = n.color && (typeof n.color === 'string' ? n.color : n.color.background);
         const lum = fillLuminance(bg);
+        // Estados "seleccionado" y "cursor encima": si no se definen, vis-network usa un azul
+        // claro (#D2E5FF) que dejaba la letra blanca ilegible. En nodos oscuros se mantiene
+        // oscuro (apenas más claro) y el borde brillante marca el estado.
+        if (lum !== null && lum <= 0.6 && typeof n.color === 'object') {
+            const c = n.color, brd = c.border || '#4fd1c5';
+            const bad = (st) => !st || typeof st !== 'object' || (fillLuminance(st.background) ?? 1) > 0.6;
+            if (bad(c.highlight) || bad(c.hover)) {
+                ups.push({ id: n.id, color: Object.assign({}, c, {
+                    highlight: { background: lightenHex(bg, 0.16), border: brd },
+                    hover: { background: lightenHex(bg, 0.10), border: brd }
+                }) });
+            }
+        }
         if (lum === null || lum <= 0.6) return;          // relleno oscuro: letra clara (default global)
         if (n.font && n.font.color) return;              // ya tiene color de letra propio
         ups.push({ id: n.id, font: Object.assign({}, n.font || {}, { color: '#334155', bold: Object.assign({}, (n.font && n.font.bold) || {}, { color: '#0f172a' }) }) });
