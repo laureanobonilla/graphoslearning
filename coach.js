@@ -12,6 +12,7 @@ const markSeen = () => { try { localStorage.setItem(KEY, String(Date.now())); } 
 const trk = (e, m) => { try { if (typeof track === 'function') track(e, m || {}); } catch { /* ok */ } };
 
 const TIPS = [
+  { id: 'scroll', kind: 'scroll', t: 'coach.t_scroll', b: 'coach.b_scroll' },
   { id: 'node', kind: 'node', t: 'coach.t_node', b: 'coach.b_node' },
   { id: 'explain', kind: 'menu', sel: '#btnMenuSimpleExplain', t: 'coach.t_explain', b: 'coach.b_explain' },
   { id: 'mark', kind: 'mark', t: 'coach.t_mark', b: 'coach.b_mark' },
@@ -96,8 +97,11 @@ function renderCard() {
   }
   c.appendChild(foot); S.shown = (S.done ? 'done' : tip.id) + (pre ? ':pre' : ''); c.classList.remove('on'); requestAnimationFrame(() => c.classList.add('on'));
 }
-function placeCard(r) {
+function placeCard(r, avoid) {
   const c = S.el.card, w = c.offsetWidth || 320, h = c.offsetHeight || 150, M = 12;
+  // `avoid`: rectángulo que la tarjeta NO debe tapar (el menú de acciones; en el paso
+  // "Generar" también la franja donde se abre su submenú, a cualquiera de los dos lados).
+  if (avoid) r = avoid;
   if (!r) { c.style.left = (innerWidth - w - 24) + 'px'; c.style.top = (innerHeight - h - 24) + 'px'; return; }
   const cands = [[r.right + 18, r.top + r.height / 2 - h / 2], [r.left - w - 18, r.top + r.height / 2 - h / 2], [r.left + r.width / 2 - w / 2, r.bottom + 18], [r.left + r.width / 2 - w / 2, r.top - h - 18]];
   let pos = cands.find(([x, y]) => x >= M && y >= M && x + w <= innerWidth - M && y + h <= innerHeight - M) || cands[0];
@@ -107,7 +111,7 @@ function setRing(r) {
   const ring = S.el.ring, cur = S.el.cur;
   if (!r) { ring.style.opacity = '0'; cur.style.display = 'none'; return; }
   const p = 7; ring.style.opacity = '1'; ring.style.left = (r.left - p) + 'px'; ring.style.top = (r.top - p) + 'px'; ring.style.width = (r.width + p * 2) + 'px'; ring.style.height = (r.height + p * 2) + 'px';
-  cur.style.display = RM ? 'none' : 'block'; cur.style.left = (r.left + r.width * 0.55) + 'px'; cur.style.top = (r.top + r.height * 0.5) + 'px';
+  cur.style.display = (RM || (S.i < TIPS.length && TIPS[S.i].kind === 'scroll')) ? 'none' : 'block'; cur.style.left = (r.left + r.width * 0.55) + 'px'; cur.style.top = (r.top + r.height * 0.5) + 'px';
 }
 function advance(via) {
   if (!S || S.done) return; const tip = TIPS[S.i];
@@ -132,10 +136,28 @@ function tick() {
     if (mv) { S.sawMenu = true; S.mode = ''; r = elRect(tip.sel); if (!r) { advance('missing'); return; } }
     else if (S.sawMenu) { advance('menu_closed'); return; }
     else { S.mode = 'pre'; r = nodeRect(); }
+  } else if (tip.kind === 'scroll') {
+    const rp = document.getElementById('readerPanel'), ct = document.getElementById('readerContentContainer');
+    if (rp && rp.classList.contains('hidden') && typeof openReaderPanel === 'function') { try { openReaderPanel(); } catch (_e) { /* ok */ } }
+    const cr = ct && ct.getBoundingClientRect();
+    if (!ct || !vis(cr) || ct.scrollHeight < ct.clientHeight + 60 || !ct.querySelector('mark.gk-coverage-mark')) {
+      S.noText = (S.noText || 0) + 1; if (S.noText > 60) { S.noText = 0; advance('no_text'); } return;
+    }
+    if (S.st0 == null) S.st0 = ct.scrollTop;
+    if (Math.abs(ct.scrollTop - S.st0) > 160 && !S.scrollDone) { S.scrollDone = true; setTimeout(() => { if (S && !S.done && TIPS[S.i] === tip) advance('scroll'); }, 1400); }
+    r = cr;
   } else if (tip.kind === 'mark') { r = markRect(); if (!r) { S.noMark = (S.noMark || 0) + 1; if (S.noMark > 90) { S.noMark = 0; advance('no_marks'); } return; } }
   const key = (S.done ? 'done' : tip.id) + (S.mode === 'pre' ? ':pre' : '');
   if (S.shown !== key) renderCard();
-  setRing(r); placeCard(r);
+  let avoid = null;
+  if (mv && tip.kind === 'menu') {
+    const m = document.getElementById('actionMenu'), mr = m && m.getBoundingClientRect();
+    if (mr && mr.width > 2) {
+      const pad = tip.id === 'grow' ? 215 : 0;   // el submenú mide ~200px y se abre a un lado
+      avoid = { left: mr.left - pad, right: mr.right + pad, top: mr.top, bottom: mr.bottom, width: mr.width + pad * 2, height: mr.height };
+    }
+  }
+  setRing(r); placeCard(r, avoid);
 }
 function onClick(e) {
   if (!S || S.done) return; const tip = TIPS[S.i]; let hit = false;

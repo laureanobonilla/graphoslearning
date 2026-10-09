@@ -222,7 +222,7 @@ const STEPS = {
     title: '¿Para qué es tu canción?', hint: 'Elige lo que más se acerque.',
     render(body) {
       body.appendChild(choiceList({ options: REASONS.map(r => r.label), multi: false, selected: S.reason === 'Otro' ? 'Otro' : S.reason, otherLabel: 'Otro (cuéntanos)', otherValue: S.reasonOther, otherPlaceholder: 'Por ejemplo: una boda, un homenaje, mi negocio…',
-        onChange: (v) => { if (v !== S.reason) { S.aiStop = 3; aiMeta = []; S.extra = []; } S.reason = v; if (v !== 'Otro') S.reasonOther = ''; track('reason_chosen', { reason: v === 'Otro' ? 'Otro' : v }); update(); },
+        onChange: (v) => { if (v !== S.reason) { S.aiStop = 3; aiMeta = []; S.extra = []; } S.reason = v; if (v !== 'Otro') S.reasonOther = ''; track('reason_chosen', { reason: v === 'Otro' ? 'Otro' : v }); update(); if (v && v !== 'Otro') setTimeout(() => { if (stepId === 'reason' && S.reason === v) advance(); }, 260); },
         onOther: (t) => { S.reasonOther = t; } }));
       const own = document.createElement('p'); own.className = 'own-link';
       const ob = document.createElement('button'); ob.type = 'button'; ob.className = 'btn-quiet'; ob.textContent = '¿Ya tienes tu letra? Pégala aquí';
@@ -232,15 +232,19 @@ const STEPS = {
     ok: () => !!S.reason && (S.reason !== 'Otro' || S.reasonOther.trim().length >= 3)
   },
   named: {
-    get title() { return isSelf() ? '¿Quieres que lleve tu nombre?' : '¿Quieres que la canción lleve su nombre?'; }, hint: 'Va dedicada: el nombre aparece en la letra.',
+    get title() { return isSelf() ? '¿Cómo te llamas?' : '¿Cómo se llama?'; }, get hint() { return isSelf() ? 'Tu nombre aparece en la letra.' : 'Su nombre aparece en la letra.'; },
     render(body) {
-      const self = isSelf();
-      const box = choiceList({ options: [self ? 'Sí, con mi nombre' : 'Sí, con su nombre', 'No, sin nombre'], multi: false, selected: S.named === true ? (self ? 'Sí, con mi nombre' : 'Sí, con su nombre') : S.named === false ? 'No, sin nombre' : '',
-        onChange: (v) => { S.named = /^Sí/.test(v) ? true : v ? false : null; nm.classList.toggle('is-hidden', S.named !== true); track('named_chosen', { named: S.named }); update(); if (S.named) setTimeout(() => inp.focus(), 30); } });
-      const nm = document.createElement('div'); nm.className = S.named === true ? '' : 'is-hidden';
-      const inp = document.createElement('input'); inp.className = 'field'; inp.type = 'text'; inp.maxLength = 30; inp.autocomplete = 'off'; inp.autocapitalize = 'words'; inp.placeholder = self ? 'Tu nombre' : 'Su nombre'; inp.value = S.name;
-      inp.addEventListener('input', () => { S.name = inp.value; update(); });
-      nm.appendChild(inp); box.appendChild(nm); body.appendChild(box);
+      const self = isSelf(), okName = () => /^[\p{L}][\p{L} '’-]{0,29}$/u.test(S.name.replace(/\s+/g, ' ').trim());
+      const inp = document.createElement('input'); inp.className = 'field'; inp.type = 'text'; inp.maxLength = 30; inp.autocomplete = 'off'; inp.autocapitalize = 'words'; inp.placeholder = self ? 'Tu nombre' : 'Su nombre'; inp.value = S.named === true ? S.name : '';
+      let tracked = false;
+      inp.addEventListener('input', () => { S.name = inp.value; S.named = inp.value.trim() ? true : null; if (okName() && !tracked) { tracked = true; track('named_chosen', { named: true }); } update(); });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !btnNext.disabled) { e.preventDefault(); advance(); } });
+      body.appendChild(inp);
+      const p = document.createElement('p'); p.className = 'own-link';
+      const nb = document.createElement('button'); nb.type = 'button'; nb.className = 'btn-quiet'; nb.textContent = self ? 'Prefiero que no lleve mi nombre' : 'Prefiero que no lleve nombre';
+      nb.addEventListener('click', () => { S.named = false; S.name = ''; track('named_chosen', { named: false }); advance(); });
+      p.appendChild(nb); body.appendChild(p);
+      setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (_e) { /* ok */ } }, 60);
     },
     ok: () => S.named === false || (S.named === true && /^[\p{L}][\p{L} '’-]{0,29}$/u.test(S.name.replace(/\s+/g, ' ').trim()))
   },

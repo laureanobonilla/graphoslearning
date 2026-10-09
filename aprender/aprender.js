@@ -86,6 +86,7 @@ const ESTILOS = [
   ['conciso', 'Directo y breve', 'Solo las ideas clave, sin relleno']
 ];
 const EJEMPLOS = ['La inflación', 'Cómo funcionan las derivadas', 'La Revolución Francesa', 'La fotosíntesis', 'Qué es el inconsciente', 'Mi tema de tesis'];
+const MAXSEL = 3;
 const STEP_ORDER = ['tema', 'q1', 'q2', 'q3', 'proposito', 'nivel', 'estilo'];
 const col = $('col');
 let lastTema = ''; let idx = -1; const stack = []; const QS = {}; let nextToken = 0;
@@ -96,8 +97,8 @@ function backBtn(s) { const b = h('button', 'back', '‹ Volver'); b.type = 'but
 
 function intro() {
   idx = -1; setP(0); const s = scr();
-  s.appendChild(h('h1', '', 'Eso que no logras entender se entiende mejor en un mapa.'));
-  s.appendChild(h('p', 'lead', 'Cuéntanos qué es. Te hacemos unas preguntas, te escribimos un texto a tu medida y lo convertimos en un mapa mental.'));
+  s.appendChild(h('h1', '', 'Aprende lo difícil de otra forma: dentro de un mapa que puedes recorrer.'));
+  s.appendChild(h('p', 'lead', 'Elige la materia que se te resiste. Te escribimos un texto a tu medida y lo convertimos en un mapa vivo: lees, y las ideas se iluminan y se conectan frente a ti.'));
   const b = h('button', 'btn', 'Contar qué quiero entender'); b.type = 'button'; b.addEventListener('click', () => { track('start_clicked', {}); stack.length = 0; go(0, false); }); s.appendChild(b);
   const f = h('ul', 'facts'); ['Gratis para probar', 'Unas 7 preguntas, 2 minutos', 'No necesitas cuenta para empezar'].forEach(t => f.appendChild(h('li', '', t))); s.appendChild(f);
   setTimeout(() => { try { b.focus({ preventScroll: true }); } catch { /* ok */ } }, 80);
@@ -107,7 +108,7 @@ function go(i, push) {
   if (push !== false) stack.push(idx);
   idx = i; maxStep = Math.max(maxStep, i + 1); setP((i + 0.4) / (TOTAL + 0.8)); track('step_viewed', { step: STEP_ORDER[i], n: i + 1 });
   const id = STEP_ORDER[i];
-  if (id === 'tema') stepTema(); else if (/^q\d$/.test(id)) stepAi(parseInt(id.slice(1), 10)); else if (id === 'proposito') stepChoice('proposito', '¿Para qué lo necesitas?', 'Así lo enfocamos mejor.', PROPOSITOS.map(o => [o, o, ''])); else if (id === 'nivel') stepChoice('nivel', '¿Qué tanto sabes del tema hoy?', 'Sé sincero: así no te aburrimos ni te perdemos.', NIVELES.map(o => [o[0], o[0], o[1]])); else stepChoice('estilo', '¿Cómo prefieres que te lo expliquen?', 'Este será el tono de tu texto.', ESTILOS, true);
+  if (id === 'tema') stepTema(); else if (/^q\d$/.test(id)) stepAi(parseInt(id.slice(1), 10)); else if (id === 'proposito') stepChoice('proposito', '¿Para qué lo necesitas?', 'Así lo enfocamos mejor. Puedes elegir hasta 3.', PROPOSITOS.map(o => [o, o, '']), false, true); else if (id === 'nivel') stepChoice('nivel', '¿Qué tanto sabes del tema hoy?', 'Sé sincero: así no te aburrimos ni te perdemos.', NIVELES.map(o => [o[0], o[0], o[1]])); else stepChoice('estilo', '¿Cómo prefieres que te lo expliquen?', 'Este será el tono de tu texto.', ESTILOS, true);
 }
 function advance() {
   track('step_done', { step: STEP_ORDER[idx] }); save();
@@ -142,20 +143,22 @@ function stepAi(n) {
     .then(({ q, fb }) => { clearTimeout(timer); if (token !== nextToken || idx !== n) return; QS[n] = q; track('ai_q_shown', { n, fallback: fb, seconds: Math.round((Date.now() - t0) / 100) / 10 }); renderChoice(scr(), n, q, true); });
 }
 function renderChoice(s, n, q, needBack) {
+  q = Object.assign({}, q, { multi: true });
   if (needBack) backBtn(s);
-  s.appendChild(h('h2', '', q.question)); if (q.hint) s.appendChild(h('p', 'hint', q.hint));
+  s.appendChild(h('h2', '', q.question)); s.appendChild(h('p', 'hint', (q.hint ? q.hint.replace(/[.\s]+$/, '') + '. ' : '') + 'Puedes elegir hasta 3.'));
   A['q' + n] = q.question;
   const picked = new Set((A['a' + n] || '').split(' · ').filter(Boolean)); let otroOn = !!A['a' + n + '_otro'];
   const wrap = h('div', 'opts' + (q.multi ? ' multi' : '')); wrap.setAttribute('role', q.multi ? 'group' : 'radiogroup'); const btns = [];
   const ta = h('textarea', 'field otro'); ta.rows = 2; ta.maxLength = 200; ta.placeholder = 'Escríbelo con tus palabras'; ta.value = A['a' + n + '_otro'] || ''; if (!otroOn) ta.classList.add('is-hidden');
   const nb = h('button', 'btn', 'Seguir'); nb.type = 'button';
-  const sync = () => { const parts = [...picked]; A['a' + n] = parts.join(' · '); if (otroOn && ta.value.trim()) A['a' + n + '_otro'] = ta.value.trim(); else delete A['a' + n + '_otro']; nb.disabled = !(parts.length || (otroOn && ta.value.trim().length >= 2)); nb.classList.toggle('is-hidden', !q.multi && !otroOn); btns.forEach(b => b.setAttribute('aria-checked', String(b.dataset.o === '__otro' ? otroOn : picked.has(b.dataset.o)))); ta.classList.toggle('is-hidden', !otroOn); };
+  const sync = () => { const parts = [...picked]; A['a' + n] = parts.join(' · '); if (otroOn && ta.value.trim()) A['a' + n + '_otro'] = ta.value.trim(); else delete A['a' + n + '_otro']; nb.disabled = !(parts.length || (otroOn && ta.value.trim().length >= 2)); nb.classList.toggle('is-hidden', !q.multi && !otroOn); const full = picked.size + (otroOn ? 1 : 0) >= MAXSEL; btns.forEach(b => { const on = b.dataset.o === '__otro' ? otroOn : picked.has(b.dataset.o); b.setAttribute('aria-checked', String(on)); b.classList.toggle('is-off', full && !on); b.setAttribute('aria-disabled', String(full && !on)); }); ta.classList.toggle('is-hidden', !otroOn); };
   q.options.concat(['__otro']).forEach(o => {
     const b = h('button', 'opt'); b.type = 'button'; b.dataset.o = o; b.setAttribute('role', q.multi ? 'checkbox' : 'radio'); b.appendChild(h('span', 'mk', '✓')); b.appendChild(h('span', '', o === '__otro' ? 'Otra cosa (escríbela)' : o));
     b.addEventListener('click', () => {
-      if (o === '__otro') { if (q.multi) otroOn = !otroOn; else { otroOn = true; picked.clear(); } sync(); if (otroOn) setTimeout(() => ta.focus(), 30); return; }
-      if (q.multi) { picked.has(o) ? picked.delete(o) : picked.add(o); } else { picked.clear(); picked.add(o); otroOn = false; }
-      sync(); if (!q.multi) setTimeout(() => { if (idx === n && picked.has(o)) advance(); }, 240);
+      const cnt = picked.size + (otroOn ? 1 : 0);
+      if (o === '__otro') { if (!otroOn && cnt >= MAXSEL) return; otroOn = !otroOn; sync(); if (otroOn) setTimeout(() => ta.focus(), 30); return; }
+      if (picked.has(o)) picked.delete(o); else { if (cnt >= MAXSEL) return; picked.add(o); }
+      sync();
     });
     btns.push(b); wrap.appendChild(b);
   });
@@ -164,8 +167,19 @@ function renderChoice(s, n, q, needBack) {
 }
 
 // Pasos fijos (propósito, nivel, estilo)
-function stepChoice(key, title, hint, opts, isEstilo) {
+function stepChoice(key, title, hint, opts, isEstilo, multi) {
   const s = scr(); backBtn(s); s.appendChild(h('h2', '', title)); s.appendChild(h('p', 'hint', hint));
+  if (multi) {
+    const picked = new Set((A[key] || '').split(' · ').filter(Boolean)); const wrapM = h('div', 'opts multi'); wrapM.setAttribute('role', 'group'); const bt = [];
+    const nbM = h('button', 'btn', 'Seguir'); nbM.type = 'button';
+    const syncM = () => { A[key] = [...picked].join(' · '); nbM.disabled = !picked.size; const full = picked.size >= MAXSEL; bt.forEach(b => { const on = picked.has(b.dataset.o); b.setAttribute('aria-checked', String(on)); b.classList.toggle('is-off', full && !on); b.setAttribute('aria-disabled', String(full && !on)); }); };
+    opts.forEach(([val, text]) => {
+      const b = h('button', 'opt'); b.type = 'button'; b.dataset.o = val; b.setAttribute('role', 'checkbox'); b.appendChild(h('span', 'mk', '✓')); b.appendChild(h('span', '', text));
+      b.addEventListener('click', () => { if (picked.has(val)) picked.delete(val); else { if (picked.size >= MAXSEL) return; picked.add(val); } syncM(); });
+      bt.push(b); wrapM.appendChild(b);
+    });
+    s.appendChild(wrapM); const footM = h('div', 'foot'); footM.appendChild(nbM); s.appendChild(footM); nbM.addEventListener('click', () => { if (!nbM.disabled) advance(); }); syncM(); return;
+  }
   const wrap = h('div', 'opts'); wrap.setAttribute('role', 'radiogroup');
   opts.forEach(([val, text, sub]) => {
     const b = h('button', 'opt'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(isEstilo ? A.estilo_id === val : A[key] === val)); b.appendChild(h('span', 'mk', '✓'));
@@ -186,7 +200,7 @@ function finish() {
   let k = 0; const iv = setInterval(() => { k = Math.min(STATUS.length - 1, k + 1); st.textContent = STATUS[k]; }, 6500);
   track('completed', { total: TOTAL }); const t0 = Date.now();
   const go2 = (okText) => { clearInterval(iv); fill.style.transitionDuration = '.4s'; fill.style.width = '100%'; track(okText ? 'generate_ok' : 'generate_failed', { seconds: Math.round((Date.now() - t0) / 100) / 10 }); st.textContent = 'Listo. Abriendo Graphikosmos…'; setTimeout(() => { try { track('redirect', {}); } catch { /* ok */ } location.href = '../?aprende=' + sid + '&ref=aprende' + (okText ? '' : '&t=' + encodeURIComponent((A.tema || '').slice(0, 120))); }, RM ? 100 : 700); };
-  const attempt = (n) => fetch(GEN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, answers: A }) }).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(d => { if (!d || !d.ok) throw 0; return true; }).catch(e => (n < 1 && e !== 429) ? new Promise(r => setTimeout(r, 1200)).then(() => attempt(n + 1)) : false);
+  const attempt = (n) => fetch(GEN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, answers: A }) }).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(d => { if (!d || !d.ok) throw 0; if (typeof d.text === 'string' && d.text.length > 200) { try { localStorage.setItem('gk_ap_pending', JSON.stringify({ sid, title: String(d.title || ''), text: d.text, t: Date.now() })); } catch { /* ok */ } } return true; }).catch(e => (n < 1 && e !== 429) ? new Promise(r => setTimeout(r, 1200)).then(() => attempt(n + 1)) : false);
   save({ completed: true }).then(() => attempt(0)).then(go2);
 }
 

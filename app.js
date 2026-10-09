@@ -5221,6 +5221,7 @@ async function runOnboardingGeneration() {
     let textForSchema = field; // respaldo: si el texto falla, se arma desde el tema como siempre
     if (generatedText) {
         readerTextMode.innerHTML = textToParagraphHtml(generatedText);
+        updateReaderEmptyHint();
         // El esquema y el resaltado deben basarse en el MISMO texto que quedó en el panel
         textForSchema = buildEditableTextIndex(readerTextMode).text || generatedText;
         currentDocumentText = textForSchema;
@@ -5299,7 +5300,14 @@ async function runAprendeHandoff() {
     track('aprende_handoff', { sid, firstVisit: isFirstTimeUser });
     showLoader(tr('aprende.abriendo'));
     let title = '', text = '', topic = fallbackTopic;
+    // Primero lo que Entiéndelo dejó en este mismo navegador (no depende del servidor)...
     try {
+        const pend = JSON.parse(localStorage.getItem('gk_ap_pending') || 'null');
+        if (pend && pend.sid === sid && typeof pend.text === 'string' && pend.text.length >= 200) { title = String(pend.title || '').trim(); text = pend.text.trim(); topic = title || topic; }
+        localStorage.removeItem('gk_ap_pending');
+    } catch (_e) { /* ok */ }
+    // ...y si no está, se pide al servidor.
+    if (text.length < 200) try {
         const res = await fetch('/.netlify/functions/ap-handoff?sid=' + encodeURIComponent(sid), { credentials: 'same-origin' });
         const d = res.ok ? await res.json() : null;
         if (d && d.ok) { title = String(d.title || '').trim(); text = String(d.text || '').trim(); topic = String(d.topic || topic || title).trim(); }
@@ -5310,6 +5318,7 @@ async function runAprendeHandoff() {
     let textForSchema = topic;
     if (text.length >= 200) {
         readerTextMode.innerHTML = textToParagraphHtml(text);
+        updateReaderEmptyHint();
         textForSchema = buildEditableTextIndex(readerTextMode).text || text;
         currentDocumentText = textForSchema;
         if (!globalDocumentContext) { globalDocumentContext = title || topic; if (docContextInput) docContextInput.value = globalDocumentContext; updateDocContextChip(); }
@@ -5411,7 +5420,102 @@ if (schemaLayoutSelectEl) schemaLayoutSelectEl.value = schemaLayoutMode; // refl
 schemaLayoutSelectEl?.addEventListener('change', (e) => {
     schemaLayoutMode = e.target.value;
     try { localStorage.setItem('gk_layout_mode', schemaLayoutMode); } catch {}
+    track('layout_mode_changed', { mode: schemaLayoutMode, nodes: nodes.length });
+    relayoutExistingMap(schemaLayoutMode);
 });
+
+// Reacomoda el mapa que ya está en el lienzo al modo elegido (Árbol / Cerebro).
+// Cada raíz (nodo sin padre, siguiendo solo las flechas de jerarquía) se queda
+// donde está y su descendencia se recoloca a su alrededor; los vínculos
+// 'relacionado' no cuentan como jerarquía. Los movimientos se animan y quedan
+// en el historial de deshacer como una sola acción.
+function relayoutExistingMap(mode) {
+    if (!network || nodes.length < 2) return;
+    const children = new Map(), hasParent = new Set();
+    edges.get().forEach(e => {
+        if (isRelatedEdgeLabel(e.label)) return;
+        if (!children.has(e.from)) children.set(e.from, []);
+        children.get(e.from).push(e.to);
+        hasParent.add(e.to);
+    });
+    const cur = network.getPositions();
+    const target = {};
+    const done = new Set();
+    const roots = nodes.getIds().filter(id => !hasParent.has(id) && (children.get(id) || []).length);
+    const kids = (id) => (children.get(id) || []).filter(c => nodes.get(c));
+
+    roots.forEach(rootId => {
+        const rp = cur[rootId]; if (!rp) return;
+        target[rootId] = { x: rp.x, y: rp.y };
+        done.add(rootId);
+        if (mode === 'solar') {
+            const top = kids(rootId).filter(c => !done.has(c));
+            const n = Math.max(1, top.length);
+            const R = n <= 1 ? 220 : Math.max(220, (n * 230) / (2 * Math.PI));
+            const place = (id, x, y, ang, spreadMax, depth) => {
+                target[id] = { x, y }; done.add(id);
+                const ch = kids(id).filter(c => !done.has(c));
+                if (!ch.length) return;
+                const spread = ch.length > 1 ? Math.min(spreadMax, (ch.length - 1) * 0.55) : 0;
+                const rr = depth === 1 ? 180 : 160;
+                ch.forEach((c, i) => {
+                    const t = ch.length === 1 ? 0 : (i / (ch.length - 1)) - 0.5;
+                    const a = ang + t * spread;
+                    place(c, x + rr * Math.cos(a), y + rr * Math.sin(a), a, spread || spreadMax * 0.6, depth + 1);
+                });
+            };
+            const maxSpread = n > 1 ? (2 * Math.PI / n) * 0.85 : Math.PI * 0.75;
+            top.forEach((c, i) => {
+                const a = n === 1 ? -Math.PI / 2 : (i * 2 * Math.PI / n) - Math.PI / 2;
+                place(c, rp.x + R * Math.cos(a), rp.y + R * Math.sin(a), a, maxSpread, 1);
+            });
+        } else {
+            // Árbol: cada subárbol ocupa el ancho de sus hojas, de arriba hacia abajo.
+            const W = 200;
+            const memo = new Map();
+            const width = (id, seen = new Set()) => {
+                if (memo.has(id)) return memo.get(id);
+                seen.add(id);
+                const ch = kids(id).filter(c => !seen.has(c));
+                const w = ch.length ? Math.max(W, ch.reduce((a, c) => a + width(c, seen), 0)) : W;
+                memo.set(id, w); return w;
+            };
+            const place = (id, cx, y) => {
+                target[id] = { x: cx, y }; done.add(id);
+                const ch = kids(id).filter(c => !done.has(c));
+                if (!ch.length) return;
+                const total = ch.reduce((a, c) => a + width(c), 0);
+                let left = cx - total / 2;
+                ch.forEach(c => { const w = width(c); place(c, left + w / 2, y + 140); left += w; });
+            };
+            const top = kids(rootId).filter(c => !done.has(c));
+            const total = top.reduce((a, c) => a + width(c), 0);
+            let left = rp.x - total / 2;
+            top.forEach(c => { const w = width(c); place(c, left + w / 2, rp.y + 150); left += w; });
+        }
+    });
+
+    const ids = Object.keys(target);
+    if (!ids.length) return;
+    network.setOptions({ physics: { enabled: false } });
+    const from = {}; ids.forEach(id => { from[id] = cur[id]; });
+    const t0 = performance.now(), DUR = 600;
+    const ease = (t) => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    const step = (now) => {
+        const k = Math.min(1, (now - t0) / DUR), e = ease(k);
+        ids.forEach(id => {
+            const a = from[id], b = target[id]; if (!a || !nodes.get(id)) return;
+            network.moveNode(id, a.x + (b.x - a.x) * e, a.y + (b.y - a.y) * e);
+        });
+        if (k < 1) requestAnimationFrame(step);
+        else {
+            // Guarda las posiciones finales en el dataset (persistencia + un paso de deshacer).
+            nodes.update(ids.filter(id => nodes.get(id)).map(id => ({ id, x: target[id].x, y: target[id].y })));
+            network.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        }
+    };
+    requestAnimationFrame(step);
+}
 
 // --- Sonido al crear nodos (togglable) ---
 const btnSoundToggle = document.getElementById('btnSoundToggle');

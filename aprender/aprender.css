@@ -78,3 +78,5 @@ h2{ font:700 clamp(1.5rem,2.6vw,2.1rem)/1.2 Sora,sans-serif; letter-spacing:-.01
   .top{ padding-top:20px; }
 }
 @media (prefers-reduced-motion:reduce){ .scr{ animation:none; } .skel i,.think b{ animation:none; } }
+.opt.is-off{ opacity:.4; cursor:not-allowed; }
+.opt.is-off:hover{ border-color:var(--line); background:var(--surface); }
