@@ -8,7 +8,7 @@ const store = require('./_lib/store');
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 const EVENT_NAME_RE = /^[a-z0-9_:]{1,60}$/;
 const MAX_METADATA_JSON_LENGTH = 1500;
-const APPS = new Set(['si-fueras-cancion', 'pareja-cancion', 'cumple-cancion', 'couple-song', 'tu-cancion', 'hf-fuga-tiempo', 'hf-nivel-ia', 'hf-ideas-posts']);   // cada versión escribe con su propio `app`
+const APPS = new Set(['si-fueras-cancion', 'pareja-cancion', 'cumple-cancion', 'couple-song', 'tu-cancion', 'hf-fuga-tiempo', 'hf-nivel-ia', 'hf-ideas-posts','hf-integra-ia','hf-aprende']);   // cada versión escribe con su propio `app`
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };

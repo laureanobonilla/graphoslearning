@@ -46,6 +46,7 @@ h1,h2,h3,.disp{ font-family:'Bricolage Grotesque','Instrument Sans',sans-serif; 
 .opt.other{ border-style:dashed; }
 .field{ width:100%; font:inherit; font-size:1.02rem; color:var(--ink); background:var(--card); border:2px solid var(--line); border-radius:12px; padding:13px 14px; resize:vertical; }
 .field:focus{ border-color:var(--ink); outline:none; } textarea.field{ min-height:112px; }
+.field::placeholder{ color:#a3abbd; opacity:1; font-weight:400; }
 .opts + .field, .opts + .otherbox{ margin-top:10px; }
 .chips{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px; }
 .chip{ appearance:none; font:inherit; font-size:.9rem; background:var(--card); border:1.5px solid var(--line); border-radius:99px; padding:7px 12px; cursor:pointer; color:var(--ink); }

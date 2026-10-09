@@ -1,8 +1,8 @@
 // «herramientas»: piezas compartidas por hf-save y hf-ai.
 const { UUID_RE, json, scrub, scrubOne, countryOf, ipOf, hashIp } = require('./tc-core');
 
-const TOOLS = ['fuga-de-tiempo', 'nivel-ia', 'ideas-posts'];
-const APP_OF = { 'fuga-de-tiempo': 'hf-fuga-tiempo', 'nivel-ia': 'hf-nivel-ia', 'ideas-posts': 'hf-ideas-posts' };
+const TOOLS = ['fuga-de-tiempo', 'nivel-ia', 'ideas-posts', 'integra-ia', 'aprende'];
+const APP_OF = { 'fuga-de-tiempo': 'hf-fuga-tiempo', 'nivel-ia': 'hf-nivel-ia', 'ideas-posts': 'hf-ideas-posts', 'integra-ia': 'hf-integra-ia', 'aprende': 'hf-aprende' };
 
 // Limpia lo que escribe la persona: objetos de poca profundidad, textos acotados. Todo es DATO, nunca instrucción.
 function cleanValue(v, depth = 0) {
@@ -51,4 +51,4 @@ async function currentStep(sid) {
         return rows && rows[0] ? rows[0] : null;
     } catch { return null; }
 }
-module.exports = { TOOLS, APP_OF, UUID_RE, json, scrub, scrubOne, countryOf, ipOf, hashIp, cleanAnswers, cleanEmail, cleanWhatsapp, saveRow, currentStep };
+module.exports = { sbCfg, TOOLS, APP_OF, UUID_RE, json, scrub, scrubOne, countryOf, ipOf, hashIp, cleanAnswers, cleanEmail, cleanWhatsapp, saveRow, currentStep };
