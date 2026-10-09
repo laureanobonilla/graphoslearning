@@ -1,5 +1,0 @@
-# La versión en inglés es la MISMA app: /en/ sirve el mismo index.html y
-# i18n/core.js detecta el prefijo /en para cargar los textos en inglés.
-/en      /index.html   200
-/en/     /index.html   200
-/en/*    /index.html   200
