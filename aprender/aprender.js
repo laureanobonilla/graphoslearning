@@ -1,10 +1,9 @@
-// «Entiéndelo» (/aprender/): cuestionario amable con preguntas que la IA adapta a lo que la persona quiere entender.
-// Al final se escribe un texto a su medida (ap-generate) y se abre Graphikosmos, que lo convierte en mapa mental solo.
+// /aprender/: una sola pantalla (título, campo «Elige un tema» y «Empezar»). Pasa directo a Graphikosmos con el tema.
 // Guarda cada respuesta al avanzar (hf-save, tool «aprende») y mide el recorrido (sfc-track-event, app «hf-aprende»).
 (function () {
 'use strict';
-const TRACK = '/.netlify/functions/sfc-track-event', SAVE = '/.netlify/functions/hf-save', NEXT = '/.netlify/functions/ap-next', GEN = '/.netlify/functions/ap-generate';
-const APP = 'hf-aprende', TOOL = 'aprende', TOTAL = 7;
+const TRACK = '/.netlify/functions/sfc-track-event', SAVE = '/.netlify/functions/hf-save';
+const APP = 'hf-aprende', TOOL = 'aprende', TOTAL = 1;
 const $ = (id) => document.getElementById(id);
 const RM = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
@@ -71,143 +70,35 @@ function setP(p) { pTarget = Math.min(1, Math.max(0, p)); if (RM) { pCur = pTarg
 function setLabel(t) { const s = String(t || '').trim(); label.textContent = s.length > 34 ? s.slice(0, 33) + '…' : s; label.classList.toggle('on', !!s); }
 setP(0); if (RM) drawViz(0);
 
-// ---------- Preguntas ----------
-const FALLBACK = {
-  1: { question: '¿Qué es lo que más se te dificulta?', multi: false, options: ['Entender los términos y definiciones', 'Ver cómo se conectan las ideas', 'No sé por dónde empezar', 'Recordarlo después de estudiarlo', 'Aplicarlo en ejemplos o problemas'] },
-  2: { question: '¿Qué te ayudaría más?', multi: false, options: ['Una explicación paso a paso', 'Ejemplos de la vida diaria', 'Ver el panorama completo primero', 'Una historia o contexto', 'Definiciones cortas y claras'] },
-  3: { question: '¿Cuánto tiempo llevas intentando entenderlo?', multi: false, options: ['Recién empiezo', 'Unos días', 'Algunas semanas', 'Meses o más'] }
-};
-const PROPOSITOS = ['Un examen o una clase', 'Mi trabajo o profesión', 'Una tesis o investigación', 'Enseñárselo a alguien', 'Pura curiosidad'];
-const NIVELES = [['Empiezo desde cero', 'Casi no sé nada del tema'], ['Conozco lo básico', 'Me suenan los términos pero se me mezclan'], ['Tengo bastante base', 'Quiero afinar y conectar mejor']];
-const ESTILOS = [
-  ['claro', 'Claro y con ejemplos', 'Como un buen profesor: ejemplos de la vida diaria'],
-  ['academico', 'Académico', 'Riguroso, con términos bien definidos'],
-  ['historia', 'Como una historia', 'De dónde surge y cómo se fue resolviendo'],
-  ['conciso', 'Directo y breve', 'Solo las ideas clave, sin relleno']
-];
-const EJEMPLOS = ['La inflación', 'Cómo funcionan las derivadas', 'La Revolución Francesa', 'La fotosíntesis', 'Qué es el inconsciente', 'Mi tema de tesis'];
-const MAXSEL = 3;
-const STEP_ORDER = ['tema', 'q1', 'q2', 'q3', 'proposito', 'nivel', 'estilo'];
+// ---------- Pantalla única: un tema y a Graphikosmos ----------
 const col = $('col');
-let lastTema = ''; let idx = -1; const stack = []; const QS = {}; let nextToken = 0;
-
-function clear() { col.textContent = ''; return col; }
-function scr(cls) { const s = h('div', 'scr ' + (cls || '')); clear().appendChild(s); return s; }
-function backBtn(s) { const b = h('button', 'back', '‹ Volver'); b.type = 'button'; b.addEventListener('click', () => { track('back_clicked', { step: STEP_ORDER[idx] }); nextToken++; if (stack.length) go(stack.pop(), false); else intro(); }); s.appendChild(b); }
-
+let idx = -1, typedTracked = false, going = false;
 function intro() {
-  idx = -1; setP(0); const s = scr();
+  col.textContent = ''; const s = h('div', 'scr'); col.appendChild(s);
   s.appendChild(h('h1', '', 'Estudia de otra forma'));
-  s.appendChild(h('p', 'lead', 'Elige la materia que se te resiste. Te escribimos un texto a tu medida y lo convertimos en un mapa vivo: lees, y las ideas se iluminan y se conectan frente a ti.'));
-  const b = h('button', 'btn', 'Empezar'); b.type = 'button'; b.addEventListener('click', () => { track('start_clicked', {}); stack.length = 0; go(0, false); }); s.appendChild(b);
-  const f = h('ul', 'facts'); ['Gratis para probar', 'Unas 7 preguntas, 2 minutos', 'No necesitas cuenta para empezar'].forEach(t => f.appendChild(h('li', '', t))); s.appendChild(f);
-  setTimeout(() => { try { b.focus({ preventScroll: true }); } catch { /* ok */ } }, 80);
-}
-
-function go(i, push) {
-  if (push !== false) stack.push(idx);
-  idx = i; maxStep = Math.max(maxStep, i + 1); setP((i + 0.4) / (TOTAL + 0.8)); track('step_viewed', { step: STEP_ORDER[i], n: i + 1 });
-  const id = STEP_ORDER[i];
-  if (id === 'tema') stepTema(); else if (/^q\d$/.test(id)) stepAi(parseInt(id.slice(1), 10)); else if (id === 'proposito') stepChoice('proposito', '¿Para qué lo necesitas?', 'Así lo enfocamos mejor. Puedes elegir hasta 3.', PROPOSITOS.map(o => [o, o, '']), false, true); else if (id === 'nivel') stepChoice('nivel', '¿Qué tanto sabes del tema hoy?', 'Sé sincero: así no te aburrimos ni te perdemos.', NIVELES.map(o => [o[0], o[0], o[1]])); else stepChoice('estilo', '¿Cómo prefieres que te lo expliquen?', 'Este será el tono de tu texto.', ESTILOS, true);
-}
-function advance() {
-  track('step_done', { step: STEP_ORDER[idx] }); save();
-  if (idx + 1 >= STEP_ORDER.length) finish(); else go(idx + 1);
-}
-
-function stepTema() {
-  const s = scr(); backBtn(s);
-  s.appendChild(h('h2', '', 'Danos un tema complejo que te interese'));
-  s.appendChild(h('p', 'hint', 'Un tema, un concepto, una duda… como te salga.'));
-  const ta = h('textarea', 'field'); ta.rows = 2; ta.maxLength = 200; ta.placeholder = 'Ej.: cómo funciona la inflación'; ta.value = A.tema || ''; s.appendChild(ta);
-  const chips = h('div', 'chips'); EJEMPLOS.forEach(t => { const c = h('button', 'chip', t); c.type = 'button'; c.addEventListener('click', () => { ta.value = t; upd(); ta.focus(); }); chips.appendChild(c); }); s.appendChild(chips);
-  const foot = h('div', 'foot'); const nb = h('button', 'btn', 'Seguir'); nb.type = 'button'; foot.appendChild(nb); s.appendChild(foot);
-  const upd = () => { A.tema = ta.value.trim(); nb.disabled = A.tema.length < 2; setLabel(A.tema); };
-  ta.addEventListener('input', upd); ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!nb.disabled) advance(); } });
-  nb.addEventListener('click', () => { if (!nb.disabled) { if (lastTema && lastTema !== A.tema) { QS[1] = QS[2] = QS[3] = undefined; ['q1','a1','a1_otro','q2','a2','a2_otro','q3','a3','a3_otro'].forEach(k => delete A[k]); } lastTema = A.tema; advance(); } });
-  upd(); setTimeout(() => { try { ta.focus({ preventScroll: true }); } catch { /* ok */ } }, 60);
-}
-
-// Una pregunta propuesta por la IA (o la de respaldo, sin avisar nada si la IA falla)
-function stepAi(n) {
-  const s = scr(); backBtn(s);
-  const token = ++nextToken;
-  if (QS[n]) return renderChoice(s, n, QS[n]);
-  const t = h('p', 'think'); t.appendChild(h('b')); t.appendChild(document.createTextNode('Pensando tu siguiente pregunta…')); s.appendChild(t);
-  const sk = h('div', 'skel'); for (let i = 0; i < 4; i++) sk.appendChild(h('i')); s.appendChild(sk);
-  const history = []; for (let k = 1; k < n; k++) if (A['q' + k] && A['a' + k]) history.push({ q: A['q' + k], a: A['a' + k] });
-  const ctrl = ('AbortController' in window) ? new AbortController() : null; const timer = setTimeout(() => { try { ctrl && ctrl.abort(); } catch { /* ok */ } }, 9500);
-  const t0 = Date.now();
-  fetch(NEXT, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, tema: A.tema, step: n, history }), signal: ctrl ? ctrl.signal : undefined })
-    .then(r => r.json()).then(d => d && !d.fallback && Array.isArray(d.options) && d.options.length >= 4 ? { q: d, fb: false } : { q: FALLBACK[n], fb: true }).catch(() => ({ q: FALLBACK[n], fb: true }))
-    .then(({ q, fb }) => { clearTimeout(timer); if (token !== nextToken || idx !== n) return; QS[n] = q; track('ai_q_shown', { n, fallback: fb, seconds: Math.round((Date.now() - t0) / 100) / 10 }); renderChoice(scr(), n, q, true); });
-}
-function renderChoice(s, n, q, needBack) {
-  q = Object.assign({}, q, { multi: true });
-  if (needBack) backBtn(s);
-  s.appendChild(h('h2', '', q.question)); s.appendChild(h('p', 'hint', (q.hint ? q.hint.replace(/[.\s]+$/, '') + '. ' : '') + 'Puedes elegir hasta 3.'));
-  A['q' + n] = q.question;
-  const picked = new Set((A['a' + n] || '').split(' · ').filter(Boolean)); let otroOn = !!A['a' + n + '_otro'];
-  const wrap = h('div', 'opts' + (q.multi ? ' multi' : '')); wrap.setAttribute('role', q.multi ? 'group' : 'radiogroup'); const btns = [];
-  const ta = h('textarea', 'field otro'); ta.rows = 2; ta.maxLength = 200; ta.placeholder = 'Escríbelo con tus palabras'; ta.value = A['a' + n + '_otro'] || ''; if (!otroOn) ta.classList.add('is-hidden');
-  const nb = h('button', 'btn', 'Seguir'); nb.type = 'button';
-  const sync = () => { const parts = [...picked]; A['a' + n] = parts.join(' · '); if (otroOn && ta.value.trim()) A['a' + n + '_otro'] = ta.value.trim(); else delete A['a' + n + '_otro']; nb.disabled = !(parts.length || (otroOn && ta.value.trim().length >= 2)); nb.classList.toggle('is-hidden', !q.multi && !otroOn); const full = picked.size + (otroOn ? 1 : 0) >= MAXSEL; btns.forEach(b => { const on = b.dataset.o === '__otro' ? otroOn : picked.has(b.dataset.o); b.setAttribute('aria-checked', String(on)); b.classList.toggle('is-off', full && !on); b.setAttribute('aria-disabled', String(full && !on)); }); ta.classList.toggle('is-hidden', !otroOn); };
-  q.options.concat(['__otro']).forEach(o => {
-    const b = h('button', 'opt'); b.type = 'button'; b.dataset.o = o; b.setAttribute('role', q.multi ? 'checkbox' : 'radio'); b.appendChild(h('span', 'mk', '✓')); b.appendChild(h('span', '', o === '__otro' ? 'Otra cosa (escríbela)' : o));
-    b.addEventListener('click', () => {
-      const cnt = picked.size + (otroOn ? 1 : 0);
-      if (o === '__otro') { if (!otroOn && cnt >= MAXSEL) return; otroOn = !otroOn; sync(); if (otroOn) setTimeout(() => ta.focus(), 30); return; }
-      if (picked.has(o)) picked.delete(o); else { if (cnt >= MAXSEL) return; picked.add(o); }
-      sync();
-    });
-    btns.push(b); wrap.appendChild(b);
+  const form = h('form', 'start'); form.noValidate = true;
+  const inp = h('input', 'field'); inp.type = 'text'; inp.maxLength = 120; inp.placeholder = 'Elige un tema'; inp.autocomplete = 'off'; inp.enterKeyHint = 'go'; inp.setAttribute('aria-label', 'Elige un tema');
+  const btn = h('button', 'btn', 'Empezar'); btn.type = 'submit'; btn.disabled = true;
+  form.appendChild(inp); form.appendChild(btn); s.appendChild(form);
+  inp.addEventListener('input', () => {
+    A.tema = inp.value.trim(); btn.disabled = A.tema.length < 2; setLabel(A.tema); setP(A.tema.length >= 2 ? 0.55 : 0);
+    if (!typedTracked && A.tema.length >= 2) { typedTracked = true; track('topic_typed', {}); }
   });
-  ta.addEventListener('input', sync); s.appendChild(wrap); s.appendChild(ta);
-  const foot = h('div', 'foot'); foot.appendChild(nb); s.appendChild(foot); nb.addEventListener('click', () => { if (!nb.disabled) advance(); }); sync();
-}
-
-// Pasos fijos (propósito, nivel, estilo)
-function stepChoice(key, title, hint, opts, isEstilo, multi) {
-  const s = scr(); backBtn(s); s.appendChild(h('h2', '', title)); s.appendChild(h('p', 'hint', hint));
-  if (multi) {
-    const picked = new Set((A[key] || '').split(' · ').filter(Boolean)); const wrapM = h('div', 'opts multi'); wrapM.setAttribute('role', 'group'); const bt = [];
-    const nbM = h('button', 'btn', 'Seguir'); nbM.type = 'button';
-    const syncM = () => { A[key] = [...picked].join(' · '); nbM.disabled = !picked.size; const full = picked.size >= MAXSEL; bt.forEach(b => { const on = picked.has(b.dataset.o); b.setAttribute('aria-checked', String(on)); b.classList.toggle('is-off', full && !on); b.setAttribute('aria-disabled', String(full && !on)); }); };
-    opts.forEach(([val, text]) => {
-      const b = h('button', 'opt'); b.type = 'button'; b.dataset.o = val; b.setAttribute('role', 'checkbox'); b.appendChild(h('span', 'mk', '✓')); b.appendChild(h('span', '', text));
-      b.addEventListener('click', () => { if (picked.has(val)) picked.delete(val); else { if (picked.size >= MAXSEL) return; picked.add(val); } syncM(); });
-      bt.push(b); wrapM.appendChild(b);
-    });
-    s.appendChild(wrapM); const footM = h('div', 'foot'); footM.appendChild(nbM); s.appendChild(footM); nbM.addEventListener('click', () => { if (!nbM.disabled) advance(); }); syncM(); return;
-  }
-  const wrap = h('div', 'opts'); wrap.setAttribute('role', 'radiogroup');
-  opts.forEach(([val, text, sub]) => {
-    const b = h('button', 'opt'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(isEstilo ? A.estilo_id === val : A[key] === val)); b.appendChild(h('span', 'mk', '✓'));
-    const d = h('span'); d.appendChild(document.createTextNode(text)); if (sub) d.appendChild(h('small', '', sub)); b.appendChild(d);
-    b.addEventListener('click', () => { if (isEstilo) { A.estilo_id = val; A.estilo = text; } else A[key] = val; wrap.querySelectorAll('.opt').forEach(x => x.setAttribute('aria-checked', String(x === b))); setTimeout(() => { if (idx === STEP_ORDER.indexOf(key)) advance(); }, 240); });
-    wrap.appendChild(b);
+  form.addEventListener('submit', (e) => {
+    e.preventDefault(); if (going || btn.disabled) return; going = true; btn.disabled = true; btn.textContent = 'Abriendo…';
+    maxStep = 1; setP(1); track('start_clicked', { topic: A.tema.slice(0, 80) }); track('completed', { total: 1 });
+    // El tema queda guardado (para ver qué quieren estudiar) y se pasa directo a Graphikosmos, que arma el mapa.
+    const go2 = () => { try { track('redirect', {}); } catch { /* ok */ } location.href = '../?aprende=' + sid + '&ref=aprende&t=' + encodeURIComponent(A.tema.slice(0, 120)); };
+    let done = false; const once = () => { if (!done) { done = true; go2(); } };
+    save({ completed: true }).then(once, once); setTimeout(once, 1500);
   });
-  s.appendChild(wrap);
-}
-
-// ---------- Final: se escribe el texto y se abre Graphikosmos ----------
-const STATUS = ['Escribiendo un texto a tu medida…', 'Buscando las ideas clave…', 'Preparando tu mapa…'];
-function finish() {
-  idx = STEP_ORDER.length; nextToken++; setP(1);
-  const s = scr('gen'); s.appendChild(h('h2', '', 'Armando tu mapa'));
-  const st = h('p', 'status', STATUS[0]); s.appendChild(st); const bar = h('div', 'bar'); const fill = h('i'); bar.appendChild(fill); s.appendChild(bar);
-  requestAnimationFrame(() => { fill.style.width = '85%'; fill.style.transitionDuration = '18s'; });
-  let k = 0; const iv = setInterval(() => { k = Math.min(STATUS.length - 1, k + 1); st.textContent = STATUS[k]; }, 6500);
-  track('completed', { total: TOTAL }); const t0 = Date.now();
-  const go2 = (okText) => { clearInterval(iv); fill.style.transitionDuration = '.4s'; fill.style.width = '100%'; track(okText ? 'generate_ok' : 'generate_failed', { seconds: Math.round((Date.now() - t0) / 100) / 10 }); st.textContent = 'Listo. Abriendo Graphikosmos…'; setTimeout(() => { try { track('redirect', {}); } catch { /* ok */ } location.href = '../?aprende=' + sid + '&ref=aprende' + (okText ? '' : '&t=' + encodeURIComponent((A.tema || '').slice(0, 120))); }, RM ? 100 : 700); };
-  const attempt = (n) => fetch(GEN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, answers: A }) }).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(d => { if (!d || !d.ok) throw 0; if (typeof d.text === 'string' && d.text.length > 200) { try { localStorage.setItem('gk_ap_pending', JSON.stringify({ sid, title: String(d.title || ''), text: d.text, t: Date.now() })); } catch { /* ok */ } } return true; }).catch(e => (n < 1 && e !== 429) ? new Promise(r => setTimeout(r, 1200)).then(() => attempt(n + 1)) : false);
-  save({ completed: true }).then(() => attempt(0)).then(go2);
+  setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch { /* ok */ } }, 80);
 }
 
 // Si cierra la pestaña a la mitad, lo respondido queda guardado.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'hidden') return;
-  try { navigator.sendBeacon(TRACK, new Blob([JSON.stringify({ event: 'page_hidden', anonId, app: APP, metadata: { step: idx >= 0 && idx < STEP_ORDER.length ? STEP_ORDER[idx] : (idx < 0 ? 'intro' : 'final') } })], { type: 'application/json' })); if (firstSaved) navigator.sendBeacon(SAVE, new Blob([JSON.stringify(payload({ first: false }))], { type: 'application/json' })); } catch { /* ok */ }
+  try { navigator.sendBeacon(TRACK, new Blob([JSON.stringify({ event: 'page_hidden', anonId, app: APP, metadata: { step: going ? 'final' : 'intro' } })], { type: 'application/json' })); if (firstSaved) navigator.sendBeacon(SAVE, new Blob([JSON.stringify(payload({ first: false }))], { type: 'application/json' })); } catch { /* ok */ }
 });
 
 track('landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 120) : '' });

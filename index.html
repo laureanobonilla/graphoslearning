@@ -384,6 +384,15 @@
             padding: 9px 14px 9px 16px; border-radius: 999px; border: 1px solid #2c3458; background: rgba(17,22,43,.92); color: #eef1fb;
             font: 600 13px 'Sora', sans-serif; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 6px 22px rgba(0,0,0,.35);
             transition: border-color .15s, color .15s, transform .15s; }
+        #schemeBreadcrumb { position: absolute; top: 16px; left: 16px; z-index: 20; display: flex; align-items: center; gap: 10px; }
+        #schemeBreadcrumb.hidden { display: none; }
+        .gk-canvas-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px 9px 12px; border-radius: 999px; border: 1px solid #2c3458; background: rgba(17,22,43,.92); color: #eef1fb;
+            font: 600 13px 'Sora', sans-serif; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 6px 22px rgba(0,0,0,.35); transition: border-color .15s, color .15s; }
+        .gk-canvas-pill:hover { border-color: #4fd1c5; color: #4fd1c5; }
+        .gk-canvas-pill svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
+        #btnExitSubscheme:hover svg { transform: translateX(-3px); }
+        #schemeBreadcrumbLabel { color: #b8bfdc; font: 500 12.5px 'Inter', sans-serif; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(17,22,43,.8); padding: 6px 12px; border-radius: 999px; border: 1px solid #262c47; }
+        .hidden-by-mode { display: none !important; }
         #btnDefsView.hidden { display: none; }
         #btnDefsView:hover { border-color: #4fd1c5; color: #4fd1c5; }
         #btnDefsView svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
@@ -472,11 +481,6 @@
     </div>
 
     <!-- Migas de pan: aparecen al entrar a un subesquema, para volver al nivel anterior -->
-    <div id="schemeBreadcrumb" class="absolute top-24 md:top-20 left-4 bg-slate-900/90 text-white backdrop-blur-md pl-2 pr-4 py-2 rounded-full shadow-2xl font-medium text-[10px] md:text-xs tracking-wide z-40 hidden flex items-center gap-2 whitespace-nowrap">
-        <button id="btnExitSubscheme" class="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1 rounded-full font-semibold transition-colors flex items-center gap-1" data-i18n="ui.volver">← Volver</button>
-        <span id="schemeBreadcrumbLabel" class="text-slate-300 italic max-w-[220px] truncate"></span>
-    </div>
-
     <!-- Barra de Navegación -->
     <header id="mainHeader" class="glass-panel p-3 md:px-6 md:py-3.5 flex flex-col z-30 gap-2.5 w-full">
         <!-- Fila 1: Marca, buscador hero y clúster de estado -->
@@ -488,8 +492,9 @@
 
             <!-- Buscador: el momento protagonista de la barra -->
             <div class="flex gap-2 flex-1 min-w-0">
-                <input type="text" id="topicInput" placeholder="Escribe algo y crea un nodo nuevo con eso..." title="Crea un solo nodo en el lienzo con exactamente lo que escribas aquí. Para generar un esquema completo a partir de un tema, un texto largo o un enlace a una página web, usa el Modo Lector." class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg pl-3.5 pr-2 py-2.5 md:py-2 text-sm text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans flex-1" data-i18n-placeholder="ui.escribe_algo_y_crea_un" data-i18n-title="ui.crea_un_solo_nodo_en">
-                <button id="btnGenerate" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0" data-i18n="ui.generar">
+                <button id="btnCreate" type="button" title="Crear: empezar con un texto, un enlace, un PDF o solo con un tema" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0 flex items-center gap-1.5"><span class="text-base leading-none">＋</span><span>Crear</span></button>
+                <input type="text" id="topicInput" hidden placeholder="Escribe algo y crea un nodo nuevo con eso..." title="Crea un solo nodo en el lienzo con exactamente lo que escribas aquí. Para generar un esquema completo a partir de un tema, un texto largo o un enlace a una página web, usa el Modo Lector." class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg pl-3.5 pr-2 py-2.5 md:py-2 text-sm text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans flex-1" data-i18n-placeholder="ui.escribe_algo_y_crea_un" data-i18n-title="ui.crea_un_solo_nodo_en">
+                <button id="btnGenerate" hidden class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0" data-i18n="ui.generar">
                     Generar
                 </button>
             </div>
@@ -691,13 +696,18 @@
                              PDF es una función importante y poco común, así que lleva color sólido
                              + su propio texto para que se note de entrada en vez de que el usuario
                              tenga que descubrirla. -->
-                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se extrae su texto, con el formato más parecido posible, al editor de abajo; podés elegir qué páginas)" class="bg-rose-600 hover:bg-rose-500 border border-rose-400/60 text-white px-2.5 py-1 rounded-md text-[11px] font-bold transition-all shadow-sm shadow-rose-900/50 flex items-center gap-1 whitespace-nowrap" data-i18n-title="ui.importar_un_pdf_se_extrae">
+                        <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se extrae su texto, con el formato más parecido posible, al editor de abajo; podés elegir qué páginas)" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1 whitespace-nowrap" data-i18n-title="ui.importar_un_pdf_se_extrae">
                             <span>📄</span><span data-i18n="ui.subir_pdf">Subir PDF</span>
                         </button>
                         <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.abrir_otro_lector_otro_esquema">➕</button>
                         <button id="btnClearReader" data-role="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.limpiar_texto_y_contexto">🧹</button>
                         <button id="btnCloseReader" data-role="btnClose" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.cerrar">✕</button>
                     </div>
+                </div>
+                <!-- Dos formas de empezar, al mismo nivel: con un texto (o enlace/PDF) o solo con un tema. -->
+                <div data-role="modeTabs" class="flex gap-1 bg-[#0f1428] border border-[#2c3458] rounded-lg p-0.5 text-[12px] font-semibold">
+                    <button type="button" data-role="tabText" class="flex-1 px-2 py-1.5 rounded-md bg-indigo-500/25 text-indigo-100 transition-colors" data-i18n="ui.tab_texto">📖 Tengo un texto</button>
+                    <button type="button" data-role="tabTopic" class="flex-1 px-2 py-1.5 rounded-md text-slate-400 hover:text-slate-200 transition-colors" data-i18n="ui.tab_tema">💡 Solo un tema</button>
                 </div>
                 <!-- Input de archivo oculto para "Importar PDF" — ver btnImportPdf en app.js. -->
                 <input type="file" id="pdfFileInput" data-role="pdfFileInput" accept="application/pdf" class="hidden">
@@ -709,27 +719,13 @@
                     <span class="truncate" id="pdfRangeFileName" data-i18n="ui.documento_pdf">documento.pdf</span>
                     <span class="text-slate-500">·</span>
                     <span data-i18n="ui.paginas">Páginas</span>
-                    <input type="number" id="pdfRangeFrom" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-rose-400">
+                    <input type="number" id="pdfRangeFrom" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-indigo-400">
                     <span>a</span>
-                    <input type="number" id="pdfRangeTo" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-rose-400">
+                    <input type="number" id="pdfRangeTo" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-indigo-400">
                     <span class="text-slate-500"><span data-i18n="ui.de">de</span> <span id="pdfRangeTotal">1</span></span>
                     <div class="flex-1"></div>
-                    <button id="btnPdfRangeLoad" class="bg-rose-600 hover:bg-rose-500 text-white px-2.5 py-1 rounded-md font-bold transition-colors" data-i18n="ui.cargar">Cargar</button>
+                    <button id="btnPdfRangeLoad" class="bg-indigo-500/25 hover:bg-indigo-500/40 border border-indigo-400/40 text-indigo-100 px-2.5 py-1 rounded-md font-semibold transition-colors" data-i18n="ui.cargar">Cargar</button>
                     <button id="btnPdfRangeCancel" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md transition-colors">✕</button>
-                </div>
-                <!-- "Generar Esquema" estructura lo que el texto DICE (sus temas, fases,
-                     categorías). "Analizar Texto" es distinto a propósito: en vez de un
-                     paso intermedio que interrumpe el flujo, es un botón aparte a la par
-                     que abre un menú para elegir el tipo de análisis (ver analyzeTypeMenu,
-                     definido una sola vez más abajo y reusado por todos los lectores,
-                     incluidos los clonados con ➕ — ver runTextAnalysis en app.js). -->
-                <div class="flex items-center gap-2">
-                    <button id="btnParseReaderText" data-role="btnGenerate" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
-                        <span data-i18n="ui.generar_esquema">🌐 Generar Esquema</span>
-                    </button>
-                    <button id="btnAnalyzeReaderText" data-role="btnAnalyzeText" title="Analiza el texto (su argumentación, estructura, etc.) en vez de solo estructurar lo que dice" class="flex-1 bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5" data-i18n-title="ui.analiza_el_texto_su_argumentacion">
-                        <span data-i18n="ui.analizar_texto">🔎 Analizar Texto</span>
-                    </button>
                 </div>
                 <!-- El contexto (para desambiguar definiciones después) ya no es un campo
                      que el usuario tenga que llenar: se detecta solo del texto o del título
@@ -783,7 +779,7 @@
 
             <!-- Área de Lectura (Fondo Blanco Limpio) -->
             <div id="readerContentContainer" data-role="contentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
-                <div id="readerTextMode" data-role="textMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none select-text" contenteditable="true" data-placeholder="Pega aquí un texto o un enlace"></div>
+                <div id="readerTextMode" data-role="textMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none select-text" contenteditable="true" data-placeholder="Escribe o pega aquí un texto o un enlace"></div>
                 <!-- Pista de inicio, sobrepuesta mientras el lector está vacío: funciona
                      como un placeholder normal ("Pega aquí un texto o un enlace"), solo
                      que "un enlace" va en un color distinto para que se note, de un
@@ -791,9 +787,28 @@
                      el usuario escribe o pega algo (ver listener 'input' en app.js). -->
                 <div id="readerEmptyHint" data-role="emptyHint" class="absolute inset-6 top-6 pointer-events-none select-none">
                     <p class="text-slate-400 text-base leading-relaxed" data-i18n="ui.pega_aqui_un_texto_o">
-                        Pega aquí un texto o <span class="text-indigo-600 font-semibold">un enlace</span>
+                        Escribe o pega aquí un texto o <span class="text-indigo-600 font-semibold">un enlace</span>
                     </p>
                 </div>
+            </div>
+            <!-- Modo "solo un tema": sin texto, la IA investiga el tema por ti. -->
+            <div data-role="topicCard" class="hidden flex-1 flex-col justify-center gap-3 p-6 bg-slate-900">
+                <p class="text-slate-100 text-base font-semibold" data-i18n="ui.tema_titulo">¿Sobre qué tema quieres el esquema?</p>
+                <input type="text" data-role="topicInputPanel" maxlength="200" placeholder="Ej.: La Revolución Francesa" data-i18n-placeholder="ui.tema_ejemplo" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400">
+                <button type="button" data-role="topicGenerate" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2.5 rounded-lg text-sm font-bold transition-all" data-i18n="ui.tema_generar">🌐 Generar esquema del tema</button>
+                <button type="button" data-role="topicSingleNode" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-3 py-2 rounded-lg text-xs font-semibold transition-all" data-i18n="ui.tema_solo_nodo">Solo agregar un nodo con este texto</button>
+                <p class="text-slate-500 text-xs leading-relaxed" data-i18n="ui.tema_ayuda">No necesitas ningún texto: la IA arma el esquema investigando el tema.</p>
+            </div>
+            <div data-role="readerFooter" class="shrink-0 flex flex-col gap-1.5 px-3 py-2.5 border-t border-slate-700 bg-slate-900">
+                <div class="flex items-center gap-2">
+                    <button id="btnParseReaderText" data-role="btnGenerate" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+                        <span data-i18n="ui.generar_esquema">🌐 Generar Esquema</span>
+                    </button>
+                    <button id="btnAnalyzeReaderText" data-role="btnAnalyzeText" title="Analiza el texto (su argumentación, estructura, etc.) en vez de solo estructurar lo que dice" class="flex-1 bg-violet-600 hover:bg-violet-500 text-white px-3 py-2 rounded-lg text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1.5" data-i18n-title="ui.analiza_el_texto_su_argumentacion">
+                        <span data-i18n="ui.analizar_texto">🔎 Analizar Texto</span>
+                    </button>
+                </div>
+                <p data-role="genHint" class="text-[11px] text-slate-500 text-center leading-snug" data-i18n="ui.gen_hint">Pega o escribe un texto largo (o un enlace) para activar estos botones.</p>
             </div>
         </div>
     </div>
@@ -811,6 +826,10 @@
     </div>
 
     <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
+    <div id="schemeBreadcrumb" class="hidden">
+        <button id="btnExitSubscheme" type="button" class="gk-canvas-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Volver</span></button>
+        <span id="schemeBreadcrumbLabel"></span>
+    </div>
     <button id="btnDefsView" type="button" class="hidden" title="Definiciones, explicaciones sencillas y ejemplos del esquema que ves ahora" ><span>Ver definiciones</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
 
     <!-- ===================== MODO MÓVIL ===================== -->

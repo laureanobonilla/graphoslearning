@@ -760,6 +760,47 @@ INSTRUCCIONES:
         // ==========================================
         // MÓVIL — mapa mental de 2 niveles (raíz + ramas), para /m/ ('m_welcome' = el primero, gratis; lo decide billing.js)
         // ==========================================
+        // ==========================================
+        // LONG_OUTLINE — un fragmento de un documento MUY largo → sus temas y puntos clave, cada uno con una
+        // cita literal. El cliente junta los resúmenes de todos los fragmentos y de ahí sale UN solo esquema de 3 niveles.
+        // Es un paso intermedio: gratis (cuenta para el límite por hora); el esquema final se cobra como parse_text.
+        // ==========================================
+        if (action === 'long_outline') {
+            const lb = JSON.parse(event.body);
+            const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+            const chunk = String(text || '');
+            if (chunk.trim().length < 200) return { statusCode: 400, body: JSON.stringify({ error: 'Fragmento muy corto' }) };
+            const part = Math.max(1, parseInt(lb.part, 10) || 1), total = Math.max(part, parseInt(lb.total, 10) || 1);
+            const schema = {
+                type: 'OBJECT',
+                properties: { topics: { type: 'ARRAY', description: 'De 3 a 6 temas principales de este fragmento, en el orden en que aparecen.', items: { type: 'OBJECT', properties: {
+                    title: { type: 'STRING', description: 'Nombre corto del tema (1 a 5 palabras).' },
+                    quote: { type: 'STRING', description: 'Cita literal breve (máx. 15 palabras) donde se introduce el tema.' },
+                    points: { type: 'ARRAY', description: 'De 2 a 4 ideas, fases o elementos clave de ese tema.', items: { type: 'OBJECT', properties: {
+                        label: { type: 'STRING', description: 'Nombre corto (1 a 5 palabras).' },
+                        quote: { type: 'STRING', description: 'Cita literal breve (máx. 15 palabras).' }
+                    }, required: ['label', 'quote'] } }
+                }, required: ['title', 'quote', 'points'] } } },
+                required: ['topics']
+            };
+            const response = await generateWithFallback({
+                contents: `Este es el fragmento ${part} de ${total} de un documento largo. Identifica sus temas principales y, de cada uno, sus ideas clave, fiel a lo que dice el fragmento.
+REGLAS: 1) De 3 a 6 temas y de 2 a 4 puntos por tema. 2) Nombres concretos y cortos (nada de "Introducción general"). 3) Cada "quote" debe ser texto COPIADO LITERALMENTE del fragmento (máx. 15 palabras), nunca parafraseado.
+FRAGMENTO:\n"""${chunk}"""`,
+                config: { responseMimeType: 'application/json', responseSchema: schema }
+            });
+            let d; try { d = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) }; }
+            const norm = (x) => String(x || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const hay = norm(chunk);
+            const okQuote = (q) => { const c = clipS(q, 160); return c && hay.includes(norm(c)) ? c : ''; };   // solo se conserva si de verdad está en el texto
+            const topics = (Array.isArray(d.topics) ? d.topics : []).slice(0, 8).map(t => ({
+                title: clipS(t && t.title, 60), quote: okQuote(t && t.quote),
+                points: (Array.isArray(t && t.points) ? t.points : []).slice(0, 5).map(p => ({ label: clipS(p && p.label, 60), quote: okQuote(p && p.quote) })).filter(p => p.label)
+            })).filter(t => t.title);
+            if (!topics.length) return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) };
+            return { statusCode: 200, body: JSON.stringify({ topics }) };
+        }
+
         if (action === 'm_map' || action === 'm_welcome') {
             const mb = JSON.parse(event.body);
             const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);

@@ -122,11 +122,11 @@
     if (res.status === 402 && data.error === 'guest_limit_reached') return { ok: false, kind: 'login', data };
     if (res.status === 402) return { ok: false, kind: user() ? 'contact' : 'login', data };
     if (res.status === 401) return { ok: false, kind: 'login', data };
-    if (res.status === 429) return { ok: false, kind: 'rate', data };
+    if (res.status === 429) return { ok: false, kind: user() ? 'rate' : 'login', data };
     return { ok: false, kind: 'server', data };
   }
-  function failMessage(kind) {
-    if (kind === 'rate') return 'Hiciste muchas solicitudes seguidas. Espera un minuto e intenta de nuevo.';
+  function failMessage(kind, data) {
+    if (kind === 'rate') return 'Hay mucha actividad en tu cuenta en este momento. Espera unos minutos e intenta de nuevo.';
     if (kind === 'network') return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
     return 'No pudimos generar el mapa. Intenta de nuevo.';
   }
@@ -149,9 +149,9 @@
     const r = await callGemini({ action: 'm_welcome', topic });
     busy(btn, false);
     if (!r.ok) {
-      track('m_map_error', { kind: r.kind, status: r.data && r.data.error, where: 'home' });
+      track('m_map_error', { kind: r.kind, status: r.data && r.data.error, used: r.data && r.data.used, where: 'home' });
       if (handleBlocked(r.kind, 'home')) { msg.textContent = ''; return; }
-      msg.textContent = failMessage(r.kind); msg.classList.add('err'); return;
+      msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return;
     }
     msg.textContent = '';
     G = emptyG();
@@ -300,7 +300,7 @@
     if (!r.ok) {
       track('m_map_error', { kind: r.kind, where: 'expand' });
       if (handleBlocked(r.kind, 'expand')) { closeSheet(); return; }
-      msg.textContent = failMessage(r.kind); msg.classList.add('err'); return;
+      msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return;
     }
     if (n.children.length === 0) addChildren(n.id, r.data.branches);
     mapsCount++;

@@ -11,11 +11,13 @@ const KNOWN = new Set([
     // esquema son gratis, ver la lógica de "welcomeFree" en withBilling.
     'onboarding_text', 'welcome_schema',
     // Móvil (/m/): mapa de 2 niveles ('m_welcome' = el primero, gratis una vez) y glosario de varios términos.
-    'm_map', 'm_welcome', 'glossary'
+    'm_map', 'm_welcome', 'glossary',
+    // Documentos muy largos: resumen por fragmentos (gratis); el esquema final se cobra como parse_text.
+    'long_outline'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary']);
+const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.
@@ -95,7 +97,7 @@ function withBilling(raw, overrides = {}) {
         buildSetCookie: require('./guest').buildSetCookie,
         store: require('./store'),
         rateLimitUser: Number(process.env.RATE_LIMIT_PER_HOUR || 60),
-        rateLimitGuest: Number(process.env.GUEST_RATE_LIMIT_PER_HOUR || 20),
+        rateLimitGuest: Number(process.env.GUEST_RATE_LIMIT_PER_HOUR || 40),
         ...overrides
     };
 
@@ -123,8 +125,10 @@ function withBilling(raw, overrides = {}) {
                     : await deps.store.ensureGuest(identity.guestId, identity.ip);
 
                 const limit = identity.kind === 'user' ? deps.rateLimitUser : deps.rateLimitGuest;
-                if ((await deps.store.usageLastHour(identity.id)) >= limit) {
-                    return json(429, { error: 'rate_limited', balance }, cookieHeaders);
+                const used = await deps.store.usageLastHour(identity.id);
+                if (used >= limit) {
+                    // used/limit se devuelven para poder ver el número real (diagnóstico en móvil).
+                    return json(429, { error: 'rate_limited', balance, used, limit }, cookieHeaders);
                 }
             } catch (err) {
                 console.error('[billing] error de base de datos:', err.message);
