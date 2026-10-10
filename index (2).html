@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<script>
+/* En teléfono, Aprender lleva directo a Graphikosmos móvil (sin preguntas).
+   ?desktop=1 mantiene la versión de escritorio. Conserva utm_* para el informe. */
+(function () {
+  try {
+    var q = location.search;
+    if (/[?&]desktop=1/.test(q)) { sessionStorage.setItem('gk_force_desktop', '1'); }
+    if (sessionStorage.getItem('gk_force_desktop') === '1') return;
+    if (window.matchMedia('(max-width: 780px)').matches) {
+      var keep = q.replace(/^\?/, '').split('&').filter(function (p) { return /^utm_/.test(p); });
+      location.replace('/m/?ref=aprende' + (keep.length ? '&' + keep.join('&') : ''));
+    }
+  } catch (e) {}
+})();
+</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estudia de otra forma</title>
+<meta name="description" content="Elige un tema y conviértelo en un mapa vivo que puedes recorrer.">
+<meta property="og:title" content="Estudia de otra forma">
+<meta property="og:description" content="Elige un tema y conviértelo en un mapa mental.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0a0e1a">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="aprender.css?v=3">
+</head>
+<body>
+<div class="stage" id="app">
+  <main class="col" id="col" aria-live="polite"></main>
+  <aside class="viz" aria-hidden="true"><svg id="viz" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet"></svg></aside>
+</div>
+<noscript><p style="padding:24px;color:#eef1fb">Esta página necesita JavaScript.</p></noscript>
+<script src="aprender.js?v=4"></script>
+</body>
+</html>
