@@ -2,6 +2,21 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<script>
+/* En teléfono, Aprender lleva directo a Graphikosmos móvil (sin preguntas).
+   ?desktop=1 mantiene la versión de escritorio. Conserva utm_* para el informe. */
+(function () {
+  try {
+    var q = location.search;
+    if (/[?&]desktop=1/.test(q)) { sessionStorage.setItem('gk_force_desktop', '1'); }
+    if (sessionStorage.getItem('gk_force_desktop') === '1') return;
+    if (window.matchMedia('(max-width: 780px)').matches) {
+      var keep = q.replace(/^\?/, '').split('&').filter(function (p) { return /^utm_/.test(p); });
+      location.replace('/m/?ref=aprende' + (keep.length ? '&' + keep.join('&') : ''));
+    }
+  } catch (e) {}
+})();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Entiéndelo: estudia de otra forma</title>
 <meta name="description" content="Elige la materia que se te resiste: te escribimos un texto a tu medida y lo convertimos en un mapa vivo que puedes recorrer.">

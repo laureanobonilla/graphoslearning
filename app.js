@@ -1,3 +1,10 @@
+// Red de seguridad: si por lo que sea el script del <head> no redirigió, un teléfono nunca debe
+// quedarse en la versión de escritorio (ni en la vieja vista móvil): va a /m/.
+try {
+    if (!/^\/en(\/|$)/.test(location.pathname) && sessionStorage.getItem('gk_force_desktop') !== '1' && window.matchMedia('(max-width: 780px)').matches) {
+        location.replace('/m/' + location.search);
+    }
+} catch (_e) { /* nada */ }
 // ==========================================
 // 0. COBRO MANUAL (temporal, mientras PayPal no habilite tarjeta de invitado)
 // ==========================================
@@ -2064,6 +2071,14 @@ network.on('click', async function (params) {
         if (typeof btnMenuExpandSub !== 'undefined' && btnMenuExpandSub) {
             const clickedNodeData = nodes.get(clickedNodeId);
             btnMenuExpandSub.classList.toggle('hidden', !(clickedNodeData && clickedNodeData.isSubscheme));
+        }
+        {   // El botón de "esquema a partir de aquí" cambia a "abrir" si este nodo ya tiene su esquema en miniatura.
+            const fs = document.getElementById('btnMenuFullSchema');
+            if (fs) {
+                if (!fs.dataset.orig) fs.dataset.orig = fs.textContent.trim();
+                const has = typeof findPointerFor === 'function' && !!findPointerFor(clickedNodeId);
+                fs.textContent = has ? ((typeof I18N !== 'undefined' && I18N.lang === 'en') ? 'Open the diagram generated from here' : 'Abrir el esquema generado desde aquí') : fs.dataset.orig;
+            }
         }
         // DETECCIÓN DE HUECOS: mostrar el botón solo si este nodo tiene
         // huecos detectados, y siempre cerrar/vaciar la caja de huecos del
@@ -4414,19 +4429,70 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
 // costo, mismo diálogo de "¿limpiar el lienzo?" si ya hay algo más en el
 // lienzo, y el mismo arreglo de posicionamiento para que el esquema nuevo no
 // se traslape con lo que ya había (ver renderThreeLevelTree).
+// "Generar esquema completo a partir de aquí": el esquema nuevo se genera en una
+// PANTALLA EN LIMPIO (como un subesquema) y en el esquema de origen este nodo queda
+// con un puntero (una miniatura del esquema nuevo, unida con una línea punteada).
+// Un clic en la miniatura entra al esquema; desde ahí se vuelve al principal.
+// Si el nodo ya tiene su esquema, el mismo botón solo lo abre.
+function findPointerFor(nodeId) {
+    return nodes.get({ filter: n => n.isPointer && String(n.pointerFor) === String(nodeId) })[0] || null;
+}
+async function generateSubschemeFromNode(nodeId) {
+    const node = nodes.get(nodeId);
+    if (!node) return;
+    const existing = findPointerFor(nodeId);
+    if (existing) { track('subscheme_pointer_opened', { source: 'menu' }); enterSubscheme(existing.id); return; }
+    const topic = node.baseTitle || String(node.label || '').replace(/\*/g, '').trim();
+    if (!topic || !checkBalance(1)) return;
+    track('schema_generate_attempt', { mode: 'from_node', length: topic.length, layoutMode: schemaLayoutMode, topicPreview: topic.slice(0, 60) });
+    showLoader(tr("js.estructurando_esquema"));
+    try {
+        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'parse_text', text: topic }) });
+        if (!ok) {
+            if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.intenta_de_nuevo_en_unos"));
+            track('schema_generate_error', { mode: 'from_node', message: String(data?.error || status).slice(0, 120), topicPreview: topic.slice(0, 60) });
+            return;
+        }
+        // Posición del puntero: hacia afuera del esquema, a un lado del nodo de origen.
+        const allIds = nodes.getIds();
+        const pos = network.getPositions(allIds);
+        const me = pos[nodeId] || { x: 0, y: 0 };
+        let cx = 0, cy = 0; allIds.forEach(id => { cx += (pos[id] || { x: 0 }).x; cy += (pos[id] || { y: 0 }).y; });
+        cx /= (allIds.length || 1); cy /= (allIds.length || 1);
+        let dx = me.x - cx, dy = me.y - cy; const len = Math.hypot(dx, dy);
+        if (len < 1) { dx = 1; dy = -0.6; } else { dx /= len; dy /= len; }
+        const ptrId = `subscheme_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        nodes.add({
+            id: ptrId,
+            label: `📦 ${topic}`,
+            baseTitle: topic,
+            isSubscheme: true, isPointer: true, pointerFor: nodeId,
+            subSchemeData: { nodes: [], edges: [] },
+            x: me.x + dx * 130, y: me.y + dy * 130,
+            shape: 'image', image: generateSubschemeThumbnail([], [], {}), size: 34,
+            shapeProperties: { useBorderWithImage: true },
+            color: { background: '#eef2ff', border: '#8b7cf6' },
+            font: { color: '#b8bfdc', size: 12, bold: { color: '#eef1fb', size: 12 }, vadjust: 8 }
+        });
+        edges.add({ from: nodeId, to: ptrId, label: '', dashes: [5, 5], width: 1.5, color: { color: '#8b7cf6', highlight: '#4fd1c5', hover: '#4fd1c5' }, arrows: { to: { enabled: false } }, smooth: { type: 'continuous' } });
+        enterSubscheme(ptrId);
+        const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
+        await renderThreeLevelTree(data, { originPanelId: node.originPanelId || null });
+        applyServerBalance(data); consumeNodes(totalNodes);
+        track('schema_generate_success', { mode: 'from_node', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview: topic.slice(0, 60) });
+    } catch (err) {
+        console.error(err);
+        track('schema_generate_error', { mode: 'from_node', message: String(err?.message || '').slice(0, 120), topicPreview: topic.slice(0, 60) });
+        appAlert(tr("js.intenta_de_nuevo_en_unos"));
+    } finally {
+        hideLoader();
+    }
+}
 document.getElementById('btnMenuFullSchema')?.addEventListener('click', async () => {
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');
     if (!selectedNodeId) return;
-    const node = nodes.get(selectedNodeId);
-    if (!node) return;
-    const topic = node.baseTitle || selectedNodeId;
-    // El esquema nuevo PARTE de este nodo existente (attachToNodeId): no se
-    // crea una raíz aparte ni se pregunta si limpiar el lienzo, siempre se
-    // agrega directo alrededor de este nodo. Si el nodo ya venía de un panel
-    // de lectura, conservamos esa herencia para que lo nuevo también quede
-    // tageado/resaltable con ese mismo panel.
-    await generateFullSchemaFromTopic(topic, { originPanelId: node.originPanelId || null, attachToNodeId: selectedNodeId });
+    await generateSubschemeFromNode(selectedNodeId);
 });
 
 document.getElementById('btnMenuLocateText')?.addEventListener('click', () => {
@@ -7499,6 +7565,8 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
 // VER DEFINICIONES (escritorio). Botón dentro del lienzo (arriba a la derecha) que abre
 // una pantalla con el esquema que se ve AHORA (si se está dentro de un subesquema, solo ese
 // fragmento): un término por fila y 3 columnas — Definición, Explicación sencilla y Ejemplos.
+// Solo se muestran 3 niveles desde el nodo principal; los nodos más profundos aparecen
+// citados junto a su término con un "Ver más" que despliega el siguiente nivel.
 // Lo que falta se pide a la acción `glossary` (gratis) en bloques de 10 y se guarda en los
 // nodos (definition/simple/example) sin crear pasos de "deshacer".
 // ==========================================
@@ -7507,10 +7575,11 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
     const view = document.getElementById('defsView');
     const grid = document.getElementById('dvGrid');
     if (!btn || !view || !grid) return;
+    const MAX_LEVELS = 3;
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
     const T = en
-        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms' }
-        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos' };
+        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', more: 'See more', below: 'Continues below:', hide: 'Hide' }
+        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
     document.getElementById('dvBackLbl').textContent = T.back;
     if (en) btn.firstElementChild.textContent = 'View definitions';
     const isOpen = () => !view.classList.contains('hidden');
@@ -7519,58 +7588,86 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
     nodes.on('*', refreshBtn);
     setTimeout(refreshBtn, 900); setTimeout(refreshBtn, 3000);
 
-    const cleanLabel = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '').split('\n')[0] || '').trim();
-    function orderedTerms() {
-        const all = nodes.get(); const byId = new Map(all.map(n => [String(n.id), n]));
-        const kids = new Map(); const hasIn = new Set();
+    const cleanLabel = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '').replace(/^📦\s*/, '').split('\n')[0] || '').trim();
+    let byId = new Map(), kids = new Map();
+    function buildTree() {
+        const all = nodes.get().filter(n => !n.isSubscheme);
+        byId = new Map(all.map(n => [String(n.id), n])); kids = new Map();
+        const hasIn = new Set();
         plainEdges().forEach(e => {
             if (isRelatedEdgeLabel && isRelatedEdgeLabel(e.label)) return;
-            if (!byId.has(String(e.from)) || !byId.has(String(e.to))) return;
-            if (!kids.has(String(e.from))) kids.set(String(e.from), []);
-            kids.get(String(e.from)).push(String(e.to)); hasIn.add(String(e.to));
+            const a = String(e.from), b = String(e.to);
+            if (!byId.has(a) || !byId.has(b) || a === b) return;
+            if (!kids.has(a)) kids.set(a, []);
+            kids.get(a).push(b); hasIn.add(b);
         });
-        const roots = all.filter(n => !hasIn.has(String(n.id))).sort((a, b) => (a.depthLevel ?? 0) - (b.depthLevel ?? 0));
-        const out = []; const seen = new Set();
-        const visit = (id, depth) => { if (seen.has(id)) return; seen.add(id); const n = byId.get(id); out.push({ n, depth }); (kids.get(id) || []).forEach(c => visit(c, depth + 1)); };
-        roots.forEach(r => visit(String(r.id), 0));
-        all.forEach(n => visit(String(n.id), 0));
-        return out;
+        return { all, roots: all.filter(n => !hasIn.has(String(n.id))).sort((a, b) => (a.depthLevel ?? 0) - (b.depthLevel ?? 0)) };
+    }
+    // Recorre en profundidad hasta `maxDepth` (inclusive); devuelve [{n, depth}].
+    function collect(id, depth, maxDepth, seen, out) {
+        if (seen.has(id)) return; seen.add(id);
+        out.push({ n: byId.get(id), depth });
+        if (depth >= maxDepth) return;
+        (kids.get(id) || []).forEach(c => collect(c, depth + 1, maxDepth, seen, out));
     }
 
-    let rowRefs = new Map();
-    function cellText(n, k) { return String((k === 'def' ? n.definition : n[k]) || '').trim(); }
-    function fillRow(id) {
-        const ref = rowRefs.get(id); const n = nodes.get(id) || nodes.get(Number(id)); if (!ref || !n) return;
-        [['def', 'definition'], ['simple', 'simple'], ['example', 'example']].forEach(([k, f], i) => {
-            const t = String(n[f] || '').trim(); const cell = ref.cells[i];
-            if (t) { cell.textContent = t; }
-        });
+    function fillRow(row, n) {
+        const cells = row._cells; const vals = [n.definition, n.simple, n.example];
+        cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; });
+    }
+    let rowOf = new Map();
+    function makeRow(n, depth, afterEl) {
+        const row = document.createElement('div'); row.className = 'dv-row'; row.dataset.id = String(n.id);
+        const term = document.createElement('div'); term.className = 'dv-term';
+        const name = document.createElement('div'); name.textContent = cleanLabel(n); term.appendChild(name);
+        const col = (n.color && (n.color.border || n.color.background)) || '#4fd1c5'; term.style.setProperty('--c', typeof col === 'string' ? col : '#4fd1c5');
+        if (depth > 0) term.style.marginLeft = Math.min(depth, 4) * 14 + 'px';
+        row.appendChild(term);
+        row._cells = [0, 1, 2].map(() => { const c = document.createElement('div'); c.className = 'dv-cell'; row.appendChild(c); return c; });
+        const vals = [n.definition, n.simple, n.example];
+        row._cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; else c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
+        // Nodos de más abajo: citados junto al término, con "Ver más".
+        const childIds = (kids.get(String(n.id)) || []);
+        if (depth >= MAX_LEVELS - 1 && childIds.length) {
+            const names = childIds.map(c => cleanLabel(byId.get(c))).filter(Boolean);
+            const note = document.createElement('div'); note.className = 'dv-below';
+            const shown = names.slice(0, 4).join(', ') + (names.length > 4 ? ' +' + (names.length - 4) : '');
+            note.textContent = T.below + ' ' + shown;
+            const more = document.createElement('button'); more.type = 'button'; more.className = 'dv-more'; more.textContent = T.more;
+            more.addEventListener('click', () => {
+                if (more._open) { // ocultar lo desplegado
+                    let nx = row.nextElementSibling; while (nx && nx._depth > depth) { const t = nx.nextElementSibling; nx.remove(); nx = t; } more._rows = []; more._open = false; more.textContent = T.more; return;
+                }
+                const newRows = []; let anchor = row;
+                const list = childIds.map(c => ({ n: byId.get(c), depth: depth + 1 }));
+                list.forEach(({ n: cn, depth: d }) => { const r = makeRow(cn, d, anchor); anchor.after(r); anchor = r; newRows.push(r); });
+                more._rows = newRows; more._open = true; more.textContent = T.hide;
+                track('defs_view_more', { depth: depth + 1, count: list.length });
+                loadMissing(list, loadMissing.token);
+            });
+            term.appendChild(note); term.appendChild(more);
+        }
+        row._depth = depth; rowOf.set(String(n.id), row);
+        return row;
     }
     function render() {
-        grid.innerHTML = ''; rowRefs = new Map();
-        const list = orderedTerms();
+        grid.innerHTML = ''; rowOf = new Map();
+        const { roots } = buildTree();
+        const list = []; const seen = new Set();
+        roots.forEach(r => collect(String(r.id), 0, MAX_LEVELS - 1, seen, list));
         document.getElementById('dvTitle').textContent = T.title;
         document.getElementById('dvSub').textContent = list.length + ' ' + T.terms;
         const h = document.createElement('div'); h.className = 'dv-row dv-h';
         [T.term, T.def, T.simple, T.ex].forEach(t => { const d = document.createElement('div'); d.textContent = t; h.appendChild(d); });
         grid.appendChild(h);
-        list.forEach(({ n, depth }) => {
-            const row = document.createElement('div'); row.className = 'dv-row';
-            const term = document.createElement('div'); term.className = 'dv-term'; term.textContent = cleanLabel(n);
-            const col = (n.color && (n.color.border || n.color.background)) || '#4fd1c5'; term.style.setProperty('--c', typeof col === 'string' ? col : '#4fd1c5');
-            if (depth > 0) term.style.marginLeft = Math.min(depth, 3) * 14 + 'px';
-            row.appendChild(term);
-            const cells = [0, 1, 2].map(() => { const c = document.createElement('div'); c.className = 'dv-cell'; row.appendChild(c); return c; });
-            grid.appendChild(row); rowRefs.set(String(n.id), { cells, row });
-            const vals = [n.definition, n.simple, n.example];
-            cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; else c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
-        });
+        list.forEach(({ n, depth }) => grid.appendChild(makeRow(n, depth)));
         return list;
     }
     async function loadMissing(list, token) {
         const missing = list.filter(({ n }) => !(String(n.definition || '').trim() && String(n.simple || '').trim() && String(n.example || '').trim()));
         if (!missing.length) { track('defs_view_ok', { cached: true, terms: list.length }); return; }
-        const rootNode = list[0] && list[0].n; const topic = rootNode ? cleanLabel(rootNode) : '';
+        const rootNode = grid.querySelector('.dv-row[data-id]'); const rn = rootNode ? byId.get(rootNode.dataset.id) : null;
+        const topic = rn ? cleanLabel(rn) : '';
         const started = Date.now(); let failed = false;
         for (let i = 0; i < missing.length; i += 10) {
             if (token !== loadMissing.token || !isOpen()) return;
@@ -7590,7 +7687,7 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
                         nodes.update(upd);
                     });
                 } finally { isApplyingUndo = false; }
-                chunk.forEach(({ n }) => fillRow(String(n.id)));
+                chunk.forEach(({ n }) => { const row = rowOf.get(String(n.id)); const fresh = nodes.get(n.id); if (row && fresh) fillRow(row, fresh); });
             } catch (_e) { failed = true; break; }
         }
         if (token !== loadMissing.token || !isOpen()) return;
@@ -7598,21 +7695,21 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
             track('defs_view_error');
             const box = document.createElement('div'); box.className = 'dv-err'; box.textContent = T.err;
             const b = document.createElement('button'); b.type = 'button'; b.textContent = T.retry;
-            b.onclick = () => { box.remove(); loadMissing.token = (loadMissing.token || 0) + 1; loadMissing(orderedTerms(), loadMissing.token); };
+            b.onclick = () => { box.remove(); loadMissing(list, loadMissing.token); };
             box.appendChild(b); grid.appendChild(box);
         } else track('defs_view_ok', { ms: Date.now() - started, terms: list.length });
     }
+    loadMissing.token = 0;
     function open() {
         if (nodes.length === 0) return;
         track('defs_view_opened', { nodes: nodes.length, in_subscheme: schemeStack.length > 0 });
         const list = render();
         view.classList.remove('hidden'); refreshBtn();
         view.querySelector('.dv-scroll').scrollTop = 0;
-        loadMissing.token = (loadMissing.token || 0) + 1;
-        loadMissing(list, loadMissing.token);
+        loadMissing(list, ++loadMissing.token);
         document.getElementById('dvBack').focus();
     }
-    function close() { view.classList.add('hidden'); loadMissing.token = (loadMissing.token || 0) + 1; refreshBtn(); }
+    function close() { view.classList.add('hidden'); loadMissing.token++; refreshBtn(); }
     btn.addEventListener('click', open);
     document.getElementById('dvBack').addEventListener('click', close);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen()) close(); });
