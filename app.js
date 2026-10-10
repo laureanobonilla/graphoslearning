@@ -7494,3 +7494,126 @@ async function exportReportRtf() {
   }
 }
 document.getElementById('btnExportReport')?.addEventListener('click', exportReportRtf);
+
+// ==========================================
+// VER DEFINICIONES (escritorio). Botón dentro del lienzo (arriba a la derecha) que abre
+// una pantalla con el esquema que se ve AHORA (si se está dentro de un subesquema, solo ese
+// fragmento): un término por fila y 3 columnas — Definición, Explicación sencilla y Ejemplos.
+// Lo que falta se pide a la acción `glossary` (gratis) en bloques de 10 y se guarda en los
+// nodos (definition/simple/example) sin crear pasos de "deshacer".
+// ==========================================
+(function setupDefsView() {
+    const btn = document.getElementById('btnDefsView');
+    const view = document.getElementById('defsView');
+    const grid = document.getElementById('dvGrid');
+    if (!btn || !view || !grid) return;
+    const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
+    const T = en
+        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms' }
+        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos' };
+    document.getElementById('dvBackLbl').textContent = T.back;
+    if (en) btn.firstElementChild.textContent = 'View definitions';
+    const isOpen = () => !view.classList.contains('hidden');
+
+    function refreshBtn() { btn.classList.toggle('hidden', nodes.length === 0 || isOpen()); }
+    nodes.on('*', refreshBtn);
+    setTimeout(refreshBtn, 900); setTimeout(refreshBtn, 3000);
+
+    const cleanLabel = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '').split('\n')[0] || '').trim();
+    function orderedTerms() {
+        const all = nodes.get(); const byId = new Map(all.map(n => [String(n.id), n]));
+        const kids = new Map(); const hasIn = new Set();
+        plainEdges().forEach(e => {
+            if (isRelatedEdgeLabel && isRelatedEdgeLabel(e.label)) return;
+            if (!byId.has(String(e.from)) || !byId.has(String(e.to))) return;
+            if (!kids.has(String(e.from))) kids.set(String(e.from), []);
+            kids.get(String(e.from)).push(String(e.to)); hasIn.add(String(e.to));
+        });
+        const roots = all.filter(n => !hasIn.has(String(n.id))).sort((a, b) => (a.depthLevel ?? 0) - (b.depthLevel ?? 0));
+        const out = []; const seen = new Set();
+        const visit = (id, depth) => { if (seen.has(id)) return; seen.add(id); const n = byId.get(id); out.push({ n, depth }); (kids.get(id) || []).forEach(c => visit(c, depth + 1)); };
+        roots.forEach(r => visit(String(r.id), 0));
+        all.forEach(n => visit(String(n.id), 0));
+        return out;
+    }
+
+    let rowRefs = new Map();
+    function cellText(n, k) { return String((k === 'def' ? n.definition : n[k]) || '').trim(); }
+    function fillRow(id) {
+        const ref = rowRefs.get(id); const n = nodes.get(id) || nodes.get(Number(id)); if (!ref || !n) return;
+        [['def', 'definition'], ['simple', 'simple'], ['example', 'example']].forEach(([k, f], i) => {
+            const t = String(n[f] || '').trim(); const cell = ref.cells[i];
+            if (t) { cell.textContent = t; }
+        });
+    }
+    function render() {
+        grid.innerHTML = ''; rowRefs = new Map();
+        const list = orderedTerms();
+        document.getElementById('dvTitle').textContent = T.title;
+        document.getElementById('dvSub').textContent = list.length + ' ' + T.terms;
+        const h = document.createElement('div'); h.className = 'dv-row dv-h';
+        [T.term, T.def, T.simple, T.ex].forEach(t => { const d = document.createElement('div'); d.textContent = t; h.appendChild(d); });
+        grid.appendChild(h);
+        list.forEach(({ n, depth }) => {
+            const row = document.createElement('div'); row.className = 'dv-row';
+            const term = document.createElement('div'); term.className = 'dv-term'; term.textContent = cleanLabel(n);
+            const col = (n.color && (n.color.border || n.color.background)) || '#4fd1c5'; term.style.setProperty('--c', typeof col === 'string' ? col : '#4fd1c5');
+            if (depth > 0) term.style.marginLeft = Math.min(depth, 3) * 14 + 'px';
+            row.appendChild(term);
+            const cells = [0, 1, 2].map(() => { const c = document.createElement('div'); c.className = 'dv-cell'; row.appendChild(c); return c; });
+            grid.appendChild(row); rowRefs.set(String(n.id), { cells, row });
+            const vals = [n.definition, n.simple, n.example];
+            cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; else c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
+        });
+        return list;
+    }
+    async function loadMissing(list, token) {
+        const missing = list.filter(({ n }) => !(String(n.definition || '').trim() && String(n.simple || '').trim() && String(n.example || '').trim()));
+        if (!missing.length) { track('defs_view_ok', { cached: true, terms: list.length }); return; }
+        const rootNode = list[0] && list[0].n; const topic = rootNode ? cleanLabel(rootNode) : '';
+        const started = Date.now(); let failed = false;
+        for (let i = 0; i < missing.length; i += 10) {
+            if (token !== loadMissing.token || !isOpen()) return;
+            const chunk = missing.slice(i, i + 10);
+            try {
+                const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) }) });
+                const data = await res.json();
+                if (!res.ok || !Array.isArray(data.items)) throw new Error('glossary_failed');
+                isApplyingUndo = true;
+                try {
+                    data.items.forEach(it => {
+                        const n = nodes.get(it.id) || nodes.get(Number(it.id)); if (!n) return;
+                        const upd = { id: n.id };
+                        if (!String(n.definition || '').trim() && it.definition) upd.definition = it.definition;
+                        if (!String(n.simple || '').trim() && it.simple) upd.simple = it.simple;
+                        if (!String(n.example || '').trim() && it.example) upd.example = it.example;
+                        nodes.update(upd);
+                    });
+                } finally { isApplyingUndo = false; }
+                chunk.forEach(({ n }) => fillRow(String(n.id)));
+            } catch (_e) { failed = true; break; }
+        }
+        if (token !== loadMissing.token || !isOpen()) return;
+        if (failed) {
+            track('defs_view_error');
+            const box = document.createElement('div'); box.className = 'dv-err'; box.textContent = T.err;
+            const b = document.createElement('button'); b.type = 'button'; b.textContent = T.retry;
+            b.onclick = () => { box.remove(); loadMissing.token = (loadMissing.token || 0) + 1; loadMissing(orderedTerms(), loadMissing.token); };
+            box.appendChild(b); grid.appendChild(box);
+        } else track('defs_view_ok', { ms: Date.now() - started, terms: list.length });
+    }
+    function open() {
+        if (nodes.length === 0) return;
+        track('defs_view_opened', { nodes: nodes.length, in_subscheme: schemeStack.length > 0 });
+        const list = render();
+        view.classList.remove('hidden'); refreshBtn();
+        view.querySelector('.dv-scroll').scrollTop = 0;
+        loadMissing.token = (loadMissing.token || 0) + 1;
+        loadMissing(list, loadMissing.token);
+        document.getElementById('dvBack').focus();
+    }
+    function close() { view.classList.add('hidden'); loadMissing.token = (loadMissing.token || 0) + 1; refreshBtn(); }
+    btn.addEventListener('click', open);
+    document.getElementById('dvBack').addEventListener('click', close);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen()) close(); });
+})();

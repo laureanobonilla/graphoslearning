@@ -9,15 +9,17 @@ const KNOWN = new Set([
     'extract_key_terms', 'analyze_text',
     // Asistente de bienvenida (primera visita): el texto de ejemplo y el primer
     // esquema son gratis, ver la lógica de "welcomeFree" en withBilling.
-    'onboarding_text', 'welcome_schema'
+    'onboarding_text', 'welcome_schema',
+    // Móvil (/m/): mapa de 2 niveles ('m_welcome' = el primero, gratis una vez) y glosario de varios términos.
+    'm_map', 'm_welcome', 'glossary'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema']);
+const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.
-const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2, analyze_text: 5 };
+const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2, analyze_text: 5, m_map: 4 };
 
 const LIMITS = { topic: 500, topicB: 500, contextPath: 2000, customRequest: 1500,
                  question: 1500, userAnswer: 4000, text: 60000, documentContext: 12000,
@@ -37,6 +39,7 @@ function computeCost(action, d) {
         case 'socratic_evaluate': return 1;
         case 'extract_key_terms': return len(d.terms);
         case 'analyze_text':      return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
+        case 'm_map':             return d.root ? 1 + len(d.branches) : 0;
         // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
         default:                  return 0;
     }
@@ -112,7 +115,7 @@ function withBilling(raw, overrides = {}) {
 
         let balance = null;
         let welcomeFree = false;
-        if (action === 'welcome_schema' && identity.isAdmin) welcomeFree = true;
+        if ((action === 'welcome_schema' || action === 'm_welcome') && identity.isAdmin) welcomeFree = true;
         if (!identity.isAdmin) {
             try {
                 balance = identity.kind === 'user'
@@ -132,12 +135,13 @@ function withBilling(raw, overrides = {}) {
             // trae la marca de haberlo usado y aún no ha gastado nada de su saldo
             // inicial. Si no cumple, se cobra como un parse_text normal (nunca se
             // rechaza: es mejor cobrar que dejar a alguien sin esquema).
-            if (action === 'welcome_schema') {
+            if (action === 'welcome_schema' || action === 'm_welcome') {
+                const paidAction = action === 'm_welcome' ? 'm_map' : 'parse_text';
                 const initial = identity.kind === 'user'
                     ? Number(process.env.INITIAL_FREE_NODES || 50)
                     : Number(process.env.GUEST_FREE_NODES || 15);
                 if (!hasWelcomeCookie(event) && balance >= initial) welcomeFree = true;
-                else { action = 'parse_text'; body.action = 'parse_text'; }
+                else { action = paidAction; body.action = paidAction; }
             }
 
             const min = FREE.has(action) ? 0 : (MIN_BALANCE[action] || 1);

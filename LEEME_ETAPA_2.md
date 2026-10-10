@@ -2965,3 +2965,50 @@ Variante de "Si fueras una canción" pensada como **regalo**: quien compra respo
 **Reiniciar registros (`tools/reiniciar-graphikosmos.sql`).** Pegar completo en el SQL Editor, cambiar los `true/false` de arriba y Run. Por defecto: borra los eventos de Graphikosmos, `usage_log` y todo lo de `/aprender/`; hace antes una copia en el esquema `respaldo` (con fecha y hora). NO toca cuentas, saldos, pagos ni proyectos (`v_cuentas = false`) ni invitados ni otras apps, y `v_antes_de` permite conservar lo nuevo. Al final cuenta lo que queda. Probado contra Postgres 16.
 **Facebook:** para este anuncio, en el conjunto de anuncios → Ubicaciones, dejar solo escritorio. Enlace de destino: `https://TU-DOMINIO/aprender/` (Facebook agrega solo la campaña; se lee `utm_campaign`/`utm_content`).
 **Límites y cuidados:** `ap-next` 60/h por IP y 12/h por persona; `ap-generate` 8/h por IP y 4/h por persona (se gasta Gemini); el texto del usuario siempre se trata como dato en los prompts. Si `ap-generate` falla, la persona llega igual a Graphikosmos y se genera el esquema desde su tema (`&t=`). Si el código no existe, queda la bienvenida de siempre. El texto generado lo gasta Gemini; el esquema lo cobra Graphikosmos como siempre (el primero, gratis).
+
+## 72b. Ajustes a Entiéndelo / tour / modo Cerebro (2026-10-08, noche)
+- **aprender/**: las preguntas de la IA y "¿Para qué lo necesitas?" son de selección múltiple (hasta 3; la "otra cosa" cuenta como una). Nivel y estilo siguen siendo de una sola. Titular nuevo: "Aprende lo difícil de otra forma: dentro de un mapa que puedes recorrer."
+- **Texto en el modo lector**: `ap-generate` ahora devuelve el texto en la respuesta y no falla si no se puede guardar en `ap_texts`; `aprender.js` lo deja en `localStorage.gk_ap_pending` y `app.js` lo usa primero (el servidor es respaldo). Además baja a 400–550 palabras (más rápido, cabe en el límite de Netlify).
+- **Tour (coach.js ?v=2)**: nuevo primer paso "Desplázate por el texto" (se completa al bajar ~160 px en el lector; se salta solo si no hay texto con marcas). En el paso "Generar" la tarjeta se coloca fuera del menú y de la franja donde se abre su submenú.
+- **Modo Cerebro** (antes "Sistema solar"): nuevo nombre/icono 🧠; al cambiar entre Árbol y Cerebro se reacomoda también el mapa existente (animado, deshacible con Ctrl+Z). Evento `layout_mode_changed`.
+- Subir: index.html, app.js, coach.js, i18n/, aprender/ y netlify/functions/ap-generate.js.
+
+## 70b. tu-cancion: primeras pantallas más cortas (2026-10-08)
+- `reason`: al elegir una opción (menos "Otro") avanza solo.
+- `named` ahora es una sola pantalla: "¿Cómo se llama?" / "¿Cómo te llamas?" con el campo del nombre y el enlace "Prefiero que no lleve nombre" (Enter también avanza). Mismos ids de paso y mismo evento `named_chosen`, así que las consultas de embudo siguen valiendo.
+- Subir: `tu-cancion/app.js` y `tu-cancion/index.html` (script `?v=20261008d`).
+
+## 72c. Textos de Entiéndelo y tour (2026-10-08, 21:45)
+- aprender: titular "Estudia de otra forma", botón "Empezar", primera pregunta "Danos un tema complejo que te interese".
+- Tour: la marca de "ya visto" cambió a `gk_coach_seen2` (las pruebas del dueño habían gastado la anterior) y se puede forzar con `&tour=1` en la URL (p. ej. `/?aprende=<código>&tour=1`) o con `?tour=1`. Archivos: app.js, coach.js (?v=3), index.html.
+
+## 72d. Estilo nuevo de Graphikosmos (2026-10-08, 22:00)
+- Nodos: tarjetas oscuras de cristal con borde luminoso por nivel (turquesa, violeta, ámbar, rosa, verde, naranja) y letra clara; títulos en Sora. `LEVEL_PALETTE`, `elegantPalette`, `highlightColorPalette` y la fuente global en app.js. Los nodos guardados con relleno claro reciben letra oscura solos (`fixNodeFontContrast`), así que los proyectos viejos se siguen leyendo.
+- Lector oscuro (hoja #121832 sobre #0b1022, texto #dde2f3, Inter 15 px, interlineado 1.8, scrollbar fino). Aplica también a los paneles de lector clonados (`data-role`).
+- Selector "Modo" con flecha propia.
+- Revertir: publicar el deploy anterior en Netlify, o borrar los bloques marcados "Lector OSCURO" en index.html y restaurar las 3 paletas.
+
+## 72e. Fix hover/selección de nodos oscuros (2026-10-08, 22:10)
+vis-network usa un azul claro (#D2E5FF) para los estados "seleccionado" y "cursor encima" cuando el nodo no los define, lo que dejaba la letra blanca ilegible. `fixNodeFontContrast` (app.js) ahora les pone a los nodos oscuros un relleno apenas más claro en esos estados, con el borde luminoso. Solo cambia app.js.
+
+## 72f. Cambio de modo Árbol ↔ Cerebro sin enredos (2026-10-08, 22:30)
+Tras mover los nodos, las flechas curvas ('dynamic') dependen de la física y se quedaban apuntando a las posiciones viejas. `relayoutExistingMap` ahora termina con el mismo "asentado" breve (silencioso) que usa la generación, y reencuadra después. Varios esquemas en el lienzo ya no se pisan entre sí (se corren a la derecha), y un cambio de modo nuevo cancela la animación del anterior. Solo app.js.
+
+## 72g. Menú contextual pegado al nodo con flecha (2026-10-08, 22:55)
+`placeActionMenuAtNode` (app.js) ubica el menú al lado del nodo (derecha; si no cabe, izquierda; si no, debajo o encima) a 16 px de su borde, centrado en él y sin salirse de la pantalla, con una flechita (`.gk-menu-arrow`, en index.html) alineada al centro del nodo. Antes se calculaba desde el centro del nodo y la altura total del menú.
+
+## 73. Graphikosmos MÓVIL (`/m/`) y "Ver definiciones"
+
+**Móvil (`/m/`, app aparte en `m/index.html`, `m/m.css`, `m/m.js`)**
+- Pantallas ≤ 780 px de ancho que abren `/` van a `/m/` (`?desktop=1` fuerza escritorio; `/en/` no se redirige). `/m/` en pantalla ancha vuelve a `/` (`/m/?force=1` para probar en PC).
+- `/aprender/` en teléfono redirige directo a `/m/?ref=aprende` (conserva `utm_*`), sin preguntas.
+- Primera pantalla: misma animación de entrada que escritorio; luego solo un campo ("Escribe el tema a estudiar") y "Generar mapa mental". Arriba: Entrar, Mis proyectos, Capturar.
+- Mapa de 2 niveles estilo Cerebro (raíz + 5–7 ramas). Tocar un nodo abre una hoja con una sola acción: "Generar mapa mental de esto" → nuevo mapa limpio con flecha ← al anterior. Un nodo ya ampliado muestra ✓ y al tocarlo solo navega a su mapa.
+- "Ver definiciones" (botón arriba en cada mapa, también los anidados): lista vertical, un término por tarjeta con Definición siempre visible y dos acordeones ("En sencillo", "Ejemplo"); barra fija "← Mapa mental" + "Expandir todo". Sin scroll horizontal. Se piden por la acción `glossary` (gratis) y se guardan en el proyecto.
+- Mis proyectos: invitados → catálogo local (máx. 10); con sesión → nube (`db`), mismo formato que escritorio (los proyectos de escritorio se abren en móvil).
+- Nodos: primer mapa gratis una vez por navegador (`m_welcome`, cookie `gk_welcome`); luego cuesta 1 + ramas. Invitado sin nodos → muro de crear cuenta; con sesión → ventana de contacto (WhatsApp + correo `recharge_request`).
+- Eventos aparte: `events.app = 'graphikosmos-mobile'` (prefijo `m_`). Consultas en `tools/movil.sql`. `tools/reiniciar-graphikosmos.sql` tiene la bandera `v_movil`.
+- Servidor: `gemini.js` (acciones `m_map`, `m_welcome`, `glossary`), `_lib/billing.js`, `track-event.js` (acepta `app`).
+
+**Escritorio: "Ver definiciones"**
+- Botón en el lienzo (arriba a la derecha, `#btnDefsView`) → pantalla `#defsView` con el esquema que se ve ahora (en un subesquema, solo ese fragmento): término hacia abajo y 3 columnas (Definición, Explicación sencilla, Ejemplos), scroll solo vertical. Lo que falta se pide a `glossary` en bloques de 10 y se guarda en los nodos sin crear pasos de deshacer. Eventos `defs_view_opened/ok/error`.

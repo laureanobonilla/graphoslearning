@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<title>Graphikosmos · Mapas mentales</title>
+<meta name="description" content="Escribe un tema y obtén un mapa mental con definiciones y ejemplos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/m/m.css?v=1">
+<script>
+/* Si se abre en una pantalla ancha, lo normal es la versión de escritorio.
+   ?force=1 (o ?m=1) lo deja aquí para poder probar en PC. */
+(function () {
+  try {
+    var q = location.search;
+    if (/[?&](force|m)=1/.test(q)) { sessionStorage.setItem('gk_force_m', '1'); }
+    if (sessionStorage.getItem('gk_force_m') === '1') return;
+    if (window.matchMedia('(min-width: 781px)').matches) {
+      location.replace('/' + q);
+    }
+  } catch (e) {}
+})();
+</script>
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+
+<div id="introSplash">
+  <div class="intro-orbit-wrap">
+    <div class="intro-orbit-ring intro-orbit-ring-1"><span class="intro-dot intro-dot-cyan"></span></div>
+    <div class="intro-orbit-ring intro-orbit-ring-2"><span class="intro-dot intro-dot-violet"></span></div>
+    <div class="intro-logo">Γ</div>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- Barra superior: sesión, proyectos, captura -->
+  <header id="appbar">
+    <button class="ab-btn" id="btnLogin" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+      <span id="loginLabel">Entrar</span>
+    </button>
+    <button class="ab-btn" id="btnProjects" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span>Mis proyectos</span>
+    </button>
+    <button class="ab-btn" id="btnCapture" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="12.5" r="3.5"/></svg>
+      <span>Capturar</span>
+    </button>
+  </header>
+
+  <!-- HOME -->
+  <main id="viewHome" class="view">
+    <form id="homeForm" autocomplete="off">
+      <input id="topicInput" type="text" maxlength="120" placeholder="Escribe el tema a estudiar" enterkeyhint="go" aria-label="Tema a estudiar">
+      <button id="btnGenerate" class="btn-primary" type="submit"><span class="btn-txt">Generar mapa mental</span><span class="spin" aria-hidden="true"></span></button>
+      <p id="homeMsg" class="msg" role="status"></p>
+    </form>
+  </main>
+
+  <!-- MAPA -->
+  <section id="viewMap" class="view" hidden>
+    <div id="mapbar">
+      <button id="btnBack" class="icon-back" type="button" aria-label="Volver"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div id="mapTitle" class="map-title"></div>
+      <button id="btnDefs" class="pill" type="button">Ver definiciones</button>
+    </div>
+    <div id="mapStage"></div>
+    <p id="mapHint" class="map-hint"></p>
+  </section>
+
+  <!-- DEFINICIONES -->
+  <section id="viewDefs" class="view" hidden>
+    <div id="defsbar">
+      <button id="btnDefsBack" class="pill pill-back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Mapa mental</button>
+      <button id="btnToggleAll" class="pill pill-ghost" type="button">Expandir todo</button>
+    </div>
+    <div id="defsScroll">
+      <h1 id="defsTitle"></h1>
+      <div id="defsList"></div>
+    </div>
+  </section>
+
+  <!-- PROYECTOS -->
+  <section id="viewProjects" class="view" hidden>
+    <div id="projbar">
+      <button id="btnProjBack" class="pill pill-back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Volver</button>
+      <span class="projbar-title">Mis proyectos</span>
+    </div>
+    <div id="projList"></div>
+  </section>
+</div>
+
+<!-- Hoja de acción de un nodo -->
+<div id="sheetBackdrop" hidden></div>
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+  <div class="sheet-grip"></div>
+  <h2 id="sheetTitle"></h2>
+  <p id="sheetRel" class="sheet-rel"></p>
+  <button id="btnExpand" class="btn-primary" type="button"><span class="btn-txt">Generar mapa mental de esto</span><span class="spin" aria-hidden="true"></span></button>
+  <p id="sheetMsg" class="msg" role="status"></p>
+</div>
+
+<!-- Modal: invitado sin nodos -->
+<div id="modalLogin" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mlTitle">
+    <h2 id="mlTitle">Crea tu cuenta para seguir</h2>
+    <p>Usaste los mapas gratis de invitado. Con una cuenta gratuita puedes seguir generando y guardar tus proyectos.</p>
+    <button id="mlGo" class="btn-primary" type="button"><span class="btn-txt">Crear cuenta o entrar</span></button>
+    <button id="mlClose" class="btn-link" type="button">Ahora no</button>
+  </div>
+</div>
+
+<!-- Modal: sin nodos (contacto) -->
+<div id="modalContact" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mcTitle">
+    <h2 id="mcTitle">Te quedaste sin nodos</h2>
+    <p>Déjanos tu correo y te escribimos para activarte más nodos.</p>
+    <form id="contactForm">
+      <input id="contactEmail" type="email" inputmode="email" autocomplete="email" placeholder="tu@correo.com" required aria-label="Tu correo">
+      <button id="contactSend" class="btn-primary" type="submit"><span class="btn-txt">Enviar mi correo</span><span class="spin" aria-hidden="true"></span></button>
+      <p id="contactMsg" class="msg" role="status"></p>
+    </form>
+    <a id="contactWa" class="btn-wa" href="#" target="_blank" rel="noopener">Escribir por WhatsApp</a>
+    <button id="mcClose" class="btn-link" type="button">Cerrar</button>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/m/m.js?v=1"></script>
+</body>
+</html>

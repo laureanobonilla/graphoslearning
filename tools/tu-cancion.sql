@@ -20,11 +20,12 @@ select
   count(distinct anon_id) filter (where event_name='examples_clicked')  as tocaron_ejemplos,
   count(distinct anon_id) filter (where event_name='example_played')    as escucharon_ejemplo,
   count(distinct anon_id) filter (where event_name='cta_clicked')       as tocaron_quiero_mi_cancion,
-  count(distinct anon_id) filter (where event_name='price_shown')       as vieron_precio,
-  count(distinct anon_id) filter (where event_name='has_lyrics_chosen') as pasaron_pregunta_1,
+  count(distinct anon_id) filter (where event_name='reason_chosen' or (event_name='has_lyrics_chosen' and metadata->>'hasOwn'='true')) as contestaron_primera_pregunta,
   count(distinct anon_id) filter (where event_name in ('lyrics_generated','own_lyrics_ready')) as llegaron_a_la_letra,
   count(distinct anon_id) filter (where event_name='edit_saved')        as editaron,
   count(distinct anon_id) filter (where event_name='send_opened')       as abrieron_enviar,
+  count(distinct anon_id) filter (where event_name='price_shown')       as vieron_precio_al_enviar,
+  count(distinct anon_id) filter (where event_name='price_ack')         as marcaron_acepto_precio,
   count(distinct anon_id) filter (where event_name='whatsapp_clicked')  as tocaron_whatsapp,
   count(distinct anon_id) filter (where event_name='request_submitted') as dejaron_telefono
 from public.events where app='tu-cancion' and created_at >= now() - interval '7 days';

@@ -83,7 +83,9 @@ exports.handler = async (event, context) => {
     if (user?.isAdmin) return json(200, { ok: true }, cookieHeaders);
 
     try {
-        await store.logEvent(actorId, actorKind, anonId, eventName, metadata, displayName);
+        // La versión móvil (/m/) guarda sus eventos aparte (app = 'graphikosmos-mobile') para hacer su propio informe.
+        const appName = body.app === 'graphikosmos-mobile' ? 'graphikosmos-mobile' : undefined;
+        await store.logEvent(actorId, actorKind, anonId, eventName, metadata, displayName, appName);
     } catch (err) {
         // No dejamos que un problema de base de datos se note en la app: solo
         // se registra en los logs del servidor para poder revisarlo luego.

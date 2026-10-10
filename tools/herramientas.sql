@@ -1,5 +1,5 @@
 -- =====================================================================================================
--- «herramientas» (fuga-de-tiempo, nivel-ia, ideas-posts): consultas para ver TODO.
+-- «herramientas» (fuga-de-tiempo, nivel-ia, ideas-posts, integra-ia): consultas para ver TODO.
 -- Supabase → SQL Editor: selecciona UNA consulta (de "-- N)" hasta su ";") y Run.
 -- Antes: corre UNA vez supabase/herramientas.sql. Cambia  interval '7 days'  al periodo que quieras.
 -- Cada persona = una fila en hf_responses (se va completando pregunta a pregunta); los pasos están en events (app = 'hf-...').
@@ -60,3 +60,13 @@ from public.hf_responses where created_at > now() - interval '7 days' group by 1
 
 -- 12) TODO lo de una persona (cambia el código) --------------------------------------------------------
 -- select * from public.hf_responses where sid = 'PEGA-AQUI-EL-CODIGO';
+
+-- 13) SOFTWARE QUE QUIEREN CONECTAR CON IA (integra-ia): qué programa, tipo, si tiene forma de sacar datos y qué quieren que haga la IA
+select created_at at time zone 'America/Costa_Rica' as hora, answers->>'software' as software, answers->>'tipo' as tipo, answers->>'donde' as donde,
+       answers->>'salida' as datos, answers->>'mantiene' as quien_lo_controla, answers->>'objetivo' as quiere_que_la_ia, answers->>'sensibles' as datos_delicados,
+       answers->'viabilidad'->>'nivel' as viabilidad, answers->>'pagaria' as invertiria, answers->>'detalle' as detalle
+from public.hf_responses where tool='integra-ia' and answers ? 'software' order by 1 desc limit 300;
+
+-- 14) integra-ia: resumen por tipo de software y por lo que quieren de la IA (qué se repite = qué construir)
+select answers->>'tipo' as tipo, answers->>'salida' as datos, count(*) from public.hf_responses where tool='integra-ia' and answers ? 'tipo' group by 1,2 order by 3 desc;
+select answers->>'objetivo' as objetivo, answers->'viabilidad'->>'nivel' as viabilidad, count(*) from public.hf_responses where tool='integra-ia' and answers ? 'objetivo' group by 1,2 order by 3 desc;
