@@ -255,22 +255,13 @@ let network = new vis.Network(container, { nodes, edges }, {
     interaction: { hover: true, multiselect: true, selectConnectedEdges: true }
 });
 
-let unlockingPhysics = false;
 function stopPhysicsAndUnlock() {
-    // Guarda de reentrada: apagar la física o actualizar nodos no debe volver a disparar esto
-    // (evita bucles de "estabilizado → actualizar → estabilizado" que movían la cámara sin parar).
-    if (unlockingPhysics) return;
-    unlockingPhysics = true;
-    try {
-        network.setOptions({ physics: { enabled: false } });
-        // Guardar las posiciones finales en el dataset: sin esto, lo que el motor
-        // acomodó (o lo que se arrastró) no llegaba a los datos guardados.
-        try { network.storePositions(); } catch { /* no crítico */ }
-        const locked = nodes.get().filter(n => n.fixed === true || (n.fixed && (n.fixed.x || n.fixed.y)));
-        if (locked.length) nodes.update(locked.map(n => ({ id: n.id, fixed: { x: false, y: false } })));
-    } finally {
-        setTimeout(() => { unlockingPhysics = false; }, 400);
-    }
+    network.setOptions({ physics: { enabled: false } });
+    // Guardar las posiciones finales en el dataset: sin esto, lo que el motor
+    // acomodó (o lo que se arrastró) no llegaba a los datos guardados.
+    try { network.storePositions(); } catch { /* no crítico */ }
+    const allNodes = nodes.get();
+    nodes.update(allNodes.map(n => ({ id: n.id, fixed: { x: false, y: false } })));
 }
 
 network.on("stabilizationIterationsDone", stopPhysicsAndUnlock);
@@ -1475,83 +1466,6 @@ document.addEventListener('click', (e) => {
     closeAnalyzeMenu();
 });
 
-// Documentos MUY largos (más de lo que la IA lee de una vez): se resume por partes (long_outline, gratis) y de
-// los resúmenes sale UN solo esquema de 3 niveles (parse_text sobre el resumen, con las citas literales del
-// original para que el resaltado en el lector siga funcionando).
-const LONG_CHUNK_CHARS = 40000, LONG_MAX_CHUNKS = 12;
-function splitLongText(text) {
-    const parts = []; let cur = '';
-    const push = () => { if (cur.trim()) parts.push(cur); cur = ''; };
-    text.split(/\n{2,}|\n/).forEach(par => {
-        while (par.length > LONG_CHUNK_CHARS) {            // párrafo gigante: se corta en un final de oración
-            let cut = par.lastIndexOf('. ', LONG_CHUNK_CHARS); if (cut < LONG_CHUNK_CHARS * 0.5) cut = LONG_CHUNK_CHARS; else cut += 1;
-            if (cur) push(); parts.push(par.slice(0, cut)); par = par.slice(cut);
-        }
-        if (cur.length + par.length + 2 > LONG_CHUNK_CHARS) push();
-        cur += (cur ? '\n\n' : '') + par;
-    });
-    push(); return parts;
-}
-async function generateSchemaFromLongText(fullText) {
-    const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
-    let chunks = splitLongText(fullText);
-    const truncated = chunks.length > LONG_MAX_CHUNKS;
-    if (truncated) chunks = chunks.slice(0, LONG_MAX_CHUNKS);
-    const ok = await appConfirm(en
-        ? `This text is very long. I'll read it in ${chunks.length} parts and build a single diagram from all of them (it can take a couple of minutes).${truncated ? ' Only the first ' + LONG_MAX_CHUNKS + ' parts fit; load the rest separately.' : ''} Continue?`
-        : `Este texto es muy largo. Lo voy a leer en ${chunks.length} partes y armar UN solo esquema con todas (puede tardar un par de minutos).${truncated ? ' Solo caben las primeras ' + LONG_MAX_CHUNKS + ' partes; el resto cárgalo aparte.' : ''} ¿Continuar?`);
-    if (!ok) return;
-    track('long_text_start', { chunks: chunks.length, chars: fullText.length, truncated });
-    const outlines = new Array(chunks.length); let done = 0, failed = false, next = 0;
-    showLoader(en ? `Reading part 1 of ${chunks.length}…` : `Leyendo la parte 1 de ${chunks.length}…`);
-    const worker = async () => {
-        while (!failed && next < chunks.length) {
-            const i = next++;
-            let res = null;
-            for (let attempt = 0; attempt < 2 && !res; attempt++) {
-                try {
-                    const r = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'long_outline', text: chunks[i], part: i + 1, total: chunks.length }) });
-                    if (r.ok && Array.isArray(r.data.topics)) res = r.data.topics;
-                    else if (r.status === 402 || r.status === 429 || r.status === 401) { handleBillingError(r.status, r.data); failed = 'billing'; return; }
-                } catch (_e) { /* se reintenta una vez */ }
-            }
-            if (!res) { failed = true; return; }
-            outlines[i] = res; done++;
-            showLoader(en ? `Read ${done} of ${chunks.length} parts…` : `Leídas ${done} de ${chunks.length} partes…`);
-        }
-    };
-    await Promise.all([worker(), worker(), worker()].slice(0, Math.min(3, chunks.length)));
-    hideLoader();
-    if (failed) { track('long_text_error', { done, chunks: chunks.length, reason: failed === 'billing' ? 'billing' : 'chunk' }); if (failed !== 'billing') appAlert(en ? 'Could not read the whole text. Try again in a moment, or load it in smaller parts.' : 'No se pudo leer todo el texto. Intenta de nuevo en un momento, o cárgalo en partes más pequeñas.'); return; }
-    // Resumen único: cada punto lleva su cita literal. Si es demasiado grande, se quitan primero las citas de tema y luego puntos de sobra.
-    const build = (withTopicQuotes, maxPts) => {
-        const lines = [en ? 'LONG DOCUMENT SUMMARIZED BY PARTS (each item carries a literal quote from the original):' : 'DOCUMENTO LARGO RESUMIDO POR PARTES (cada elemento lleva una cita literal del original):'];
-        outlines.forEach((tp, i) => {
-            lines.push('', (en ? 'PART ' : 'PARTE ') + (i + 1));
-            tp.forEach(t => {
-                lines.push((en ? 'TOPIC: ' : 'TEMA: ') + t.title + (withTopicQuotes && t.quote ? ' — «' + t.quote + '»' : ''));
-                t.points.slice(0, maxPts).forEach(p => lines.push('  - ' + p.label + (p.quote ? ' — «' + p.quote + '»' : '')));
-            });
-        });
-        return lines.join('\n');
-    };
-    let outline = build(true, 4);
-    if (outline.length > 55000) outline = build(false, 4);
-    if (outline.length > 55000) outline = build(false, 2);
-    currentDocumentText = fullText;
-    track('long_text_outline_ok', { chunks: chunks.length, outlineChars: outline.length });
-    await generateFullSchemaFromTopic(outline, { originPanelId: 'main' });
-}
-// Avisa cuando un texto es más largo de lo que la IA lee de una vez (en vez de recortarlo sin decir nada).
-async function confirmLongText(text) {
-    const limit = 60000; // ver LIMITS.text en netlify/functions/_lib/billing.js
-    if (!text || text.length <= limit) return true;
-    const pct = Math.max(1, Math.round(limit / text.length * 100));
-    const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
-    return await appConfirm(en
-        ? `This text is very long. The AI reads about the first ${pct}% of it at a time. To cover everything, load it in parts (e.g. by chapter, with the page range) and generate each one. Generate with the first part now?`
-        : `Este texto es muy largo: la IA lee de una vez más o menos el primer ${pct}% . Para cubrirlo todo, cárgalo por partes (por ejemplo por capítulos, con el rango de páginas) y genera cada una. ¿Generar ahora con la primera parte?`);
-}
 async function runTextAnalysis(analysisType, customType) {
     const context = analyzeMenuContext;
     closeAnalyzeMenu();
@@ -1563,7 +1477,6 @@ async function runTextAnalysis(analysisType, customType) {
     textContent = await resolveTextOrWebLink(textContent, { targetTextEl: context.textEl, onTitle: context.onTitle });
     if (textContent === null) return;
 
-    if (!await confirmLongText(textContent)) return;
     if (context.panelId === 'main') { currentDocumentText = textContent; updateReaderEmptyHint(); }
     await generateTextAnalysis(textContent, analysisType, customType, { originPanelId: context.panelId });
 }
@@ -2351,12 +2264,11 @@ network.on('click', updateSubschemeActionBar); // cubre clic en fondo vacío (li
 function updateSchemeBreadcrumb() {
     if (!schemeBreadcrumb) return;
     if (schemeStack.length === 0) {
-        schemeBreadcrumb.classList.add('hidden'); schemeBreadcrumb.style.display = '';
+        schemeBreadcrumb.classList.add('hidden');
     } else {
         schemeBreadcrumb.classList.remove('hidden');
         const top = schemeStack[schemeStack.length - 1];
         if (schemeBreadcrumbLabel) schemeBreadcrumbLabel.innerText = tr("js.dentro_de", { label: top.label });
-        schemeBreadcrumb.style.display = 'flex';
     }
 }
 
@@ -3893,7 +3805,7 @@ function escapeHtml(str) {
 // puede ampliarlo a mano antes de darle "Cargar") — páginas de más no se
 // extraen de entrada para no volver pesado un PDF largo sin que el usuario
 // lo haya pedido explícitamente.
-const MAX_PDF_DEFAULT_PAGES = 100000; // por defecto se eligen TODAS las páginas del PDF
+const MAX_PDF_DEFAULT_PAGES = 20;
 
 let activePdfDoc = null;       // documento pdf.js actualmente elegido (antes de "Cargar")
 let pdfCurrentFileName = '';
@@ -4360,7 +4272,7 @@ function createExtraReaderPanel() {
     // clon en vez de dejar un botón que se vería igual pero no haría nada
     // (nunca se le conecta ningún listener, porque ese cableado se hizo una
     // sola vez contra el #btnImportPdf original antes de clonar).
-    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"], [data-role="modeTabs"], [data-role="topicCard"]').forEach(el => el.remove());
+    clone.querySelectorAll('[data-role="btnImportPdf"], [data-role="pdfFileInput"], [data-role="pdfRangeBar"]').forEach(el => el.remove());
 
     const cloneText = clone.querySelector('[data-role="textMode"]');
     if (cloneText) cloneText.innerText = '';
@@ -4388,7 +4300,6 @@ function createExtraReaderPanel() {
     const accent = panelAccentPalette[n % panelAccentPalette.length];
     registerReaderPanel(panelId, clone, cloneText, accent);
     wireReaderPanelClone(clone, panelId);
-    wireGenGate(clone);
     wireResizeRedraw(clone);
     return clone;
 }
@@ -5045,7 +4956,6 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
     if (textContent === null) return;
     updateReaderEmptyHint();
 
-    if (textContent.length > 60000) { await generateSchemaFromLongText(textContent); return; }
     currentDocumentText = textContent;
     await generateFullSchemaFromTopic(textContent, { originPanelId: 'main' });
 });
@@ -5486,7 +5396,7 @@ async function runAprendeHandoff() {
         localStorage.removeItem('gk_ap_pending');
     } catch (_e) { /* ok */ }
     // ...y si no está, se pide al servidor.
-    if (text.length < 200 && !topic) try {
+    if (text.length < 200) try {
         const res = await fetch('/.netlify/functions/ap-handoff?sid=' + encodeURIComponent(sid), { credentials: 'same-origin' });
         const d = res.ok ? await res.json() : null;
         if (d && d.ok) { title = String(d.title || '').trim(); text = String(d.text || '').trim(); topic = String(d.topic || topic || title).trim(); }
@@ -5771,28 +5681,16 @@ function renderSearchResults(query) {
     `).join('');
 }
 searchPaletteInput?.addEventListener('input', (e) => renderSearchResults(e.target.value));
-let searchJumpBusy = false;
 searchPaletteResults?.addEventListener('click', (e) => {
     const btn = e.target.closest('.gk-search-result');
     if (!btn) return;
     const nodeId = btn.dataset.nodeId;
     closeSearchPalette();
-    if (searchJumpBusy || !nodeId || !nodes.get(nodeId)) return;
-    searchJumpBusy = true;
-    // Un solo movimiento de cámara (sin repetirse) y un destello suave del borde:
-    // antes se animaba también el tamaño del nodo varias veces, lo que podía dejar
-    // la cámara acercándose y alejándose sin parar.
-    try { network.stopMoving?.(); } catch (_e) { /* ok */ }
-    setTimeout(() => {
-        try { network.selectNodes([nodeId]); } catch (_e) { /* ok */ }
-        try { focusNodeAvoidingOverlays(nodeId, { scale: Math.max(network.getScale(), 0.9), duration: 450 }); } catch (_e) { /* ok */ }
-        const n0 = nodes.get(nodeId);
-        if (n0) {
-            const prev = { borderWidth: n0.borderWidth };
-            nodes.update({ id: nodeId, borderWidth: 5 });
-            setTimeout(() => { if (nodes.get(nodeId)) nodes.update({ id: nodeId, borderWidth: prev.borderWidth ?? 1.5 }); searchJumpBusy = false; }, 1100);
-        } else searchJumpBusy = false;
-    }, 60);
+    if (nodeId && nodes.get(nodeId)) {
+        network.selectNodes([nodeId]);
+        network.focus(nodeId, { scale: 1.2, animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+        flashNewNode(nodeId);
+    }
 });
 searchPalette?.addEventListener('click', (e) => { if (e.target === searchPalette) closeSearchPalette(); });
 document.getElementById('btnSearchNodes')?.addEventListener('click', openSearchPalette);
@@ -7680,8 +7578,8 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
     const MAX_LEVELS = 3;
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
     const T = en
-        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', loading: 'loading', more: 'See more', below: 'Continues below:', hide: 'Hide' }
-        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', loading: 'cargando', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
+        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', more: 'See more', below: 'Continues below:', hide: 'Hide' }
+        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
     document.getElementById('dvBackLbl').textContent = T.back;
     if (en) btn.firstElementChild.textContent = 'View definitions';
     const isOpen = () => !view.classList.contains('hidden');
@@ -7765,56 +7663,39 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
         list.forEach(({ n, depth }) => grid.appendChild(makeRow(n, depth)));
         return list;
     }
-    // Se piden en bloques pequeños (5) y 3 a la vez: cada bloque que llega rellena sus filas
-    // enseguida, así se puede ir leyendo mientras el resto sigue cargando.
-    let pendingRows = 0;
-    function updateProgress() {
-        const sub = document.getElementById('dvSub'); if (!sub) return;
-        const total = grid.querySelectorAll('.dv-row[data-id]').length;
-        sub.textContent = total + ' ' + T.terms + (pendingRows > 0 ? ' · ' + T.loading + ' ' + pendingRows + '…' : '');
-    }
     async function loadMissing(list, token) {
         const missing = list.filter(({ n }) => !(String(n.definition || '').trim() && String(n.simple || '').trim() && String(n.example || '').trim()));
         if (!missing.length) { track('defs_view_ok', { cached: true, terms: list.length }); return; }
         const rootNode = grid.querySelector('.dv-row[data-id]'); const rn = rootNode ? byId.get(rootNode.dataset.id) : null;
         const topic = rn ? cleanLabel(rn) : '';
         const started = Date.now(); let failed = false;
-        const CHUNK = 5, PAR = 3;
-        const chunks = []; for (let i = 0; i < missing.length; i += CHUNK) chunks.push(missing.slice(i, i + CHUNK));
-        pendingRows += missing.length; updateProgress();
-        let next = 0;
-        const worker = async () => {
-            while (!failed && next < chunks.length) {
-                const chunk = chunks[next++];
-                if (token !== loadMissing.token || !isOpen()) return;
+        for (let i = 0; i < missing.length; i += 10) {
+            if (token !== loadMissing.token || !isOpen()) return;
+            const chunk = missing.slice(i, i + 10);
+            try {
+                const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) }) });
+                const data = await res.json();
+                if (!res.ok || !Array.isArray(data.items)) throw new Error('glossary_failed');
+                isApplyingUndo = true;
                 try {
-                    const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) }) });
-                    const data = await res.json();
-                    if (!res.ok || !Array.isArray(data.items)) throw new Error('glossary_failed');
-                    isApplyingUndo = true;
-                    try {
-                        data.items.forEach(it => {
-                            const n = nodes.get(it.id) || nodes.get(Number(it.id)); if (!n) return;
-                            const upd = { id: n.id };
-                            if (!String(n.definition || '').trim() && it.definition) upd.definition = it.definition;
-                            if (!String(n.simple || '').trim() && it.simple) upd.simple = it.simple;
-                            if (!String(n.example || '').trim() && it.example) upd.example = it.example;
-                            nodes.update(upd);
-                        });
-                    } finally { isApplyingUndo = false; }
-                    chunk.forEach(({ n }) => { const row = rowOf.get(String(n.id)); const fresh = nodes.get(n.id); if (row && fresh) fillRow(row, fresh); });
-                    pendingRows -= chunk.length; updateProgress();
-                } catch (_e) { failed = true; pendingRows -= chunk.length; }
-            }
-        };
-        await Promise.all(Array.from({ length: Math.min(PAR, chunks.length) }, worker));
+                    data.items.forEach(it => {
+                        const n = nodes.get(it.id) || nodes.get(Number(it.id)); if (!n) return;
+                        const upd = { id: n.id };
+                        if (!String(n.definition || '').trim() && it.definition) upd.definition = it.definition;
+                        if (!String(n.simple || '').trim() && it.simple) upd.simple = it.simple;
+                        if (!String(n.example || '').trim() && it.example) upd.example = it.example;
+                        nodes.update(upd);
+                    });
+                } finally { isApplyingUndo = false; }
+                chunk.forEach(({ n }) => { const row = rowOf.get(String(n.id)); const fresh = nodes.get(n.id); if (row && fresh) fillRow(row, fresh); });
+            } catch (_e) { failed = true; break; }
+        }
         if (token !== loadMissing.token || !isOpen()) return;
-        pendingRows = Math.max(0, grid.querySelectorAll('.dv-skel').length ? pendingRows : 0); updateProgress();
         if (failed) {
             track('defs_view_error');
             const box = document.createElement('div'); box.className = 'dv-err'; box.textContent = T.err;
             const b = document.createElement('button'); b.type = 'button'; b.textContent = T.retry;
-            b.onclick = () => { box.remove(); pendingRows = 0; loadMissing(list, loadMissing.token); };
+            b.onclick = () => { box.remove(); loadMissing(list, loadMissing.token); };
             box.appendChild(b); grid.appendChild(box);
         } else track('defs_view_ok', { ms: Date.now() - started, terms: list.length });
     }
@@ -7822,7 +7703,6 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
     function open() {
         if (nodes.length === 0) return;
         track('defs_view_opened', { nodes: nodes.length, in_subscheme: schemeStack.length > 0 });
-        pendingRows = 0;
         const list = render();
         view.classList.remove('hidden'); refreshBtn();
         view.querySelector('.dv-scroll').scrollTop = 0;
@@ -7834,74 +7714,3 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
     document.getElementById('dvBack').addEventListener('click', close);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen()) close(); });
 })();
-if (typeof I18N !== 'undefined' && I18N.lang === 'en') { const sp = document.querySelector('#btnExitSubscheme span'); if (sp) sp.textContent = 'Back'; }
-
-// ==========================================
-// MODO LECTOR: pestañas "Tengo un texto" / "Solo un tema", y botones de generar abajo
-// (activos solo con un texto largo o un enlace). Los paneles clonados (➕) solo llevan
-// la parte del texto; las pestañas y el PDF son del panel principal.
-// ==========================================
-const GEN_MIN_WORDS = 25;          // igual que el criterio de "texto largo" de generateFullSchemaFromTopic
-const MAX_SCHEMA_CHARS = 60000;    // tope que el servidor lee de un texto (ver LIMITS.text en _lib/billing.js)
-function wireGenGate(panelEl) {
-    if (!panelEl || panelEl._genGateWired) return;
-    panelEl._genGateWired = true;
-    const q = (r) => panelEl.querySelector(`[data-role="${r}"]`);
-    const textEl = q('textMode'), bGen = q('btnGenerate'), bAn = q('btnAnalyzeText'), hint = q('genHint');
-    if (!textEl || !bGen) return;
-    const apply = () => {
-        const t = (textEl.innerText || '').trim();
-        const words = t ? t.split(/\s+/).length : 0;
-        const ok = words >= GEN_MIN_WORDS || (typeof looksLikeWebLink === 'function' && looksLikeWebLink(t));
-        [bGen, bAn].forEach(b => { if (!b) return; b.disabled = !ok; b.classList.toggle('opacity-40', !ok); b.classList.toggle('cursor-not-allowed', !ok); });
-        if (hint) hint.classList.toggle('hidden', ok);
-    };
-    new MutationObserver(apply).observe(textEl, { childList: true, characterData: true, subtree: true });
-    textEl.addEventListener('input', apply);
-    apply();
-}
-wireGenGate(document.getElementById('readerPanel'));
-(function wireReaderModeTabs() {
-    const panel = document.getElementById('readerPanel'); if (!panel) return;
-    const q = (r) => panel.querySelector(`[data-role="${r}"]`);
-    const tabText = q('tabText'), tabTopic = q('tabTopic'), card = q('topicCard'), inp = q('topicInputPanel');
-    if (!tabText || !tabTopic || !card) return;
-    const hideInTopic = ['contentContainer', 'readerFooter', 'rtfToolbar', 'pdfRangeBar', 'docContextChip', 'docContextEditRow'].map(r => q(r)).filter(Boolean);
-    const ACTIVE = ['bg-indigo-500/25', 'text-indigo-100'], IDLE = ['text-slate-400'];
-    function setMode(mode) {
-        const topic = mode === 'topic';
-        tabText.classList.toggle('bg-indigo-500/25', !topic); tabText.classList.toggle('text-indigo-100', !topic); tabText.classList.toggle('text-slate-400', topic);
-        tabTopic.classList.toggle('bg-indigo-500/25', topic); tabTopic.classList.toggle('text-indigo-100', topic); tabTopic.classList.toggle('text-slate-400', !topic);
-        hideInTopic.forEach(el => { if (topic) el.classList.add('hidden-by-mode'); else el.classList.remove('hidden-by-mode'); });
-        card.classList.toggle('hidden', !topic); card.classList.toggle('flex', topic);
-        const btnPdf = q('btnImportPdf'); if (btnPdf) btnPdf.classList.toggle('hidden', topic);
-        if (topic) setTimeout(() => inp?.focus(), 30);
-        track('reader_mode_tab', { mode });
-    }
-    tabText.addEventListener('click', () => setMode('text'));
-    tabTopic.addEventListener('click', () => setMode('topic'));
-    const go = async () => {
-        const topic = (inp.value || '').trim();
-        if (topic.length < 2) { appAlert(tr("js.escribe_un_tema_pega_un")); return; }
-        track('topic_tab_generate', { length: topic.length });
-        await generateFullSchemaFromTopic(topic, {});
-        inp.value = '';
-    };
-    q('topicGenerate')?.addEventListener('click', go);
-    inp?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
-    q('topicSingleNode')?.addEventListener('click', () => {
-        const topic = (inp.value || '').trim(); if (topic.length < 1) return;
-        track('topic_tab_single_node'); insertSingleNode(topic); inp.value = '';
-    });
-    window.__gkSetReaderMode = setMode;
-})();
-
-// Botón "＋ Crear" de la cabecera: abre el panel de crear (texto/enlace/PDF o solo un tema).
-document.getElementById('btnCreate')?.addEventListener('click', () => {
-    if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
-    openReaderPanel();
-    if (typeof window.__gkSetReaderMode === 'function') window.__gkSetReaderMode('text');
-    track('create_clicked');
-    setTimeout(() => { try { readerTextMode.focus(); } catch (_e) { /* ok */ } }, 80);
-});
-if (typeof I18N !== 'undefined' && I18N.lang === 'en') { const sp = document.querySelector('#btnCreate span:last-child'); if (sp) sp.textContent = 'Create'; }
