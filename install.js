@@ -2,7 +2,7 @@
    Uso: GK_INSTALL.maybe() desde cada app, justo después de que el usuario logra su primer resultado. */
 (function () {
   'use strict';
-  var KEY = 'gk_install_seen', deferred = null, shown = false;
+  var KEY = 'gk_install_seen2', deferred = null, shown = false;
   var EN = /^en/i.test(navigator.language || '');
   var T = EN ? {
     title: 'Keep this app on your phone', sub: 'Open it in one tap, like any other app.',
