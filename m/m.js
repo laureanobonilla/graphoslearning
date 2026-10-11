@@ -322,7 +322,7 @@
       const a = s.anchorNode && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentElement);
       if (!a || !a.closest || !a.closest('#defsList')) return '';
       const t = clip(s.toString(), 1500);
-      return t.split(' ').filter(Boolean).length >= 4 ? t : '';
+      return t.length >= 3 ? t : '';
     } catch { return ''; }
   }
   let selT; document.addEventListener('selectionchange', () => {
@@ -354,7 +354,10 @@
     busy(btn, true); other.disabled = true;
     const started = Date.now();
     const topic = G.rootId ? G.nodes[G.rootId].label : '';
-    const r = await callGemini({ action: 'm_text', text: selText, topic });
+    const few = selText.split(' ').filter(Boolean).length < 4;   // una palabra o frase corta: se trata como tema
+    const r = few
+      ? await callGemini({ action: 'm_map', topic: clip(selText, 120), contextPath: (G.nodes[cur] ? pathOf(cur).concat([G.nodes[cur].label]) : [topic]).join(' > ').slice(0, 380) })
+      : await callGemini({ action: 'm_text', text: selText, topic });
     busy(btn, false); other.disabled = false;
     if (!r.ok) {
       track('m_map_error', { kind: r.kind, where: 'text' });
