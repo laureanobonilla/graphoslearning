@@ -5,91 +5,112 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0e1a">
 <title>Graphikosmos · Idiomas</title>
-<meta name="description" content="Entiende un texto en otro idioma con un mapa de bloques, su traducción, la frase de origen y la pronunciación.">
+<meta name="description" content="Escribe un tema y obtén un mapa mental para aprender un idioma: bloques de uso real, traducción, frase de origen y pronunciación.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/idiomas/idiomas.css?v=2">
+<link rel="stylesheet" href="/m/m.css?v=1">
+<link rel="stylesheet" href="/idiomas/idiomas.css?v=3">
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
-<main id="app">
-  <header class="bar">
-    <a class="brand" href="/" aria-label="Graphikosmos"><span class="logo">Γ</span><span>Graphikosmos</span></a>
-    <button type="button" id="balance" class="balance" hidden aria-label="Mis gemas"></button>
+<div id="app">
+
+  <header id="appbar">
+    <button class="ab-btn" id="btnLogin" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+      <span id="loginLabel">Entrar</span>
+    </button>
+    <button class="ab-btn" id="btnGems" type="button" hidden aria-label="Mis gemas">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M9 3l-2 6 5 12 5-12-2-6"/></svg>
+      <span id="gemsVal">0</span>
+    </button>
+    <a class="ab-btn" href="/m/" aria-label="Graphikosmos">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><circle cx="5" cy="6" r="2"/><circle cx="19" cy="7" r="2"/><circle cx="18" cy="18" r="2"/><path d="M10 10.5 6.5 7.3M14.7 11l3-3M14 14l3 3"/></svg>
+      <span>Graphikosmos</span>
+    </a>
   </header>
 
-  <section id="viewStart" class="start">
-    <h1>Entiende un texto en otro idioma</h1>
-    <p class="lead">Pega un texto o escribe un tema. Obtienes un mapa de bloques de uso real, con su traducción, la frase de donde salieron y su pronunciación.</p>
+  <!-- INICIO -->
+  <main id="viewHome" class="view">
+    <form id="homeForm" autocomplete="off">
+      <label class="lbl" for="langSel">Idioma que quieres aprender</label>
+      <select id="langSel">
+        <option value="en">Inglés</option>
+        <option value="de">Alemán</option>
+        <option value="fr">Francés</option>
+        <option value="it">Italiano</option>
+        <option value="pt">Portugués</option>
+        <option value="nl">Neerlandés</option>
+        <option value="sv">Sueco</option>
+        <option value="pl">Polaco</option>
+        <option value="ru">Ruso</option>
+        <option value="tr">Turco</option>
+        <option value="ja">Japonés</option>
+        <option value="ko">Coreano</option>
+        <option value="zh">Chino mandarín</option>
+      </select>
 
-    <label class="field-label" for="langSel">Idioma que estudias</label>
-    <select id="langSel">
-      <option value="de">Alemán</option>
-      <option value="en">Inglés</option>
-      <option value="fr">Francés</option>
-      <option value="it">Italiano</option>
-      <option value="pt">Portugués</option>
-      <option value="nl">Neerlandés</option>
-      <option value="sv">Sueco</option>
-      <option value="pl">Polaco</option>
-      <option value="ru">Ruso</option>
-      <option value="tr">Turco</option>
-      <option value="ja">Japonés</option>
-      <option value="ko">Coreano</option>
-      <option value="zh">Chino mandarín</option>
-    </select>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab on" id="tabTopic" role="tab" aria-selected="true">Un tema</button>
+        <button type="button" class="tab" id="tabText" role="tab" aria-selected="false">Un texto</button>
+      </div>
+      <input id="topicIn" type="text" maxlength="120" placeholder="Un tema, ej.: viajar en tren" enterkeyhint="go" aria-label="Tema">
+      <textarea id="textIn" rows="6" placeholder="Pega aquí un texto en el idioma que estudias" hidden aria-label="Texto"></textarea>
+      <button id="btnGo" class="btn-primary" type="submit" disabled><span class="btn-txt">Crear mapa mental</span><span class="spin" aria-hidden="true"></span></button>
+      <p id="startMsg" class="msg" role="status">Armamos un texto corto sobre el tema y lo convertimos en un mapa.</p>
+    </form>
+  </main>
 
-    <div class="tabs" role="tablist">
-      <button type="button" class="tab on" id="tabText" role="tab" aria-selected="true">Tengo un texto</button>
-      <button type="button" class="tab" id="tabTopic" role="tab" aria-selected="false">Solo un tema</button>
+  <!-- MAPA -->
+  <section id="viewMap" class="view" hidden>
+    <div id="mapbar">
+      <button id="btnBack" class="icon-back" type="button" aria-label="Volver"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div id="mapTitle" class="map-title"></div>
+      <button id="btnText" class="pill" type="button">Ver texto</button>
     </div>
-    <textarea id="textIn" rows="7" placeholder="Pega aquí un texto en el idioma que estudias"></textarea>
-    <input id="topicIn" type="text" maxlength="120" placeholder="Por ejemplo: un viaje en tren, la cocina, el trabajo" hidden>
-    <p id="hint" class="hint">Mínimo 6 palabras.</p>
-    <button type="button" id="btnGo" class="primary" disabled>Crear mapa</button>
-    <p id="startMsg" class="msg" role="status"></p>
+    <div id="mapStage"></div>
+    <div id="legend" class="legend"></div>
+    <p id="mapHint" class="map-hint">Toca un bloque para ver qué significa.</p>
   </section>
 
-  <section id="viewResult" class="result" hidden>
-    <div class="result-bar">
-      <button type="button" id="btnBack" class="ghost">Volver</button>
-      <div class="seg" role="tablist">
-        <button type="button" class="seg-b on" id="segMap">Mapa</button>
-        <button type="button" class="seg-b" id="segText">Texto</button>
-      </div>
+  <!-- TEXTO -->
+  <section id="viewText" class="view" hidden>
+    <div id="defsbar">
+      <button id="btnTextBack" class="pill pill-back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Mapa mental</button>
     </div>
-    <div class="legend" id="legend"></div>
-    <div class="panes">
-      <div id="mapPane" class="map-pane"><svg id="mapSvg" role="img" aria-label="Mapa de bloques"></svg></div>
-      <div id="textPane" class="text-pane" hidden>
-        <p class="text-tip">Toca una palabra para ver qué hace en la oración.</p>
-        <div id="textBody" class="text-body" lang=""></div>
-      </div>
+    <div id="textScroll">
+      <p class="text-tip">Toca una palabra para ver qué hace en la oración.</p>
+      <div id="textBody" class="text-body" lang=""></div>
     </div>
   </section>
+</div>
 
-  <aside id="sheet" class="sheet" hidden>
-    <button type="button" id="sheetClose" class="sheet-x" aria-label="Cerrar">×</button>
-    <div class="sheet-chip" id="shRole"></div>
-    <h2 id="shLabel"></h2>
-    <p class="sh-tr" id="shTr"></p>
-    <p id="shMeaning" class="sh-meaning"></p>
-    <div id="shQuoteBox" class="sh-quote" hidden>
-      <span class="sh-quote-k">En el texto</span>
-      <p id="shQuote"></p>
-      <button type="button" id="btnShowInText" class="link">Ver en el texto</button>
-    </div>
-    <div class="sheet-actions">
-      <button type="button" id="btnSayChunk" class="primary small">Escuchar bloque</button>
-      <button type="button" id="btnSaySentence" class="secondary small">Escuchar frase</button>
-      <button type="button" id="btnAddNode" class="secondary small" hidden>Agregar al mapa</button>
-    </div>
-    <p id="shVoiceMsg" class="msg"></p>
-  </aside>
-</main>
-<div id="toast" class="toast" role="status"></div>
+<!-- Hoja de detalle -->
+<div id="sheetBackdrop" hidden></div>
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="shLabel" hidden>
+  <div class="sheet-grip"></div>
+  <div class="sheet-chip" id="shRole"></div>
+  <h2 id="shLabel"></h2>
+  <p id="shTr" class="sh-tr"></p>
+  <p id="shRel" class="sheet-rel"></p>
+  <p id="shMeaning" class="sh-meaning"></p>
+  <div id="shQuoteBox" class="sh-quote" hidden>
+    <span class="sh-quote-k">En el texto</span>
+    <p id="shQuote"></p>
+    <button type="button" id="btnShowInText" class="btn-link">Ver en el texto</button>
+  </div>
+  <div class="sheet-actions">
+    <button type="button" id="btnSayChunk" class="pill">Escuchar bloque</button>
+    <button type="button" id="btnSaySentence" class="pill pill-back">Escuchar frase</button>
+  </div>
+  <button id="btnKids" class="btn-primary" type="button" hidden><span class="btn-txt">Ver sus partes</span></button>
+  <button id="btnAddNode" class="btn-primary" type="button" hidden><span class="btn-txt">Agregar al mapa</span></button>
+  <p id="shVoiceMsg" class="msg" role="status"></p>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=2"></script>
-<script src="/idiomas/idiomas.js?v=2"></script>
+<script src="/idiomas/idiomas.js?v=3"></script>
 </body>
 </html>

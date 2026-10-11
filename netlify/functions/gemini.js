@@ -902,19 +902,19 @@ REGLAS:
                 label: { type: 'STRING', description: `BLOQUE de 2 a 6 palabras en ${L} (colocación o grupo con su verbo/preposición/artículo), nunca una palabra huérfana. Ej.: «eine Entscheidung treffen», «obwohl es regnet».` },
                 translation: { type: 'STRING', description: 'Traducción natural al español del bloque.' },
                 role: { type: 'STRING', enum: ROLES, description: 'Función gramatical del bloque en la oración: sujeto, verbo, objeto, circunstancia (tiempo/lugar/modo/causa: adverbios y complementos), conector (conjunciones y partículas que unen ideas) u otro.' },
-                meaning: { type: 'STRING', description: 'En español, 1 o 2 oraciones (máx. 45 palabras): qué significa el bloque EN ESTE CONTEXTO y qué función cumple cada conector, preposición, caso o terminación relevante. Sin markdown.' },
+                meaning: { type: 'STRING', description: 'En español, UNA oración corta (máx. 25 palabras): qué significa el bloque EN ESTE CONTEXTO y la función del conector, preposición, caso o terminación clave. Sin markdown.' },
                 sourceQuote: { type: 'STRING', description: 'La oración o fragmento LITERAL del texto fuente donde aparece (copia exacta, máx. 30 palabras). Cadena vacía si no hay texto fuente.' }
             };
             const schema = {
                 type: 'OBJECT',
                 properties: {
-                    generatedText: { type: 'STRING', description: hasText ? 'Déjalo como cadena vacía.' : `Un texto breve y natural en ${L} (3 a 5 oraciones, nivel intermedio) sobre el tema. Los bloques y sus citas salen de este texto.` },
+                    generatedText: { type: 'STRING', description: hasText ? 'Déjalo como cadena vacía.' : `Un texto breve y natural en ${L} (3 oraciones cortas, nivel intermedio, sin palabras raras) sobre el tema. Los bloques y sus citas salen de este texto.` },
                     root: { type: 'OBJECT', properties: {
                         label: { type: 'STRING', description: `La proposición o cláusula principal en ${L} (sujeto + verbo central), 3 a 8 palabras.` },
                         translation: nodeProps.translation, meaning: nodeProps.meaning, sourceQuote: nodeProps.sourceQuote
                     }, required: ['label', 'translation', 'meaning'] },
-                    branches: { type: 'ARRAY', description: 'Entre 4 y 6 bloques clave del nivel 1, ordenados como aparecen en el texto.', items: { type: 'OBJECT', properties: Object.assign({ id: { type: 'STRING', description: 'b1, b2, b3…' }, relationship: { type: 'STRING', description: 'Conector en español de 1 a 3 palabras desde la raíz (ej.: «qué hace», «cuándo», «aunque»).' } }, nodeProps), required: ['id', 'label', 'translation', 'role', 'meaning', 'relationship'] } },
-                    subBranches: { type: 'ARRAY', description: 'Nivel 2: 0 a 2 bloques por cada rama que la complementen (un objeto, un complemento, una circunstancia).', items: { type: 'OBJECT', properties: Object.assign({ id: { type: 'STRING' }, parentId: { type: 'STRING', description: 'id exacto de la rama de nivel 1.' }, relationship: { type: 'STRING', description: 'Conector en español de 1 a 3 palabras.' } }, nodeProps), required: ['id', 'parentId', 'label', 'translation', 'role', 'meaning', 'relationship'] } }
+                    branches: { type: 'ARRAY', description: 'Entre 4 y 5 bloques clave del nivel 1, ordenados como aparecen en el texto.', items: { type: 'OBJECT', properties: Object.assign({ id: { type: 'STRING', description: 'b1, b2, b3…' }, relationship: { type: 'STRING', description: 'Conector en español de 1 a 3 palabras desde la raíz (ej.: «qué hace», «cuándo», «aunque»).' } }, nodeProps), required: ['id', 'label', 'translation', 'role', 'meaning', 'relationship'] } },
+                    subBranches: { type: 'ARRAY', description: 'Nivel 2: máximo 1 bloque por rama y solo en 2 o 3 ramas (un objeto, un complemento o una circunstancia). Total de nivel 2: 3 bloques como máximo.', items: { type: 'OBJECT', properties: Object.assign({ id: { type: 'STRING' }, parentId: { type: 'STRING', description: 'id exacto de la rama de nivel 1.' }, relationship: { type: 'STRING', description: 'Conector en español de 1 a 3 palabras.' } }, nodeProps), required: ['id', 'parentId', 'label', 'translation', 'role', 'meaning', 'relationship'] } }
                 },
                 required: ['root', 'branches', 'subBranches']
             };
@@ -951,7 +951,7 @@ REGLAS:
             rawB.forEach((b, i) => { const c = cleanNode(b); if (!c.label) return; const id = 'b' + (branches.length + 1); idMap[String(b.id)] = id; branches.push(Object.assign({ id, relationship: clipS(b.relationship, 30) }, c)); });
             const cnt = {};
             const subBranches = [];
-            (Array.isArray(d.subBranches) ? d.subBranches : []).forEach((s) => { const pid = idMap[String(s && s.parentId)]; if (!pid) return; cnt[pid] = (cnt[pid] || 0) + 1; if (cnt[pid] > 2) return; const c = cleanNode(s); if (!c.label) return; subBranches.push(Object.assign({ id: 's' + (subBranches.length + 1), parentId: pid, relationship: clipS(s.relationship, 30) }, c)); });
+            (Array.isArray(d.subBranches) ? d.subBranches : []).forEach((s) => { const pid = idMap[String(s && s.parentId)]; if (!pid) return; cnt[pid] = (cnt[pid] || 0) + 1; if (cnt[pid] > 1 || subBranches.length >= 4) return; const c = cleanNode(s); if (!c.label) return; subBranches.push(Object.assign({ id: 's' + (subBranches.length + 1), parentId: pid, relationship: clipS(s.relationship, 30) }, c)); });
             if (!root.label || branches.length < 2) return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) };
             return { statusCode: 200, body: JSON.stringify({ studyLang: code, text: usedText, generated: !hasText, root, branches, subBranches }) };
         }
