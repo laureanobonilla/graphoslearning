@@ -160,6 +160,7 @@
     G.rootId = root.id;
     addChildren(root.id, r.data.branches);
     mapsCount++;
+    if (window.GK_INSTALL) window.GK_INSTALL.maybe();
     track('m_map_ok', { depth: 0, branches: root.children.length, ms: Date.now() - started });
     scheduleSave();
     go('map', root.id, true);

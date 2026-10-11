@@ -174,7 +174,7 @@
   }
   $('#cText').addEventListener('click', () => $('#cText').classList.add('skip'));
   function closeStage() { stage.hidden = true; const c = fx.getContext('2d'); c.clearRect(0, 0, fx.width, fx.height); cancelAnimationFrame(sparks._raf); }
-  $('#again').addEventListener('click', closeStage);
+  $('#again').addEventListener('click', () => { closeStage(); if (window.GK_INSTALL) window.GK_INSTALL.maybe(); });
   stage.addEventListener('click', (e) => { if (e.target === stage) closeStage(); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !stage.hidden) closeStage(); });
 

@@ -122,6 +122,7 @@
     }
     msg.textContent = '';
     startSession(lang, r.data);
+    if (window.GK_INSTALL) window.GK_INSTALL.maybe();
   });
 
   /* ---------- Sesión de estudio ---------- */
