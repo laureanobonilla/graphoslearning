@@ -33,6 +33,11 @@ const LIMITS = { topic: 500, topicB: 500, contextPath: 2000, customRequest: 1500
 
 // Día de Costa Rica (UTC-6) para la cuota gratis del oráculo.
 const ORACLE_FREE_PER_DAY = Number(process.env.ORACLE_FREE_PER_DAY || 5);
+// SIN RESTRICCIÓN (temporal, pedido del dueño): el oráculo es gratis e ilimitado mientras esto sea true.
+// Para restaurar el límite diario: poner ORACLE_UNLIMITED=0 en Netlify, o cambiar el default a false.
+const ORACLE_UNLIMITED = String(process.env.ORACLE_UNLIMITED == null ? '1' : process.env.ORACLE_UNLIMITED) !== '0';
+// Las señales gastadas antes de esta fecha no cuentan al restaurar el límite (reinicio del contador).
+const ORACLE_COUNT_FROM = process.env.ORACLE_COUNT_FROM || '2026-10-11T15:10:00Z';
 function dayStartIso() {
     const off = 6 * 3600 * 1000, now = Date.now();
     return new Date(Math.floor((now - off) / 86400000) * 86400000 + off).toISOString();
@@ -163,12 +168,13 @@ function withBilling(raw, overrides = {}) {
 
             // Oráculo: las primeras ORACLE_FREE_PER_DAY señales del día (con tono al azar) no cuestan nada.
             if (action === 'oracle') {
-                const day = dayStartIso();
+                let day = dayStartIso();
+                if (day < ORACLE_COUNT_FROM) day = ORACLE_COUNT_FROM;
                 let usedToday = 0;
                 try { usedToday = await deps.store.countEventsSince(identity.id, 'oracle_used', day); } catch (err) { usedToday = ORACLE_FREE_PER_DAY; }
                 const wantsTone = body.tone && body.tone !== 'auto';
-                oracleFree = !wantsTone && usedToday < ORACLE_FREE_PER_DAY;
-                oracleFreeLeft = Math.max(0, ORACLE_FREE_PER_DAY - usedToday);
+                oracleFree = ORACLE_UNLIMITED || (!wantsTone && usedToday < ORACLE_FREE_PER_DAY);
+                oracleFreeLeft = ORACLE_UNLIMITED ? ORACLE_FREE_PER_DAY : Math.max(0, ORACLE_FREE_PER_DAY - usedToday);
             }
             const min = (action === 'oracle' && oracleFree) ? 0 : (FREE.has(action) ? 0 : (MIN_BALANCE[action] || 1));
             if (balance < min) {
@@ -190,7 +196,7 @@ function withBilling(raw, overrides = {}) {
             cost = (data.care || oracleFree || identity.isAdmin) ? 0 : 1;
             if (!data.care && !identity.isAdmin) {
                 try { await deps.store.logEvent(identity.id, identity.kind, null, 'oracle_used', { free: oracleFree, tone: data.tone, rarity: data.rarity }, identity.email || null, 'oraculo'); } catch (err) { console.error('[billing] oracle_used:', err.message); }
-                if (oracleFree) oracleFreeLeft = Math.max(0, oracleFreeLeft - 1);
+                if (oracleFree && !ORACLE_UNLIMITED) oracleFreeLeft = Math.max(0, oracleFreeLeft - 1);
             }
             data.freeLeft = identity.isAdmin ? ORACLE_FREE_PER_DAY : (data.care ? oracleFreeLeft : oracleFreeLeft);
         }
