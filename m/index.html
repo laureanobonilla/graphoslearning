@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/m/m.css?v=1">
+<link rel="stylesheet" href="/m/m.css?v=2">
 <script>
 /* Si se abre en una pantalla ancha, lo normal es la versión de escritorio.
    ?force=1 (o ?m=1) lo deja aquí para poder probar en PC. */
@@ -114,6 +114,19 @@
   <p id="sheetMsg" class="msg" role="status"></p>
 </div>
 
+<!-- Texto seleccionado: ofrecer esquema -->
+<button id="selBtn" class="sel-btn" type="button" hidden>Hacer un esquema con este texto</button>
+<div id="sheetTextBackdrop" hidden></div>
+<div id="sheetText" class="sheet-text" role="dialog" aria-modal="true" aria-labelledby="stTitle" hidden>
+  <div class="sheet-grip"></div>
+  <h2 id="stTitle">¿Dónde guardamos el esquema?</h2>
+  <p id="stQuote" class="st-quote"></p>
+  <button id="stSame" class="btn-primary" type="button"><span class="btn-txt">En este mismo proyecto</span><span class="spin" aria-hidden="true"></span></button>
+  <button id="stNew" class="btn-primary st-alt" type="button"><span class="btn-txt">En un proyecto nuevo</span><span class="spin" aria-hidden="true"></span></button>
+  <p id="stMsg" class="msg" role="status"></p>
+  <button id="stCancel" class="btn-link" type="button">Cancelar</button>
+</div>
+
 <!-- Modal: invitado sin gemas -->
 <div id="modalLogin" class="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mlTitle">
@@ -142,6 +155,6 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=2"></script>
 <script src="/install.js?v=2"></script>
-<script src="/m/m.js?v=2"></script>
+<script src="/m/m.js?v=3"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@ const KNOWN = new Set([
     // esquema son gratis, ver la lógica de "welcomeFree" en withBilling.
     'onboarding_text', 'welcome_schema',
     // Móvil (/m/): mapa de 2 niveles ('m_welcome' = el primero, gratis una vez) y glosario de varios términos.
-    'm_map', 'm_welcome', 'glossary',
+    'm_map', 'm_welcome', 'glossary', 'm_text',
     // Documentos muy largos: resumen por fragmentos (gratis); el esquema final se cobra como parse_text.
     'long_outline',
     // Idiomas (/idiomas/): mapa de bloques con rol gramatical (se cobra por nodo) y palabra suelta en contexto (gratis).
@@ -25,7 +25,7 @@ const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extr
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.
-const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2, analyze_text: 5, m_map: 4, lang_map: 5 };
+const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2, analyze_text: 5, m_map: 4, m_text: 4, lang_map: 5 };
 
 const LIMITS = { topic: 500, topicB: 500, contextPath: 2000, customRequest: 1500,
                  question: 1500, userAnswer: 4000, text: 60000, documentContext: 12000,
@@ -58,6 +58,7 @@ function computeCost(action, d) {
         case 'extract_key_terms': return len(d.terms);
         case 'analyze_text':      return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         case 'm_map':             return d.root ? 1 + len(d.branches) : 0;
+        case 'm_text':            return d.root ? 1 + len(d.branches) : 0;
         case 'lang_map':          return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
         default:                  return 0;

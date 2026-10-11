@@ -134,3 +134,12 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 :focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 @media (max-width:340px){.mnode.root{max-width:116px;font-size:15px}.mnode{max-width:118px;font-size:14px}}
+
+/* ===== Esquema desde texto seleccionado ===== */
+.sel-btn{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;max-width:90vw;height:50px;padding:0 22px;border:0;border-radius:25px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#071016;font:700 15px var(--font-display);box-shadow:0 8px 28px rgba(0,0,0,.5);animation:sheet-up .2s ease-out}
+#sheetTextBackdrop{position:fixed;inset:0;z-index:100;background:rgba(3,5,12,.6)}
+.sheet-text{position:fixed;left:0;right:0;bottom:0;z-index:101;background:var(--surface);border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:10px 20px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;animation:sheet-up .22s ease-out;max-height:88vh;overflow-y:auto}
+.sheet-text h2{margin:0;font:700 21px/1.2 var(--font-display);text-align:center}
+.st-quote{margin:0;padding:10px 12px;border-left:3px solid var(--cyan);background:var(--surface-2);border-radius:10px;color:var(--text-mid);font-size:15px;line-height:1.45;max-height:7.2em;overflow:hidden}
+.st-alt{background:var(--surface-2);color:var(--text-hi);border:1.5px solid var(--cyan);box-shadow:none}
+.st-alt .spin{border-color:rgba(238,241,251,.25);border-top-color:var(--text-hi)}

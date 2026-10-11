@@ -312,6 +312,74 @@
     go('map', n.id, true);
   });
 
+  /* ---------- Esquema a partir de un texto seleccionado (pantalla de definiciones) ---------- */
+  let selText = '';
+  function currentSelection() {
+    try {
+      const s = window.getSelection(); if (!s || s.isCollapsed || !s.rangeCount) return '';
+      const a = s.anchorNode && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentElement);
+      if (!a || !a.closest || !a.closest('#defsList')) return '';
+      const t = clip(s.toString(), 1500);
+      return t.split(' ').filter(Boolean).length >= 4 ? t : '';
+    } catch { return ''; }
+  }
+  let selT; document.addEventListener('selectionchange', () => {
+    clearTimeout(selT);
+    selT = setTimeout(() => {
+      if (view !== 'defs' || !$('#sheetText').hidden) { $('#selBtn').hidden = true; return; }
+      const t = currentSelection();
+      if (t) { if ($('#selBtn').hidden) track('m_text_selected', { words: t.split(' ').length }); selText = t; $('#selBtn').hidden = false; }
+      else $('#selBtn').hidden = true;
+    }, 250);
+  });
+  $('#selBtn').addEventListener('pointerdown', (e) => e.preventDefault());
+  $('#selBtn').addEventListener('click', () => {
+    if (!selText) return;
+    $('#stQuote').textContent = '«' + (selText.length > 220 ? selText.slice(0, 217) + '…' : selText) + '»';
+    $('#stMsg').textContent = ''; $('#stMsg').className = 'msg';
+    busy($('#stSame'), false); busy($('#stNew'), false);
+    $('#sheetText').hidden = false; $('#sheetTextBackdrop').hidden = false; $('#selBtn').hidden = true;
+    try { window.getSelection().removeAllRanges(); } catch { /* nada */ }
+  });
+  function closeTextSheet() { $('#sheetText').hidden = true; $('#sheetTextBackdrop').hidden = true; }
+  $('#stCancel').addEventListener('click', closeTextSheet);
+  $('#sheetTextBackdrop').addEventListener('click', () => { if (!$('#stSame').disabled) closeTextSheet(); });
+  async function makeFromText(where) {
+    const msg = $('#stMsg'), btn = where === 'same' ? $('#stSame') : $('#stNew'), other = where === 'same' ? $('#stNew') : $('#stSame');
+    msg.className = 'msg'; msg.textContent = 'Armando el esquema…';
+    if (where === 'same' && countNodes() >= MAX_NODES) { msg.textContent = 'Este proyecto ya es muy grande. Prueba con un proyecto nuevo.'; msg.classList.add('err'); return; }
+    track('m_text_map_clicked', { where });
+    busy(btn, true); other.disabled = true;
+    const started = Date.now();
+    const topic = G.rootId ? G.nodes[G.rootId].label : '';
+    const r = await callGemini({ action: 'm_text', text: selText, topic });
+    busy(btn, false); other.disabled = false;
+    if (!r.ok) {
+      track('m_map_error', { kind: r.kind, where: 'text' });
+      if (handleBlocked(r.kind, 'text')) { closeTextSheet(); return; }
+      msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return;
+    }
+    const label = clip(r.data.root && r.data.root.label, 80) || 'Esquema';
+    let target;
+    if (where === 'same') {
+      const parent = G.nodes[cur] ? cur : G.rootId;
+      target = newNode(label, 'del texto', parent);
+      target.color = PALETTE[(G.nodes[parent].children.length - 1) % PALETTE.length];
+    } else {
+      try { await saveProject(); } catch { /* nada */ }
+      G = emptyG();
+      target = newNode(label, '', null); G.rootId = target.id;
+    }
+    addChildren(target.id, r.data.branches);
+    mapsCount++;
+    track('m_text_map_ok', { where, branches: target.children.length, ms: Date.now() - started });
+    scheduleSave();
+    closeTextSheet();
+    go('map', target.id, true);
+  }
+  $('#stSame').addEventListener('click', () => makeFromText('same'));
+  $('#stNew').addEventListener('click', () => makeFromText('new'));
+
   /* ---------- Ver definiciones ---------- */
   $('#btnDefs').addEventListener('click', () => { track('m_defs_opened', { depth: depthOf(cur) }); go('defs', cur); });
   $('#btnDefsBack').addEventListener('click', () => { track('m_defs_back'); go('map', cur, false); });
