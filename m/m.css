@@ -136,7 +136,8 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 @media (max-width:340px){.mnode.root{max-width:116px;font-size:15px}.mnode{max-width:118px;font-size:14px}}
 
 /* ===== Esquema desde texto seleccionado ===== */
-.sel-btn{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;max-width:90vw;height:50px;padding:0 22px;border:0;border-radius:25px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#071016;font:700 15px var(--font-display);box-shadow:0 8px 28px rgba(0,0,0,.5);animation:sheet-up .2s ease-out}
+.sel-btn{position:fixed;left:50%;top:calc(62px + env(safe-area-inset-top));transform:translateX(-50%);z-index:90;max-width:90vw;height:50px;padding:0 22px;border:0;border-radius:25px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#071016;font:700 15px var(--font-display);box-shadow:0 8px 28px rgba(0,0,0,.55);animation:sel-down .2s ease-out}
+@keyframes sel-down{from{opacity:0;transform:translate(-50%,-14px)}}
 #sheetTextBackdrop{position:fixed;inset:0;z-index:100;background:rgba(3,5,12,.6)}
 .sheet-text{position:fixed;left:0;right:0;bottom:0;z-index:101;background:var(--surface);border-top:1px solid var(--line);border-radius:22px 22px 0 0;padding:10px 20px calc(18px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:12px;animation:sheet-up .22s ease-out;max-height:88vh;overflow-y:auto}
 .sheet-text h2{margin:0;font:700 21px/1.2 var(--font-display);text-align:center}
