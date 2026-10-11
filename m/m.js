@@ -593,7 +593,7 @@
   function openContact() {
     const u = user(); if (u && !$('#contactEmail').value) $('#contactEmail').value = u.email || '';
     $('#contactMsg').textContent = ''; $('#contactMsg').className = 'msg';
-    $('#contactWa').href = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent('Hola, me quedé sin nodos en Graphikosmos (versión móvil) y quiero seguir usándolo.');
+    $('#contactWa').href = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent('Hola, me quedé sin gemas en Graphikosmos (versión móvil) y quiero seguir usándolo.');
     openModal('#modalContact');
   }
   $('#contactWa').addEventListener('click', () => track('m_contact_whatsapp'));
@@ -604,7 +604,7 @@
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.textContent = 'Escribe un correo válido.'; msg.classList.add('err'); return; }
     busy(btn, true); msg.textContent = 'Enviando…';
     try {
-      const res = await fetch(FN + 'send-feedback', { method: 'POST', credentials: 'same-origin', headers: await headers(), body: JSON.stringify({ kind: 'recharge_request', email, message: 'Solicitud desde Graphikosmos MÓVIL: se quedó sin nodos y quiere seguir usándolo.' }) });
+      const res = await fetch(FN + 'send-feedback', { method: 'POST', credentials: 'same-origin', headers: await headers(), body: JSON.stringify({ kind: 'recharge_request', email, message: 'Solicitud desde Graphikosmos MÓVIL: se quedó sin gemas y quiere seguir usándolo.' }) });
       const out = await res.json().catch(() => ({}));
       if (!res.ok) { msg.textContent = out.error === 'rate_limited' ? 'Ya nos escribiste varias veces. Te responderemos pronto.' : 'No se pudo enviar. Intenta de nuevo.'; msg.classList.add('err'); return; }
       track('m_contact_sent'); msg.textContent = '¡Listo! Te escribimos pronto.'; setTimeout(closeModals, 2200);

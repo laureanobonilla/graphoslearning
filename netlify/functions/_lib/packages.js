@@ -22,14 +22,23 @@ const PACKAGES = {
 // ==========================================
 const GEMS_PER_NODE = 250;
 const GEM_PACKAGES = {
-    g15:  { id: 'g15',  gems: 15000,  usd: '4.99',  token: '1k29394856678',    url: 'https://www.paypal.com/ncp/payment/Z4LSQ42QGWQFG' },
-    g40:  { id: 'g40',  gems: 40000,  usd: '9.99',  token: 'j3j4jjU76k288',    url: 'https://www.paypal.com/ncp/payment/LPZLV5MM36KU4' },
-    g100: { id: 'g100', gems: 100000, usd: '19.99', token: 'ki455ffdsfg6763xy', url: 'https://www.paypal.com/ncp/payment/94PTU9KLHLEJW' }
+    g15:  { id: 'g15',  gems: 15000,  usd: '4.99',  cooldownHours: 6,  token: '1k29394856678',    url: 'https://www.paypal.com/ncp/payment/Z4LSQ42QGWQFG' },
+    g40:  { id: 'g40',  gems: 40000,  usd: '9.99',  cooldownHours: 24, token: 'j3j4jjU76k288',    url: 'https://www.paypal.com/ncp/payment/LPZLV5MM36KU4' },
+    g100: { id: 'g100', gems: 100000, usd: '19.99', cooldownHours: 48, token: 'ki455ffdsfg6763xy', url: 'https://www.paypal.com/ncp/payment/94PTU9KLHLEJW' }
 };
 Object.values(GEM_PACKAGES).forEach((p) => { p.nodes = Math.round(p.gems / GEMS_PER_NODE); });
+// Regalo inicial en NODOS (250 gemas por nodo): el INVITADO recibe 15.000 gemas = 60 nodos; una cuenta nueva
+// ya no recibe regalo (tras registrarse hay que comprar). Las variables de entorno de Netlify, si existen, mandan.
+function envNodes(name, fallback) {
+    const v = process.env[name];
+    return v === undefined || String(v).trim() === '' ? fallback : Number(v);
+}
+const freeGuestNodes = () => envNodes('GUEST_FREE_NODES', 60);
+const freeUserNodes = () => envNodes('INITIAL_FREE_NODES', 0);
+
 function findGemPackageByToken(token) {
     const t = String(token || '');
     return Object.values(GEM_PACKAGES).find((p) => p.token === t) || null;
 }
 
-module.exports = { PACKAGES, GEMS_PER_NODE, GEM_PACKAGES, findGemPackageByToken };
+module.exports = { PACKAGES, GEMS_PER_NODE, GEM_PACKAGES, findGemPackageByToken, freeGuestNodes, freeUserNodes };

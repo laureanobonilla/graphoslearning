@@ -37,7 +37,7 @@ async function table(path, options = {}) {
 
 module.exports = {
     ensureProfile: (id, email) =>
-        rpc('ensure_profile', { p_user: id, p_email: email, p_initial: Number(process.env.INITIAL_FREE_NODES || 50) }),
+        rpc('ensure_profile', { p_user: id, p_email: email, p_initial: require('./packages').freeUserNodes() }),
     spendNodes: (id, cost, action) => rpc('spend_nodes', { p_user: id, p_cost: cost, p_action: action }),
     creditNodes: (id, nodes, order, amount) =>
         rpc('credit_nodes', { p_user: id, p_nodes: nodes, p_order: order, p_amount: amount }),
@@ -45,7 +45,7 @@ module.exports = {
 
     ensureGuest: (guestId, ip) => rpc('ensure_guest', {
         p_guest: guestId, p_ip: ip,
-        p_initial: Number(process.env.GUEST_FREE_NODES || 15),
+        p_initial: require('./packages').freeGuestNodes(),
         p_ip_cap: Number(process.env.GUEST_IP_CAP || 3),
         p_ip_window_hours: Number(process.env.GUEST_IP_WINDOW_HOURS || 24)
     }),
@@ -101,6 +101,11 @@ module.exports = {
     async recentEvents(actorId, eventName, sinceIso, limit) {
         const rows = await table(`events?actor_id=eq.${encodeURIComponent(actorId)}&event_name=eq.${encodeURIComponent(eventName)}&created_at=gt.${encodeURIComponent(sinceIso)}&select=id,metadata,created_at&order=created_at.desc&limit=${Number(limit) || 10}`);
         return Array.isArray(rows) ? rows : [];
+    },
+    // Último pago acreditado de este usuario (cualquier vía), para el tiempo de espera entre compras.
+    async lastPayment(userId) {
+        const rows = await table(`payments?user_id=eq.${encodeURIComponent(userId)}&select=amount,created_at&order=created_at.desc&limit=1`);
+        return Array.isArray(rows) && rows[0] ? rows[0] : null;
     },
     async paymentExists(orderId) {
         const rows = await table(`payments?order_id=eq.${encodeURIComponent(orderId)}&select=order_id`);

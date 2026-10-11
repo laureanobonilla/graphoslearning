@@ -16,6 +16,17 @@ const store = require('./_lib/store');
 
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(obj) });
 const INTENT_TTL_MS = 6 * 60 * 60 * 1000;
+// Tiempo de espera entre compras: lo fija el paquete de la ÚLTIMA compra (4,99 → 6 h, 9,99 → 24 h, 19,99 → 48 h).
+// Frena que alguien reutilice la URL de retorno una y otra vez para juntar gemas. Los pagos antiguos (otros
+// montos) no imponen espera.
+async function cooldownFor(userId) {
+    const last = await store.lastPayment(userId);
+    if (!last) return null;
+    const pk = Object.values(GEM_PACKAGES).find((p) => Number(p.usd).toFixed(2) === Number(last.amount).toFixed(2));
+    if (!pk) return null;
+    const until = new Date(last.created_at).getTime() + pk.cooldownHours * 3600 * 1000;
+    return until > Date.now() ? { until: new Date(until).toISOString(), msLeft: until - Date.now() } : null;
+}
 const FROM_OK = new Set(['graphikosmos', 'idiomas']);
 
 exports.handler = async (event, context) => {
@@ -36,6 +47,8 @@ exports.handler = async (event, context) => {
             const pkg = GEM_PACKAGES[String(body.packageId)];
             if (!pkg) return json(400, { error: 'paquete_invalido' });
             if (user.isAdmin) return json(200, { url: pkg.url, intent: null });
+            const cd = await cooldownFor(user.id);
+            if (cd) return json(429, { error: 'cooldown', until: cd.until, msLeft: cd.msLeft });
             const recent = await store.countEventsLastHour(user.id, 'pay_intent');
             if (recent >= 10) return json(429, { error: 'rate_limited' });
             const intent = crypto.randomUUID();
@@ -48,6 +61,13 @@ exports.handler = async (event, context) => {
             if (!pkg) {
                 store.logEvent(user.id, 'user', null, 'pay_invalid_token', {}, user.email, 'graphikosmos').catch(() => {});
                 return json(400, { error: 'ficha_invalida' });
+            }
+            if (!user.isAdmin) {
+                const cd = await cooldownFor(user.id);
+                if (cd) {
+                    store.logEvent(user.id, 'user', null, 'pay_blocked_cooldown', { packageId: pkg.id, until: cd.until }, user.email, 'graphikosmos').catch(() => {});
+                    return json(429, { error: 'cooldown', until: cd.until, msLeft: cd.msLeft });
+                }
             }
             const since = new Date(Date.now() - INTENT_TTL_MS).toISOString();
             const intents = (await store.recentEvents(user.id, 'pay_intent', since, 10))

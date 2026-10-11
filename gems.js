@@ -19,7 +19,9 @@
     cont: 'Continue', close: 'Close', waiting: 'Confirming your purchase…',
     loginFirst: 'Log in to receive your gems', loginFirstSub: 'Use the same account you bought with and we add them right away.',
     noIntent: 'We could not match this payment to your account', noIntentSub: 'If you already paid, message us with your email and we add them by hand.',
-    err: 'We could not confirm the purchase', errSub: 'Try again in a minute or message us.'
+    err: 'We could not confirm the purchase', errSub: 'Try again in a minute or message us.',
+    coolIntent: (t) => `You bought recently. You can buy again in ${t}.`,
+    coolClaim: 'Your last purchase was too recent', coolClaimSub: (t) => `You can add gems from a new purchase in ${t}. If you already paid, message us and we add them by hand.`
   } : {
     shopTitle: 'Consigue más gemas', shopSub: 'Las gemas son lo que gasta cada idea nueva de tu mapa.',
     best: 'Mejor precio', rec: 'Recomendado', gems: 'gemas', buy: 'Comprar',
@@ -30,7 +32,9 @@
     cont: 'Seguir', close: 'Cerrar', waiting: 'Confirmando tu compra…',
     loginFirst: 'Inicia sesión para recibir tus gemas', loginFirstSub: 'Entra con la misma cuenta con la que compraste y se acreditan al instante.',
     noIntent: 'No pudimos asociar este pago a tu cuenta', noIntentSub: 'Si ya pagaste, escríbenos con tu correo y las acreditamos a mano.',
-    err: 'No pudimos confirmar la compra', errSub: 'Intenta de nuevo en un minuto o escríbenos.'
+    err: 'No pudimos confirmar la compra', errSub: 'Intenta de nuevo en un minuto o escríbenos.',
+    coolIntent: (t) => `Hiciste una compra hace poco. Podrás comprar de nuevo en ${t}.`,
+    coolClaim: 'Tu última compra fue muy reciente', coolClaimSub: (t) => `Podrás acreditar gemas de una compra nueva en ${t}. Si ya pagaste, escríbenos y las acreditamos a mano.`
   };
   const PACKS = [
     { id: 'g15', gems: 15000, usd: '4.99' },
@@ -38,6 +42,11 @@
     { id: 'g100', gems: 100000, usd: '19.99', tag: 'best' }
   ];
 
+  function leftText(ms) {
+    const m = Math.max(1, Math.ceil((Number(ms) || 0) / 60000)), hh = Math.floor(m / 60), mm = m % 60;
+    if (hh >= 1) return hh + ' h' + (mm ? ' ' + mm + ' min' : '');
+    return m + ' min';
+  }
   const cfg = { from: 'graphikosmos', refresh: null };
   function fmt(n) { return Math.round(Number(n) || 0).toLocaleString(EN ? 'en-US' : 'es-CR').replace(/ /g, ' '); }
   function nodesToGems(nodes) { return Math.max(0, Math.round((Number(nodes) || 0) * GEMS_PER_NODE)); }
@@ -136,7 +145,7 @@
     card.querySelectorAll('.gkg-pk').forEach((b) => { b.disabled = false; });
     if (!r.ok || !r.data.url) {
       try { w && w.close(); } catch (e) { /* nada */ }
-      msg.className = 'gkg-msg err'; msg.textContent = r.status === 429 ? T.rate : T.fail; return;
+      msg.className = 'gkg-msg err'; msg.textContent = r.status === 429 ? (r.data && r.data.error === 'cooldown' ? T.coolIntent(leftText(r.data.msLeft)) : T.rate) : T.fail; return;
     }
     if (w) { try { w.opener = null; } catch (e) { /* nada */ } w.location.href = r.data.url; msg.textContent = ''; }
     else { location.href = r.data.url; }
@@ -189,6 +198,11 @@
       return;
     }
     if (r.status === 401) { loginShown = false; return; }
+    if (r.status === 429 && r.data && r.data.error === 'cooldown') {
+      clearPending();
+      openOverlay(infoCard(T.coolClaim, T.coolClaimSub(leftText(r.data.msLeft)), '', [h('p', { class: 'gkg-foot' }, [helpLink()]), h('button', { class: 'gkg-btn sec', type: 'button', text: T.close, onclick: closeOverlay })]));
+      return;
+    }
     clearPending();
     const noIntent = r.status === 404 || (r.data && r.data.error === 'ficha_invalida');
     openOverlay(infoCard(noIntent ? T.noIntent : T.err, noIntent ? T.noIntentSub : T.errSub, '', [h('p', { class: 'gkg-foot' }, [helpLink()]), h('button', { class: 'gkg-btn sec', type: 'button', text: T.close, onclick: closeOverlay })]));

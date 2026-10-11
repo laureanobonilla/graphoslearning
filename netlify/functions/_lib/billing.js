@@ -145,8 +145,8 @@ function withBilling(raw, overrides = {}) {
             if (action === 'welcome_schema' || action === 'm_welcome') {
                 const paidAction = action === 'm_welcome' ? 'm_map' : 'parse_text';
                 const initial = identity.kind === 'user'
-                    ? Number(process.env.INITIAL_FREE_NODES || 50)
-                    : Number(process.env.GUEST_FREE_NODES || 15);
+                    ? require('./packages').freeUserNodes()
+                    : require('./packages').freeGuestNodes();
                 if (!hasWelcomeCookie(event) && balance >= initial) welcomeFree = true;
                 else { action = paidAction; body.action = paidAction; }
             }
