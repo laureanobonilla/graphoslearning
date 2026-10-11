@@ -107,6 +107,10 @@ module.exports = {
         const rows = await table(`payments?user_id=eq.${encodeURIComponent(userId)}&select=amount,created_at&order=created_at.desc&limit=1`);
         return Array.isArray(rows) && rows[0] ? rows[0] : null;
     },
+    async countEventsSince(actorId, eventName, sinceIso) {
+        const rows = await table(`events?actor_id=eq.${encodeURIComponent(actorId)}&event_name=eq.${encodeURIComponent(eventName)}&created_at=gte.${encodeURIComponent(sinceIso)}&select=id`);
+        return Array.isArray(rows) ? rows.length : 0;
+    },
     async paymentExists(orderId) {
         const rows = await table(`payments?order_id=eq.${encodeURIComponent(orderId)}&select=order_id`);
         return Array.isArray(rows) && rows.length > 0;

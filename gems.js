@@ -152,6 +152,7 @@
   }
 
   /* ---------- Regreso de PayPal (?pago=FICHA) ---------- */
+  const HOME = { idiomas: '/idiomas/', oraculo: '/oraculo/' };   // a dónde se vuelve tras pagar, según desde qué app se compró
   const PEND = 'gk_pago_pending';
   function readPending() { try { return JSON.parse(localStorage.getItem(PEND) || 'null'); } catch (e) { return null; } }
   function clearPending() { try { localStorage.removeItem(PEND); } catch (e) { /* nada */ } }
@@ -191,10 +192,11 @@
       try { localStorage.setItem('gk_gems_ts', String(Date.now())); } catch (e) { /* nada */ }
       const total = fmt(nodesToGems(r.data.balance));
       const line = r.data.already ? T.already(total) : T.okLine(fmt(r.data.gemsAdded), total);
-      const away = r.data.from === 'idiomas' && !/^\/idiomas(\/|$)/.test(location.pathname);
-      openOverlay(infoCard(T.okTitle, line, '💎', [h('button', { class: 'gkg-btn', type: 'button', text: T.cont, onclick: () => { closeOverlay(); if (away) location.replace('/idiomas/'); } })]));
+      const dest = HOME[r.data.from] || null;
+      const away = !!dest && location.pathname.indexOf(dest) !== 0;
+      openOverlay(infoCard(T.okTitle, line, '💎', [h('button', { class: 'gkg-btn', type: 'button', text: T.cont, onclick: () => { closeOverlay(); if (away) location.replace(dest); } })]));
       if (typeof cfg.refresh === 'function') { try { cfg.refresh(r.data.balance); } catch (e) { /* nada */ } }
-      if (away) setTimeout(() => { if (overlay) location.replace('/idiomas/'); }, 3500);
+      if (away) setTimeout(() => { if (overlay) location.replace(dest); }, 3500);
       return;
     }
     if (r.status === 401) { loginShown = false; return; }

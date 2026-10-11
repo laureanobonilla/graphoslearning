@@ -27,7 +27,7 @@ async function cooldownFor(userId) {
     const until = new Date(last.created_at).getTime() + pk.cooldownHours * 3600 * 1000;
     return until > Date.now() ? { until: new Date(until).toISOString(), msLeft: until - Date.now() } : null;
 }
-const FROM_OK = new Set(['graphikosmos', 'idiomas']);
+const FROM_OK = new Set(['graphikosmos', 'idiomas', 'oraculo']);
 
 exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };

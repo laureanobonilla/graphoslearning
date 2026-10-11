@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0716">
+<title>El Oráculo del Caos</title>
+<meta name="description" content="Recibe una señal: a veces profunda, a veces absurda, siempre distinta. Solo entretenimiento.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/oraculo/oraculo.css?v=1">
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<main id="app">
+  <header class="top">
+    <span class="mark">El Oráculo del Caos</span>
+    <button type="button" id="gems" class="pill" hidden aria-label="Mis gemas"></button>
+  </header>
+
+  <section class="ask">
+    <h1>¿Qué quieres saber?</h1>
+    <textarea id="q" rows="3" maxlength="300" placeholder="Pregunta lo que quieras, o déjalo vacío y recibe una señal"></textarea>
+
+    <div class="tone-row" id="toneRow" role="radiogroup" aria-label="Tono de la señal">
+      <button type="button" class="tone on" data-tone="auto" role="radio" aria-checked="true">Al azar</button>
+      <button type="button" class="tone" data-tone="poetico" role="radio" aria-checked="false">Poético</button>
+      <button type="button" class="tone" data-tone="comico" role="radio" aria-checked="false">Cómico</button>
+      <button type="button" class="tone" data-tone="absurdo" role="radio" aria-checked="false">Absurdo</button>
+      <button type="button" class="tone" data-tone="pasivo" role="radio" aria-checked="false">Pasivo-agresivo</button>
+      <button type="button" class="tone" data-tone="extremo" role="radio" aria-checked="false">Extremo</button>
+    </div>
+    <p id="toneNote" class="note">Al azar es gratis: 5 señales al día.</p>
+
+    <button type="button" id="go" class="go">Recibir una señal</button>
+    <p id="msg" class="msg" role="status"></p>
+  </section>
+
+  <section id="result" class="result" hidden aria-live="polite">
+    <article id="card" class="card">
+      <div class="card-top"><span id="cRarity" class="rar"></span><span id="cTone" class="tonelbl"></span></div>
+      <h2 id="cTitle"></h2>
+      <p id="cText"></p>
+      <div class="card-foot">El Oráculo del Caos</div>
+    </article>
+    <div class="actions" id="actions">
+      <button type="button" id="share" class="sec">Compartir</button>
+      <button type="button" id="again" class="sec">Otra señal</button>
+    </div>
+    <p class="odds">Probabilidades: común 70 %, rara 25 %, legendaria 5 %.</p>
+  </section>
+
+  <section id="albumBox" class="album" hidden>
+    <h3>Tus cartas <span id="albumCount"></span></h3>
+    <div id="album" class="album-grid"></div>
+  </section>
+
+  <footer class="foot">
+    Solo entretenimiento. No es consejo médico, legal ni financiero.
+    <a id="help" href="#" target="_blank" rel="noopener">¿Necesitas ayuda?</a>
+  </footer>
+</main>
+<div id="toast" class="toast" role="status"></div>
+<script src="/gems.js?v=2"></script>
+<script src="/oraculo/oraculo.js?v=1"></script>
+</body>
+</html>

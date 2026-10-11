@@ -15,7 +15,9 @@ const KNOWN = new Set([
     // Documentos muy largos: resumen por fragmentos (gratis); el esquema final se cobra como parse_text.
     'long_outline',
     // Idiomas (/idiomas/): mapa de bloques con rol gramatical (se cobra por nodo) y palabra suelta en contexto (gratis).
-    'lang_map', 'lang_word'
+    'lang_map', 'lang_word',
+    // Oráculo del Caos (/oraculo/): 5 señales gratis al día con tono al azar; elegir el tono o pasar de 5 cuesta 1 nodo.
+    'oracle'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
@@ -28,6 +30,13 @@ const MIN_BALANCE = { parse_text: 5, synergy: 3, antithesis: 2, analyze_text: 5,
 const LIMITS = { topic: 500, topicB: 500, contextPath: 2000, customRequest: 1500,
                  question: 1500, userAnswer: 4000, text: 60000, documentContext: 12000,
                  analysisType: 30, customType: 200, purpose: 60, level: 30, question: 600, studyLang: 10, word: 60, sentence: 400 };
+
+// Día de Costa Rica (UTC-6) para la cuota gratis del oráculo.
+const ORACLE_FREE_PER_DAY = Number(process.env.ORACLE_FREE_PER_DAY || 5);
+function dayStartIso() {
+    const off = 6 * 3600 * 1000, now = Date.now();
+    return new Date(Math.floor((now - off) / 86400000) * 86400000 + off).toISOString();
+}
 
 const len = a => (Array.isArray(a) ? a.length : 0);
 
@@ -120,6 +129,7 @@ function withBilling(raw, overrides = {}) {
 
         let balance = null;
         let welcomeFree = false;
+        let oracleFree = false, oracleFreeLeft = 0;
         if ((action === 'welcome_schema' || action === 'm_welcome') && identity.isAdmin) welcomeFree = true;
         if (!identity.isAdmin) {
             try {
@@ -151,7 +161,16 @@ function withBilling(raw, overrides = {}) {
                 else { action = paidAction; body.action = paidAction; }
             }
 
-            const min = FREE.has(action) ? 0 : (MIN_BALANCE[action] || 1);
+            // Oráculo: las primeras ORACLE_FREE_PER_DAY señales del día (con tono al azar) no cuestan nada.
+            if (action === 'oracle') {
+                const day = dayStartIso();
+                let usedToday = 0;
+                try { usedToday = await deps.store.countEventsSince(identity.id, 'oracle_used', day); } catch (err) { usedToday = ORACLE_FREE_PER_DAY; }
+                const wantsTone = body.tone && body.tone !== 'auto';
+                oracleFree = !wantsTone && usedToday < ORACLE_FREE_PER_DAY;
+                oracleFreeLeft = Math.max(0, ORACLE_FREE_PER_DAY - usedToday);
+            }
+            const min = (action === 'oracle' && oracleFree) ? 0 : (FREE.has(action) ? 0 : (MIN_BALANCE[action] || 1));
             if (balance < min) {
                 // Para invitados sin saldo, el cliente debe mostrar el muro de login,
                 // no la tienda (los invitados no pueden comprar sin cuenta).
@@ -166,7 +185,15 @@ function withBilling(raw, overrides = {}) {
         let data;
         try { data = JSON.parse(result.body); } catch { return result; }
 
-        const cost = computeCost(action, data);
+        let cost = computeCost(action, data);
+        if (action === 'oracle') {
+            cost = (data.care || oracleFree || identity.isAdmin) ? 0 : 1;
+            if (!data.care && !identity.isAdmin) {
+                try { await deps.store.logEvent(identity.id, identity.kind, null, 'oracle_used', { free: oracleFree, tone: data.tone, rarity: data.rarity }, identity.email || null, 'oraculo'); } catch (err) { console.error('[billing] oracle_used:', err.message); }
+                if (oracleFree) oracleFreeLeft = Math.max(0, oracleFreeLeft - 1);
+            }
+            data.freeLeft = identity.isAdmin ? ORACLE_FREE_PER_DAY : (data.care ? oracleFreeLeft : oracleFreeLeft);
+        }
         if (!identity.isAdmin) {
             try {
                 balance = identity.kind === 'user'
