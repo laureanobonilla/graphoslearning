@@ -90,6 +90,8 @@
     Object.keys(views).forEach((k) => { views[k].hidden = k !== v; });
     $('#appbar').hidden = (v === 'defs' || v === 'projects');
     $('#btnCapture').disabled = (v === 'home');
+    $('#btnNew').hidden = (v === 'home');
+    if (v === 'home') { $('#topicInput').value = ''; $('#homeMsg').textContent = ''; $('#homeMsg').className = 'msg'; }
     if (v === 'map') renderMap(!!show.animate);
     if (v === 'defs') renderDefs();
     if (v === 'projects') renderProjects();
@@ -379,6 +381,16 @@
   }
   $('#stSame').addEventListener('click', () => makeFromText('same'));
   $('#stNew').addEventListener('click', () => makeFromText('new'));
+
+  /* ---------- Atajo "Nuevo": volver al inicio para hacer otro mapa (el actual ya queda guardado) ---------- */
+  $('#btnNew').addEventListener('click', async () => {
+    track('m_new_clicked', { from: view });
+    closeSheet(); closeTextSheet();
+    clearTimeout(saveTimer);
+    if (G.rootId) { try { await saveProject(); } catch { /* nada */ } }
+    G = emptyG(); cur = null;
+    go('home');
+  });
 
   /* ---------- Ver definiciones ---------- */
   $('#btnDefs').addEventListener('click', () => { track('m_defs_opened', { depth: depthOf(cur) }); go('defs', cur); });
