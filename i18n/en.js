@@ -229,7 +229,7 @@
   "js.procesar_este_esquema": "process this map",
   "js.mi_cuenta": "My Account",
   "js.iniciar_sesion": "Sign in",
-  "js.nodos": "{availableNodes} Nodes",
+  "js.nodos": "{availableNodes} Gems",
   "js.relacionado": "related",
   "js.ya_tienes_un_esquema_en": "You already have a map on the canvas. Do you want to clear the existing canvas before generating the new one?",
   "js.limpiar_el_lienzo": "Clear the canvas?",

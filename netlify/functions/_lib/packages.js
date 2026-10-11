@@ -11,4 +11,25 @@ const PACKAGES = {
     '600': { nodes: 600, usd: '59.99' }
 };
 
-module.exports = { PACKAGES };
+
+// ==========================================
+// GEMAS (paquetes con enlace de pago de PayPal + URL de retorno con "ficha").
+// El saldo en la base sigue contándose en NODOS; la gema es solo la unidad que ve la persona:
+// 1 nodo = GEMS_PER_NODE gemas. Cada paquete acredita nodes = gems / GEMS_PER_NODE.
+// "token" es la ficha que PayPal pone en la URL al volver (?pago=TOKEN); define qué paquete se compró.
+// Ver pay.js: la ficha sola NO acredita nada, hace falta además una intención de compra reciente
+// de esa misma cuenta (se crea al pulsar el paquete dentro de la app).
+// ==========================================
+const GEMS_PER_NODE = 250;
+const GEM_PACKAGES = {
+    g15:  { id: 'g15',  gems: 15000,  usd: '4.99',  token: '1k29394856678',    url: 'https://www.paypal.com/ncp/payment/Z4LSQ42QGWQFG' },
+    g40:  { id: 'g40',  gems: 40000,  usd: '9.99',  token: 'j3j4jjU76k288',    url: 'https://www.paypal.com/ncp/payment/LPZLV5MM36KU4' },
+    g100: { id: 'g100', gems: 100000, usd: '19.99', token: 'ki455ffdsfg6763xy', url: 'https://www.paypal.com/ncp/payment/94PTU9KLHLEJW' }
+};
+Object.values(GEM_PACKAGES).forEach((p) => { p.nodes = Math.round(p.gems / GEMS_PER_NODE); });
+function findGemPackageByToken(token) {
+    const t = String(token || '');
+    return Object.values(GEM_PACKAGES).find((p) => p.token === t) || null;
+}
+
+module.exports = { PACKAGES, GEMS_PER_NODE, GEM_PACKAGES, findGemPackageByToken };

@@ -118,7 +118,8 @@
       res = await fetch(FN + 'gemini', { method: 'POST', credentials: 'same-origin', headers: await headers(), body: JSON.stringify(Object.assign({ lang: 'es' }, body)) });
     } catch { return { ok: false, kind: 'network' }; }
     let data = {}; try { data = await res.json(); } catch { /* nada */ }
-    if (res.ok) return { ok: true, data };
+    if (res.ok) { if (typeof data.balance === 'number' && !data.admin) setGems(data.balance); return { ok: true, data }; }
+    if (res.status === 402 && typeof data.balance === 'number') setGems(data.balance);
     if (res.status === 402 && data.error === 'guest_limit_reached') return { ok: false, kind: 'login', data };
     if (res.status === 402) return { ok: false, kind: user() ? 'contact' : 'login', data };
     if (res.status === 401) return { ok: false, kind: 'login', data };
@@ -132,7 +133,7 @@
   }
   function handleBlocked(kind, where) {
     if (kind === 'login') { track('m_paywall_shown', { reason: 'guest_limit', where }); openModal('#modalLogin'); return true; }
-    if (kind === 'contact') { track('m_paywall_shown', { reason: 'no_nodes', where }); openContact(); return true; }
+    if (kind === 'contact') { track('m_paywall_shown', { reason: 'no_nodes', where }); if (window.GK_GEMS) window.GK_GEMS.openShop({ from: 'graphikosmos' }); else openContact(); return true; }
     return false;
   }
 
@@ -546,6 +547,23 @@
     go('map', G.rootId, false);
   }
 
+  /* ---------- Gemas (saldo visible + tienda) ---------- */
+  function setGems(nodes) {
+    const b = $('#btnGems'); if (!b || typeof nodes !== 'number' || !window.GK_GEMS) return;
+    b.hidden = false; $('#gemsVal').textContent = window.GK_GEMS.gemsLabel(nodes);
+  }
+  async function fetchBalance(n) {
+    if (typeof n === 'number') { setGems(n); return; }
+    try {
+      const r = await fetch(FN + 'balance', { credentials: 'same-origin', headers: await headers() });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.kind === 'admin') $('#btnGems').hidden = true;
+      else if (r.ok) setGems(d.balance);
+    } catch { /* sin saldo visible, no pasa nada */ }
+  }
+  if (window.GK_GEMS) window.GK_GEMS.configure({ from: 'graphikosmos', refresh: fetchBalance });
+  $('#btnGems').addEventListener('click', () => { track('m_gems_clicked'); if (window.GK_GEMS) window.GK_GEMS.openShop({ from: 'graphikosmos' }); });
+
   /* ---------- Sesión ---------- */
   function updateLogin() {
     const u = user(); const lab = $('#loginLabel');
@@ -559,9 +577,9 @@
   });
   if (window.netlifyIdentity) {
     netlifyIdentity.init({ locale: 'es' });
-    netlifyIdentity.on('init', updateLogin);
-    netlifyIdentity.on('login', () => { netlifyIdentity.close(); closeModals(); updateLogin(); track('m_login_success'); toast('Sesión iniciada'); if (G.rootId) scheduleSave(); });
-    netlifyIdentity.on('logout', () => { updateLogin(); toast('Sesión cerrada'); });
+    netlifyIdentity.on('init', () => { updateLogin(); fetchBalance(); });
+    netlifyIdentity.on('login', () => { netlifyIdentity.close(); closeModals(); updateLogin(); track('m_login_success'); toast('Sesión iniciada'); fetchBalance(); if (G.rootId) scheduleSave(); });
+    netlifyIdentity.on('logout', () => { updateLogin(); fetchBalance(); toast('Sesión cerrada'); });
   }
   updateLogin();
 

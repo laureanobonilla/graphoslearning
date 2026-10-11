@@ -9,14 +9,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/idiomas/idiomas.css?v=1">
+<link rel="stylesheet" href="/idiomas/idiomas.css?v=2">
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
 <main id="app">
   <header class="bar">
     <a class="brand" href="/" aria-label="Graphikosmos"><span class="logo">Γ</span><span>Graphikosmos</span></a>
-    <span class="bar-title">Idiomas</span>
+    <button type="button" id="balance" class="balance" hidden aria-label="Mis gemas"></button>
   </header>
 
   <section id="viewStart" class="start">
@@ -58,7 +58,6 @@
         <button type="button" class="seg-b on" id="segMap">Mapa</button>
         <button type="button" class="seg-b" id="segText">Texto</button>
       </div>
-      <span id="balance" class="balance" hidden></span>
     </div>
     <div class="legend" id="legend"></div>
     <div class="panes">
@@ -90,6 +89,7 @@
   </aside>
 </main>
 <div id="toast" class="toast" role="status"></div>
-<script src="/idiomas/idiomas.js?v=1"></script>
+<script src="/gems.js?v=1"></script>
+<script src="/idiomas/idiomas.js?v=2"></script>
 </body>
 </html>

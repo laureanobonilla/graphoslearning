@@ -229,7 +229,7 @@
   "js.procesar_este_esquema": "procesar este esquema",
   "js.mi_cuenta": "Mi Cuenta",
   "js.iniciar_sesion": "Iniciar Sesión",
-  "js.nodos": "{availableNodes} Nodos",
+  "js.nodos": "{availableNodes} Gemas",
   "js.relacionado": "relacionado",
   "js.ya_tienes_un_esquema_en": "Ya tienes un esquema en el lienzo. ¿Deseas limpiar el lienzo existente antes de generar el nuevo?",
   "js.limpiar_el_lienzo": "¿Limpiar el lienzo?",

@@ -97,6 +97,16 @@ module.exports = {
     // con ese nombre (p. ej. "feedback_sent") registró este actor en la
     // última hora, reutilizando la tabla `events` que ya existe en vez de
     // crear una tabla/RPC aparte solo para esto.
+    // Eventos recientes de un actor (más nuevos primero), con su metadata. Lo usa pay.js para las intenciones de compra.
+    async recentEvents(actorId, eventName, sinceIso, limit) {
+        const rows = await table(`events?actor_id=eq.${encodeURIComponent(actorId)}&event_name=eq.${encodeURIComponent(eventName)}&created_at=gt.${encodeURIComponent(sinceIso)}&select=id,metadata,created_at&order=created_at.desc&limit=${Number(limit) || 10}`);
+        return Array.isArray(rows) ? rows : [];
+    },
+    async paymentExists(orderId) {
+        const rows = await table(`payments?order_id=eq.${encodeURIComponent(orderId)}&select=order_id`);
+        return Array.isArray(rows) && rows.length > 0;
+    },
+
     async countEventsLastHour(actorId, eventName) {
         const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
         const rows = await table(`events?actor_id=eq.${encodeURIComponent(actorId)}&event_name=eq.${encodeURIComponent(eventName)}&created_at=gt.${encodeURIComponent(since)}&select=id`);

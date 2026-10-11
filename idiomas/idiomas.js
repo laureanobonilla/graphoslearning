@@ -33,12 +33,36 @@
   function busy(btn, on) { btn.classList.toggle('is-busy', !!on); btn.disabled = !!on; }
   function wc(s) { return s.trim().split(/\s+/).filter(Boolean).length; }
 
+  function setGems(nodes) {
+    const b = $('#balance'); if (!b || typeof nodes !== 'number' || !window.GK_GEMS) return;
+    b.hidden = false; b.textContent = '💎 ' + window.GK_GEMS.gemsLabel(nodes);
+  }
+  async function fetchBalance(n) {
+    if (typeof n === 'number') { setGems(n); return; }
+    try {
+      const r = await fetch(FN + 'balance', { credentials: 'same-origin', headers: await headers() });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok && d.kind === 'admin') $('#balance').hidden = true; else if (r.ok) setGems(d.balance);
+    } catch { /* sin saldo visible */ }
+  }
+  if (window.GK_GEMS) window.GK_GEMS.configure({ from: 'idiomas', refresh: fetchBalance });
+  $('#balance').addEventListener('click', () => { if (window.GK_GEMS) window.GK_GEMS.openShop({ from: 'idiomas' }); });
+  try {
+    if (window.netlifyIdentity) {
+      netlifyIdentity.on('init', () => fetchBalance());
+      netlifyIdentity.on('login', () => { try { netlifyIdentity.close(); } catch (e) { /* nada */ } fetchBalance(); });
+      netlifyIdentity.on('logout', () => fetchBalance());
+      netlifyIdentity.init({ locale: 'es' });
+    }
+  } catch { /* nada */ }
+
   async function callGemini(body) {
     let res;
     try { res = await fetch(FN + 'gemini', { method: 'POST', credentials: 'same-origin', headers: await headers(), body: JSON.stringify(Object.assign({ lang: 'es' }, body)) }); }
     catch { return { ok: false, kind: 'network' }; }
     let data = {}; try { data = await res.json(); } catch { /* nada */ }
-    if (res.ok) return { ok: true, data };
+    if (res.ok) { if (typeof data.balance === 'number' && !data.admin) setGems(data.balance); return { ok: true, data }; }
+    if (res.status === 402 && typeof data.balance === 'number') setGems(data.balance);
     if (res.status === 402 && data.error === 'guest_limit_reached') return { ok: false, kind: 'login', data };
     if (res.status === 402) return { ok: false, kind: user() ? 'nobalance' : 'login', data };
     if (res.status === 401) return { ok: false, kind: 'login', data };
@@ -47,7 +71,7 @@
   }
   function failText(kind) {
     if (kind === 'login') return 'Para seguir, crea tu cuenta gratis o inicia sesión.';
-    if (kind === 'nobalance') return 'Se acabaron tus gemas. Recarga desde Graphikosmos para seguir.';
+    if (kind === 'nobalance') return 'Se acabaron tus gemas. Consigue más para seguir.';
     if (kind === 'rate') return 'Hay mucha actividad en tu cuenta. Espera unos minutos e intenta de nuevo.';
     if (kind === 'network') return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
     return 'No pudimos hacerlo. Intenta de nuevo.';
@@ -85,6 +109,7 @@
     if (!r.ok) {
       msg.className = 'msg err'; msg.textContent = failText(r.kind);
       if (r.kind === 'login') openLogin();
+      if (r.kind === 'nobalance' && window.GK_GEMS) window.GK_GEMS.openShop({ from: 'idiomas' });
       return;
     }
     msg.textContent = '';
@@ -99,7 +124,6 @@
     (d.branches || []).forEach((b) => add(b, 'root', b.relationship));
     (d.subBranches || []).forEach((s) => { if (S.nodes[s.parentId]) add(s, s.parentId, s.relationship); });
     S.seq = S.order.length;
-    if (typeof d.balance === 'number' && !d.admin) { const b = $('#balance'); b.hidden = false; b.textContent = 'Saldo: ' + d.balance; }
     $('#viewStart').hidden = true; $('#viewResult').hidden = false;
     $('#legend').innerHTML = Object.keys(ROLES).filter((k) => k !== 'otro').map((k) => '<span><i style="background:' + ROLES[k].color + '"></i>' + ROLES[k].name + '</span>').join('');
     $('#textBody').lang = lang;

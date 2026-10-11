@@ -319,10 +319,15 @@ function updateManualPurchaseBox() {
 }
 
 function openStoreModal() {
+    // Tienda de gemas (gems.js, pago con PayPal). Si por lo que sea ese módulo no cargó,
+    // queda el modal anterior de contacto como respaldo.
+    if (window.GK_GEMS) { window.GK_GEMS.openShop({ from: 'graphikosmos' }); return; }
     storeModal?.classList.remove('hidden');
     storeModal?.classList.add('flex');
     updateManualPurchaseBox();
 }
+if (window.GK_GEMS) window.GK_GEMS.configure({ from: 'graphikosmos', refresh: () => { try { refreshBalanceFromServer(); } catch (_e) { /* nada */ } } });
+document.getElementById('nodeCounterBtn')?.addEventListener('click', () => { if (typeof isAdmin !== 'undefined' && isAdmin) return; openStoreModal(); });
 
 // ==========================================
 // ENVÍO DE CORREO REAL DESDE EL SERVIDOR (Resend) — a diferencia del enlace
@@ -897,7 +902,7 @@ function updateCounterDisplay() {
         dot.className = 'w-2 h-2 rounded-full bg-purple-500';
         return;
     }
-    display.innerText = tr("js.nodos", { availableNodes });
+    display.innerText = tr("js.nodos", { availableNodes: window.GK_GEMS ? window.GK_GEMS.gemsLabel(availableNodes) : availableNodes });
     if (availableNodes <= 0) dot.className = 'w-2 h-2 rounded-full bg-red-500';
     else if (availableNodes < 10 && currentUser) dot.className = 'w-2 h-2 rounded-full bg-amber-500';
     else dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
