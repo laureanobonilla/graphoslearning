@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Ponle música a tu voz</title>
+<meta name="description" content="Tu voz sola o con tu instrumento: la musicalizamos y la arreglamos hasta convertirla en una canción. Primero escuchas una muestra; solo si te gusta, pagas.">
+<meta property="og:title" content="Ponle música a tu voz">
+<meta property="og:description" content="Tu voz sola o con tu instrumento: la musicalizamos y la arreglamos hasta convertirla en una canción. Primero escuchas una muestra; solo si te gusta, pagas.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gloock&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/cs/cs.css?v=1">
+</head>
+<body>
+<div class="shell">
+  <div class="topbar"><span class="brand">tu voz</span></div>
+  <section class="hero">
+    <svg id="coverWave" viewBox="0 0 320 92" role="img" aria-label="Una onda de sonido"></svg>
+    <h1 class="display">Tu voz merece una canción</h1>
+    <p class="sub">Cántanos o tócanos lo que tienes, tu voz sola o con tu instrumento, y la musicalizamos o la arreglamos hasta convertirla en una canción.</p>
+  </section>
+
+  <div class="sec">
+    <h2 class="display">Así funciona</h2>
+    <ol class="steps">
+      <li><span class="n">1</span><div><b>Sube tu audio</b><span>Tu voz sola o con tu instrumento. Puede ser una grabación del celular.</span></div></li>
+      <li><span class="n">2</span><div><b>Mira el precio</b><span>Se calcula por minuto de audio. Lo ves antes de enviar.</span></div></li>
+      <li><span class="n">3</span><div><b>Escucha una muestra</b><span>Te la enviamos por WhatsApp o correo. Si te gusta, la terminamos y recién ahí pagas.</span></div></li>
+    </ol>
+  </div>
+
+  <div class="sec">
+    <div class="price-teaser" id="teaser"></div>
+  </div>
+
+  <div class="sec">
+    <h2 class="display">Por qué confiar</h2>
+    <ul class="trust">
+      <li>Escuchas una muestra antes de pagar. Si no te gusta, no pagas nada.</li>
+      <li>Antes de enviar ves el precio exacto.</li>
+      <li>Tu audio solo se usa para preparar tu canción.</li>
+    </ul>
+  </div>
+
+  <div class="sec" id="pedido">
+    <h2 class="display">Envíanos tu voz</h2>
+    <div id="orderRoot"><p class="cs-fine">Cargando…</p></div>
+  </div>
+</div>
+<div id="ctaBar" class="cta-bar"><button type="button" class="btn btn-primary" id="btnCta">Quiero mi canción</button></div>
+<script src="/cs/cs.js?v=1"></script>
+<script>
+(function () {
+  var APP = 'tu-voz', root = document.getElementById('orderRoot');
+  CS.drawWave(document.getElementById('coverWave'));
+  CS.track(APP, 'landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 200) : null, likelyBot: /bot|crawl|spider|facebookexternalhit|whatsapp|preview|slackbot|embedly|discordbot/i.test(navigator.userAgent) });
+  var bar = document.getElementById('ctaBar');
+  document.getElementById('btnCta').addEventListener('click', function () { CS.track(APP, 'cta_clicked', {}); document.getElementById('pedido').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  if ('IntersectionObserver' in window) new IntersectionObserver(function (e) { bar.classList.toggle('is-hidden', e[0].isIntersecting); }, { threshold: 0.05 }).observe(document.getElementById('pedido'));
+  CS.loadConfig(APP).then(function (cfg) {
+    if (!cfg) { root.innerHTML = '<p class="cs-err">No pudimos cargar la página. Recárgala o inténtalo en un momento.</p>'; return; }
+    var t = document.getElementById('teaser');
+    t.innerHTML = '<p class="amt">' + cfg.texts.perMinute + '</p><p>por minuto de audio</p><hr><p>No pagas nada hasta que escuches una muestra.</p>';
+    CS.mountOrder({ app: APP, cfg: cfg, root: root, videoCopy: null });
+  });
+})();
+</script>
+</body>
+</html>
