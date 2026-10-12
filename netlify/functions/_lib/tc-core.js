@@ -1,17 +1,16 @@
 // «tu-cancion»: piezas compartidas por las funciones tc-*.
 const crypto = require('crypto');
 
-// >>> EDITA AQUÍ los precios por país. Lo que dice la página sale de esta tabla (la función tc-config). <<<
-// Costa Rica ya está definido. Los demás países usan DEFAULT, que es PROVISIONAL hasta que definas los precios.
-const PRICES = {
-    CR: { amount: 9900, currency: 'CRC' },
-    DEFAULT: { amount: 22, currency: 'USD', provisional: true }
-};
+// >>> EDITA AQUÍ los precios. Costa Rica paga CR_CRC colones; los demás países, el equivalente de BASE_CRC colones en su
+// moneda (tipos de cambio aproximados en _lib/currency.js). <<<
+const { currencyOf, convertCrc, fmtMoney } = require('./currency');
+const CR_CRC = 3900, BASE_CRC = 9900;
+const PRICES = { CR: { amount: CR_CRC, currency: 'CRC' }, BASE_CRC };
 const priceFor = (country) => {
-    const p = PRICES[String(country || '').toUpperCase()] || PRICES.DEFAULT;
-    const n = String(p.amount).replace(/\B(?=(\d{3})+(?!\d))/g, p.currency === 'CRC' ? '.' : ',');
-    const text = p.currency === 'CRC' ? `₡${n}` : `US$${n}`;
-    return { amount: p.amount, currency: p.currency, text, provisional: !!p.provisional };
+    const c = String(country || '').toUpperCase();
+    if (c === 'CR') return { amount: CR_CRC, currency: 'CRC', text: fmtMoney('CRC', CR_CRC), provisional: false };
+    const cur = currencyOf(c), amount = convertCrc(BASE_CRC, cur);
+    return { amount, currency: cur, text: fmtMoney(cur, amount), provisional: !c };   // sin país detectado: se avisa en el correo
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

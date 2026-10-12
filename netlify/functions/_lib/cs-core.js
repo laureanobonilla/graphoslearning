@@ -16,8 +16,8 @@ const AUDIO_TYPES = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|aac|wav|x-wav|wave|webm|ogg
 const PHOTO_TYPES = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i;
 
 const money = (n) => '₡' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-// Precio proporcional a la duración (1:15 = 1,25 minutos), redondeado hacia arriba a los ₡100; mínimo 1 minuto.
-const exactMinutes = (seconds) => Math.max(1, (Number(seconds) || 0) / 60);
+// Precio proporcional a la duración (1:15 = 1,25 minutos), redondeado hacia arriba a los ₡100 (12 s = ₡2.000).
+const exactMinutes = (seconds) => ((Number(seconds) || 0) > 0 ? Number(seconds) / 60 : 1);   // sin duración conocida: 1 minuto
 const billedMinutes = (seconds) => Math.ceil(exactMinutes(seconds) - 0.0001);   // entero, para la tabla
 const roundUp100 = (n) => Math.ceil(Math.round(n * 100) / 100 / 100 - 1e-9) * 100;
 function priceOf(app, withVideo, seconds) {
@@ -32,26 +32,7 @@ function priceOf(app, withVideo, seconds) {
 const publicConfig = (app) => { const a = APPS[app]; if (!a) return null; return { app, label: a.label, audio: a.audio, video: a.video, perMinute: a.perMinute || null, perMinuteVideo: a.perMinuteVideo || null, flat: a.flat || null, flatVideo: a.flatVideo || null, maxAudioMin: MAX_AUDIO_MIN, texts: { perMinute: a.perMinute ? money(a.perMinute) : null, perMinuteVideo: a.perMinuteVideo ? money(a.perMinuteVideo) : null, flat: a.flat ? money(a.flat) : null, flatVideo: a.flatVideo ? money(a.flatVideo) : null } }; };
 
 
-// ---- Moneda de cada país ----
-// Los precios base están en colones (₡). A cada país se le muestra el equivalente en su moneda, redondeado hacia arriba
-// a un número "limpio" (step). Los tipos de cambio son APROXIMADOS y fijos: edita CRC_PER_USD y PER_USD cuando quieras.
-const CRC_PER_USD = 510;
-const CURRENCIES = {   // perUSD = unidades de esa moneda por 1 US$; step = redondeo; dots = separador de miles "."
-    CRC: { symbol: '₡', perUSD: CRC_PER_USD, step: 100, dots: true },  USD: { symbol: 'US$', perUSD: 1, step: 1 },
-    MXN: { symbol: 'MX$', perUSD: 19, step: 10 },   GTQ: { symbol: 'Q', perUSD: 7.7, step: 5 },    HNL: { symbol: 'L', perUSD: 26, step: 10 },
-    NIO: { symbol: 'C$', perUSD: 36.8, step: 10 },  COP: { symbol: 'COL$', perUSD: 4000, step: 1000, dots: true }, PEN: { symbol: 'S/', perUSD: 3.6, step: 1 },
-    CLP: { symbol: 'CLP$', perUSD: 950, step: 500, dots: true }, ARS: { symbol: 'AR$', perUSD: 1300, step: 1000, dots: true }, UYU: { symbol: '$U', perUSD: 40, step: 10, dots: true },
-    BOB: { symbol: 'Bs', perUSD: 6.9, step: 5, dots: true }, PYG: { symbol: '₲', perUSD: 7500, step: 5000, dots: true }, DOP: { symbol: 'RD$', perUSD: 62, step: 50 },
-    EUR: { symbol: '€', perUSD: 0.88, step: 1, dots: true }, BRL: { symbol: 'R$', perUSD: 5.5, step: 1, dots: true }, CAD: { symbol: 'CA$', perUSD: 1.38, step: 1 }, GBP: { symbol: '£', perUSD: 0.75, step: 1 }
-};
-const COUNTRY_CUR = { CR: 'CRC', US: 'USD', PA: 'USD', EC: 'USD', SV: 'USD', PR: 'USD', VE: 'USD', MX: 'MXN', GT: 'GTQ', HN: 'HNL', NI: 'NIO', CO: 'COP', PE: 'PEN', CL: 'CLP', AR: 'ARS', UY: 'UYU', BO: 'BOB', PY: 'PYG', DO: 'DOP',
-    BR: 'BRL', CA: 'CAD', GB: 'GBP', ES: 'EUR', DE: 'EUR', FR: 'EUR', IT: 'EUR', PT: 'EUR', NL: 'EUR', BE: 'EUR', IE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
-const currencyOf = (country) => COUNTRY_CUR[String(country || '').toUpperCase()] || 'USD';
-const fmtMoney = (cur, n) => { const c = CURRENCIES[cur] || CURRENCIES.USD, t = String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, c.dots ? '.' : ','); return c.symbol + t; };
-// De colones a la moneda indicada (redondeo hacia arriba al "step" de esa moneda).
-function convertCrc(crc, cur) { const c = CURRENCIES[cur] || CURRENCIES.USD; if (cur === 'CRC') return Math.ceil(crc / 100 - 1e-9) * 100; return Math.ceil((crc * (c.perUSD / CRC_PER_USD)) / c.step - 1e-9) * c.step; }
-const displayPrice = (crc, cur) => { const code = CURRENCIES[cur] ? cur : 'USD'; return fmtMoney(code, convertCrc(crc, code)); };
-const currencyInfo = (country) => { const code = currencyOf(country), c = CURRENCIES[code]; return { code, symbol: c.symbol, perCrc: c.perUSD / CRC_PER_USD, step: c.step, dots: !!c.dots, country: country || null }; };
+const { CURRENCIES, currencyOf, fmtMoney, convertCrc, displayPrice, currencyInfo } = require('./currency');
 
 // ---- Cloudinary ----
 function cld() {

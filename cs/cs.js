@@ -169,19 +169,17 @@ CS.mountOrder = function (opts) {
   form.appendChild(notes);
 
   // 5) Precio + confirmación
-  const price = el('div', 'cs-price', '<p class="amt" data-p="amt"></p><p class="lbl" data-p="lbl"></p><p class="calc" data-p="calc"></p><p class="free"><b>No pagas nada ahora.</b> Primero te enviamos una muestra para que la escuches. Solo si te gusta, pagas y la terminamos.</p>');
-  form.appendChild(price);
-  const P = (n) => price.querySelector(`[data-p="${n}"]`);
+  let ready = false;   // el precio solo se muestra, ya calculado, dentro de la casilla de confirmación
   const ack = el('label', 'ack', '<input type="checkbox" id="csAck"><span id="csAckTxt"></span>'); form.appendChild(ack);
   const errBox = el('p', 'cs-err is-hidden'); errBox.setAttribute('role', 'alert'); form.appendChild(errBox);
   const prog = el('div', 'cs-prog is-hidden', '<div class="track"><i></i></div><p></p>'); form.appendChild(prog);
   const submit = el('button', 'btn btn-primary cs-submit', opts.submitLabel || 'Enviar y recibir mi muestra'); submit.type = 'submit'; form.appendChild(submit);
   form.appendChild(el('p', 'cs-fine', 'Al enviar aceptas que usemos tu audio, letra y foto solo para preparar tu muestra.'));
 
-  const priceFor = (sec, per) => Math.ceil(Math.round(Math.max(1, sec / 60) * per) / 100 - 1e-9) * 100;
+  const priceFor = (sec, per) => Math.max(100, Math.ceil(Math.round((sec > 0 ? sec / 60 : 1) * per) / 100 - 1e-9) * 100);   // proporcional, hacia arriba a ₡100
   function calc() {
-    const ready = (!hasAudio || !!st.audio) && (!canVideo || !!st.video);
-    price.classList.toggle('is-hidden', !ready); ack.classList.toggle('is-hidden', !ready);
+    ready = (!hasAudio || !!st.audio) && (!canVideo || !!st.video);
+    ack.classList.toggle('is-hidden', !ready);
     if (!ready) return;
     const withVideo = st.video === 'yes';
     let amount, amtTxt, lbl = withVideo ? 'Canción con video' : 'Solo la canción', calcTxt = '', ackTxt;
@@ -199,7 +197,6 @@ CS.mountOrder = function (opts) {
       calcTxt = withVideo ? 'Nosotros ponemos la voz; el video eres tú cantando.' : 'Nosotros ponemos la voz.';
       ackTxt = `Entiendo que el precio será ${amtTxt}. No se me cobra nada hasta que reciba y escuche una muestra.`;
     }
-    P('amt').textContent = amtTxt; P('lbl').textContent = lbl; P('calc').textContent = calcTxt; P('calc').classList.toggle('is-hidden', !calcTxt);
     ack.querySelector('#csAckTxt').textContent = ackTxt;
   }
   calc();
@@ -282,7 +279,7 @@ CS.mountOrder = function (opts) {
     if (withVideo && !st.photo) missing.push(['la foto de tu rostro para el video', videoCard]);
     if (withVideo && st.photo && !V('consent').checked) missing.push(['confirmar que la foto es tuya o que tienes permiso', videoCard]);
     if (!rawPhone && !email) missing.push(['tu WhatsApp o tu correo', contact]);
-    const ackMissing = !price.classList.contains('is-hidden') && !ack.querySelector('input').checked;
+    const ackMissing = ready && !ack.querySelector('input').checked;
     if (missing.length) { if (ackMissing) missing.push(['marcar la casilla del precio', ack]); return fail('Te falta: ' + missing.map(m => m[0]).join('; ') + '.', missing[0][1]); }
     let phone = '';
     if (rawPhone) { const pr = CS.buildPhone(contact.querySelector('#csDial').value, rawPhone); if (!pr.phone) { CS.track(app, 'phone_invalid', { reason: pr.reason }); return fail(CS.PHONE_MSG[pr.reason] || CS.PHONE_MSG.short, contact); } phone = pr.phone; }
@@ -322,7 +319,7 @@ CS.mountOrder = function (opts) {
     ps[0].textContent = `Te escribiremos ${via} con una muestra${withVideo ? ' de tu canción y tu video' : ' de tu canción'}.`;
     ps[1].textContent = `Precio si te gusta: ${res.price}. No pagas nada hasta escuchar la muestra.`;
     ps[2].textContent = withVideo ? 'Y recuerda: en el video eres tú cantando. ¡Prepárate para verte!' : 'Revisa tus mensajes pronto.';
-    root.appendChild(d); try { root.scrollIntoView({ block: 'start' }); } catch { /* ok */ } window.scrollTo(0, 0);
+    root.appendChild(d); try { d.scrollIntoView({ block: 'center' }); } catch { window.scrollTo(0, 0); }
     if (opts.onDone) opts.onDone(res);
   }
   CS.track(app, 'form_shown', {});
