@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gloock&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/cs/cs.css?v=1">
+<link rel="stylesheet" href="/cs/cs.css?v=2">
 </head>
 <body>
 <div class="shell">
@@ -25,14 +25,10 @@
   <div class="sec">
     <h2 class="display">Así funciona</h2>
     <ol class="steps">
-      <li><span class="n">1</span><div><b>Sube tu audio</b><span>Tu voz sola o con tu instrumento. Puede ser una grabación del celular.</span></div></li>
-      <li><span class="n">2</span><div><b>Mira el precio</b><span>Se calcula por minuto de audio. Lo ves antes de enviar.</span></div></li>
+      <li><span class="n">1</span><div><b>Sube tu voz</b><span>Tu voz sola o con tu instrumento, en audio o en video. También puedes grabarla aquí.</span></div></li>
+      <li><span class="n">2</span><div><b>Mira el precio al enviar</b><span>Lo calculamos con la duración de tu archivo y lo ves antes de enviar.</span></div></li>
       <li><span class="n">3</span><div><b>Escucha una muestra</b><span>Te la enviamos por WhatsApp o correo. Si te gusta, la terminamos y recién ahí pagas.</span></div></li>
     </ol>
-  </div>
-
-  <div class="sec">
-    <div class="price-teaser" id="teaser"></div>
   </div>
 
   <div class="sec">
@@ -50,7 +46,7 @@
   </div>
 </div>
 <div id="ctaBar" class="cta-bar"><button type="button" class="btn btn-primary" id="btnCta">Quiero mi canción</button></div>
-<script src="/cs/cs.js?v=1"></script>
+<script src="/cs/cs.js?v=2"></script>
 <script>
 (function () {
   var APP = 'tu-voz', root = document.getElementById('orderRoot');
@@ -61,8 +57,6 @@
   if ('IntersectionObserver' in window) new IntersectionObserver(function (e) { bar.classList.toggle('is-hidden', e[0].isIntersecting); }, { threshold: 0.05 }).observe(document.getElementById('pedido'));
   CS.loadConfig(APP).then(function (cfg) {
     if (!cfg) { root.innerHTML = '<p class="cs-err">No pudimos cargar la página. Recárgala o inténtalo en un momento.</p>'; return; }
-    var t = document.getElementById('teaser');
-    t.innerHTML = '<p class="amt">' + cfg.texts.perMinute + '</p><p>por minuto de audio</p><hr><p>No pagas nada hasta que escuches una muestra.</p>';
     CS.mountOrder({ app: APP, cfg: cfg, root: root, videoCopy: null });
   });
 })();

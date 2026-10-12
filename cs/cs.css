@@ -53,7 +53,7 @@ button,input,textarea,select{ font-family:inherit; }
 .cs-pick label.opt small{ display:block; color:var(--muted); font-size:.85rem; margin-top:2px; }
 .cs-pick label.opt.on{ border-color:var(--ink); box-shadow:3px 3px 0 var(--ink); }
 .cs-file{ display:flex; flex-wrap:wrap; gap:8px; }
-.cs-file .btn{ padding:13px 18px; font-size:.98rem; flex:1 1 auto; }
+.cs-file .btn{ padding:13px 16px; font-size:.95rem; flex:1 1 auto; }
 .cs-file input[type=file]{ position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
 .cs-chosen{ margin:10px 0 0; padding:10px 12px; border-radius:12px; background:#fff; border:1.5px solid var(--line); font-size:.93rem; display:flex; gap:10px; align-items:center; justify-content:space-between; }
 .cs-chosen .nm{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }

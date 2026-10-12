@@ -121,8 +121,8 @@ CS.mountOrder = function (opts) {
   // 1) Audio
   let audioCard = null;
   if (hasAudio) {
-    audioCard = el('div', 'cs-card', `<h3>Tu audio</h3><p>Sube tu voz sola o con tu instrumento. Puede ser una grabación del celular. Hasta ${cfg.maxAudioMin} minutos.</p>
-      <div class="cs-file"><button type="button" class="btn btn-primary" data-a="pick">Elegir audio</button><button type="button" class="btn btn-ghost" data-a="rec">Grabar ahora</button><input type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac,.webm" data-a="file"></div>
+    audioCard = el('div', 'cs-card', `<h3>Tu audio o video</h3><p>Sube tu voz sola o con tu instrumento, en audio o en video, o grábala aquí mismo. Hasta ${cfg.maxAudioMin} minutos.</p>
+      <div class="cs-file"><button type="button" class="btn btn-primary" data-a="pick">Elegir audio o video</button><button type="button" class="btn btn-ghost" data-a="rec">Grabar audio</button><button type="button" class="btn btn-ghost" data-a="vrec">Grabar video</button><input type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac,.webm,.mp4,.mov,.3gp" data-a="file"><input type="file" accept="video/*" capture="user" data-a="vfile"></div>
       <div class="cs-rec is-hidden" data-a="recbox"><i></i><span data-a="rect">0:00</span><button type="button" class="btn btn-primary" data-a="stop" style="margin-left:auto;padding:9px 18px">Detener</button></div>
       <div class="cs-chosen is-hidden" data-a="chosen"><span class="nm" data-a="nm"></span><span class="meta" data-a="meta"></span><button type="button" class="btn-quiet" data-a="del">Quitar</button></div>
       <audio class="cs-player is-hidden" controls data-a="player"></audio><p class="cs-err is-hidden" data-a="err" role="alert"></p>`);
@@ -133,12 +133,10 @@ CS.mountOrder = function (opts) {
   // 2) Video
   let videoCard = null;
   if (canVideo) {
-    const pv = hasAudio ? `Con video: ${cfg.texts.perMinuteVideo} por minuto de audio` : `Con video: ${cfg.texts.flatVideo}`;
-    const ps = hasAudio ? `Solo la canción: ${cfg.texts.perMinute} por minuto de audio` : `Solo la canción: ${cfg.texts.flat}`;
     videoCard = el('div', 'cs-card', `<h3>¿Quieres también el video?</h3><p>${opts.videoCopy || 'El video eres tú cantando tu canción. Por eso necesitamos una foto clara de tu rostro.'}</p>
       <div class="cs-pick" role="radiogroup" aria-label="¿Quieres video?">
-        <label class="opt"><input type="radio" name="csvideo" value="no"><span>Solo la canción<small>${ps}</small></span></label>
-        <label class="opt"><input type="radio" name="csvideo" value="yes"><span>Canción con video<small>${pv}</small></span></label>
+        <label class="opt"><input type="radio" name="csvideo" value="no"><span>Solo la canción</span></label>
+        <label class="opt"><input type="radio" name="csvideo" value="yes"><span>Canción con video<small>Eres tú cantando tu canción</small></span></label>
       </div>
       <div class="is-hidden" data-v="photoBox" style="margin-top:12px">
         <p class="strong">Sube una foto de tu rostro, de frente y con buena luz. Sin foto de tu rostro no podemos hacer el video.</p>
@@ -179,29 +177,27 @@ CS.mountOrder = function (opts) {
 
   const billed = (sec) => Math.max(1, Math.ceil((sec || 0) / 60 - 0.0001));
   function calc() {
+    const ready = (!hasAudio || !!st.audio) && (!canVideo || !!st.video);
+    price.classList.toggle('is-hidden', !ready); ack.classList.toggle('is-hidden', !ready);
+    if (!ready) return;
     const withVideo = st.video === 'yes';
-    let amount = 0, lbl = '', calcTxt = '', ackTxt = '';
+    let amount, amtTxt, lbl = withVideo ? 'Canción con video' : 'Solo la canción', calcTxt = '', ackTxt;
     if (hasAudio) {
       const per = withVideo ? cfg.perMinuteVideo : cfg.perMinute;
       if (st.audioSeconds) {
-        const m = billed(st.audioSeconds); amount = m * per;
-        lbl = withVideo ? 'Canción con video' : 'Solo la canción';
-        calcTxt = `Tu audio dura ${CS.fmtTime(st.audioSeconds)} → ${m} ${m === 1 ? 'minuto' : 'minutos'} × ${CS.money(per)}`;
-      } else if (st.audio) { // duración desconocida
-        lbl = withVideo ? 'Canción con video' : 'Solo la canción'; calcTxt = 'Calcularemos el precio con la duración exacta de tu audio.';
+        const m = billed(st.audioSeconds); amount = m * per; amtTxt = CS.money(amount);
+        calcTxt = `Tu archivo dura ${CS.fmtTime(st.audioSeconds)} → ${m} ${m === 1 ? 'minuto' : 'minutos'} × ${CS.money(per)}`;
+        ackTxt = `Entiendo que el precio será ${amtTxt}. No se me cobra nada hasta que reciba y escuche una muestra.`;
       } else {
-        lbl = 'Se calcula con la duración de tu audio'; calcTxt = canVideo && st.video == null ? `Solo canción: ${cfg.texts.perMinute} por minuto · Con video: ${cfg.texts.perMinuteVideo} por minuto` : '';
+        amtTxt = `${CS.money(per)} por minuto`; calcTxt = 'No pudimos medir la duración; la calcularemos con tu archivo y te confirmamos el total.';
+        ackTxt = `Entiendo que el precio es ${CS.money(per)} por minuto. No se me cobra nada hasta que reciba y escuche una muestra.`;
       }
-      P('amt').textContent = amount ? CS.money(amount) : `${CS.money(per)} por minuto`;
-      ackTxt = amount ? `Entiendo que el precio será ${CS.money(amount)}. No se me cobra nada hasta que reciba y escuche una muestra.` : `Entiendo que el precio es ${CS.money(per)} por minuto de audio. No se me cobra nada hasta que reciba y escuche una muestra.`;
     } else {
-      amount = withVideo ? cfg.flatVideo : cfg.flat;
-      P('amt').textContent = canVideo && st.video == null ? `${cfg.texts.flat} o ${cfg.texts.flatVideo}` : CS.money(amount);
-      lbl = st.video == null ? 'Solo canción · Con video' : (withVideo ? 'Canción con video' : 'Solo la canción');
-      calcTxt = withVideo ? 'Incluye que nosotros ponemos la voz y el video contigo cantando.' : 'Nosotros ponemos la voz.';
-      ackTxt = st.video == null ? 'Entiendo el precio. No se me cobra nada hasta que reciba y escuche una muestra.' : `Entiendo que el precio será ${CS.money(amount)}. No se me cobra nada hasta que reciba y escuche una muestra.`;
+      amount = withVideo ? cfg.flatVideo : cfg.flat; amtTxt = CS.money(amount);
+      calcTxt = withVideo ? 'Nosotros ponemos la voz; el video eres tú cantando.' : 'Nosotros ponemos la voz.';
+      ackTxt = `Entiendo que el precio será ${amtTxt}. No se me cobra nada hasta que reciba y escuche una muestra.`;
     }
-    P('lbl').textContent = lbl; P('calc').textContent = calcTxt; P('calc').classList.toggle('is-hidden', !calcTxt);
+    P('amt').textContent = amtTxt; P('lbl').textContent = lbl; P('calc').textContent = calcTxt; P('calc').classList.toggle('is-hidden', !calcTxt);
     ack.querySelector('#csAckTxt').textContent = ackTxt;
   }
   calc();
@@ -212,19 +208,21 @@ CS.mountOrder = function (opts) {
   async function setAudio(blob, name, knownSeconds) {
     setErr(A('err'), '');
     const type = CS.typeOf(blob);
-    if (!/^(audio|video)\//.test(type)) { setErr(A('err'), 'Ese archivo no parece un audio. Prueba con mp3, m4a o wav.'); return; }
-    if (blob.size > 60 * 1024 * 1024) { setErr(A('err'), 'El audio es muy pesado (máximo 60 MB).'); return; }
+    if (!/^(audio|video)\//.test(type)) { setErr(A('err'), 'Ese archivo no parece un audio ni un video. Prueba con mp3, m4a, wav o mp4.'); return; }
+    if (blob.size > 100 * 1024 * 1024) { setErr(A('err'), 'El archivo es muy pesado (máximo 100 MB). Prueba con uno más corto o en menor calidad.'); return; }
     const sec = knownSeconds || await CS.audioDuration(blob);
-    if (sec && sec > cfg.maxAudioMin * 60 + 2) { setErr(A('err'), `Tu audio dura ${CS.fmtTime(sec)} y el máximo es ${cfg.maxAudioMin} minutos. Envía un fragmento más corto.`); return; }
+    if (sec && sec > cfg.maxAudioMin * 60 + 2) { setErr(A('err'), `Tu archivo dura ${CS.fmtTime(sec)} y el máximo es ${cfg.maxAudioMin} minutos. Envía un fragmento más corto.`); return; }
     st.audio = blob; st.audio.csName = name; st.audioSeconds = sec ? Math.round(sec) : null; st.audioUp = null;
     A('nm').textContent = name; A('meta').textContent = sec ? CS.fmtTime(sec) : ''; A('chosen').classList.remove('is-hidden');
     const pl = A('player'); try { if (pl.src) URL.revokeObjectURL(pl.src); } catch { /* ok */ } pl.src = URL.createObjectURL(blob); pl.classList.remove('is-hidden');
-    A('pick').textContent = 'Cambiar audio'; calc(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
+    A('pick').textContent = 'Cambiar archivo'; calc(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
   }
-  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'Elegir audio'; A('file').value = ''; calc(); }
+  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'Elegir audio o video'; A('file').value = ''; A('vfile').value = ''; calc(); }
   if (hasAudio) {
     A('pick').addEventListener('click', () => A('file').click());
     A('file').addEventListener('change', () => { const f = A('file').files[0]; if (f) setAudio(f, f.name || 'audio'); });
+    A('vrec').addEventListener('click', () => A('vfile').click());
+    A('vfile').addEventListener('change', () => { const f = A('vfile').files[0]; if (f) setAudio(f, f.name || 'video'); });
     A('del').addEventListener('click', clearAudio);
     const canRec = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
     if (!canRec) A('rec').classList.add('is-hidden');
@@ -276,7 +274,7 @@ CS.mountOrder = function (opts) {
   function fail(msg, node) { setErr(errBox, msg); errBox.classList.remove('is-hidden'); try { (node || errBox).scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* ok */ } }
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault(); setErr(errBox, '');
-    if (hasAudio && !st.audio) return fail('Falta tu audio: elige un archivo o grábalo.', audioCard);
+    if (hasAudio && !st.audio) return fail('Falta tu audio o video: elige un archivo o grábalo.', audioCard);
     if (canVideo && !st.video) return fail('Elige si quieres solo la canción o también el video.', videoCard);
     const withVideo = canVideo && st.video === 'yes';
     if (withVideo && !st.photo) return fail('Para hacer el video necesitamos una foto de tu rostro. Súbela o elige «Solo la canción».', videoCard);

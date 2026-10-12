@@ -11,8 +11,8 @@ const APPS = {
     'tu-cancion-video': { label: 'Tu canción cantada por ti',    audio: false, video: true,  flat: 9900, flatVideo: 29900 }
 };
 const MAX_AUDIO_MIN = 10;                       // minutos máximos por pedido
-const MAX_AUDIO_BYTES = 60 * 1024 * 1024, MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-const AUDIO_TYPES = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|aac|wav|x-wav|wave|webm|ogg|opus|flac|x-flac)$|^video\/(mp4|webm|quicktime)$/i;
+const MAX_AUDIO_BYTES = 100 * 1024 * 1024, MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const AUDIO_TYPES = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|aac|wav|x-wav|wave|webm|ogg|opus|flac|x-flac|3gpp|3gpp2|amr)$|^video\/(mp4|webm|quicktime|3gpp|3gpp2|x-m4v|ogg)$/i;
 const PHOTO_TYPES = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i;
 
 const money = (n) => '₡' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');

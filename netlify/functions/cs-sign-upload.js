@@ -12,8 +12,8 @@ exports.handler = async (event) => {
     if (kind === 'photo' && !APPS[app].video) return json(400, { error: 'Esta página no recibe foto.' });
     const size = Number(b.size) || 0, type = String(b.contentType || '');
     if (kind === 'audio') {
-        if (!core.AUDIO_TYPES.test(type)) return json(400, { error: 'Ese formato de audio no se puede usar. Prueba con mp3, m4a o wav.' });
-        if (size <= 0 || size > core.MAX_AUDIO_BYTES) return json(400, { error: 'El audio es muy pesado (máximo 60 MB).' });
+        if (!core.AUDIO_TYPES.test(type)) return json(400, { error: 'Ese formato de audio no se puede usar. Prueba con mp3, m4a, wav o un video mp4.' });
+        if (size <= 0 || size > core.MAX_AUDIO_BYTES) return json(400, { error: 'El archivo es muy pesado (máximo 100 MB).' });
     } else {
         if (!core.PHOTO_TYPES.test(type)) return json(400, { error: 'Sube la foto en formato JPG, PNG o WEBP.' });
         if (size <= 0 || size > core.MAX_PHOTO_BYTES) return json(400, { error: 'La foto es muy pesada (máximo 10 MB).' });
