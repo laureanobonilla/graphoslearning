@@ -124,8 +124,8 @@ CS.mountOrder = function (opts) {
   // 1) Audio
   let audioCard = null;
   if (hasAudio) {
-    audioCard = el('div', 'cs-card', `<h3>Tu audio</h3><p>Sube tu voz sola o con tu instrumento, o grábala aquí mismo. Puede ser una grabación del celular. Hasta ${cfg.maxAudioMin} minutos.</p>
-      <div class="cs-file"><button type="button" class="btn btn-primary" data-a="pick">Elegir audio</button><button type="button" class="btn btn-ghost" data-a="rec">Grabar ahora</button><input type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac,.webm" data-a="file"></div>
+    audioCard = el('div', 'cs-card', `<h3>Sube o graba tu canto</h3><p>Sube o graba tu canto completo para ponerle música. Puedes mandar solo tu voz cantando y también puedes acompañarte con algún instrumento si quisieras. Hasta ${cfg.maxAudioMin} minutos.</p>
+      <div class="cs-file cs-file-audio"><button type="button" class="btn btn-rec" data-a="rec"><i></i>Grabar ahora</button><button type="button" class="btn-quiet cs-pick-file" data-a="pick">o elige un audio que ya tengas</button><input type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac,.webm" data-a="file"></div>
       <div class="cs-rec is-hidden" data-a="recbox"><i></i><span data-a="rect">0:00</span><button type="button" class="btn btn-primary" data-a="stop" style="margin-left:auto;padding:9px 18px">Detener</button></div>
       <div class="cs-chosen is-hidden" data-a="chosen"><span class="nm" data-a="nm"></span><span class="meta" data-a="meta"></span><button type="button" class="btn-quiet" data-a="del">Quitar</button></div>
       <audio class="cs-player is-hidden" controls data-a="player"></audio><p class="cs-err is-hidden" data-a="err" role="alert"></p>`);
@@ -154,7 +154,7 @@ CS.mountOrder = function (opts) {
   const V = (n) => videoCard && videoCard.querySelector(`[data-v="${n}"]`);
 
   // 3) Contacto
-  const contact = el('div', 'cs-card', `<h3>¿Dónde te enviamos la muestra?</h3><p>Déjanos tu WhatsApp o tu correo (con uno basta). <span class="strong">Sin esto no podemos enviarte nada.</span></p>
+  const contact = el('div', 'cs-card', `<h3>¿Dónde te enviamos la muestra?</h3><p>Déjanos tu WhatsApp o tu correo (con uno basta).</p>
     <label class="cs-lbl" for="csName">Tu nombre (opcional)</label><input class="cs-field" id="csName" type="text" maxlength="60" autocomplete="given-name" placeholder="Cómo te llamas">
     <label class="cs-lbl" for="csPhone">WhatsApp</label>
     <div class="phone-row"><select id="csDial" aria-label="Código de país">${DIAL_OPTIONS}</select><input id="csPhone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="Ej. 8888 1234" maxlength="24"></div>
@@ -217,15 +217,15 @@ CS.mountOrder = function (opts) {
     st.audio = blob; st.audio.csName = name; st.audioSeconds = sec ? Math.round(sec) : null; st.audioUp = null;
     A('nm').textContent = name; A('meta').textContent = sec ? CS.fmtTime(sec) : ''; A('chosen').classList.remove('is-hidden');
     const pl = A('player'); try { if (pl.src) URL.revokeObjectURL(pl.src); } catch { /* ok */ } pl.src = URL.createObjectURL(blob); pl.classList.remove('is-hidden');
-    A('pick').textContent = 'Cambiar audio'; calc(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
+    A('pick').textContent = 'o elige otro audio'; calc(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
   }
-  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'Elegir audio'; A('file').value = ''; calc(); }
+  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'o elige un audio que ya tengas'; A('file').value = ''; calc(); }
   if (hasAudio) {
     A('pick').addEventListener('click', () => A('file').click());
     A('file').addEventListener('change', () => { const f = A('file').files[0]; if (f) setAudio(f, f.name || 'audio'); });
     A('del').addEventListener('click', clearAudio);
     const canRec = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
-    if (!canRec) A('rec').classList.add('is-hidden');
+    if (!canRec) { A('rec').classList.add('is-hidden'); A('pick').classList.add('cs-pick-main'); }
     let timer = null;
     const stopRec = () => { if (st.rec && st.rec.mr.state !== 'inactive') st.rec.mr.stop(); };
     A('rec').addEventListener('click', async () => {
@@ -274,17 +274,20 @@ CS.mountOrder = function (opts) {
   function fail(msg, node) { setErr(errBox, msg); errBox.classList.remove('is-hidden'); try { (node || errBox).scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* ok */ } }
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault(); setErr(errBox, '');
-    if (hasAudio && !st.audio) return fail('Falta tu audio: elige un archivo o grábalo.', audioCard);
-    if (canVideo && !st.video) return fail('Elige si quieres solo la canción o también el video.', videoCard);
     const withVideo = canVideo && st.video === 'yes';
-    if (withVideo && !st.photo) return fail('Para hacer el video necesitamos una foto de tu rostro. Súbela o elige «Solo la canción».', videoCard);
-    if (withVideo && !V('consent').checked) return fail('Confirma que la foto es tuya o que tienes permiso de la persona.', videoCard);
     const rawPhone = contact.querySelector('#csPhone').value.trim(), email = contact.querySelector('#csEmail').value.trim();
-    if (!rawPhone && !email) return fail('Déjanos tu WhatsApp o tu correo. Sin eso no podemos enviarte la muestra.', contact);
+    const missing = [];   // [texto, nodo donde está]
+    if (hasAudio && !st.audio) missing.push(['tu canto (sube o graba el audio)', audioCard]);
+    if (canVideo && !st.video) missing.push(['elegir si quieres solo la canción o también el video', videoCard]);
+    if (withVideo && !st.photo) missing.push(['la foto de tu rostro para el video', videoCard]);
+    if (withVideo && st.photo && !V('consent').checked) missing.push(['confirmar que la foto es tuya o que tienes permiso', videoCard]);
+    if (!rawPhone && !email) missing.push(['tu WhatsApp o tu correo', contact]);
+    const ackMissing = !price.classList.contains('is-hidden') && !ack.querySelector('input').checked;
+    if (missing.length) { if (ackMissing) missing.push(['marcar la casilla del precio', ack]); return fail('Te falta: ' + missing.map(m => m[0]).join('; ') + '.', missing[0][1]); }
     let phone = '';
     if (rawPhone) { const pr = CS.buildPhone(contact.querySelector('#csDial').value, rawPhone); if (!pr.phone) { CS.track(app, 'phone_invalid', { reason: pr.reason }); return fail(CS.PHONE_MSG[pr.reason] || CS.PHONE_MSG.short, contact); } phone = pr.phone; }
     if (email && !CS.validEmail(email)) return fail('Revisa tu correo: parece que le falta algo.', contact);
-    if (!ack.querySelector('input').checked) return fail('Marca la casilla para confirmar que entiendes el precio.', ack);
+    if (ackMissing) return fail('Te falta: marcar la casilla del precio.', ack);
     let extra = {};
     if (opts.getExtra) { try { extra = opts.getExtra() || {}; } catch (e) { return fail(e.message || 'Falta información.'); } }
 
