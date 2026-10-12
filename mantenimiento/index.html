@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Mantenimiento · pedidos de canciones</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gloock&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#eef0fb; --card:#fff; --ink:#1b1740; --muted:#5d5b88; --line:rgba(27,23,64,.16); --magenta:#e0246a; --mango:#ffbf2e; --ok:#1f8f4e; --warn:#b3261e; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Figtree',-apple-system,sans-serif; font-size:15px; line-height:1.45; }
+  .wrap{ max-width:980px; margin:0 auto; padding:16px 16px 60px; }
+  h1{ font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.7rem; margin:6px 0 2px; }
+  .sub{ color:var(--muted); margin:0 0 14px; }
+  button,input,select,textarea{ font:inherit; color:inherit; }
+  .btn{ appearance:none; border:0; border-radius:999px; background:var(--magenta); color:#fff; font-weight:700; padding:10px 18px; cursor:pointer; }
+  .btn:disabled{ opacity:.5; cursor:default; }
+  .btn.ghost{ background:transparent; color:var(--ink); border:1.5px solid var(--ink); }
+  .btn.small{ padding:7px 14px; font-size:.9rem; }
+  .login{ background:var(--card); border:1.5px solid var(--ink); border-radius:18px; padding:26px 20px; text-align:center; box-shadow:4px 4px 0 var(--ink); margin-top:30px; }
+  .login p{ color:var(--muted); }
+  .bar{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+  .tabs{ display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .tab{ appearance:none; background:var(--card); border:1.5px solid var(--line); border-radius:999px; padding:8px 14px; cursor:pointer; font-weight:600; }
+  .tab.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .tab small{ opacity:.7; font-weight:500; margin-left:4px; }
+  .totals{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:6px 0 12px; }
+  .tot{ background:var(--ink); color:#fff; border-radius:14px; padding:12px 14px; }
+  .tot b{ display:block; font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.5rem; color:var(--mango); line-height:1.15; }
+  .tot span{ font-size:.85rem; color:#d9d7f3; }
+  .filters{ display:flex; gap:8px; flex-wrap:wrap; margin:0 0 12px; }
+  .filters select,.filters input{ background:var(--card); border:1.5px solid var(--line); border-radius:12px; padding:9px 12px; min-width:0; }
+  .filters input{ flex:1 1 180px; }
+  .order{ background:var(--card); border:1.5px solid var(--line); border-radius:16px; padding:14px; margin:0 0 12px; }
+  .order.paid{ border-color:var(--ok); }
+  .order.cancel{ opacity:.6; }
+  .top{ display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .who{ font-weight:700; font-size:1.05rem; }
+  .meta{ color:var(--muted); font-size:.85rem; }
+  .badge{ display:inline-block; font-size:.75rem; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--ink); color:#fff; margin-right:6px; }
+  .badge.video{ background:var(--magenta); } .badge.int{ background:#9a98bd; }
+  .price{ font-family:'Gloock',Georgia,serif; font-size:1.3rem; text-align:right; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:10px 0 0; }
+  .row label{ font-size:.85rem; color:var(--muted); display:flex; flex-direction:column; gap:3px; }
+  .row select,.row input[type=number]{ border:1.5px solid var(--line); border-radius:10px; padding:8px 10px; background:#fff; }
+  .row input[type=number]{ width:140px; }
+  .chk{ flex-direction:row !important; align-items:center; gap:8px !important; font-size:1rem !important; color:var(--ink) !important; font-weight:600; }
+  .chk input{ width:20px; height:20px; accent-color:var(--ok); }
+  textarea.note{ width:100%; border:1.5px solid var(--line); border-radius:10px; padding:8px 10px; min-height:44px; resize:vertical; margin-top:10px; background:#fff; }
+  .links a,.links button{ font-size:.9rem; margin-right:12px; color:var(--ink); }
+  .links button{ background:none; border:0; text-decoration:underline; cursor:pointer; padding:0; }
+  details{ margin-top:8px; } summary{ cursor:pointer; color:var(--muted); font-size:.9rem; }
+  pre{ white-space:pre-wrap; background:#f6f6fd; border-radius:10px; padding:10px; font-family:inherit; margin:6px 0 0; }
+  .msg{ padding:10px 12px; border-radius:12px; background:#fff3cd; margin:0 0 12px; }
+  .msg.err{ background:#fde7e4; color:var(--warn); }
+  .saved{ color:var(--ok); font-weight:600; font-size:.88rem; }
+  .empty{ text-align:center; color:var(--muted); padding:30px; }
+</style>
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div id="loginView" class="login" hidden>
+    <h1>Mantenimiento</h1>
+    <p>Entra con tu correo para ver y actualizar los pedidos de canciones.</p>
+    <button class="btn" id="btnLogin" type="button">Entrar</button>
+  </div>
+
+  <div id="appView" hidden>
+    <div class="bar">
+      <div><h1>Pedidos de canciones</h1><p class="sub" id="who"></p></div>
+      <div><button class="btn ghost small" id="btnReload" type="button">Actualizar</button> <button class="btn ghost small" id="btnLogout" type="button">Salir</button></div>
+    </div>
+    <div id="notice"></div>
+    <div class="tabs" id="tabs"></div>
+    <div class="totals" id="totals"></div>
+    <div class="filters">
+      <select id="fStatus" aria-label="Estado"></select>
+      <select id="fPaid" aria-label="Pago"><option value="">Pagados y no pagados</option><option value="paid">Solo pagados</option><option value="unpaid">Solo sin pagar</option></select>
+      <select id="fKind" aria-label="Tipo"><option value="">Pedidos e intenciones</option><option value="pedido">Solo pedidos</option><option value="int">Solo intenciones de WhatsApp</option></select>
+      <input id="fText" type="search" placeholder="Buscar nombre, teléfono, correo, título…" aria-label="Buscar">
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+<script>
+(function () {
+  var FN = '/.netlify/functions/mnt-orders';
+  var APPS = [['all', 'Todas'], ['tu-cancion', 'tu-cancion'], ['tu-voz', 'tu-voz'], ['tu-voz-video', 'tu-voz-video'], ['tu-cancion-video', 'tu-cancion-video']];
+  var STATUS_LABEL = { nuevo: 'Nuevo', contactado: 'Contactado', muestra_enviada: 'Muestra enviada', pagado: 'Pagado', entregado: 'Entregado', cancelado: 'Cancelado' };
+  var state = { orders: [], app: 'all', statuses: [] };
+  var $ = function (id) { return document.getElementById(id); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function money(n, cur) { var s = String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return (cur === 'CRC' || !cur ? '₡' : '') + s + (cur && cur !== 'CRC' ? ' ' + cur : ''); }
+  function fmtDate(iso) { try { return new Date(iso).toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; } }
+
+  function user() { try { return netlifyIdentity.currentUser(); } catch (e) { return null; } }
+  async function call(method, path, body) {
+    var u = user(); if (!u) throw new Error('Inicia sesión.');
+    var t = await u.jwt();
+    var res = await fetch(FN + (path || ''), { method: method, headers: { Authorization: 'Bearer ' + t, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    var d = await res.json().catch(function () { return {}; });
+    if (!res.ok) { var e = new Error(d.error || ('Error ' + res.status)); e.status = res.status; throw e; }
+    return d;
+  }
+
+  function show() {
+    var u = user();
+    $('loginView').hidden = !!u; $('appView').hidden = !u;
+    if (u) { $('who').textContent = u.email; load(); }
+  }
+  async function load() {
+    $('notice').textContent = '';
+    try {
+      var d = await call('GET');
+      state.orders = d.orders; state.statuses = d.statuses;
+      var msgs = [];
+      if (d.needsSql || (d.tablesMissing && (d.tablesMissing.cs_orders || d.tablesMissing.tc_songs))) msgs.push('Falta correr supabase/mantenimiento.sql (y servicio-canciones.sql) en Supabase para poder guardar estados y pagos.');
+      if (msgs.length) { var m = el('p', 'msg', msgs.join(' ')); $('notice').appendChild(m); }
+      renderAll();
+    } catch (e) {
+      var m2 = el('p', 'msg err', e.status === 403 ? 'Este correo no tiene acceso.' : e.message); $('notice').appendChild(m2);
+    }
+  }
+
+  function visible(o) {
+    var st = $('fStatus').value, pd = $('fPaid').value, k = $('fKind').value, q = $('fText').value.trim().toLowerCase();
+    if (state.app !== 'all' && o.app !== state.app) return false;
+    if (st && o.fulfil_status !== st) return false;
+    if (pd === 'paid' && !o.paid) return false; if (pd === 'unpaid' && o.paid) return false;
+    if (k === 'pedido' && o.kind !== 'pedido') return false; if (k === 'int' && o.kind === 'pedido') return false;
+    if (q && ![o.name, o.phone, o.email, o.title, o.id, o.notes].join(' ').toLowerCase().includes(q)) return false;
+    return true;
+  }
+  function renderAll() { renderTabs(); renderFilters(); renderList(); }
+  function renderTabs() {
+    var box = $('tabs'); box.textContent = '';
+    APPS.forEach(function (a) {
+      var n = state.orders.filter(function (o) { return a[0] === 'all' || o.app === a[0]; }).length;
+      var b = el('button', 'tab' + (state.app === a[0] ? ' on' : ''), a[1]); b.type = 'button'; b.appendChild(el('small', '', String(n)));
+      b.addEventListener('click', function () { state.app = a[0]; renderAll(); }); box.appendChild(b);
+    });
+  }
+  function renderFilters() {
+    var s = $('fStatus'), cur = s.value; if (s.options.length) return;
+    s.appendChild(new Option('Todos los estados', ''));
+    state.statuses.forEach(function (x) { s.appendChild(new Option(STATUS_LABEL[x] || x, x)); });
+    s.value = cur; ['fStatus', 'fPaid', 'fKind'].forEach(function (id) { $(id).addEventListener('change', renderList); }); $('fText').addEventListener('input', renderList);
+  }
+  function renderTotals(rows) {
+    var box = $('totals'); box.textContent = '';
+    var cur = {}; rows.forEach(function (o) { var c = o.currency || 'CRC'; (cur[c] = cur[c] || { quoted: 0, paid: 0, pending: 0 }); if (o.fulfil_status !== 'cancelado') { cur[c].quoted += o.price_amount || 0; if (!o.paid) cur[c].pending += o.price_amount || 0; } if (o.paid) cur[c].paid += (o.paid_amount != null ? o.paid_amount : o.price_amount) || 0; });
+    function tot(big, small) { var d = el('div', 'tot'); d.appendChild(el('b', '', big)); d.appendChild(el('span', '', small)); box.appendChild(d); }
+    tot(String(rows.length), 'pedidos en pantalla');
+    tot(String(rows.filter(function (o) { return o.paid; }).length), 'pagados');
+    Object.keys(cur).forEach(function (c) { var x = cur[c], tag = c === 'CRC' ? '' : ' (' + c + ')'; tot(money(x.paid, c), 'cobrado' + tag); tot(money(x.pending, c), 'por cobrar (precio de lista)' + tag); });
+  }
+  function renderList() {
+    var rows = state.orders.filter(visible); renderTotals(rows);
+    var box = $('list'); box.textContent = '';
+    if (!rows.length) { box.appendChild(el('p', 'empty', 'No hay pedidos con estos filtros.')); return; }
+    rows.forEach(function (o) { box.appendChild(card(o)); });
+  }
+
+  function card(o) {
+    var c = el('div', 'order' + (o.paid ? ' paid' : '') + (o.fulfil_status === 'cancelado' ? ' cancel' : ''));
+    var top = el('div', 'top'), left = el('div');
+    var line = el('div'); line.appendChild(el('span', 'badge', o.app)); if (o.with_video) line.appendChild(el('span', 'badge video', 'con video')); if (o.kind !== 'pedido') line.appendChild(el('span', 'badge int', 'intención'));
+    left.appendChild(line);
+    left.appendChild(el('div', 'who', o.name || '(sin nombre)'));
+    var contact = el('div', 'meta');
+    if (o.phone) { var a = el('a', '', o.phone); a.href = 'https://wa.me/' + o.phone.replace(/\D/g, ''); a.target = '_blank'; a.rel = 'noopener'; contact.appendChild(a); }
+    if (o.phone && o.email) contact.appendChild(document.createTextNode(' · '));
+    if (o.email) { var m = el('a', '', o.email); m.href = 'mailto:' + o.email; contact.appendChild(m); }
+    left.appendChild(contact);
+    left.appendChild(el('div', 'meta', fmtDate(o.created_at) + (o.title ? ' · «' + o.title + '»' : '') + (o.rhythm ? ' · ' + o.rhythm : '') + (o.country ? ' · ' + o.country : '') + ' · código ' + o.id.slice(0, 8)));
+    top.appendChild(left);
+    var pr = el('div', 'price', o.price_text || (o.price_amount ? money(o.price_amount, o.currency) : '—')); top.appendChild(pr);
+    c.appendChild(top);
+
+    var row = el('div', 'row');
+    var stL = el('label', '', 'Estado'), st = document.createElement('select');
+    state.statuses.forEach(function (x) { st.appendChild(new Option(STATUS_LABEL[x] || x, x)); }); st.value = o.fulfil_status; stL.appendChild(st); row.appendChild(stL);
+    var pL = el('label', 'chk'), pc = document.createElement('input'); pc.type = 'checkbox'; pc.checked = o.paid; pL.appendChild(pc); pL.appendChild(document.createTextNode('Pagó')); row.appendChild(pL);
+    var aL = el('label', '', 'Monto pagado' + (o.currency && o.currency !== 'CRC' ? ' (' + o.currency + ')' : ' (₡)')), am = document.createElement('input'); am.type = 'number'; am.min = '0'; am.step = '100'; am.inputMode = 'numeric'; am.value = o.paid_amount != null ? o.paid_amount : ''; aL.appendChild(am); row.appendChild(aL);
+    c.appendChild(row);
+    var note = document.createElement('textarea'); note.className = 'note'; note.placeholder = 'Nota tuya (no la ve el cliente)'; note.maxLength = 1500; note.value = o.admin_note || ''; c.appendChild(note);
+
+    var foot = el('div', 'row'), save = el('button', 'btn small', 'Guardar'); save.type = 'button'; var ok = el('span', 'saved'); foot.appendChild(save); foot.appendChild(ok);
+    var links = el('span', 'links');
+    if (o.has_files) {
+      var lb = el('button', '', 'Obtener enlaces de audio/foto'); lb.type = 'button';
+      lb.addEventListener('click', async function () {
+        lb.disabled = true; lb.textContent = 'Generando…';
+        try { var d = await call('GET', '?action=links&id=' + encodeURIComponent(o.id)); links.textContent = '';
+          if (d.audio) { var x = el('a', '', 'Descargar audio'); x.href = d.audio; links.appendChild(x); } if (d.photo) { var y = el('a', '', 'Descargar foto'); y.href = d.photo; links.appendChild(y); }
+          if (!d.audio && !d.photo) links.textContent = 'No se encontraron archivos.'; } catch (e) { lb.disabled = false; lb.textContent = 'Obtener enlaces de audio/foto'; ok.textContent = e.message; ok.style.color = 'var(--warn)'; }
+      });
+      links.appendChild(lb);
+    }
+    foot.appendChild(links); c.appendChild(foot);
+
+    if (o.notes) { var dn = document.createElement('details'); dn.appendChild(el('summary', '', 'Lo que escribió la persona')); dn.appendChild(el('pre', '', o.notes)); c.appendChild(dn); }
+    if (o.lyrics) { var dl = document.createElement('details'); dl.appendChild(el('summary', '', 'Letra')); dl.appendChild(el('pre', '', o.lyrics)); c.appendChild(dl); }
+
+    // Al marcar «Pagó» sin monto, se propone el precio de lista; al marcar estado «pagado», se marca «Pagó».
+    pc.addEventListener('change', function () { if (pc.checked && !am.value && o.price_amount) am.value = o.price_amount; if (pc.checked && st.value !== 'entregado') st.value = 'pagado'; });
+    st.addEventListener('change', function () { if (st.value === 'pagado' && !pc.checked) { pc.checked = true; if (!am.value && o.price_amount) am.value = o.price_amount; } });
+    save.addEventListener('click', async function () {
+      save.disabled = true; ok.textContent = ''; ok.style.color = '';
+      var body = { app: o.app, id: o.id, fulfil_status: st.value, paid: pc.checked, paid_amount: am.value === '' ? null : Number(am.value), admin_note: note.value };
+      try { await call('POST', '', body); o.fulfil_status = st.value; o.paid = pc.checked; o.paid_amount = body.paid_amount; o.admin_note = note.value; ok.textContent = 'Guardado ✓'; c.classList.toggle('paid', o.paid); c.classList.toggle('cancel', o.fulfil_status === 'cancelado'); renderTotals(state.orders.filter(visible)); }
+      catch (e) { ok.textContent = e.message; ok.style.color = 'var(--warn)'; }
+      save.disabled = false;
+    });
+    return c;
+  }
+
+  $('btnLogin').addEventListener('click', function () { if (window.netlifyIdentity) netlifyIdentity.open('login'); });
+  $('btnLogout').addEventListener('click', function () { netlifyIdentity.logout(); });
+  $('btnReload').addEventListener('click', load);
+  if (window.netlifyIdentity) {
+    netlifyIdentity.on('init', show);
+    netlifyIdentity.on('login', function () { netlifyIdentity.close(); show(); });
+    netlifyIdentity.on('logout', show);
+    netlifyIdentity.init({ locale: 'es' });
+  } else { $('loginView').hidden = false; $('loginView').querySelector('p').textContent = 'No se pudo cargar el inicio de sesión. Revisa tu conexión.'; }
+})();
+</script>
+</body>
+</html>
