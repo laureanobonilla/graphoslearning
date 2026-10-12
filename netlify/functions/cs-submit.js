@@ -75,9 +75,12 @@ exports.handler = async (event) => {
     let seconds = audio ? (audio.duration || Math.min(Number(b.audioSeconds) || 0, core.MAX_AUDIO_MIN * 60)) : 0;
     if (audio && seconds > core.MAX_AUDIO_MIN * 60 + 5) return json(400, { error: `El audio dura más de ${core.MAX_AUDIO_MIN} minutos. Envíanos un fragmento más corto o escríbenos.` });
     const price = core.priceOf(app, withVideo, seconds);
+    const curCode = core.CURRENCIES[b.currency] ? b.currency : 'CRC';          // moneda que vio la persona (para el correo y la pantalla de mantenimiento)
+    const shown = core.displayPrice(price.amount, curCode);
+    const priceLabel = curCode === 'CRC' ? price.text : `${shown} (≈ ${price.text})`;
 
     const row = { id: orderId, app, status: 'requested', anon_id: anonId || null, country: country || null, contact_name: name || null, phone: phone || null, email: email || null,
-        with_video: withVideo, audio_seconds: audio ? Math.round(seconds) : null, billed_minutes: price.minutes, price_amount: price.amount, price_text: price.text,
+        with_video: withVideo, audio_seconds: audio ? Math.round(seconds) : null, billed_minutes: price.minutes, price_amount: price.amount, price_text: priceLabel,
         audio_id: audio ? audio.publicId : null, photo_id: photo ? photo.publicId : null, title: title || null, lyrics: lyrics || null, lyrics_final: lyricsFinal || null,
         brief: brief, notes: notes || null, utm: { campaign: scrubOne(b.utm && b.utm.campaign, 40), ad: scrubOne(b.utm && b.utm.ad, 40) } };
     let saved = true;
@@ -97,7 +100,7 @@ exports.handler = async (event) => {
         ...(name ? [`Nombre: ${name}`] : []),
         ...contactLines,
         ``,
-        `Precio que aceptó ver: ${price.text}${price.exactMinutes ? ` (${price.exactMinutes} min × ${core.money(price.perMinute)}, redondeado a los ₡100)` : ''} — NO se le cobra hasta que reciba una muestra.`,
+        `Precio que aceptó ver: ${priceLabel}${price.exactMinutes ? ` (${price.exactMinutes} min × ${core.money(price.perMinute)}, redondeado a los ₡100)` : ''} — NO se le cobra hasta que reciba una muestra.`,
         ...(audio ? [`Duración del audio: ${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`] : []),
         `Código: ${orderId} · País (aprox.): ${country || 'desconocido'}`,
         ``,
@@ -114,7 +117,7 @@ exports.handler = async (event) => {
         const res = await fetch('https://api.resend.com/emails', {
             method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ from: 'Graphikosmos <onboarding@resend.dev>', to: [process.env.FEEDBACK_TO_EMAIL || FALLBACK_TO_EMAIL],
-                subject: `Pedido ${cfg.label}${withVideo ? ' + VIDEO' : ''} · ${price.text} · ${phone || email}`, text, ...(email ? { reply_to: email } : {}) })
+                subject: `Pedido ${cfg.label}${withVideo ? ' + VIDEO' : ''} · ${priceLabel} · ${phone || email}`, text, ...(email ? { reply_to: email } : {}) })
         });
         if (!res.ok) {
             console.error('[cs-submit] Resend', res.status, await res.text().catch(() => ''));
@@ -124,5 +127,5 @@ exports.handler = async (event) => {
     } catch (err) { console.error('[cs-submit]', err.message); return json(502, { error: 'No pudimos registrar tu pedido. Inténtalo de nuevo en un momento.' }); }
     try { await core.saveOrder({ id: orderId, email_sent: true }); } catch (_e) { /* no crítico */ }
     try { await store.logEvent(ipKey, 'anon', orderId, 'cs_submitted', { app, withVideo, price: price.amount, minutes: price.minutes, saved, hasPhone: !!phone, hasEmail: !!email }, null, app); } catch (e) { console.error('[cs-submit] evento', e.message); }
-    return json(200, { ok: true, price: price.text, minutes: price.minutes, seconds: Math.round(seconds) });
+    return json(200, { ok: true, price: shown, minutes: price.minutes, seconds: Math.round(seconds) });
 };

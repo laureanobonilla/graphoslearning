@@ -30,8 +30,11 @@ CS.postFn = async function (name, payload) {
   return data;
 };
 CS.newId = () => (crypto.randomUUID ? crypto.randomUUID() : `00000000-0000-4000-8000-${String(Date.now()).padStart(12, '0')}`);
+CS.cur = { code: 'CRC', symbol: '₡', perCrc: 1, step: 100, dots: true };
+// Precio base en colones → texto en la moneda del país de la persona (redondeo hacia arriba al «step» de esa moneda).
+CS.show = function (crc) { const c = CS.cur, n = c.code === 'CRC' ? Math.ceil(crc / 100 - 1e-9) * 100 : Math.ceil((crc * c.perCrc) / c.step - 1e-9) * c.step; return c.symbol + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, c.dots ? '.' : ','); };
 CS.money = (n) => '₡' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-CS.loadConfig = (app) => fetch(`/.netlify/functions/cs-config?app=${encodeURIComponent(app)}`, { cache: 'no-store' }).then(r => r.json()).then(d => (d && d.app ? d : null)).catch(() => null);
+CS.loadConfig = (app) => fetch(`/.netlify/functions/cs-config?app=${encodeURIComponent(app)}${/^[A-Za-z]{2}$/.test(new URLSearchParams(location.search).get('pais') || '') ? '&pais=' + new URLSearchParams(location.search).get('pais') : ''}`, { cache: 'no-store' }).then(r => r.json()).then(d => { if (d && d.app && d.cur) CS.cur = d.cur; return d && d.app ? d : null; }).catch(() => null);
 CS.fmtTime = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 // ---------- Onda decorativa ----------
@@ -185,14 +188,14 @@ CS.mountOrder = function (opts) {
     if (hasAudio) {
       const per = withVideo ? cfg.perMinuteVideo : cfg.perMinute;
       if (st.audioSeconds) {
-        amount = priceFor(st.audioSeconds, per); amtTxt = CS.money(amount);
+        amount = priceFor(st.audioSeconds, per); amtTxt = CS.show(amount);
         ackTxt = `Entiendo que el precio será ${amtTxt}. No se me cobra nada hasta que reciba y escuche una muestra.`;
       } else {
-        amtTxt = `${CS.money(per)} por minuto`; calcTxt = 'Calcularemos el total con la duración exacta y te lo confirmamos.';
-        ackTxt = `Entiendo que el precio es ${CS.money(per)} por minuto. No se me cobra nada hasta que reciba y escuche una muestra.`;
+        amtTxt = `${CS.show(per)} por minuto`; calcTxt = 'Calcularemos el total con la duración exacta y te lo confirmamos.';
+        ackTxt = `Entiendo que el precio es ${CS.show(per)} por minuto. No se me cobra nada hasta que reciba y escuche una muestra.`;
       }
     } else {
-      amount = withVideo ? cfg.flatVideo : cfg.flat; amtTxt = CS.money(amount);
+      amount = withVideo ? cfg.flatVideo : cfg.flat; amtTxt = CS.show(amount);
       calcTxt = withVideo ? 'Nosotros ponemos la voz; el video eres tú cantando.' : 'Nosotros ponemos la voz.';
       ackTxt = `Entiendo que el precio será ${amtTxt}. No se me cobra nada hasta que reciba y escuche una muestra.`;
     }
@@ -297,7 +300,7 @@ CS.mountOrder = function (opts) {
       if (withVideo) doneParts = parts;
       setProg('Enviando tu pedido…', 0.1);
       const res = await CS.postFn('cs-submit', Object.assign({ app, orderId: st.orderId, anonId: CS.anonId, utm: CS.UTM, phone, email, contactName: contact.querySelector('#csName').value.trim(), notes: notes.querySelector('#csNotes').value.trim(),
-        priceAck: true, video: withVideo, photoConsent: withVideo ? true : false, audio: st.audioUp, photo: withVideo ? st.photoUp : null, audioSeconds: st.audioSeconds || 0 }, extra));
+        priceAck: true, video: withVideo, currency: CS.cur.code, photoConsent: withVideo ? true : false, audio: st.audioUp, photo: withVideo ? st.photoUp : null, audioSeconds: st.audioSeconds || 0 }, extra));
       CS.track(app, 'submit_ok', { video: withVideo, minutes: res.minutes || 0 });
       showDone(res, phone, email, withVideo);
     } catch (e) {
