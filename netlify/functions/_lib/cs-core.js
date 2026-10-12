@@ -11,21 +11,23 @@ const APPS = {
     'tu-cancion-video': { label: 'Tu canción cantada por ti',    audio: false, video: true,  flat: 9900, flatVideo: 29900 }
 };
 const MAX_AUDIO_MIN = 10;                       // minutos máximos por pedido
-const MAX_AUDIO_BYTES = 100 * 1024 * 1024, MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-const AUDIO_TYPES = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|aac|wav|x-wav|wave|webm|ogg|opus|flac|x-flac|3gpp|3gpp2|amr)$|^video\/(mp4|webm|quicktime|3gpp|3gpp2|x-m4v|ogg)$/i;
+const MAX_AUDIO_BYTES = 60 * 1024 * 1024, MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+const AUDIO_TYPES = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|aac|wav|x-wav|wave|webm|ogg|opus|flac|x-flac|3gpp|3gpp2|amr)$$/i;
 const PHOTO_TYPES = /^image\/(jpeg|jpg|png|webp|heic|heif)$/i;
 
 const money = (n) => '₡' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-// Minutos que se cobran: se redondea hacia arriba al minuto, mínimo 1.
-const billedMinutes = (seconds) => Math.max(1, Math.ceil((Number(seconds) || 0) / 60 - 0.0001));
+// Precio proporcional a la duración (1:15 = 1,25 minutos), redondeado hacia arriba a los ₡100; mínimo 1 minuto.
+const exactMinutes = (seconds) => Math.max(1, (Number(seconds) || 0) / 60);
+const billedMinutes = (seconds) => Math.ceil(exactMinutes(seconds) - 0.0001);   // entero, para la tabla
+const roundUp100 = (n) => Math.ceil(Math.round(n * 100) / 100 / 100 - 1e-9) * 100;
 function priceOf(app, withVideo, seconds) {
     const a = APPS[app]; if (!a) return null;
     if (a.audio) {
-        const min = billedMinutes(seconds), per = withVideo && a.video ? a.perMinuteVideo : a.perMinute;
-        return { minutes: min, perMinute: per, amount: min * per, text: money(min * per) };
+        const per = withVideo && a.video ? a.perMinuteVideo : a.perMinute, em = exactMinutes(seconds), amount = roundUp100(em * per);
+        return { minutes: billedMinutes(seconds), exactMinutes: Math.round(em * 100) / 100, perMinute: per, amount, text: money(amount) };
     }
     const amount = withVideo ? a.flatVideo : a.flat;
-    return { minutes: null, perMinute: null, amount, text: money(amount) };
+    return { minutes: null, exactMinutes: null, perMinute: null, amount, text: money(amount) };
 }
 const publicConfig = (app) => { const a = APPS[app]; if (!a) return null; return { app, label: a.label, audio: a.audio, video: a.video, perMinute: a.perMinute || null, perMinuteVideo: a.perMinuteVideo || null, flat: a.flat || null, flatVideo: a.flatVideo || null, maxAudioMin: MAX_AUDIO_MIN, texts: { perMinute: a.perMinute ? money(a.perMinute) : null, perMinuteVideo: a.perMinuteVideo ? money(a.perMinuteVideo) : null, flat: a.flat ? money(a.flat) : null, flatVideo: a.flatVideo ? money(a.flatVideo) : null } }; };
 
@@ -80,5 +82,5 @@ async function saveOrder(row) {
 const EMAIL_RE = /^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[A-Za-z]{2,}$/;
 const cleanEmail = (s) => { const v = String(s || '').trim().toLowerCase(); return v.length <= 254 && EMAIL_RE.test(v) ? v : ''; };
 
-module.exports = { APPS, MAX_AUDIO_MIN, MAX_AUDIO_BYTES, MAX_PHOTO_BYTES, AUDIO_TYPES, PHOTO_TYPES, money, billedMinutes, priceOf, publicConfig,
+module.exports = { roundUp100, exactMinutes, APPS, MAX_AUDIO_MIN, MAX_AUDIO_BYTES, MAX_PHOTO_BYTES, AUDIO_TYPES, PHOTO_TYPES, money, billedMinutes, priceOf, publicConfig,
     cldConfigured, signUpload, resourceInfo, downloadUrl, saveOrder, cleanEmail, json, UUID_RE, scrub, scrubOne, ipOf, hashIp, countryOf };

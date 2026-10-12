@@ -121,8 +121,8 @@ CS.mountOrder = function (opts) {
   // 1) Audio
   let audioCard = null;
   if (hasAudio) {
-    audioCard = el('div', 'cs-card', `<h3>Tu audio o video</h3><p>Sube tu voz sola o con tu instrumento, en audio o en video, o grábala aquí mismo. Hasta ${cfg.maxAudioMin} minutos.</p>
-      <div class="cs-file"><button type="button" class="btn btn-primary" data-a="pick">Elegir audio o video</button><button type="button" class="btn btn-ghost" data-a="rec">Grabar audio</button><button type="button" class="btn btn-ghost" data-a="vrec">Grabar video</button><input type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac,.webm,.mp4,.mov,.3gp" data-a="file"><input type="file" accept="video/*" capture="user" data-a="vfile"></div>
+    audioCard = el('div', 'cs-card', `<h3>Tu audio</h3><p>Sube tu voz sola o con tu instrumento, o grábala aquí mismo. Puede ser una grabación del celular. Hasta ${cfg.maxAudioMin} minutos.</p>
+      <div class="cs-file"><button type="button" class="btn btn-primary" data-a="pick">Elegir audio</button><button type="button" class="btn btn-ghost" data-a="rec">Grabar ahora</button><input type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac,.webm" data-a="file"></div>
       <div class="cs-rec is-hidden" data-a="recbox"><i></i><span data-a="rect">0:00</span><button type="button" class="btn btn-primary" data-a="stop" style="margin-left:auto;padding:9px 18px">Detener</button></div>
       <div class="cs-chosen is-hidden" data-a="chosen"><span class="nm" data-a="nm"></span><span class="meta" data-a="meta"></span><button type="button" class="btn-quiet" data-a="del">Quitar</button></div>
       <audio class="cs-player is-hidden" controls data-a="player"></audio><p class="cs-err is-hidden" data-a="err" role="alert"></p>`);
@@ -175,7 +175,7 @@ CS.mountOrder = function (opts) {
   const submit = el('button', 'btn btn-primary cs-submit', opts.submitLabel || 'Enviar y recibir mi muestra'); submit.type = 'submit'; form.appendChild(submit);
   form.appendChild(el('p', 'cs-fine', 'Al enviar aceptas que usemos tu audio, letra y foto solo para preparar tu muestra.'));
 
-  const billed = (sec) => Math.max(1, Math.ceil((sec || 0) / 60 - 0.0001));
+  const priceFor = (sec, per) => Math.ceil(Math.round(Math.max(1, sec / 60) * per) / 100 - 1e-9) * 100;
   function calc() {
     const ready = (!hasAudio || !!st.audio) && (!canVideo || !!st.video);
     price.classList.toggle('is-hidden', !ready); ack.classList.toggle('is-hidden', !ready);
@@ -185,11 +185,10 @@ CS.mountOrder = function (opts) {
     if (hasAudio) {
       const per = withVideo ? cfg.perMinuteVideo : cfg.perMinute;
       if (st.audioSeconds) {
-        const m = billed(st.audioSeconds); amount = m * per; amtTxt = CS.money(amount);
-        calcTxt = `Tu archivo dura ${CS.fmtTime(st.audioSeconds)} → ${m} ${m === 1 ? 'minuto' : 'minutos'} × ${CS.money(per)}`;
+        amount = priceFor(st.audioSeconds, per); amtTxt = CS.money(amount);
         ackTxt = `Entiendo que el precio será ${amtTxt}. No se me cobra nada hasta que reciba y escuche una muestra.`;
       } else {
-        amtTxt = `${CS.money(per)} por minuto`; calcTxt = 'No pudimos medir la duración; la calcularemos con tu archivo y te confirmamos el total.';
+        amtTxt = `${CS.money(per)} por minuto`; calcTxt = 'Calcularemos el total con la duración exacta y te lo confirmamos.';
         ackTxt = `Entiendo que el precio es ${CS.money(per)} por minuto. No se me cobra nada hasta que reciba y escuche una muestra.`;
       }
     } else {
@@ -208,21 +207,19 @@ CS.mountOrder = function (opts) {
   async function setAudio(blob, name, knownSeconds) {
     setErr(A('err'), '');
     const type = CS.typeOf(blob);
-    if (!/^(audio|video)\//.test(type)) { setErr(A('err'), 'Ese archivo no parece un audio ni un video. Prueba con mp3, m4a, wav o mp4.'); return; }
-    if (blob.size > 100 * 1024 * 1024) { setErr(A('err'), 'El archivo es muy pesado (máximo 100 MB). Prueba con uno más corto o en menor calidad.'); return; }
+    if (!/^audio\//.test(type)) { setErr(A('err'), 'Ese archivo no parece un audio. Prueba con mp3, m4a o wav.'); return; }
+    if (blob.size > 60 * 1024 * 1024) { setErr(A('err'), 'El audio es muy pesado (máximo 60 MB).'); return; }
     const sec = knownSeconds || await CS.audioDuration(blob);
-    if (sec && sec > cfg.maxAudioMin * 60 + 2) { setErr(A('err'), `Tu archivo dura ${CS.fmtTime(sec)} y el máximo es ${cfg.maxAudioMin} minutos. Envía un fragmento más corto.`); return; }
+    if (sec && sec > cfg.maxAudioMin * 60 + 2) { setErr(A('err'), `Tu audio dura ${CS.fmtTime(sec)} y el máximo es ${cfg.maxAudioMin} minutos. Envía un fragmento más corto.`); return; }
     st.audio = blob; st.audio.csName = name; st.audioSeconds = sec ? Math.round(sec) : null; st.audioUp = null;
     A('nm').textContent = name; A('meta').textContent = sec ? CS.fmtTime(sec) : ''; A('chosen').classList.remove('is-hidden');
     const pl = A('player'); try { if (pl.src) URL.revokeObjectURL(pl.src); } catch { /* ok */ } pl.src = URL.createObjectURL(blob); pl.classList.remove('is-hidden');
-    A('pick').textContent = 'Cambiar archivo'; calc(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
+    A('pick').textContent = 'Cambiar audio'; calc(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
   }
-  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'Elegir audio o video'; A('file').value = ''; A('vfile').value = ''; calc(); }
+  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'Elegir audio'; A('file').value = ''; calc(); }
   if (hasAudio) {
     A('pick').addEventListener('click', () => A('file').click());
     A('file').addEventListener('change', () => { const f = A('file').files[0]; if (f) setAudio(f, f.name || 'audio'); });
-    A('vrec').addEventListener('click', () => A('vfile').click());
-    A('vfile').addEventListener('change', () => { const f = A('vfile').files[0]; if (f) setAudio(f, f.name || 'video'); });
     A('del').addEventListener('click', clearAudio);
     const canRec = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
     if (!canRec) A('rec').classList.add('is-hidden');
@@ -274,7 +271,7 @@ CS.mountOrder = function (opts) {
   function fail(msg, node) { setErr(errBox, msg); errBox.classList.remove('is-hidden'); try { (node || errBox).scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* ok */ } }
   form.addEventListener('submit', async (ev) => {
     ev.preventDefault(); setErr(errBox, '');
-    if (hasAudio && !st.audio) return fail('Falta tu audio o video: elige un archivo o grábalo.', audioCard);
+    if (hasAudio && !st.audio) return fail('Falta tu audio: elige un archivo o grábalo.', audioCard);
     if (canVideo && !st.video) return fail('Elige si quieres solo la canción o también el video.', videoCard);
     const withVideo = canVideo && st.video === 'yes';
     if (withVideo && !st.photo) return fail('Para hacer el video necesitamos una foto de tu rostro. Súbela o elige «Solo la canción».', videoCard);
@@ -317,7 +314,7 @@ CS.mountOrder = function (opts) {
     d.innerHTML = `<h2 class="display">¡Recibimos tu pedido!</h2><p class="big"></p><p></p><p></p>`;
     const ps = d.querySelectorAll('p');
     ps[0].textContent = `Te escribiremos ${via} con una muestra${withVideo ? ' de tu canción y tu video' : ' de tu canción'}.`;
-    ps[1].textContent = `Precio si te gusta: ${res.price}${res.minutes ? ` (${res.minutes} ${res.minutes === 1 ? 'minuto' : 'minutos'})` : ''}. No pagas nada hasta escuchar la muestra.`;
+    ps[1].textContent = `Precio si te gusta: ${res.price}. No pagas nada hasta escuchar la muestra.`;
     ps[2].textContent = withVideo ? 'Y recuerda: en el video eres tú cantando. ¡Prepárate para verte!' : 'Revisa tus mensajes pronto.';
     root.appendChild(d); try { root.scrollIntoView({ block: 'start' }); } catch { /* ok */ } window.scrollTo(0, 0);
     if (opts.onDone) opts.onDone(res);

@@ -97,7 +97,7 @@ exports.handler = async (event) => {
         ...(name ? [`Nombre: ${name}`] : []),
         ...contactLines,
         ``,
-        `Precio que aceptó ver: ${price.text}${price.minutes ? ` (${price.minutes} min × ${core.money(price.perMinute)})` : ''} — NO se le cobra hasta que reciba una muestra.`,
+        `Precio que aceptó ver: ${price.text}${price.exactMinutes ? ` (${price.exactMinutes} min × ${core.money(price.perMinute)}, redondeado a los ₡100)` : ''} — NO se le cobra hasta que reciba una muestra.`,
         ...(audio ? [`Duración del audio: ${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, '0')}`] : []),
         `Código: ${orderId} · País (aprox.): ${country || 'desconocido'}`,
         ``,
