@@ -124,7 +124,7 @@ CS.mountOrder = function (opts) {
   // 1) Audio
   let audioCard = null;
   if (hasAudio) {
-    audioCard = el('div', 'cs-card', `<h3>Sube o graba tu canto</h3><p>Sube o graba tu canto completo para ponerle música. Puedes mandar solo tu voz cantando y también puedes acompañarte con algún instrumento si quisieras. Hasta ${cfg.maxAudioMin} minutos.</p>
+    audioCard = el('div', 'cs-card', `<h3>Sube o graba tu canto</h3><p>Sube o graba tu canto completo para ponerle música. Puedes mandar solo tu voz cantando y también puedes acompañarte con algún instrumento si quisieras. De ${cfg.minAudioSec || 30} segundos hasta ${cfg.maxAudioMin} minutos.</p>
       <div class="cs-file cs-file-audio"><button type="button" class="btn btn-rec" data-a="rec"><i></i>Grabar ahora</button><button type="button" class="btn-quiet cs-pick-file" data-a="pick">o elige un audio que ya tengas</button><input type="file" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac,.webm" data-a="file"></div>
       <div class="cs-rec is-hidden" data-a="recbox"><i></i><span data-a="rect">0:00</span><button type="button" class="btn btn-primary" data-a="stop" style="margin-left:auto;padding:9px 18px">Detener</button></div>
       <div class="cs-chosen is-hidden" data-a="chosen"><span class="nm" data-a="nm"></span><span class="meta" data-a="meta"></span><button type="button" class="btn-quiet" data-a="del">Quitar</button></div>
@@ -211,6 +211,8 @@ CS.mountOrder = function (opts) {
     if (blob.size > 60 * 1024 * 1024) { setErr(A('err'), 'El audio es muy pesado (máximo 60 MB).'); return; }
     const sec = knownSeconds || await CS.audioDuration(blob);
     if (sec && sec > cfg.maxAudioMin * 60 + 2) { setErr(A('err'), `Tu audio dura ${CS.fmtTime(sec)} y el máximo es ${cfg.maxAudioMin} minutos. Envía un fragmento más corto.`); return; }
+    const minSec = cfg.minAudioSec || 30;
+    if (sec && sec < minSec - 0.5) { setErr(A('err'), `Tu audio dura ${Math.round(sec)} segundos. Necesitamos al menos ${minSec} segundos de tu canto: graba o sube uno más largo.`); return; }
     st.audio = blob; st.audio.csName = name; st.audioSeconds = sec ? Math.round(sec) : null; st.audioUp = null;
     A('nm').textContent = name; A('meta').textContent = sec ? CS.fmtTime(sec) : ''; A('chosen').classList.remove('is-hidden');
     const pl = A('player'); try { if (pl.src) URL.revokeObjectURL(pl.src); } catch { /* ok */ } pl.src = URL.createObjectURL(blob); pl.classList.remove('is-hidden');

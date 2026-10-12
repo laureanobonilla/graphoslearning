@@ -74,6 +74,7 @@ exports.handler = async (event) => {
     // Duración: la mide Cloudinary; si no la da, se usa la del navegador (acotada).
     let seconds = audio ? (audio.duration || Math.min(Number(b.audioSeconds) || 0, core.MAX_AUDIO_MIN * 60)) : 0;
     if (audio && seconds > core.MAX_AUDIO_MIN * 60 + 5) return json(400, { error: `El audio dura más de ${core.MAX_AUDIO_MIN} minutos. Envíanos un fragmento más corto o escríbenos.` });
+    if (audio && seconds > 0 && seconds < core.MIN_AUDIO_SEC - 1) return json(400, { error: `Tu audio dura menos de ${core.MIN_AUDIO_SEC} segundos. Necesitamos al menos ${core.MIN_AUDIO_SEC} segundos de tu canto.` });
     const price = core.priceOf(app, withVideo, seconds);
     const curCode = core.CURRENCIES[b.currency] ? b.currency : 'CRC';          // moneda que vio la persona (para el correo y la pantalla de mantenimiento)
     const shown = core.displayPrice(price.amount, curCode);

@@ -10,6 +10,7 @@ const APPS = {
     'tu-voz-video':    { label: 'Tu voz, tu canción y tu video', audio: true,  video: true,  perMinute: 9900, perMinuteVideo: 18900 },
     'tu-cancion-video': { label: 'Tu canción cantada por ti',    audio: false, video: true,  flat: 9900, flatVideo: 29900 }
 };
+const MIN_AUDIO_SEC = 30;                       // el audio debe durar al menos esto
 const MAX_AUDIO_MIN = 10;                       // minutos máximos por pedido
 const MAX_AUDIO_BYTES = 60 * 1024 * 1024, MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const AUDIO_TYPES = /^audio\/(mpeg|mp3|mp4|x-m4a|m4a|aac|wav|x-wav|wave|webm|ogg|opus|flac|x-flac|3gpp|3gpp2|amr)$$/i;
@@ -29,7 +30,7 @@ function priceOf(app, withVideo, seconds) {
     const amount = withVideo ? a.flatVideo : a.flat;
     return { minutes: null, exactMinutes: null, perMinute: null, amount, text: money(amount) };
 }
-const publicConfig = (app) => { const a = APPS[app]; if (!a) return null; return { app, label: a.label, audio: a.audio, video: a.video, perMinute: a.perMinute || null, perMinuteVideo: a.perMinuteVideo || null, flat: a.flat || null, flatVideo: a.flatVideo || null, maxAudioMin: MAX_AUDIO_MIN, texts: { perMinute: a.perMinute ? money(a.perMinute) : null, perMinuteVideo: a.perMinuteVideo ? money(a.perMinuteVideo) : null, flat: a.flat ? money(a.flat) : null, flatVideo: a.flatVideo ? money(a.flatVideo) : null } }; };
+const publicConfig = (app) => { const a = APPS[app]; if (!a) return null; return { app, label: a.label, audio: a.audio, video: a.video, perMinute: a.perMinute || null, perMinuteVideo: a.perMinuteVideo || null, flat: a.flat || null, flatVideo: a.flatVideo || null, minAudioSec: MIN_AUDIO_SEC, maxAudioMin: MAX_AUDIO_MIN, texts: { perMinute: a.perMinute ? money(a.perMinute) : null, perMinuteVideo: a.perMinuteVideo ? money(a.perMinuteVideo) : null, flat: a.flat ? money(a.flat) : null, flatVideo: a.flatVideo ? money(a.flatVideo) : null } }; };
 
 
 const { CURRENCIES, currencyOf, fmtMoney, convertCrc, displayPrice, currencyInfo } = require('./currency');
@@ -85,5 +86,5 @@ async function saveOrder(row) {
 const EMAIL_RE = /^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[A-Za-z]{2,}$/;
 const cleanEmail = (s) => { const v = String(s || '').trim().toLowerCase(); return v.length <= 254 && EMAIL_RE.test(v) ? v : ''; };
 
-module.exports = { CURRENCIES, currencyOf, currencyInfo, displayPrice, convertCrc, fmtMoney, roundUp100, exactMinutes, APPS, MAX_AUDIO_MIN, MAX_AUDIO_BYTES, MAX_PHOTO_BYTES, AUDIO_TYPES, PHOTO_TYPES, money, billedMinutes, priceOf, publicConfig,
+module.exports = { MIN_AUDIO_SEC, CURRENCIES, currencyOf, currencyInfo, displayPrice, convertCrc, fmtMoney, roundUp100, exactMinutes, APPS, MAX_AUDIO_MIN, MAX_AUDIO_BYTES, MAX_PHOTO_BYTES, AUDIO_TYPES, PHOTO_TYPES, money, billedMinutes, priceOf, publicConfig,
     cldConfigured, signUpload, resourceInfo, downloadUrl, saveOrder, cleanEmail, json, UUID_RE, scrub, scrubOne, ipOf, hashIp, countryOf };
