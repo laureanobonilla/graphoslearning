@@ -95,12 +95,11 @@ CS.prepPhoto = async function (file) {
   if (!blob) throw new Error('encode');
   return blob;
 };
-// Sube a Cloudinary con la firma del servidor. onProgress(0..1).
-CS.upload = async function (app, kind, orderId, blob, onProgress) {
-  const contentType = kind === 'photo' ? 'image/jpeg' : CS.typeOf(blob);
-  const sig = await CS.postFn('cs-sign-upload', { app, kind, orderId, size: blob.size, contentType });
+// Sube a Cloudinary con la firma del servidor (función `fn`, con su `payload`). onProgress(0..1).
+CS.uploadWith = async function (fn, payload, blob, onProgress, fileName) {
+  const sig = await CS.postFn(fn, Object.assign({ size: blob.size, contentType: CS.typeOf(blob) }, payload));
   const fd = new FormData();
-  fd.append('file', blob, kind === 'photo' ? 'foto.jpg' : (blob.csName || blob.name || 'audio'));
+  fd.append('file', blob, fileName || blob.csName || blob.name || 'audio');
   fd.append('api_key', sig.apiKey); fd.append('timestamp', sig.timestamp); fd.append('signature', sig.signature); fd.append('public_id', sig.publicId); fd.append('type', sig.type);
   await new Promise((resolve, reject) => {
     const x = new XMLHttpRequest(); x.open('POST', sig.uploadUrl);
@@ -110,6 +109,11 @@ CS.upload = async function (app, kind, orderId, blob, onProgress) {
     x.send(fd);
   });
   return { publicId: sig.publicId };
+};
+CS.upload = async function (app, kind, orderId, blob, onProgress) {
+  const contentType = kind === 'photo' ? 'image/jpeg' : CS.typeOf(blob);
+  const sig = { app, kind, orderId, contentType };
+  return CS.uploadWith('cs-sign-upload', sig, Object.assign(blob, {}), onProgress, kind === 'photo' ? 'foto.jpg' : undefined);
 };
 
 // ---------- Formulario de pedido ----------

@@ -86,5 +86,5 @@ async function saveOrder(row) {
 const EMAIL_RE = /^[^\s@<>"']{1,64}@[^\s@<>"']{1,190}\.[A-Za-z]{2,}$/;
 const cleanEmail = (s) => { const v = String(s || '').trim().toLowerCase(); return v.length <= 254 && EMAIL_RE.test(v) ? v : ''; };
 
-module.exports = { MIN_AUDIO_SEC, CURRENCIES, currencyOf, currencyInfo, displayPrice, convertCrc, fmtMoney, roundUp100, exactMinutes, APPS, MAX_AUDIO_MIN, MAX_AUDIO_BYTES, MAX_PHOTO_BYTES, AUDIO_TYPES, PHOTO_TYPES, money, billedMinutes, priceOf, publicConfig,
+module.exports = { cld, sign, MIN_AUDIO_SEC, CURRENCIES, currencyOf, currencyInfo, displayPrice, convertCrc, fmtMoney, roundUp100, exactMinutes, APPS, MAX_AUDIO_MIN, MAX_AUDIO_BYTES, MAX_PHOTO_BYTES, AUDIO_TYPES, PHOTO_TYPES, money, billedMinutes, priceOf, publicConfig,
     cldConfigured, signUpload, resourceInfo, downloadUrl, saveOrder, cleanEmail, json, UUID_RE, scrub, scrubOne, ipOf, hashIp, countryOf };

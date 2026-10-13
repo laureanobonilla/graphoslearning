@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Quita la voz de tu canción</title>
+<meta name="description" content="Sube tu canción y te devolvemos solo la pista instrumental en MP3. Escuchas un fragmento antes de pagar.">
+<meta property="og:title" content="Quita la voz de tu canción y quédate con la pista">
+<meta property="og:description" content="Sube tu audio, escucha un fragmento de la pista y descárgala completa en MP3 por US$4,99.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gloock&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/cs/cs.css?v=3">
+<style>
+  .drop{ display:block; border:2px dashed var(--ink); border-radius:18px; background:var(--paper); padding:26px 16px; text-align:center; cursor:pointer; }
+  .drop b{ display:block; font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.3rem; margin-bottom:4px; }
+  .drop span{ color:var(--muted); font-size:.93rem; }
+  .drop.has{ border-style:solid; box-shadow:4px 4px 0 var(--ink); }
+  .work{ text-align:center; padding:26px 8px; }
+  .work h2{ font-size:1.5rem; margin:0 0 8px; }
+  .work p{ color:var(--muted); margin:0; }
+  .eq{ display:flex; gap:5px; justify-content:center; align-items:center; height:56px; margin:0 0 14px; }
+  .eq i{ width:8px; height:100%; border-radius:4px; background:var(--magenta); transform-origin:center; animation:eq 1s ease-in-out infinite; }
+  .eq i:nth-child(2){ animation-delay:-.2s; } .eq i:nth-child(3){ animation-delay:-.4s; } .eq i:nth-child(4){ animation-delay:-.6s; } .eq i:nth-child(5){ animation-delay:-.8s; }
+  @keyframes eq{ 0%,100%{ transform:scaleY(.25); } 50%{ transform:scaleY(1); } }
+  @media (prefers-reduced-motion: reduce){ .eq i{ animation:none; transform:scaleY(.6); } }
+  .buy{ background:var(--ink); color:#fff; border-radius:20px; padding:20px 16px; margin-top:12px; }
+  .buy h3{ font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.35rem; margin:0 0 6px; color:var(--mango); }
+  .buy p{ margin:0 0 12px; color:#e4e3f6; font-size:.95rem; }
+  #paypalBox{ background:#fff; border-radius:14px; padding:12px; min-height:60px; }
+  .okbox{ text-align:center; }
+  .okbox .btn{ display:block; text-decoration:none; text-align:center; margin:12px 0 0; }
+  .keep{ background:var(--paper); border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; font-size:.85rem; color:var(--muted); word-break:break-all; margin-top:14px; }
+  audio{ width:100%; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar"><span class="brand">tu pista</span></div>
+  <section class="hero">
+    <svg id="coverWave" viewBox="0 0 320 92" role="img" aria-label="Una onda de sonido"></svg>
+    <h1 class="display">Quita la voz, quédate con la pista</h1>
+    <p class="sub">Sube tu canción y te devolvemos solo la música, en MP3, lista para cantar encima. Escuchas un fragmento antes de pagar.</p>
+  </section>
+
+  <div class="sec" id="main">
+    <!-- 1) subir -->
+    <div id="vUpload">
+      <label class="drop" id="drop" for="fileIn"><b id="dropTitle">Elegir un audio</b><span id="dropSub">MP3, M4A o WAV · de 10 segundos a 8 minutos</span></label>
+      <input type="file" id="fileIn" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+      <p class="cs-err is-hidden" id="upErr" role="alert"></p>
+      <label class="ack" style="margin-top:12px"><input type="checkbox" id="consent"><span>El audio es mío o tengo permiso para usarlo. Solo lo uso para obtener la pista.</span></label>
+      <button class="btn btn-primary cs-submit" id="goBtn" type="button">Quitar la voz</button>
+      <p class="cs-fine">Tu audio se usa solo para sacar la pista y no se comparte.</p>
+    </div>
+
+    <!-- 2) trabajando -->
+    <div id="vWork" class="work is-hidden">
+      <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <h2 class="display" id="workTitle">Subiendo tu audio…</h2>
+      <p id="workSub"></p>
+      <div class="cs-prog is-hidden" id="prog"><div class="track"><i></i></div></div>
+    </div>
+
+    <!-- 3) listo: fragmento + pago -->
+    <div id="vReady" class="is-hidden">
+      <div class="cs-card">
+        <h3>Tu pista está lista</h3>
+        <p>Escucha un fragmento de <span id="prevSec">30</span> segundos. La pista completa se descarga en MP3 después del pago.</p>
+        <audio id="player" controls preload="none"></audio>
+      </div>
+      <div class="buy" id="buyBox">
+        <h3 id="buyTitle">Descargar la pista completa</h3>
+        <p>MP3 de calidad, sin la voz. Pago único de <b id="priceTxt">US$4,99</b>, con tarjeta o con tu cuenta de PayPal.</p>
+        <div id="paypalBox"></div>
+        <p class="cs-err is-hidden" id="payErr" role="alert" style="color:#ffb4ab"></p>
+      </div>
+      <div class="cs-card okbox is-hidden" id="paidBox">
+        <h3>¡Pago recibido!</h3>
+        <p>Tu pista completa ya está lista para descargar.</p>
+        <a class="btn btn-primary" id="dlBtn" href="#">Descargar MP3</a>
+        <div class="keep">Guarda este enlace por si necesitas descargarla otra vez:<br><span id="keepLink"></span></div>
+      </div>
+    </div>
+
+    <!-- error -->
+    <div id="vError" class="work is-hidden">
+      <h2 class="display">No pudimos con este audio</h2>
+      <p id="errMsg"></p>
+      <button class="btn btn-primary" id="againBtn" type="button" style="margin-top:16px">Probar con otro audio</button>
+    </div>
+  </div>
+  <p class="disclaimer">Usa solo audios tuyos o con permiso de quien tenga los derechos. La separación se hace con inteligencia artificial y el resultado puede conservar restos leves de la voz según la grabación.</p>
+</div>
+<script src="/cs/cs.js?v=8"></script>
+<script>
+(function () {
+  var APP = 'tu-pista', $ = function (id) { return document.getElementById(id); };
+  CS.drawWave($('coverWave'));
+  var state = { cfg: null, file: null, seconds: null, jobId: null };
+  var KEY = 'ins_job_v1';
+  function view(name) { ['vUpload', 'vWork', 'vReady', 'vError'].forEach(function (v) { $(v).classList.toggle('is-hidden', v !== name); }); }
+  function setErr(n, m) { n.textContent = m || ''; n.classList.toggle('is-hidden', !m); }
+  function sget() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function sset(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* ok */ } }
+  function fail(msg) { $('errMsg').textContent = msg; view('vError'); }
+
+  CS.track(APP, 'landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 200) : null, likelyBot: /bot|crawl|spider|facebookexternalhit|whatsapp|preview|slackbot|embedly|discordbot/i.test(navigator.userAgent) });
+  var cfgP = fetch('/.netlify/functions/ins-config', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) { if (d && d.clientId) { state.cfg = d; $('priceTxt').textContent = 'US$' + String(d.priceUsd).replace('.', ','); } return state.cfg; }).catch(function () { return null; });
+
+  // ---- elegir audio ----
+  $('fileIn').addEventListener('change', async function () {
+    setErr($('upErr'), ''); var f = $('fileIn').files[0]; if (!f) return;
+    var type = CS.typeOf(f);
+    if (!/^audio\//.test(type)) { setErr($('upErr'), 'Ese archivo no parece un audio. Prueba con mp3, m4a o wav.'); return; }
+    var max = (state.cfg && state.cfg.maxMb) || 40;
+    if (f.size > max * 1048576) { setErr($('upErr'), 'El audio es muy pesado (máximo ' + max + ' MB).'); return; }
+    var sec = await CS.audioDuration(f), minS = (state.cfg && state.cfg.minSec) || 10, maxM = (state.cfg && state.cfg.maxMin) || 8;
+    if (sec && sec < minS) { setErr($('upErr'), 'El audio dura ' + Math.round(sec) + ' segundos. Necesitamos al menos ' + minS + '.'); return; }
+    if (sec && sec > maxM * 60 + 2) { setErr($('upErr'), 'El audio dura ' + CS.fmtTime(sec) + ' y el máximo es ' + maxM + ' minutos.'); return; }
+    state.file = f; state.seconds = sec ? Math.round(sec) : null;
+    $('drop').classList.add('has'); $('dropTitle').textContent = f.name; $('dropSub').textContent = (sec ? CS.fmtTime(sec) + ' · ' : '') + 'toca para cambiarlo';
+    CS.track(APP, 'audio_chosen', { seconds: state.seconds || 0, kb: Math.round(f.size / 1024) });
+  });
+
+  // ---- subir y separar ----
+  $('goBtn').addEventListener('click', async function () {
+    setErr($('upErr'), '');
+    var missing = []; if (!state.file) missing.push('elegir tu audio'); if (!$('consent').checked) missing.push('marcar que el audio es tuyo o que tienes permiso');
+    if (missing.length) { setErr($('upErr'), 'Te falta: ' + missing.join('; ') + '.'); return; }
+    var jobId = CS.newId(); state.jobId = jobId; view('vWork'); $('workTitle').textContent = 'Subiendo tu audio…'; $('workSub').textContent = ''; $('prog').classList.remove('is-hidden');
+    CS.track(APP, 'submit_clicked', { seconds: state.seconds || 0 });
+    try {
+      var up = await CS.uploadWith('ins-sign-upload', { jobId: jobId }, state.file, function (f) { $('prog').querySelector('i').style.width = Math.round(f * 100) + '%'; });
+      $('prog').classList.add('is-hidden'); $('workTitle').textContent = 'Separando la voz…'; $('workSub').textContent = 'Suele tardar menos de un minuto. No cierres esta página.';
+      await CS.postFn('ins-start', { jobId: jobId, audio: up, consent: true, audioSeconds: state.seconds || 0, anonId: CS.anonId });
+      sset({ jobId: jobId, at: Date.now() }); poll(jobId, 0);
+    } catch (e) { CS.track(APP, 'submit_failed', { status: e.status || 0 }); fail(e.status ? e.message : 'Se cortó la conexión. Inténtalo de nuevo.'); }
+  });
+  $('againBtn').addEventListener('click', function () { state.file = null; $('fileIn').value = ''; $('drop').classList.remove('has'); $('dropTitle').textContent = 'Elegir un audio'; $('dropSub').textContent = 'MP3, M4A o WAV · de 10 segundos a 8 minutos'; view('vUpload'); });
+
+  // ---- esperar el resultado ----
+  async function poll(jobId, n) {
+    if (state.jobId !== jobId) return;
+    if (n > 120) return fail('Esto está tardando más de lo normal. Vuelve a abrir esta página en unos minutos; tu trabajo se guarda.');
+    var d; try { var r = await fetch('/.netlify/functions/ins-status?job=' + encodeURIComponent(jobId), { cache: 'no-store' }); d = await r.json(); if (r.status === 404) { try { localStorage.removeItem(KEY); } catch (e3) { /* ok */ } state.jobId = null; return view('vUpload'); } if (!r.ok) throw new Error(d.error || 'error'); } catch (e) { return setTimeout(function () { poll(jobId, n + 1); }, 4000); }
+    if (d.status === 'failed') { CS.track(APP, 'job_failed', {}); try { localStorage.removeItem(KEY); } catch (e2) { /* ok */ } return fail(d.error || 'No pudimos separar este audio.'); }
+    if (d.status === 'ready') return showReady(jobId, d.paid);
+    setTimeout(function () { poll(jobId, n + 1); }, 3000);
+  }
+
+  // ---- fragmento + pago ----
+  function setLink(jobId) { var u = location.origin + location.pathname + '?j=' + jobId; $('keepLink').textContent = u; $('dlBtn').href = '/.netlify/functions/ins-download?job=' + encodeURIComponent(jobId); }
+  async function showReady(jobId, paid) {
+    state.jobId = jobId; view('vReady'); sset({ jobId: jobId, at: Date.now() }); setLink(jobId);
+    var cfg = await cfgP; if (cfg) $('prevSec').textContent = cfg.previewSec;
+    $('player').src = '/.netlify/functions/ins-preview?job=' + encodeURIComponent(jobId);
+    CS.track(APP, 'preview_ready', { paid: !!paid });
+    if (paid) return showPaid();
+    $('buyBox').classList.remove('is-hidden'); $('paidBox').classList.add('is-hidden'); mountPaypal(jobId);
+  }
+  function showPaid() { $('buyBox').classList.add('is-hidden'); $('paidBox').classList.remove('is-hidden'); try { $('paidBox').scrollIntoView({ block: 'center' }); } catch (e) { /* ok */ } }
+  var ppMounted = null;
+  async function mountPaypal(jobId) {
+    if (ppMounted === jobId) return; ppMounted = jobId;
+    var cfg = await cfgP; var box = $('paypalBox'); box.textContent = '';
+    if (!cfg) { setErr($('payErr'), 'El pago aún no está disponible. Inténtalo en un momento.'); return; }
+    try {
+      if (!window.paypal) await new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(cfg.clientId) + '&currency=USD'; s.onload = res; s.onerror = function () { rej(new Error('No se pudo cargar PayPal.')); }; document.head.appendChild(s); });
+      window.paypal.Buttons({
+        style: { layout: 'vertical', shape: 'pill', label: 'pay' },
+        createOrder: async function () { setErr($('payErr'), ''); CS.track(APP, 'pay_clicked', {}); var d = await CS.postFn('ins-pay-create', { jobId: jobId }); return d.orderID; },
+        onApprove: async function (data) {
+          try { await CS.postFn('ins-pay-capture', { jobId: jobId, orderID: data.orderID }); CS.track(APP, 'pay_ok', {}); showPaid(); }
+          catch (e) { setErr($('payErr'), e.message || 'No pudimos confirmar el pago.'); }
+        },
+        onCancel: function () { CS.track(APP, 'pay_cancel', {}); },
+        onError: function () { setErr($('payErr'), 'PayPal tuvo un problema. Inténtalo de nuevo.'); }
+      }).render('#paypalBox');
+    } catch (e) { ppMounted = null; setErr($('payErr'), e.message || 'No se pudo cargar PayPal.'); }
+  }
+
+  // ---- volver con un trabajo guardado (?j=… o el último de este navegador) ----
+  var q = new URLSearchParams(location.search).get('j'), saved = sget();
+  var resume = (q && /^[0-9a-f-]{36}$/i.test(q)) ? q : (saved && saved.jobId && Date.now() - saved.at < 3 * 86400000 ? saved.jobId : null);
+  if (resume) { state.jobId = resume; view('vWork'); $('workTitle').textContent = 'Buscando tu pista…'; poll(resume, 0); }
+})();
+</script>
+</body>
+</html>
