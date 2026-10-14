@@ -2,7 +2,7 @@
 // puede sobrescribir cualquier clave en su `t`; si no la trae, qer-app.js usa esta (según CFG.lang).
 window.QER_STR = {
   es: {
-    n_cta: 'Ver todo lo que hay en mí',
+    n_cta: 'Quítame la máscara completamente',
     n_cta_sub: 'Pago único y pequeño · te llega al correo y queda tuya',
     n_prev_title: 'Tu perfil',
     n_prev_locked: 'Se abre al desbloquear',
@@ -62,7 +62,7 @@ window.QER_STR = {
     n_test_note: 'Esta es la pantalla de pago. En modo prueba, en vez de cobrar, se arma la lectura y se envía a tu correo.'
   },
   en: {
-    n_cta: 'Show me everything about me',
+    n_cta: 'Take my mask off completely',
     n_cta_sub: 'One small payment · sent to your email and yours to keep',
     n_prev_title: 'Your profile',
     n_prev_locked: 'Opens when you unlock',
