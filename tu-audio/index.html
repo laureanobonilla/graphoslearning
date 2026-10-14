@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tu audio, a tu medida</title>
+<meta name="description" content="Quita la voz de una canción, deja solo la voz, cambia el tono o la velocidad, o saca la letra. Escuchas un fragmento antes de pagar.">
+<meta property="og:title" content="Tu audio, a tu medida">
+<meta property="og:description" content="Quita la voz, cambia el tono o la velocidad, saca la letra. Escuchas antes de pagar.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gloock&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/cs/cs.css?v=3">
+<style>
+  .tools{ display:grid; gap:10px; }
+  .tool{ appearance:none; text-align:left; width:100%; background:var(--paper); border:2px solid var(--ink); border-radius:16px; padding:14px 16px; cursor:pointer; color:var(--ink); box-shadow:3px 3px 0 var(--ink); transition:transform .1s ease, box-shadow .1s ease; }
+  .tool:active{ transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+  .tool b{ display:block; font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.2rem; }
+  .tool span{ color:var(--muted); font-size:.92rem; }
+  .back{ background:none; border:none; color:var(--muted); font-weight:600; cursor:pointer; padding:4px 0 10px; font-size:.95rem; }
+  .drop{ display:block; border:2px dashed var(--ink); border-radius:18px; background:var(--paper); padding:26px 16px; text-align:center; cursor:pointer; }
+  .drop b{ display:block; font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.3rem; margin-bottom:4px; }
+  .drop span{ color:var(--muted); font-size:.93rem; }
+  .drop.has{ border-style:solid; box-shadow:4px 4px 0 var(--ink); }
+  .work{ text-align:center; padding:26px 8px; }
+  .work h2{ font-size:1.5rem; margin:0 0 8px; }
+  .work p{ color:var(--muted); margin:0; }
+  .eq{ display:flex; gap:5px; justify-content:center; align-items:center; height:56px; margin:0 0 14px; }
+  .eq i{ width:8px; height:100%; border-radius:4px; background:var(--magenta); transform-origin:center; animation:eq 1s ease-in-out infinite; }
+  .eq i:nth-child(2){ animation-delay:-.2s; } .eq i:nth-child(3){ animation-delay:-.4s; } .eq i:nth-child(4){ animation-delay:-.6s; } .eq i:nth-child(5){ animation-delay:-.8s; }
+  @keyframes eq{ 0%,100%{ transform:scaleY(.25); } 50%{ transform:scaleY(1); } }
+  @media (prefers-reduced-motion: reduce){ .eq i{ animation:none; transform:scaleY(.6); } }
+  .buy{ background:var(--ink); color:#fff; border-radius:20px; padding:20px 16px; margin-top:12px; }
+  .buy h3{ font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.35rem; margin:0 0 6px; color:var(--mango); }
+  .buy p{ margin:0 0 12px; color:#e4e3f6; font-size:.95rem; }
+  #paypalBox{ background:#fff; border-radius:14px; padding:12px; min-height:60px; }
+  .okbox{ text-align:center; }
+  .okbox .btn{ display:block; width:100%; text-decoration:none; text-align:center; margin:12px 0 0; }
+  .okbox .btn-ghost{ background:transparent; border:2px solid var(--ink); color:var(--ink); }
+  .keep{ background:var(--paper); border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; font-size:.85rem; color:var(--muted); word-break:break-all; margin-top:14px; text-align:left; }
+  audio{ width:100%; margin-top:6px; }
+  .ctl{ margin:14px 0 0; }
+  .ctl > label{ display:flex; justify-content:space-between; align-items:baseline; font-weight:700; }
+  .ctl small{ display:block; color:var(--muted); margin-top:4px; }
+  .step{ display:flex; align-items:center; gap:12px; margin-top:6px; }
+  .step button{ width:48px; height:48px; border-radius:50%; border:2px solid var(--ink); background:var(--paper); font-size:1.5rem; font-weight:700; cursor:pointer; color:var(--ink); line-height:1; }
+  .step button:active{ background:var(--mango); }
+  .step output{ min-width:84px; text-align:center; font-family:'Gloock',Georgia,serif; font-size:1.5rem; }
+  input[type=range]{ width:100%; accent-color:var(--magenta); margin:8px 0 0; }
+  .det{ background:var(--paper); border:1.5px solid var(--line); border-radius:12px; padding:8px 12px; font-size:.92rem; margin:8px 0 0; }
+  .lyr{ white-space:pre-wrap; background:var(--paper); border:2px solid var(--ink); border-radius:14px; padding:14px; margin:8px 0 0; max-height:340px; overflow:auto; line-height:1.6; }
+  .lyr.fade{ position:relative; -webkit-mask-image:linear-gradient(#000 55%, transparent); mask-image:linear-gradient(#000 55%, transparent); }
+  .stat{ color:var(--muted); font-size:.9rem; margin:8px 0 0; text-align:center; min-height:1.3em; }
+  .nudge{ background:var(--mango); border-radius:12px; padding:10px 12px; font-weight:600; margin:0 0 12px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar"><span class="brand">tu audio</span></div>
+  <section class="hero">
+    <svg id="coverWave" viewBox="0 0 320 92" role="img" aria-label="Una onda de sonido"></svg>
+    <h1 class="display">Tu audio, a tu medida</h1>
+    <p class="sub">Quita la voz, cambia el tono o la velocidad, o saca la letra. Escuchas antes de pagar.</p>
+  </section>
+
+  <div class="sec" id="main">
+    <!-- 1) elegir qué hacer -->
+    <div id="vPick">
+      <div class="tools" id="toolList"></div>
+    </div>
+
+    <!-- 2) subir -->
+    <div id="vUpload" class="is-hidden">
+      <button class="back" id="backBtn" type="button">← Cambiar de herramienta</button>
+      <p class="nudge is-hidden" id="paidNudge">Ya pagaste. Elige otra vez tu audio para descargarlo con tus ajustes.</p>
+      <label class="drop" id="drop" for="fileIn"><b id="dropTitle">Elegir un audio</b><span id="dropSub">MP3, M4A o WAV</span></label>
+      <input type="file" id="fileIn" accept="audio/*,.m4a,.mp3,.wav,.aac,.ogg,.opus,.flac" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+      <p class="cs-err is-hidden" id="upErr" role="alert"></p>
+      <label class="ack" id="consentRow" style="margin-top:12px"><input type="checkbox" id="consent"><span>El audio es mío o tengo permiso para usarlo.</span></label>
+      <button class="btn btn-primary cs-submit" id="goBtn" type="button">Empezar</button>
+      <p class="cs-fine" id="upFine">Tu audio se usa solo para esto y no se comparte.</p>
+    </div>
+
+    <!-- 3) trabajando -->
+    <div id="vWork" class="work is-hidden">
+      <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      <h2 class="display" id="workTitle">Subiendo tu audio…</h2>
+      <p id="workSub"></p>
+      <div class="cs-prog is-hidden" id="prog"><div class="track"><i></i></div></div>
+    </div>
+
+    <!-- 4) listo -->
+    <div id="vReady" class="is-hidden">
+      <div class="cs-card" id="resBox">
+        <h3 id="resTitle">Listo</h3>
+        <p id="resSub"></p>
+        <audio id="player" controls preload="none"></audio>
+        <div class="lyr is-hidden" id="lyr"></div>
+        <button class="btn btn-quiet is-hidden" id="adjOpen" type="button" style="margin-top:12px">Ajustar tono o velocidad</button>
+      </div>
+
+      <div class="cs-card is-hidden" id="edBox">
+        <h3 id="edTitle">Ajusta tu audio</h3>
+        <p class="det is-hidden" id="detInfo"></p>
+        <div class="ctl"><label for="stVal">Tono <small style="margin:0">medios tonos</small></label>
+          <div class="step"><button type="button" id="stDn" aria-label="Bajar un medio tono">−</button><output id="stVal" for="stDn stUp">0</output><button type="button" id="stUp" aria-label="Subir un medio tono">+</button></div>
+          <small id="stNote"></small></div>
+        <div class="ctl"><label for="spR">Velocidad <output id="spVal">100%</output></label>
+          <input type="range" id="spR" min="70" max="130" step="5" value="100"><small id="spNote"></small></div>
+        <div class="ctl is-hidden" id="trimCtl"><label>Recortar <output id="trimVal"></output></label>
+          <small>Desde</small><input type="range" id="t0R" min="0" max="100" step="0.1" value="0" aria-label="Desde"><small>Hasta</small><input type="range" id="t1R" min="0" max="100" step="0.1" value="100" aria-label="Hasta"></div>
+        <p class="stat" id="edStat"></p>
+        <audio id="edPlayer" controls preload="none"></audio>
+        <p class="cs-fine" id="edFine">Así suena un fragmento con tus ajustes.</p>
+      </div>
+
+      <div class="buy" id="buyBox">
+        <h3 id="buyTitle">Descargar completo</h3>
+        <p id="buyText"></p>
+        <div id="paypalBox"></div>
+        <p class="cs-err is-hidden" id="payErr" role="alert" style="color:#ffb4ab"></p>
+      </div>
+      <div class="cs-card okbox is-hidden" id="paidBox">
+        <h3>¡Pago recibido!</h3>
+        <p id="paidText"></p>
+        <a class="btn btn-primary" id="dlBtn" href="#">Descargar</a>
+        <button class="btn btn-ghost is-hidden" id="cpBtn" type="button">Copiar la letra</button>
+        <p class="stat" id="dlStat"></p>
+        <div class="keep">Guarda este enlace por si necesitas volver:<br><span id="keepLink"></span></div>
+      </div>
+      <button class="btn btn-quiet" id="moreBtn" type="button" style="margin-top:14px;width:100%">Hacer otra cosa</button>
+    </div>
+
+    <!-- error -->
+    <div id="vError" class="work is-hidden">
+      <h2 class="display">No pudimos con este audio</h2>
+      <p id="errMsg"></p>
+      <button class="btn btn-primary" id="againBtn" type="button" style="margin-top:16px">Probar de nuevo</button>
+    </div>
+  </div>
+  <p class="disclaimer">Usa solo audios tuyos o con permiso de quien tenga los derechos. La separación y la letra se hacen con inteligencia artificial: el resultado puede conservar restos leves de la voz o tener errores según la grabación. El cambio de tono suena mejor con ajustes pequeños (hasta unos 5 medios tonos).</p>
+</div>
+<script src="/cs/cs.js?v=8"></script>
+<script src="/tu-audio/engine.js?v=1"></script>
+<script>
+(function () {
+  var APP = 'tu-audio', E = window.AudEngine, $ = function (id) { return document.getElementById(id); };
+  CS.drawWave($('coverWave'));
+  var META = {
+    pista:   { t: 'Quitar la voz', d: 'Te dejamos solo la música, lista para cantar encima.', go: 'Quitar la voz', work: 'Quitando la voz…', res: 'Tu pista está lista', kind: 'audio', buy: 'MP3 sin la voz', file: 'pista-sin-voz' },
+    voz:     { t: 'Dejar solo la voz', d: 'La voz sin la música, para estudiarla o remezclarla.', go: 'Dejar solo la voz', work: 'Separando la voz…', res: 'Tu voz sola está lista', kind: 'audio', buy: 'MP3 con solo la voz', file: 'solo-voz' },
+    ajustar: { t: 'Cambiar tono o velocidad', d: 'Sube o baja medios tonos, ve más lento o más rápido, y recorta.', go: 'Abrir mi audio', kind: 'local', buy: 'MP3 con tus ajustes', file: 'audio-ajustado' },
+    letra:   { t: 'Sacar la letra', d: 'Convertimos lo que se canta o se dice en texto.', go: 'Sacar la letra', work: 'Escuchando tu audio…', res: 'Tu letra está lista', kind: 'text', buy: 'la letra completa', file: 'letra' },
+    limpiar: { t: 'Limpiar ruido', d: 'Quitamos el ruido de fondo de una grabación de voz.', go: 'Limpiar el audio', work: 'Limpiando el audio…', res: 'Tu audio limpio está listo', kind: 'audio', buy: 'MP3 sin ruido', file: 'audio-limpio' }
+  };
+  var ORDER = ['pista', 'voz', 'ajustar', 'letra', 'limpiar'];
+  var state = { cfg: null, tool: null, file: null, seconds: null, jobId: null, paid: false, price: null, src: null, srcKind: null, det: null, st: 0, sp: 100, t0: 0, t1: 0 };
+  var KEY = 'aud_job_v1', timer = null, prevUrl = null;
+  function view(name) { ['vPick', 'vUpload', 'vWork', 'vReady', 'vError'].forEach(function (v) { $(v).classList.toggle('is-hidden', v !== name); }); }
+  function setErr(n, m) { n.textContent = m || ''; n.classList.toggle('is-hidden', !m); }
+  function sget() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function sset(v) { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (e) { /* ok */ } }
+  function sclear() { try { localStorage.removeItem(KEY); } catch (e) { /* ok */ } }
+  function fail(msg) { $('errMsg').textContent = msg; view('vError'); }
+  var usd = function (p) { return 'US$' + String(p).replace('.', ','); };
+  var neutral = function () { return state.st === 0 && state.sp === 100 && (!state.src || state.tool !== 'ajustar' || (state.t0 <= 0.05 && state.t1 >= state.src.dur - 0.05)); };
+
+  CS.track(APP, 'landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 200) : null, likelyBot: /bot|crawl|spider|facebookexternalhit|whatsapp|preview|slackbot|embedly|discordbot/i.test(navigator.userAgent) });
+  var cfgP = fetch('/.netlify/functions/aud-config', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) { if (d && d.clientId) { state.cfg = d; drawTools(); } return state.cfg; }).catch(function () { return null; });
+
+  // ---- 1) herramientas ----
+  function drawTools() {
+    var box = $('toolList'); box.textContent = '';
+    ORDER.forEach(function (t) {
+      if (state.cfg && state.cfg.tools && !state.cfg.tools[t]) return;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'tool'; b.innerHTML = '<b></b><span></span>'; b.firstChild.textContent = META[t].t; b.lastChild.textContent = META[t].d;
+      b.addEventListener('click', function () { pickTool(t); }); box.appendChild(b);
+    });
+  }
+  drawTools();
+  function pickTool(t) {
+    state.tool = t; var m = META[t]; CS.track(APP, 'tool_picked', { tool: t });
+    state.file = null; $('fileIn').value = ''; $('drop').classList.remove('has'); $('dropTitle').textContent = 'Elegir un audio';
+    var maxM = (state.cfg && state.cfg.maxMin) || 8;
+    $('dropSub').textContent = 'MP3, M4A o WAV · hasta ' + maxM + ' minutos'; $('goBtn').textContent = m.go;
+    var local = m.kind === 'local'; $('consentRow').classList.toggle('is-hidden', local); $('upFine').textContent = local ? 'Tu audio no sale de tu celular ni de tu computador.' : 'Tu audio se usa solo para esto y no se comparte.';
+    $('paidNudge').classList.toggle('is-hidden', !(local && state.paid)); setErr($('upErr'), ''); view('vUpload');
+  }
+  $('backBtn').addEventListener('click', function () { view('vPick'); });
+  $('moreBtn').addEventListener('click', resetAll);
+  $('againBtn').addEventListener('click', function () { state.jobId = null; state.paid = false; view(state.tool ? 'vUpload' : 'vPick'); });
+  function resetAll() { state.jobId = null; state.paid = false; state.src = null; state.det = null; state.st = 0; state.sp = 100; ppMounted = null; sclear(); history.replaceState(null, '', location.pathname); $('edBox').classList.add('is-hidden'); view('vPick'); }
+
+  // ---- 2) elegir audio ----
+  $('fileIn').addEventListener('change', async function () {
+    setErr($('upErr'), ''); var f = $('fileIn').files[0]; if (!f) return;
+    var type = CS.typeOf(f);
+    if (!/^audio\//.test(type)) { setErr($('upErr'), 'Ese archivo no parece un audio. Prueba con mp3, m4a o wav.'); return; }
+    var max = (state.cfg && state.cfg.maxMb) || 40;
+    if (f.size > max * 1048576) { setErr($('upErr'), 'El audio es muy pesado (máximo ' + max + ' MB).'); return; }
+    var sec = await CS.audioDuration(f), minS = (state.cfg && state.cfg.minSec) || 10, maxM = (state.cfg && state.cfg.maxMin) || 8;
+    if (sec && sec < minS) { setErr($('upErr'), 'El audio dura ' + Math.round(sec) + ' segundos. Necesitamos al menos ' + minS + '.'); return; }
+    if (sec && sec > maxM * 60 + 2) { setErr($('upErr'), 'El audio dura ' + CS.fmtTime(sec) + ' y el máximo es ' + maxM + ' minutos.'); return; }
+    state.file = f; state.seconds = sec ? Math.round(sec) : null;
+    $('drop').classList.add('has'); $('dropTitle').textContent = f.name; $('dropSub').textContent = (sec ? CS.fmtTime(sec) + ' · ' : '') + 'toca para cambiarlo';
+    CS.track(APP, 'audio_chosen', { tool: state.tool, seconds: state.seconds || 0, kb: Math.round(f.size / 1024) });
+  });
+
+  // ---- 3) empezar ----
+  $('goBtn').addEventListener('click', async function () {
+    setErr($('upErr'), ''); var m = META[state.tool], local = m.kind === 'local';
+    var missing = []; if (!state.file) missing.push('elegir tu audio'); if (!local && !$('consent').checked) missing.push('marcar que el audio es tuyo o que tienes permiso');
+    if (missing.length) { setErr($('upErr'), 'Te falta: ' + missing.join('; ') + '.'); return; }
+    CS.track(APP, 'submit_clicked', { tool: state.tool, seconds: state.seconds || 0 });
+    if (local) return openLocal();
+    var jobId = CS.newId(); state.jobId = jobId; view('vWork'); $('workTitle').textContent = 'Subiendo tu audio…'; $('workSub').textContent = ''; $('prog').classList.remove('is-hidden');
+    try {
+      var up = await CS.uploadWith('aud-sign-upload', { jobId: jobId }, state.file, function (f) { $('prog').querySelector('i').style.width = Math.round(f * 100) + '%'; });
+      $('prog').classList.add('is-hidden'); $('workTitle').textContent = m.work; $('workSub').textContent = 'Suele tardar un minuto o menos. No cierres esta página.';
+      await CS.postFn('aud-start', { jobId: jobId, tool: state.tool, audio: up, consent: true, audioSeconds: state.seconds || 0, anonId: CS.anonId });
+      sset({ jobId: jobId, at: Date.now() }); poll(jobId, 0);
+    } catch (e) { CS.track(APP, 'submit_failed', { tool: state.tool, status: e.status || 0 }); fail(e.status ? e.message : 'Se cortó la conexión. Inténtalo de nuevo.'); }
+  });
+
+  async function poll(jobId, n) {
+    if (state.jobId !== jobId) return;
+    if (n > 120) return fail('Esto está tardando más de lo normal. Vuelve a abrir esta página en unos minutos; tu trabajo se guarda.');
+    var d; try { var r = await fetch('/.netlify/functions/aud-status?job=' + encodeURIComponent(jobId), { cache: 'no-store' }); d = await r.json(); if (r.status === 404) { sclear(); state.jobId = null; return view('vPick'); } if (!r.ok) throw new Error(d.error || 'error'); } catch (e) { return setTimeout(function () { poll(jobId, n + 1); }, 4000); }
+    if (d.status === 'failed') { CS.track(APP, 'job_failed', { tool: d.tool }); sclear(); return fail(d.error || 'No pudimos procesar este audio.'); }
+    if (d.status === 'ready') { state.tool = d.tool || state.tool; return showReady(jobId, d); }
+    setTimeout(function () { poll(jobId, n + 1); }, 3000);
+  }
+
+  // ---- audio en el navegador ----
+  var ctx = null;
+  async function decode(arrayBuf) {
+    var AC = window.AudioContext || window.webkitAudioContext; if (!AC) throw new Error('Tu navegador no puede ajustar audio.'); ctx = ctx || new AC();
+    var buf = await new Promise(function (res, rej) { var p = ctx.decodeAudioData(arrayBuf, res, rej); if (p && p.then) p.then(res, rej); });
+    var ch = []; for (var i = 0; i < Math.min(2, buf.numberOfChannels); i++) ch.push(buf.getChannelData(i).slice());
+    return { ch: ch, sr: buf.sampleRate, dur: buf.duration };
+  }
+  async function fetchDecode(url) { var r = await fetch(url); if (!r.ok) throw new Error('No se pudo leer el audio'); return decode(await r.arrayBuffer()); }
+  function wavUrl(ch, sr) { return URL.createObjectURL(new Blob([E.encodeWav(ch, sr)], { type: 'audio/wav' })); }
+  function loadScript(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('script')); }; document.head.appendChild(s); }); }
+  async function encodeMp3(ch, sr, onProg) {
+    try { if (!window.lamejs) await loadScript('https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js'); } catch (e) { return null; }
+    var nch = Math.min(2, ch.length), enc = new window.lamejs.Mp3Encoder(nch, sr, 192), parts = [], B = 1152 * 24, n = ch[0].length;
+    function i16(f, a, b) { var o = new Int16Array(b - a); for (var i = 0; i < o.length; i++) { var s = Math.max(-1, Math.min(1, f[a + i])); o[i] = s < 0 ? s * 32768 : s * 32767; } return o; }
+    for (var i = 0, k = 0; i < n; i += B, k++) {
+      var e = Math.min(n, i + B), out = nch > 1 ? enc.encodeBuffer(i16(ch[0], i, e), i16(ch[1], i, e)) : enc.encodeBuffer(i16(ch[0], i, e));
+      if (out.length) parts.push(new Uint8Array(out)); if (k % 8 === 0) { onProg && onProg(i / n); await new Promise(function (r) { setTimeout(r, 0); }); }
+    }
+    var end = enc.flush(); if (end.length) parts.push(new Uint8Array(end)); return new Blob(parts, { type: 'audio/mpeg' });
+  }
+  function saveBlob(blob, name) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000); }
+
+  // ---- editor (tono, velocidad, recorte) ----
+  function noteName(t, minor) { return E.NOTES[((t % 12) + 12) % 12] + (minor ? ' menor' : ' mayor'); }
+  function refreshLabels() {
+    $('stVal').textContent = (state.st > 0 ? '+' : '') + state.st; $('spVal').textContent = state.sp + '%';
+    $('stNote').textContent = state.det && state.st !== 0 ? 'Pasa de ' + noteName(state.det.tonic, state.det.minor) + ' a ' + noteName(state.det.tonic + state.st, state.det.minor) + (Math.abs(state.st) > 6 ? ' · con cambios muy grandes la voz suena menos natural' : '') : (Math.abs(state.st) > 6 ? 'Con cambios muy grandes la voz suena menos natural.' : '');
+    $('spNote').textContent = state.det && state.det.bpm && state.sp !== 100 ? 'De ' + state.det.bpm + ' a unos ' + Math.round(state.det.bpm * state.sp / 100) + ' pulsos por minuto (BPM)' : '';
+    if (state.src && state.tool === 'ajustar') $('trimVal').textContent = CS.fmtTime(state.t0) + ' – ' + CS.fmtTime(state.t1);
+  }
+  function schedulePreview() { refreshLabels(); clearTimeout(timer); timer = setTimeout(renderPreview, 350); }
+  function renderPreview() {
+    var s = state.src; if (!s) return;
+    if (neutral() && state.tool !== 'ajustar') { $('edStat').textContent = 'Sin cambios: se oye como el fragmento de arriba.'; return; }
+    var from = state.tool === 'ajustar' ? state.t0 : 0, to = state.tool === 'ajustar' ? Math.min(state.t1, state.t0 + 20) : Math.min(s.dur, 30);
+    if (to - from < 1) { $('edStat').textContent = 'Deja al menos 1 segundo entre “desde” y “hasta”.'; return; }
+    $('edStat').textContent = 'Preparando…';
+    setTimeout(function () {
+      try { var out = E.shift(E.slice(s.ch, s.sr, from, to), s.sr, state.st, state.sp / 100), u = wavUrl(out, s.sr); if (prevUrl) URL.revokeObjectURL(prevUrl); prevUrl = u; var p = $('edPlayer'); p.src = u; $('edStat').textContent = ''; CS.track(APP, 'adjust_preview', { tool: state.tool, st: state.st, sp: state.sp }); }
+      catch (e) { $('edStat').textContent = 'No pudimos preparar el fragmento.'; }
+    }, 20);
+  }
+  function setupEditorSource() {   // detecta tono/BPM una vez cargada la fuente
+    var s = state.src; if (!s) return;
+    try { state.det = E.detect(s.ch, s.sr); } catch (e) { state.det = null; }
+    var d = $('detInfo'); if (state.det && state.det.confidence > 0.55) { d.textContent = 'Tono detectado: ' + state.det.key + (state.det.bpm ? ' · unos ' + state.det.bpm + ' BPM' : '') + ' (aproximado)'; d.classList.remove('is-hidden'); } else { state.det = null; d.classList.add('is-hidden'); }
+    if (state.tool === 'ajustar') { state.t0 = 0; state.t1 = s.dur; $('t0R').max = $('t1R').max = s.dur.toFixed(1); $('t0R').value = 0; $('t1R').value = s.dur.toFixed(1); $('trimCtl').classList.remove('is-hidden'); }
+    else $('trimCtl').classList.add('is-hidden');
+    schedulePreview();
+  }
+  $('stDn').addEventListener('click', function () { state.st = Math.max(-12, state.st - 1); schedulePreview(); });
+  $('stUp').addEventListener('click', function () { state.st = Math.min(12, state.st + 1); schedulePreview(); });
+  $('spR').addEventListener('input', function () { state.sp = Number($('spR').value); schedulePreview(); });
+  $('t0R').addEventListener('input', function () { state.t0 = Math.min(Number($('t0R').value), state.t1 - 1); $('t0R').value = state.t0; schedulePreview(); });
+  $('t1R').addEventListener('input', function () { state.t1 = Math.max(Number($('t1R').value), state.t0 + 1); $('t1R').value = state.t1; schedulePreview(); });
+
+  async function openLocal() {
+    view('vWork'); $('workTitle').textContent = 'Abriendo tu audio…'; $('workSub').textContent = ''; $('prog').classList.add('is-hidden');
+    try {
+      state.src = await decode(await state.file.arrayBuffer());
+      if (!state.jobId) state.jobId = CS.newId();
+      var d = await CS.postFn('aud-start', { jobId: state.jobId, tool: 'ajustar', audioSeconds: Math.round(state.src.dur), anonId: CS.anonId });
+      state.paid = !!d.paid; state.price = d.price; state.st = 0; state.sp = 100; $('spR').value = 100; sset({ jobId: state.jobId, at: Date.now() });
+      showReady(state.jobId, d, true);
+    } catch (e) { CS.track(APP, 'submit_failed', { tool: 'ajustar', status: e.status || 0 }); fail(e.status ? e.message : 'No pudimos abrir este audio. Prueba con un mp3 o m4a.'); }
+  }
+
+  // ---- 4) listo ----
+  function setLink(jobId) { $('keepLink').textContent = location.origin + location.pathname + '?j=' + jobId; }
+  async function showReady(jobId, d, fromLocal) {
+    state.jobId = jobId; state.tool = d.tool || state.tool; state.paid = !!d.paid; state.price = d.price || (state.cfg && state.cfg.tools && state.cfg.tools[state.tool]) || null;
+    var m = META[state.tool]; view('vReady'); sset({ jobId: jobId, at: Date.now() }); setLink(jobId); ppMounted = null;
+    var kind = m.kind;
+    $('resTitle').textContent = kind === 'local' ? 'Ajusta tu audio' : m.res;
+    $('resSub').textContent = kind === 'text' ? 'Aquí ves el comienzo. La letra completa se desbloquea con el pago.' : kind === 'audio' ? 'Escucha un fragmento de ' + ((state.cfg && state.cfg.previewSec) || 30) + ' segundos. El archivo completo se descarga después del pago.' : '';
+    $('player').classList.toggle('is-hidden', kind !== 'audio'); $('lyr').classList.toggle('is-hidden', kind !== 'text');
+    $('adjOpen').classList.toggle('is-hidden', kind !== 'audio'); $('resBox').classList.toggle('is-hidden', kind === 'local');
+    $('edBox').classList.toggle('is-hidden', kind !== 'local');
+    CS.track(APP, 'result_ready', { tool: state.tool, paid: state.paid });
+    var cfg = await cfgP; if (cfg && cfg.previewSec) $('resSub').textContent = $('resSub').textContent.replace(/\d+ segundos/, cfg.previewSec + ' segundos');
+    $('buyTitle').textContent = kind === 'text' ? 'Ver la letra completa' : 'Descargar ' + (kind === 'local' ? 'tu audio ajustado' : 'completo');
+    $('buyText').innerHTML = ''; $('buyText').appendChild(document.createTextNode((kind === 'text' ? 'Letra completa para copiar o guardar' : m.buy) + '. Pago único de ')); var bb = document.createElement('b'); bb.textContent = state.price ? usd(state.price) : ''; $('buyText').appendChild(bb); $('buyText').appendChild(document.createTextNode(', con tarjeta o con tu cuenta de PayPal.'));
+    if (kind === 'text') await loadText(jobId);
+    else if (kind === 'audio') { try { var f = await (await fetch('/.netlify/functions/aud-file?job=' + encodeURIComponent(jobId) + '&kind=preview', { cache: 'no-store' })).json(); if (f.url) $('player').src = f.url; } catch (e) { /* el reproductor queda vacío */ } }
+    else if (kind === 'local') {
+      if (!state.src) { $('paidNudge').classList.toggle('is-hidden', !state.paid); state.tool = 'ajustar'; $('goBtn').textContent = META.ajustar.go; $('consentRow').classList.add('is-hidden'); view('vUpload'); return; }   // volvió con ?j=: hay que elegir el archivo otra vez
+      $('edTitle').textContent = 'Ajusta tu audio'; $('edFine').textContent = 'Así suena un fragmento de hasta 20 segundos con tus ajustes.'; setupEditorSource();
+    }
+    if (state.paid) showPaid(); else { $('buyBox').classList.remove('is-hidden'); $('paidBox').classList.add('is-hidden'); mountPaypal(jobId); }
+  }
+  async function loadText(jobId) {
+    try {
+      var d = await (await fetch('/.netlify/functions/aud-text?job=' + encodeURIComponent(jobId), { cache: 'no-store' })).json();
+      $('lyr').textContent = d.text || ''; $('lyr').classList.toggle('fade', !d.paid); state.paid = !!d.paid; if (d.paid) $('resSub').textContent = 'Esta es tu letra completa. Revísala: puede tener errores.';
+    } catch (e) { $('lyr').textContent = 'No pudimos cargar la letra.'; }
+  }
+  async function showPaid() {
+    var kind = META[state.tool].kind; $('buyBox').classList.add('is-hidden'); $('paidBox').classList.remove('is-hidden');
+    $('paidText').textContent = kind === 'text' ? 'Tu letra completa ya está arriba.' : 'Tu archivo está listo para descargar.';
+    $('dlBtn').classList.toggle('is-hidden', kind === 'text'); $('cpBtn').classList.toggle('is-hidden', kind !== 'text'); $('dlBtn').textContent = kind === 'text' ? 'Descargar .txt' : 'Descargar MP3'; $('dlBtn').classList.toggle('is-hidden', false);
+    if (kind === 'text') { await loadText(state.jobId); $('lyr').classList.remove('fade'); $('dlBtn').textContent = 'Descargar .txt'; }
+    try { $('paidBox').scrollIntoView({ block: 'center' }); } catch (e) { /* ok */ }
+  }
+  $('cpBtn').addEventListener('click', function () { var t = $('lyr').textContent; if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () { $('dlStat').textContent = 'Letra copiada.'; }, function () { $('dlStat').textContent = 'No se pudo copiar. Selecciona el texto y cópialo.'; }); });
+  $('adjOpen').addEventListener('click', async function () {
+    $('edBox').classList.remove('is-hidden'); $('adjOpen').classList.add('is-hidden'); $('edTitle').textContent = 'Cambia el tono o la velocidad'; $('edFine').textContent = 'Así suena el fragmento con tus ajustes. Al descargar, se aplican a todo el audio.';
+    CS.track(APP, 'adjust_open', { tool: state.tool });
+    if (!state.src) { $('edStat').textContent = 'Cargando el audio…'; try { var f = await (await fetch('/.netlify/functions/aud-file?job=' + encodeURIComponent(state.jobId) + '&kind=preview', { cache: 'no-store' })).json(); state.src = await fetchDecode(f.url); $('edStat').textContent = ''; setupEditorSource(); } catch (e) { $('edStat').textContent = 'No pudimos cargar el audio para ajustarlo. Aun así puedes descargarlo tal cual.'; } }
+  });
+
+  // ---- descargar ----
+  $('dlBtn').addEventListener('click', async function (ev) {
+    var kind = META[state.tool].kind;
+    if (kind === 'text') { ev.preventDefault(); saveBlob(new Blob([$('lyr').textContent], { type: 'text/plain;charset=utf-8' }), 'letra.txt'); CS.track(APP, 'download', { tool: state.tool }); return; }
+    var useEditor = kind === 'local' || (!neutral() && !$('edBox').classList.contains('is-hidden'));
+    if (!useEditor) { $('dlBtn').href = '/.netlify/functions/aud-download?job=' + encodeURIComponent(state.jobId); CS.track(APP, 'download', { tool: state.tool }); return; }   // sin ajustes: descarga directa
+    ev.preventDefault(); var st = $('dlStat'); $('dlBtn').style.pointerEvents = 'none'; st.textContent = 'Preparando tu archivo…';
+    try {
+      var src = state.src;
+      if (kind !== 'local') { var f = await (await fetch('/.netlify/functions/aud-file?job=' + encodeURIComponent(state.jobId) + '&kind=full', { cache: 'no-store' })).json(); if (!f.url) throw new Error('sin enlace'); st.textContent = 'Descargando el audio…'; src = await fetchDecode(f.url); }
+      var ch = src.ch, trimmed = false;
+      if (kind === 'local' && (state.t0 > 0.05 || state.t1 < src.dur - 0.05)) { ch = E.slice(ch, src.sr, state.t0, state.t1); trimmed = true; }
+      st.textContent = 'Aplicando tus ajustes…'; await new Promise(function (r) { setTimeout(r, 30); });
+      ch = E.shift(ch, src.sr, state.st, state.sp / 100);
+      var mp3 = await encodeMp3(ch, src.sr, function (p) { st.textContent = 'Creando el MP3… ' + Math.round(p * 100) + '%'; }), fmt = mp3 ? 'mp3' : 'wav';
+      saveBlob(mp3 || new Blob([E.encodeWav(ch, src.sr)], { type: 'audio/wav' }), META[state.tool].file + (state.st ? (state.st > 0 ? '-mas' : '-menos') + Math.abs(state.st) : '') + '.' + fmt);
+      st.textContent = fmt === 'wav' ? 'Listo. Se descargó en WAV porque no pudimos crear el MP3.' : 'Listo, revisa tus descargas.';
+      CS.postFn('aud-mark', { jobId: state.jobId, semitones: state.st, speed: state.sp / 100, trimmed: trimmed, format: fmt }).catch(function () {});
+      CS.track(APP, 'download', { tool: state.tool, st: state.st, sp: state.sp });
+    } catch (e) { st.textContent = 'No pudimos preparar el archivo con tus ajustes. Inténtalo otra vez.'; }
+    $('dlBtn').style.pointerEvents = '';
+  });
+
+  // ---- pago ----
+  var ppMounted = null;
+  async function mountPaypal(jobId) {
+    if (ppMounted === jobId) return; ppMounted = jobId;
+    var cfg = await cfgP; var box = $('paypalBox'); box.textContent = '';
+    if (!cfg) { setErr($('payErr'), 'El pago aún no está disponible. Inténtalo en un momento.'); return; }
+    try {
+      if (!window.paypal) await new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(cfg.clientId) + '&currency=USD'; s.onload = res; s.onerror = function () { rej(new Error('No se pudo cargar PayPal.')); }; document.head.appendChild(s); });
+      window.paypal.Buttons({
+        style: { layout: 'vertical', shape: 'pill', label: 'pay' },
+        createOrder: async function () { setErr($('payErr'), ''); CS.track(APP, 'pay_clicked', { tool: state.tool }); var d = await CS.postFn('aud-pay-create', { jobId: jobId }); return d.orderID; },
+        onApprove: async function (data) {
+          try { await CS.postFn('aud-pay-capture', { jobId: jobId, orderID: data.orderID }); CS.track(APP, 'pay_ok', { tool: state.tool }); state.paid = true; showPaid(); }
+          catch (e) { setErr($('payErr'), e.message || 'No pudimos confirmar el pago.'); }
+        },
+        onCancel: function () { CS.track(APP, 'pay_cancel', { tool: state.tool }); },
+        onError: function () { setErr($('payErr'), 'PayPal tuvo un problema. Inténtalo de nuevo.'); }
+      }).render('#paypalBox');
+    } catch (e) { ppMounted = null; setErr($('payErr'), e.message || 'No se pudo cargar PayPal.'); }
+  }
+
+  // ---- volver con un trabajo guardado (?j=… o el último de este navegador) ----
+  var q = new URLSearchParams(location.search).get('j'), saved = sget();
+  var resume = (q && /^[0-9a-f-]{36}$/i.test(q)) ? q : (saved && saved.jobId && Date.now() - saved.at < 3 * 86400000 ? saved.jobId : null);
+  if (resume) { state.jobId = resume; view('vWork'); $('workTitle').textContent = 'Buscando tu trabajo…'; poll(resume, 0); }
+})();
+</script>
+</body>
+</html>
