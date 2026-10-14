@@ -4358,6 +4358,9 @@ function createExtraReaderPanel() {
     // misma copia en vez de empezar vacío. Un panel nuevo siempre debe
     // arrancar en blanco, así que se limpia explícitamente después de clonar.
     const clone = readerPanel.cloneNode(true);
+    // Si el lector principal estaba en «Dividir»/«Ampliar», el clon no hereda ese modo (ni su tamaño).
+    if (clone.classList.contains('gk-view-dock') || clone.classList.contains('gk-view-full')) { clone.classList.remove('gk-view-dock', 'gk-view-full'); clone.style.width = ''; clone.style.height = ''; }
+    delete clone.dataset.viewModesWired;
     clone.removeAttribute('id');
     clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
     // Importar PDF es una funcionalidad SOLO del panel "main" (el estado del
@@ -4395,10 +4398,49 @@ function createExtraReaderPanel() {
     wireReaderPanelClone(clone, panelId);
     wireGenGate(clone);
     wireResizeRedraw(clone);
+    wireReaderViewModes(clone);
     return clone;
 }
 
 document.querySelector('#readerPanel [data-role="btnAdd"]')?.addEventListener('click', () => createExtraReaderPanel());
+
+// --- Modo lector ampliado: «Dividir» (texto a la izquierda, mapa a la derecha) y «Ampliar» (pantalla completa) ---
+// Sirve para cuando el texto es lo principal: se lee cómodo (letra más grande, columna centrada) y los fragmentos
+// subrayados siguen llevando a su nodo. Al tocar un subrayado en pantalla completa se pasa a «Dividir» para ver el nodo.
+function wireReaderViewModes(root) {
+    if (!root || root.dataset.viewModesWired) return;
+    root.dataset.viewModesWired = '1';
+    const q = (r) => root.querySelector(`[data-role="${r}"]`);
+    const bDock = q('btnViewDock'), bFull = q('btnViewFull'), header = q('header'), textEl = q('textMode');
+    if (!bDock || !bFull) return;
+    let mode = 'float', saved = null;
+    const geo = { dock: { left: '0px', top: '0px', width: '50%', height: '100%' }, full: { left: '0px', top: '0px', width: '100%', height: '100%' } };
+    const setBtn = (btn, key) => { btn.textContent = tr('ui.lector_' + key); btn.title = tr('ui.lector_' + key + '_t'); };
+    function paint() {
+        setBtn(bDock, mode === 'full' ? 'ver_mapa' : mode === 'dock' ? 'reducir' : 'dividir');
+        setBtn(bFull, mode === 'full' ? 'reducir' : 'ampliar');
+        bDock.classList.toggle('bg-indigo-500/30', mode === 'dock'); bFull.classList.toggle('bg-indigo-500/30', mode === 'full');
+    }
+    function setMode(next) {
+        if (next === mode) return;
+        if (mode === 'float') saved = { left: root.style.left, top: root.style.top, width: root.style.width, height: root.style.height };
+        root.classList.remove('gk-view-dock', 'gk-view-full');
+        if (next === 'float') Object.assign(root.style, saved || {});
+        else { root.classList.add('gk-view-' + next); Object.assign(root.style, geo[next]); root.style.zIndex = String(500 + (++floatingPanelCount)); }
+        mode = next; paint();
+        setTimeout(() => { try { network.redraw(); } catch (_e) { /* el lienzo aún no existe */ } }, 150);
+    }
+    bDock.addEventListener('click', () => setMode(mode === 'float' || mode === 'full' ? 'dock' : 'float'));
+    bFull.addEventListener('click', () => setMode(mode === 'full' ? 'float' : 'full'));
+    // Ampliado o dividido, el panel no se arrastra (la captura va antes que los listeners de arrastre ya existentes).
+    header?.addEventListener('mousedown', (e) => { if (mode !== 'float' && !e.target.closest('button, input, select')) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+    // Tocar un subrayado en pantalla completa: pasar a «Dividir» ANTES de que el otro listener acerque la cámara al nodo.
+    textEl?.addEventListener('click', (e) => { if (mode === 'full' && e.target.closest('mark.gk-coverage-mark')) setMode('dock'); }, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && mode === 'full' && !root.classList.contains('hidden')) setMode('dock'); });
+    paint();
+}
+wireReaderViewModes(readerPanel);
+
 
 function formatInteractiveDefinition(rawText, parentNodeId) {
     const safeHtml = rawText.replace(/\n/g, '<br>');

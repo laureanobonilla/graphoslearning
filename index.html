@@ -32,6 +32,12 @@
         /* Lector OSCURO (2026-10-08): mismo cosmos que el lienzo y que /aprender/, en vez de
            una hoja blanca. Para volver a la hoja blanca basta borrar este bloque y el
            bloque "LECTOR OSCURO — complemento" del final de este <style>. */
+        /* Modo lector ampliado: «Dividir» (mitad izquierda) y «Ampliar» (pantalla completa). El texto se vuelve la pieza principal. */
+        .reader-panel-instance.gk-view-dock, .reader-panel-instance.gk-view-full { max-width: none !important; max-height: none !important; resize: none !important; border-radius: 0 !important; }
+        .reader-panel-instance.gk-view-dock [data-role="header"], .reader-panel-instance.gk-view-full [data-role="header"] { cursor: default; }
+        .reader-panel-instance.gk-view-dock [data-role="contentContainer"], .reader-panel-instance.gk-view-full [data-role="contentContainer"] { padding: 2rem 1.25rem 4rem; }
+        .reader-panel-instance.gk-view-dock [data-role="textMode"], .reader-panel-instance.gk-view-full [data-role="textMode"] { max-width: 46rem; margin: 0 auto; height: auto; min-height: 100%; line-height: 1.85; zoom: 1.12; }
+        .reader-panel-instance.gk-view-full [data-role="textMode"] { zoom: 1.25; }
         #readerTextMode, [data-role="textMode"] {
             background-color: #121832 !important;
             color: #dde2f3 !important;
@@ -699,6 +705,8 @@
                         <button id="btnImportPdf" data-role="btnImportPdf" title="Importar un PDF (se extrae su texto, con el formato más parecido posible, al editor de abajo; podés elegir qué páginas)" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all flex items-center gap-1 whitespace-nowrap" data-i18n-title="ui.importar_un_pdf_se_extrae">
                             <span>📄</span><span data-i18n="ui.subir_pdf">Subir PDF</span>
                         </button>
+                        <button type="button" data-role="btnViewDock" data-i18n="ui.lector_dividir" data-i18n-title="ui.lector_dividir_t" title="Texto a la izquierda y mapa a la derecha" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-2 py-1 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap">◧ Dividir</button>
+                        <button type="button" data-role="btnViewFull" data-i18n="ui.lector_ampliar" data-i18n-title="ui.lector_ampliar_t" title="Leer el texto a pantalla completa" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 px-2 py-1 rounded-md text-[11px] font-semibold transition-all whitespace-nowrap">⤢ Ampliar</button>
                         <button data-role="btnAdd" title="Abrir otro lector (otro esquema aparte)" class="bg-slate-800 hover:bg-indigo-500/20 hover:text-indigo-300 border border-slate-700 hover:border-indigo-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.abrir_otro_lector_otro_esquema">➕</button>
                         <button id="btnClearReader" data-role="btnClearReader" title="Limpiar texto y contexto" class="bg-slate-800 hover:bg-red-500/20 hover:text-red-400 border border-slate-700 hover:border-red-500/50 text-slate-400 px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.limpiar_texto_y_contexto">🧹</button>
                         <button id="btnCloseReader" data-role="btnClose" title="Cerrar" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md text-xs font-bold transition-all" data-i18n-title="ui.cerrar">✕</button>

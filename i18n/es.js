@@ -486,5 +486,14 @@
   "ui.ph_mobile_paste": "Pegá aquí un texto, un tema, o el enlace de una página web...",
   "ui.ph_onb_question": "Ej: ¿Por qué se dio así? ¿En qué se diferencia de...?",
   "ui.ph_onb_source": "Pegá aquí un texto o el enlace de una página...",
-  "ui.ph_feedback": "Contanos qué se te ocurrió, qué no te funcionó, o qué te gustaría que la app hiciera..."
+  "ui.ph_feedback": "Contanos qué se te ocurrió, qué no te funcionó, o qué te gustaría que la app hiciera...",
+  "ui.lector_dividir": "◧ Dividir",
+  "ui.lector_ampliar": "⤢ Ampliar",
+  "ui.lector_reducir": "↙ Reducir",
+  "ui.lector_ver_mapa": "🗺 Ver mapa",
+  "ui.lector_dividir_t": "Texto a la izquierda y mapa a la derecha",
+  "ui.lector_ampliar_t": "Leer el texto a pantalla completa (toca un fragmento subrayado para ir a su nodo)",
+  "ui.lector_reducir_t": "Volver al panel flotante",
+  "ui.lector_ver_mapa_t": "Ver el mapa junto al texto"
+
 };

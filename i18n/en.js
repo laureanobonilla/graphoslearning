@@ -486,5 +486,14 @@
   "ui.ph_mobile_paste": "Paste a text, a topic, or a web page link here...",
   "ui.ph_onb_question": "E.g.: Why did it happen that way? How is it different from...?",
   "ui.ph_onb_source": "Paste a text or a page link here...",
-  "ui.ph_feedback": "Tell us what you came up with, what didn't work, or what you'd like the app to do..."
+  "ui.ph_feedback": "Tell us what you came up with, what didn't work, or what you'd like the app to do...",
+  "ui.lector_dividir": "◧ Split",
+  "ui.lector_ampliar": "⤢ Expand",
+  "ui.lector_reducir": "↙ Shrink",
+  "ui.lector_ver_mapa": "🗺 See map",
+  "ui.lector_dividir_t": "Text on the left, map on the right",
+  "ui.lector_ampliar_t": "Read the text full screen (tap a highlighted passage to jump to its node)",
+  "ui.lector_reducir_t": "Back to the floating panel",
+  "ui.lector_ver_mapa_t": "See the map next to the text"
+
 };
