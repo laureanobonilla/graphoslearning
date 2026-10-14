@@ -433,7 +433,7 @@ async function priceInfo() {
   let local = '';
   const cur = COUNTRY_CUR[country];
   if (cur && cur !== 'USD') { const rates = await getRates(); if (rates && rates[cur]) local = money(usd * rates[cur], cur); }
-  return { usd, amountText, local, shown: local || amountText, full: local ? `${amountText} (≈ ${local})` : amountText };
+  return { usd, amountText, local, shown: local || amountText, full: local || amountText };
 }
 function goSeeAll(from) {
   if (currentScreenName !== 'reveal' || readUnlocked) return;
@@ -480,7 +480,7 @@ async function setupPay(forReadingId) {
   $('payChecking').classList.add('is-hidden');
   payShownAt = Date.now();
   $('priceLabel').textContent = info.shown;
-  $('paypalNote').textContent = info.local ? tt('n_pp_local', { amount: info.amountText, local: info.local }) : tt('n_pp_note');
+  $('paypalNote').textContent = tt('n_pp_note');
   $('payIntl').classList.remove('is-hidden');
   track('paypal_shown', { country, countrySource, method: 'paypal_orders', shownAmount: info.shown, converted: !!info.local, paywallVersion: PAYWALL_VERSION });
   mountPaypal(forReadingId);
