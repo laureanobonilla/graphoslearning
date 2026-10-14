@@ -220,9 +220,9 @@ CS.mountOrder = function (opts) {
     st.audio = blob; st.audio.csName = name; st.audioSeconds = sec ? Math.round(sec) : null; st.audioUp = null;
     A('nm').textContent = name; A('meta').textContent = sec ? CS.fmtTime(sec) : ''; A('chosen').classList.remove('is-hidden');
     const pl = A('player'); try { if (pl.src) URL.revokeObjectURL(pl.src); } catch { /* ok */ } pl.src = URL.createObjectURL(blob); pl.classList.remove('is-hidden');
-    A('pick').textContent = 'o elige otro audio'; calc(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
+    A('pick').textContent = 'o elige otro audio'; calc(); refreshMissing(); CS.track(app, 'audio_chosen', { seconds: st.audioSeconds || 0, kb: Math.round(blob.size / 1024) });
   }
-  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'o elige un audio que ya tengas'; A('file').value = ''; calc(); }
+  function clearAudio() { st.audio = null; st.audioSeconds = null; st.audioUp = null; A('chosen').classList.add('is-hidden'); const pl = A('player'); pl.pause(); pl.removeAttribute('src'); pl.classList.add('is-hidden'); A('pick').textContent = 'o elige un audio que ya tengas'; A('file').value = ''; calc(); refreshMissing(); }
   if (hasAudio) {
     A('pick').addEventListener('click', () => A('file').click());
     A('file').addEventListener('change', () => { const f = A('file').files[0]; if (f) setAudio(f, f.name || 'audio'); });
@@ -274,9 +274,8 @@ CS.mountOrder = function (opts) {
   }
 
   // ----- Enviar -----
-  function fail(msg, node) { setErr(errBox, msg); errBox.classList.remove('is-hidden'); try { (node || errBox).scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* ok */ } }
-  form.addEventListener('submit', async (ev) => {
-    ev.preventDefault(); setErr(errBox, '');
+  // Qué falta ahora mismo (se usa al enviar y para quitar el aviso "Te falta" en cuanto la persona lo completa).
+  function computeMissing() {
     const withVideo = canVideo && st.video === 'yes';
     const rawPhone = contact.querySelector('#csPhone').value.trim(), email = contact.querySelector('#csEmail').value.trim();
     const missing = [];   // [texto, nodo donde está]
@@ -286,6 +285,22 @@ CS.mountOrder = function (opts) {
     if (withVideo && st.photo && !V('consent').checked) missing.push(['confirmar que la foto es tuya o que tienes permiso', videoCard]);
     if (!rawPhone && !email) missing.push(['tu WhatsApp o tu correo', contact]);
     const ackMissing = ready && !ack.querySelector('input').checked;
+    return { withVideo, rawPhone, email, missing, ackMissing };
+  }
+  function refreshMissing() {
+    if (errBox.classList.contains('is-hidden') || !/^Te falta/.test(errBox.textContent)) return;
+    const { missing, ackMissing } = computeMissing();
+    if (!missing.length && !ackMissing) return setErr(errBox, '');
+    const list = missing.map(m => m[0]); if (ackMissing && missing.length) list.push('marcar la casilla del precio');
+    if (!missing.length && ackMissing) list.push('marcar la casilla del precio');
+    setErr(errBox, 'Te falta: ' + list.join('; ') + '.');
+  }
+  form.addEventListener('input', refreshMissing); form.addEventListener('change', refreshMissing);
+  setInterval(refreshMissing, 500);   // cubre lo que se completa de forma asíncrona (grabación, foto)
+  function fail(msg, node) { setErr(errBox, msg); errBox.classList.remove('is-hidden'); try { (node || errBox).scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch { /* ok */ } }
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault(); setErr(errBox, '');
+    const { withVideo, rawPhone, email, missing, ackMissing } = computeMissing();
     if (missing.length) { if (ackMissing) missing.push(['marcar la casilla del precio', ack]); return fail('Te falta: ' + missing.map(m => m[0]).join('; ') + '.', missing[0][1]); }
     let phone = '';
     if (rawPhone) { const pr = CS.buildPhone(contact.querySelector('#csDial').value, rawPhone); if (!pr.phone) { CS.track(app, 'phone_invalid', { reason: pr.reason }); return fail(CS.PHONE_MSG[pr.reason] || CS.PHONE_MSG.short, contact); } phone = pr.phone; }
