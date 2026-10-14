@@ -772,13 +772,14 @@ if (window.netlifyIdentity) {
     refreshBalanceFromServer();
     updateAuthUI();
 
-    netlifyIdentity.on('init', user => { currentUser = user; refreshBalanceFromServer(); updateAuthUI(); });
+    netlifyIdentity.on('init', user => { currentUser = user; refreshBalanceFromServer(); updateAuthUI(); if (user) setTimeout(() => resumePendingGen('init'), 600); });
     netlifyIdentity.on('login', user => {
         currentUser = user;
         authWallModal?.classList.add('hidden');
         netlifyIdentity.close();
         refreshBalanceFromServer(); updateAuthUI();
         track('login_success');
+        resumePendingGen('login');
     });
     netlifyIdentity.on('logout', () => { currentUser = null; refreshBalanceFromServer(); updateAuthUI(); });
 }
@@ -811,6 +812,7 @@ function applyServerBalance(data) {
 function handleBillingError(status, data) {
     if (status === 402 && data?.error === 'guest_limit_reached') {
         if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
+        markPendingGenWall();
         requireAuth('guest_limit_reached');
         return true;
     }
@@ -826,6 +828,7 @@ function handleBillingError(status, data) {
         return true;
     }
     if (status === 401) {
+        markPendingGenWall();
         requireAuth(tr("js.procesar_este_esquema"));
         return true;
     }
@@ -1331,6 +1334,42 @@ async function renderThreeLevelTree(data, opts = {}) {
     }
 }
 
+// Pedido de generar que se quedó esperando un inicio de sesión (muro de invitado agotado). Antes el tema se
+// borraba al enviarlo y, tras registrarse, la persona tenía que volver a escribirlo (el 2026-10-14 alguien se
+// registró y no volvió a pedir nada). Ahora se guarda y se reintenta solo al iniciar sesión. En memoria con todas
+// sus opciones; en localStorage (sin el panel de origen) solo por si el inicio de sesión recarga la página.
+const PENDING_GEN_KEY = 'gk_pending_gen';
+const PENDING_GEN_MAX_AGE_MS = 30 * 60 * 1000;
+let pendingGen = null;
+function savePendingGen(text, opts) {
+    pendingGen = { text, opts: { ...opts }, at: Date.now() };
+    try { if (text.length <= 20000) localStorage.setItem(PENDING_GEN_KEY, JSON.stringify({ text, welcome: !!opts.welcome, at: Date.now() })); } catch (_e) { /* ok */ }
+}
+function markPendingGenWall() {
+    if (pendingGen) pendingGen.wall = true;
+    try { const d = JSON.parse(localStorage.getItem(PENDING_GEN_KEY) || 'null'); if (d) { d.wall = true; localStorage.setItem(PENDING_GEN_KEY, JSON.stringify(d)); } } catch (_e) { /* ok */ }
+}
+function clearPendingGen() { pendingGen = null; try { localStorage.removeItem(PENDING_GEN_KEY); } catch (_e) { /* ok */ } }
+let resumingGen = false;
+async function resumePendingGen(source) {
+    if (resumingGen) return;
+    let job = pendingGen;
+    if (!job) {
+        try { const d = JSON.parse(localStorage.getItem(PENDING_GEN_KEY) || 'null'); if (d && d.text) job = { text: d.text, opts: { welcome: !!d.welcome }, at: d.at, wall: !!d.wall }; } catch (_e) { /* ok */ }
+    }
+    if (!job || !job.text || Date.now() - (job.at || 0) > PENDING_GEN_MAX_AGE_MS) { clearPendingGen(); return; }
+    if (!job.wall) return; // solo se reintenta lo que quedó detenido por el muro de inicio de sesión
+    if (!currentUser && !isAdmin) return;
+    resumingGen = true;
+    clearPendingGen();
+    try {
+        authWallModal?.classList.add('hidden');
+        track('login_resume_generate', { source, length: job.text.length });
+        await refreshBalanceFromServer();
+        await generateFullSchemaFromTopic(job.text, { ...job.opts, welcome: false });
+    } finally { resumingGen = false; }
+}
+
 async function generateFullSchemaFromTopic(topicText, opts = {}) {
     if (!topicText) return;
     const { originPanelId = null, attachToNodeId = null, welcome = false } = opts;
@@ -1354,6 +1393,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
 
     showLoader(tr("js.estructurando_esquema"));
     if (topicInput) topicInput.value = '';
+    if (!attachToNodeId) savePendingGen(topicText, opts);
 
     try {
         const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
@@ -1361,10 +1401,13 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
             body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText })
         });
         if (!ok) {
-            if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.intenta_de_nuevo_en_unos"));
+            const handled = handleBillingError(status, data);
+            if (!handled) { appAlert(data?.error || tr("js.intenta_de_nuevo_en_unos")); clearPendingGen(); }
+            else if (!(status === 402 && data?.error === 'guest_limit_reached') && status !== 401) clearPendingGen(); // solo el muro de login conserva el pedido
             track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(data?.error || status).slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
             return;
         }
+        clearPendingGen();
 
         // Si se parte de un nodo existente, esa raíz ya estaba pagada (no se
         // crea un nodo nuevo para ella), así que no se vuelve a cobrar.
@@ -1376,7 +1419,8 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     } catch (err) {
         console.error(err);
         track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
-        appAlert(tr("js.intenta_de_nuevo_en_unos"));
+        // 'billing_blocked' ya mostró su propio aviso (muro de login / tienda): no se apila además un «intenta de nuevo».
+        if (err?.message !== 'billing_blocked') { appAlert(tr("js.intenta_de_nuevo_en_unos")); clearPendingGen(); }
     } finally {
         hideLoader();
     }
