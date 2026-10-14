@@ -4,7 +4,7 @@
 const crypto = require('crypto');
 const { saveReading } = require('./_lib/qer-readings-store');
 const { generateWithRetries, sanitizeAnswers } = require('./_lib/qer-gemini');
-const { json, TIME_BUDGET_MS, transcriptOf, AXIS_SCHEMA, validAxis, formatOf, isKnownFormat } = require('./_lib/qer-map-core');
+const { json, TIME_BUDGET_MS, transcriptOf, AXIS_SCHEMA, validAxis, formatOf, isKnownFormat, cleanProfile } = require('./_lib/qer-map-core');
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -20,7 +20,7 @@ exports.handler = async (event) => {
     const t0 = Date.now();
     try {
         const axis = await generateWithRetries(fmt.axisPrompt(transcript), fmt.axisSchema || AXIS_SCHEMA, validAxis,
-            { tag: 'map-axis', maxOutputTokens: 1024, deadline: t0 + TIME_BUDGET_MS });
+            { tag: 'map-axis', maxOutputTokens: 1536, deadline: t0 + TIME_BUDGET_MS });
         console.log(`[generate-map] eje listo en ${Date.now() - t0} ms`);
 
         const readingId = crypto.randomUUID();
@@ -33,6 +33,7 @@ exports.handler = async (event) => {
             hookLine: axis.hookLine,
             closingLine: axis.closingLine,
             axis: axis.axis,
+            profile: cleanProfile(axis),
             full: []
         });
         return json(200, { readingId, archetypeName: axis.archetypeName, hookLine: axis.hookLine, axis: axis.axis });

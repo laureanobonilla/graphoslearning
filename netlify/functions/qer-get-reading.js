@@ -13,6 +13,7 @@
 // de acceso de toda la app (igual que paypal-capture-order.js) — no hay
 // cuentas ni contraseñas que agregar encima.
 const { getReading } = require('./_lib/qer-readings-store');
+const { fullView } = require('./_lib/qer-reading-view');
 
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 
@@ -27,7 +28,7 @@ exports.handler = async (event) => {
 
     try {
         const reading = await getReading(readingId);
-        if (!reading) return json(404, { error: 'Esa lectura ya no está disponible (pasaron más de 24h).' });
+        if (!reading) return json(404, { error: 'Esa lectura ya no está disponible (pasaron más de 72 h sin pagar). / This reading is no longer available.' });
 
         if (!reading.paid) {
             // No pagó (o el pago no se confirmó) — no se entrega nada más que
@@ -35,12 +36,7 @@ exports.handler = async (event) => {
             return json(200, { paid: false });
         }
 
-        return json(200, {
-            paid: true,
-            full: reading.full,
-            closingLine: reading.closingLine,
-            ...(reading.map ? { mapTexts: reading.map.nodes.map(n => ({ id: n.id, text: n.text })) } : {})
-        });
+        return json(200, fullView(reading));
     } catch (err) {
         console.error('[get-reading]', err.message);
         return json(502, { error: 'No se pudo recuperar tu lectura en este momento.' });

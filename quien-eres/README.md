@@ -209,3 +209,9 @@ Supabase) con el mismo patrón de pago único sin cuenta.
 - Generación (lectura y mapa) en 3 llamadas: `qer-generate-map` (eje; recibe `format:'reading'|'map'`), `qer-generate-map-part` x5 en paralelo y `qer-generate-map-finalize`; piezas compartidas en `_lib/qer-map-core.js` y `_lib/qer-gemini.js`.
 - Precio por defecto: **$9.99** (la variable `READING_PRICE_USD` de Netlify, si existe, manda).
 - Eventos nuevos: `paywall_in_view`, `page_hidden` (segundos, scroll máximo, preguntas respondidas), `paywall_reopened`, `quiz_resumed`; `variant:'reading'` y `paywallVersion:'read1'` (mapa: `variant:'map'`, `map2`).
+
+## Flujo de pago actual (2026-10-14)
+Resultado cerrado con candado + adelantos (perfil borroso, rasgo más fuerte, títulos) → «Ver todo» → motivación → pago.
+PayPal por la API de pedidos (el servidor verifica y manda la lectura por correo); SINPE (Costa Rica) sigue como desbloqueo de confianza.
+Variables: PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET (/ PAYPAL_ENV), QER_PRICE_USD (def. 2.00), RESEND_API_KEY, QER_FROM_EMAIL (dominio verificado en Resend para escribir a clientes), QER_TEST_KEY (opcional, página de prueba).
+Prueba del dueño: /quien-eres/prueba/?k=QER_TEST_KEY. Se reconstruye con `python3 tools/build_qer_apps.py`.

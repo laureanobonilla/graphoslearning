@@ -8,12 +8,29 @@ const { json, UUID_RE, CHUNKS, formatOf, wordCount, publicNodes } = require('./_
 const TEASER_WORDS = 10;
 const teaserOf = (text) => { const w = String(text || '').trim().split(/\s+/); return w.slice(0, TEASER_WORDS).join(' ').replace(/[.,;:!?¡¿…\-–—]+$/, '') + '…'; };
 
+// Adelanto del perfil que SÍ puede verse antes de pagar: nombres de los rasgos, el rasgo más fuerte (nombre y cifra),
+// la primera letra y el largo de la palabra, y el inicio de la frase. Las demás cifras y el resto del texto salen solo
+// al desbloquear (ver _lib/qer-reading-view.js).
+function previewOf(base) {
+    const p = base.profile;
+    if (!p || !Array.isArray(p.traits) || p.traits.length < 3) return null;
+    const top = p.traits.reduce((a, t) => (t.score > a.score ? t : a), p.traits[0]);
+    const quoteWords = String(p.quote || '').trim().split(/\s+/).filter(Boolean);
+    return {
+        traits: p.traits.map(t => t.name),
+        top: { name: top.name, score: top.score },
+        keywordInitial: String(p.keyword || '').charAt(0), keywordLen: String(p.keyword || '').length,
+        quoteHead: quoteWords.slice(0, 3).join(' '), quoteWords: quoteWords.length,
+        closingHead: String(base.closingLine || '').trim().split(/\s+/).slice(0, 4).join(' ')
+    };
+}
+
 function payloadOf(readingId, base, nodes) {
     if (String(base.format || '').startsWith('paid-')) {
         const hidden = nodes.reduce((a, n) => a + wordCount(n.text), 0) + wordCount(base.closingLine);
         return { readingId, format: base.format, archetypeName: base.archetypeName, hookLine: base.hookLine,
             nodes: nodes.map(n => ({ id: n.id, label: n.label, hook: n.hook, free: false, words: wordCount(n.text), teaser: teaserOf(n.text) })),
-            stats: { freeWords: 0, hiddenWords: hidden, hiddenCount: nodes.length } };
+            stats: { freeWords: 0, hiddenWords: hidden, hiddenCount: nodes.length }, preview: previewOf(base) };
     }
     const freeWords = nodes.filter(n => n.free).reduce((a, n) => a + wordCount(n.text), 0);
     const hiddenWords = nodes.filter(n => !n.free).reduce((a, n) => a + wordCount(n.text), 0) + wordCount(base.closingLine);
@@ -50,6 +67,7 @@ exports.handler = async (event) => {
         await saveReading(readingId, {
             format: base.format || 'map',
             archetypeName: base.archetypeName, hookLine: base.hookLine, closingLine: base.closingLine,
+            profile: base.profile || null,
             full: [], map: { nodes }
         });
         return json(200, payloadOf(readingId, base, nodes));

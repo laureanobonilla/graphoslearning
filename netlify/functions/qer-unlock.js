@@ -4,6 +4,7 @@
 // cada desbloqueo queda en `events` como `payment_unlocked_trust` con el método y el país, para poder comparar
 // después con los SINPE y pagos de PayPal reales.
 const store = require('./_lib/store');
+const { fullView } = require('./_lib/qer-reading-view');
 const { getReading, markPaid } = require('./_lib/qer-readings-store');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,10 +36,7 @@ exports.handler = async (event) => {
         const meta = { method, country: countryOf(event), clientCountry: String(body.clientCountry || '').slice(0, 2).toUpperCase() || null, shownAmount: String(body.shownAmount || '').slice(0, 30), evidence: (body.evidence && typeof body.evidence === 'object' && JSON.stringify(body.evidence).length < 1200) ? body.evidence : null };
         try { await store.logEvent(readingId, 'anon', readingId, 'payment_unlocked_trust', meta, null, app); }
         catch (err) { console.error('[qer-unlock] evento', err.message); }
-        return json(200, {
-            paid: true, closingLine: reading.closingLine,
-            ...(reading.map ? { mapTexts: reading.map.nodes.map(n => ({ id: n.id, text: n.text })) } : {})
-        });
+        return json(200, fullView(reading));
     } catch (err) {
         console.error('[qer-unlock]', err.message);
         return json(502, { error: 'Could not unlock right now. / No se pudo desbloquear en este momento.' });

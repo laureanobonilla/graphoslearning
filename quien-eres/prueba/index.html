@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
-<title>Prueba — ¿Quién eres en realidad?</title>
 <meta name="robots" content="noindex, nofollow">
-<meta name="description" content="Un cuestionario corto, directo, que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.">
+<title>Prueba · ¿Quién eres en realidad?</title>
+<meta name="description" content="Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -155,6 +155,23 @@
     pointer-events:none;
   }
 
+  .paywall{
+    background: var(--rosewood);
+    margin: -6px 0 28px;
+    padding: 30px 26px 26px;
+    position: relative;
+    clip-path: polygon(0% 10px, 4% 0%, 8% 10px, 12% 0%, 16% 10px, 20% 0%, 24% 10px, 28% 0%, 32% 10px, 36% 0%, 40% 10px, 44% 0%, 48% 10px, 52% 0%, 56% 10px, 60% 0%, 64% 10px, 68% 0%, 72% 10px, 76% 0%, 80% 10px, 84% 0%, 88% 10px, 92% 0%, 96% 10px, 100% 0%, 100% 100%, 0% 100%);
+  }
+  /* Ancla de compromiso: deliberadamente discreta (no es el gancho, es el
+     contexto antes del gancho) — letra chica, en mayúsculas espaciadas como
+     una "credencial" ganada, no como un titular. */
+  .paywall-commitment{ text-align:center; color: #c9a08f; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px; opacity: 0.85; }
+  .paywall-label{ font-family:'Fraunces', serif; font-size: 1.15rem; line-height: 1.35; font-weight:500; text-align:center; margin: 0 0 10px; }
+  .paywall-price{ text-align:center; color: #e9c9ba; font-size: 0.92rem; margin-bottom: 20px; }
+  .paywall-price b{ color:#fff; font-size: 1.15rem; }
+  #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
+  .paywall-note{ text-align:center; color: #d8a79d; font-size: 0.74rem; margin-bottom: 4px; }
+  /* Alternativa al pago con PayPal: contacto directo (WhatsApp / correo) para coordinar otro método. */
   .song-offer{ margin: 26px 0 8px; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--line); background: rgba(198,163,88,0.07); }
   .song-offer h3{ margin: 0 0 8px; font-size: 1.15rem; color: var(--brass); }
   .song-offer p{ margin: 0 0 12px; font-size: 0.88rem; line-height: 1.5; color: var(--muted); }
@@ -169,53 +186,45 @@
   .song-phone select, .song-phone input{ appearance:none; border:1px solid var(--line); background: rgba(0,0,0,0.25); color:#f4efe2; border-radius: 12px; padding: 12px; font-family:'Work Sans',sans-serif; font-size: 1rem; min-width:0; }
   .song-phone select{ flex: 0 0 38%; font-size: 0.88rem; }
   .song-phone input{ flex: 1 1 auto; }
-  .song-check{ display:flex; align-items:center; gap:10px; margin: 0 0 10px; font-size:.88rem; color:#e9e2d0; cursor:pointer; }
-  .song-check input{ width:18px; height:18px; accent-color: var(--brass); flex:0 0 auto; }
-  .song-name{ width:100%; margin: 0 0 14px; appearance:none; border:1px solid var(--line); background: rgba(0,0,0,0.25); color:#f4efe2; border-radius:12px; padding:12px; font-family:'Work Sans',sans-serif; font-size:1rem; }
-  .song-name.is-hidden{ display:none; }
   .song-go{ appearance:none; width:100%; border:none; cursor:pointer; border-radius: 999px; padding: 14px 18px; background: var(--brass); color:#211a0c; font-family:'Work Sans',sans-serif; font-size: 0.98rem; font-weight: 600; }
-  .song-wa{ display:block; text-align:center; text-decoration:none; color:#211a0c; }
-  .song-wa:visited{ color:#211a0c; }
-  .song-go-alt{ background: transparent; border: 1px solid var(--brass); color:#f4e9c9; }
-  .song-go-alt:disabled{ background: transparent; border-color:#4a4436; }
-  .song-offer .song-or{ margin: 14px 0 10px; text-align:center; font-size:.8rem; color: var(--muted); }
-  #songWaAgain.is-hidden{ display:none; }
   .song-go:disabled{ background:#4a4436; color:#8a8575; cursor:default; }
   .song-form.is-hidden, .song-teaser.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden{ display:none; }
   .song-offer .song-title{ margin: 2px 0 8px; font-size: 1.3rem; line-height: 1.25; color:#f4e9c9; }
+  .classic-pay{ margin: 0 0 14px; text-align:center; }
+  .classic-pay.is-hidden{ display:none; }
+  .btn-classic-pay{ appearance:none; width:100%; border:none; cursor:pointer; border-radius:999px; padding:15px 20px; background:#ffc439; color:#1a1a1a; font-family:'Work Sans',sans-serif; font-size:1rem; font-weight:600; }
+  .btn-classic-pay:active{ background:#f2b72e; }
+  .classic-pay-note{ margin:8px 0 0; font-size:0.74rem; color:#d8a79d; }
+  .pay-wait{ margin: 14px 0; padding: 12px 14px; border-radius: 12px; text-align:center; font-size:0.9rem; color:#f2e3d6; background: rgba(255,255,255,0.08); }
+  .pay-wait.is-hidden{ display:none; }
+  .alt-pay{ margin: 14px 0 6px; padding: 12px 14px; border: 1px dashed rgba(233,201,186,0.35); border-radius: 12px; text-align:center; }
+  .alt-pay.is-nudged{ border-style: solid; border-color:#f2c9a8; background: rgba(242,201,168,0.12); }
+  .alt-pay p{ margin: 0 0 10px; font-size: 0.82rem; line-height: 1.45; color: #e9c9ba; }
+  .alt-pay .alt-links{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .alt-pay a{ display:inline-block; padding: 9px 14px; border-radius: 999px; border:1px solid rgba(233,201,186,0.55); color:#f6e7de; font-size:0.82rem; text-decoration:none; }
+  .alt-pay a:hover, .alt-pay a:focus-visible{ background: rgba(233,201,186,0.14); }
+  /* Botón de "seguir sin pagar": sigue ahí, siempre disponible y legible
+     (no es un patrón oscuro ocultarlo), pero con más distancia del bloque
+     de pago y menos peso visual, para que no compita al mismo nivel que el
+     botón de PayPal — ver conversación sobre "pain of paying" del
+     2026-10-04. */
+  .paywall-skip{ text-align:center; margin-top: 30px; }
+  .paywall-skip button{ background:none; border:none; color: #e9c9ba; font-size: 0.74rem; text-decoration:underline; cursor:pointer; opacity: 0.55; }
 
   #fullContainer.is-hidden{ display:none; }
+  /* Sin estas reglas, add/remove('is-hidden') sobre estos elementos no tenía
+     ningún efecto visual (solo existían para #progress, #btnBack y
+     #fullContainer): "Seguir sin pagar" no ocultaba el paywall y la nota de
+     "Está bien…" se veía desde el principio. */
+  #paywall.is-hidden, #skippedNote.is-hidden, #skipReasonBox.is-hidden, #skipReasonThanks.is-hidden{ display:none; }
   #fullContainer{ animation: fadeUp 0.6s ease; }
   @keyframes fadeUp{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform:none; } }
   .closing-line{ font-family:'Fraunces', serif; font-style: italic; text-align:center; font-size: 1.15rem; line-height:1.5; max-width: 30ch; margin: 30px auto 36px; color: var(--brass); }
 
+  .unlocked-badge{ text-align:center; color: var(--brass); font-size: 0.8rem; letter-spacing:0.02em; margin-bottom: 24px; }
 
   .reveal-actions{ display:flex; flex-direction:column; gap:14px; align-items:center; margin-top: 10px; }
   .disclaimer{ color:#5c5370; font-size: 0.72rem; text-align:center; line-height:1.5; max-width: 32ch; margin: 30px auto 0; }
-
-
-  /* ===== Canción: columna fija al lado de la lectura (pantalla ancha) / barra fija abajo (celular) ===== */
-  .song-close{ display:none; position:absolute; top:6px; right:8px; appearance:none; border:none; background:none; color:var(--muted); font-size:1.6rem; line-height:1; cursor:pointer; padding:6px 10px; }
-  .song-offer{ position:relative; }
-  @media (min-width: 960px){
-    .shell.is-reveal{ max-width: 980px; overflow: visible; }
-    .reveal-layout{ display:grid; grid-template-columns: minmax(0,480px) 330px; gap: 64px; justify-content:center; align-items:start; }
-    .reveal-layout .song-offer{ position: sticky; top: 28px; margin: 52px 0 0; }
-  }
-  @media (max-width: 959px){
-    #screen-reveal{ padding-bottom: 120px; }
-    .song-offer{ position:fixed; left:0; right:0; bottom:0; max-width:480px; margin:0 auto; z-index:15; border-radius:18px 18px 0 0; border:1px solid var(--brass-dim); border-bottom:none; background: var(--ink-3); box-shadow: 0 -10px 30px rgba(0,0,0,.5); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); max-height: 86vh; overflow-y:auto; }
-    .song-offer:not(.is-open){ display:flex; align-items:center; gap:12px; }
-    .song-offer:not(.is-open) h3{ flex:1 1 auto; margin:0; font-size:.95rem; line-height:1.25; }
-    .song-offer:not(.is-open) #songTeaser{ flex:0 0 auto; }
-    .song-offer:not(.is-open) #songTeaser p{ display:none; }
-    .song-offer:not(.is-open) .song-go{ width:auto; padding:10px 16px; font-size:.88rem; white-space:nowrap; }
-    .song-offer.is-open{ padding-top: 22px; }
-    .song-offer.kb-open{ padding-bottom: 12px; }
-    .song-offer.kb-open .song-fine{ display:none; }
-    .song-offer.is-open .song-close{ display:block; }
-  }
-  .song-offer.is-hidden{ display:none !important; }
 
   @media (prefers-reduced-motion: reduce){
     .mask-wrap, .mask-crack, #fullContainer, .pulse-mask{ animation: none !important; }
@@ -247,10 +256,6 @@
   .map-pulse{ animation: pulseRing 1.6s ease-out 2; }
   @keyframes pulseRing{ 0%{ box-shadow:0 0 0 0 rgba(242,236,223,.5);} 100%{ box-shadow:0 0 0 18px rgba(242,236,223,0);} }
 
-  .finish-early{ margin-top: 18px; text-align:center; }
-  .finish-early.is-hidden{ display:none; }
-  .finish-early p{ margin: 0 0 6px; font-size: .8rem; line-height:1.45; color: var(--muted); }
-  .finish-early .btn-ghost{ color: var(--parchment); font-size: .9rem; text-decoration: underline; text-decoration-color: var(--brass-dim); text-underline-offset: 3px; padding: 8px 6px; }
   .btn-ghost{ appearance:none; border:none; cursor:pointer; font-family:'Work Sans', sans-serif; }
   /* Hoja inferior: lo que se abre al tocar un punto. */
   .sheet-backdrop{ position:fixed; inset:0; background: rgba(8,5,14,.62); opacity:0; pointer-events:none; transition: opacity .25s ease; z-index: 20; }
@@ -297,16 +302,109 @@
   .chapter + .chapter{ border-top: 1px solid var(--line); padding-top: 28px; }
   .chapter-title{ font-size: 1.3rem; line-height: 1.3; font-weight: 500; color: var(--brass); margin: 0 0 14px; }
   .chapter p{ font-size: 1.03rem; line-height: 1.78; margin: 0 0 16px; }
+  .locked-list{ margin: 6px 0 26px; padding: 22px 0 0; border-top: 1px solid var(--line); }
+  .locked-list.is-hidden{ display:none; }
+  .locked-intro{ color: var(--muted); font-size: .92rem; margin: 0 0 16px; }
+  .locked-item{ display:flex; gap: 14px; align-items:flex-start; border: 1px dashed var(--brass-dim); border-radius: 12px; padding: 14px 16px; margin: 0 0 12px; }
   .lock-ico{ width: 20px; height: 20px; flex-shrink:0; margin-top: 3px; fill:none; stroke: var(--brass); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .locked-title{ font-size: 1.08rem; line-height:1.3; margin: 0 0 6px; color: var(--parchment); }
+  .locked-hook{ font-size: .92rem; line-height: 1.5; color: var(--muted); margin: 0 0 6px; }
+  .locked-words{ font-size: .78rem; color: var(--brass-dim); margin: 0; }
   #btnResume.is-hidden{ display:none; }
+
+  /* --- pago por país (SINPE / PayPal) --- */
+  .pay-panel{ margin: 0 0 14px; padding: 16px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.14); text-align:center; }
+  .pay-panel.is-hidden{ display:none; }
+  .pay-title{ margin: 0 0 10px; font-size: 1rem; color:#fff; }
+  .pay-steps{ list-style:none; margin: 0 0 14px; padding: 0; text-align:left; color:#f6e7de; font-size:.9rem; line-height:1.5; }
+  .pay-steps li{ margin: 0 0 6px; padding-left: 22px; position:relative; }
+  .pay-steps li::before{ content: attr(data-n); position:absolute; left:0; top:0; color:#ffd9a8; font-weight:600; }
+  .pay-copy{ appearance:none; background:transparent; border:1px solid rgba(255,255,255,.55); color:#fff; border-radius:999px; padding:7px 14px; font-size:.8rem; cursor:pointer; margin-bottom: 12px; }
+  .pay-upload{ display:block; width:100%; appearance:none; border:none; cursor:pointer; border-radius:999px; padding:15px 20px; background:#ffc439; color:#1a1a1a; font-weight:600; font-size:1rem; font-family:inherit; }
+  .pay-upload:disabled{ opacity:.6; cursor:default; }
+  .pay-msg{ margin: 10px 0 0; font-size:.84rem; color:#ffe3c9; line-height:1.4; }
+  .pay-msg.is-hidden{ display:none; }
+  .pay-note{ margin: 10px 0 0; font-size:.76rem; color:#d8a79d; }
+  .pay-help{ margin: 14px 0 6px; text-align:center; font-size:.82rem; line-height:1.45; color:#e9c9ba; }
+  .pay-help a{ color:#f6e7de; margin: 0 4px; }
+  .other-wrap{ margin-top: 10px; }
+  .other-wrap.is-hidden{ display:none; }
+  .other-wrap .short-input{ min-height: 56px; }
+  .options .option.is-other{ border-style: dashed; }
+  .finish-early{ margin-top: 18px; text-align:center; }
+  .finish-early.is-hidden{ display:none; }
+  .finish-early p{ margin: 0 0 6px; font-size: .8rem; line-height:1.45; color: var(--muted); }
+  .finish-early .btn-ghost{ color: var(--parchment); font-size: .9rem; text-decoration: underline; text-decoration-color: var(--brass-dim); text-underline-offset: 3px; padding: 8px 6px; }
+  .pay-covers{ text-align:center; margin: -8px 0 14px; font-size:.88rem; color:#fff; font-weight:500; }
+  .locked-teaser{ margin: 4px 0 6px; font-size:.95rem; line-height:1.5; color: var(--parchment); }
+  .read-more{ appearance:none; background:none; border:none; padding:2px 0; cursor:pointer; font: inherit; font-size:.88rem; font-weight:600; color: var(--brass); text-decoration: underline; text-underline-offset: 3px; }
+  #paywall.pay-flash{ animation: payflash 1.6s ease-out 1; }
+  @keyframes payflash{ 0%{ box-shadow: 0 0 0 0 rgba(255,217,168,.9);} 100%{ box-shadow: 0 0 0 22px rgba(255,217,168,0);} }
+  @media (prefers-reduced-motion: reduce){ #paywall.pay-flash{ animation:none; } }
+
+  /* ===================== FLUJO CERRADO → MOTIVACIÓN → PAGO ===================== */
+  .profile-box.is-hidden, .unlock-cta.is-hidden, .delivery-line.is-hidden, .email-msg.is-hidden, #payTest.is-hidden, #payChecking.is-hidden{ display:none; }
+  .profile-box{ margin: 0 0 26px; padding: 18px 16px 20px; border: 1px solid var(--brass-dim); border-radius: 16px; background: rgba(198,163,88,.06); }
+  .profile-head{ display:flex; align-items:baseline; justify-content:space-between; margin: 0 0 4px; }
+  .profile-title{ font-size: 1.12rem; color: var(--brass); margin: 0; font-weight: 500; }
+  .profile-lock-note{ font-size: .74rem; color: var(--brass-dim); display:flex; align-items:center; gap:5px; }
+  .profile-lock-note svg{ width:13px; height:13px; fill:none; stroke: var(--brass-dim); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .radar-wrap{ position:relative; margin: 0 auto; max-width: 340px; }
+  .radar-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .radar-grid{ fill:none; stroke: var(--line); stroke-width:1; }
+  .radar-axis{ stroke: var(--line); stroke-width:1; }
+  .radar-shape{ fill: rgba(198,163,88,.30); stroke: var(--brass); stroke-width:1.6; stroke-linejoin:round; }
+  .radar-dot{ fill: var(--brass); }
+  .radar-val{ fill: var(--parchment); font-size: 10px; font-family:'Work Sans',sans-serif; text-anchor:middle; }
+  .radar-label{ fill: var(--parchment); font-size: 11px; font-family:'Work Sans',sans-serif; }
+  .radar-wrap.is-locked .radar-shape-g{ filter: blur(7px); opacity:.9; }
+  .radar-pad{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:44px; height:44px; border-radius:50%; background: var(--ink-2); border:1px solid var(--brass-dim); display:flex; align-items:center; justify-content:center; }
+  .radar-pad svg{ width:20px; height:20px; fill:none; stroke: var(--brass); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .profile-rows{ margin: 10px 0 0; display:flex; flex-direction:column; gap:10px; }
+  .profile-row{ font-size:.92rem; line-height:1.45; color: var(--parchment); }
+  .profile-row .k{ display:block; color: var(--muted); font-size:.76rem; margin-bottom:2px; }
+  .profile-row b{ color: var(--brass); font-weight:600; }
+  .redact{ display:inline-block; vertical-align:middle; height:.8em; border-radius:3px; background: rgba(242,236,223,.16); margin: 0 3px 2px 0; filter: blur(1.5px); }
+  .profile-word{ font-family:'Fraunces',serif; font-size:1.5rem; color: var(--parchment); }
+  .profile-quote{ font-family:'Fraunces',serif; font-style:italic; font-size:1.06rem; line-height:1.5; }
+  .profile-stats{ margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size:.8rem; color: var(--brass); text-align:center; }
+  .profile-closing{ margin: 6px 0 0; font-size:.8rem; color: var(--muted); text-align:center; font-style:italic; }
+
+  .unlock-cta{ position:fixed; left:0; right:0; bottom:0; z-index:15; margin:0 auto; max-width:480px; padding: 22px 28px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, rgba(22,17,31,0), var(--ink) 38%); text-align:center; }
+  .cta-btn{ width:100%; padding: 16px 20px; font-size: 1.02rem; }
+  .cta-sub{ margin: 8px 0 0; font-size:.76rem; color: var(--muted); }
+  #screen-reveal.has-cta{ padding-bottom: 150px; }
+
+  #screen-prepay{ padding: 38px 0 40px; }
+  .prepay{ text-align:center; }
+  .prepay-mask{ width:64px; height:64px; margin: 0 auto 14px; display:block; opacity:.9; }
+  .prepay-title{ font-size:1.7rem; line-height:1.2; font-weight:500; margin: 0 0 16px; }
+  .prepay-p{ font-size:1rem; line-height:1.65; margin: 0 0 16px; text-align:left; }
+  .prepay-soft{ color:#d9d0bd; }
+  .prepay-inc-title{ text-align:left; margin: 6px 0 8px; font-size:.9rem; color: var(--brass); }
+  .prepay-inc{ list-style:none; margin:0 0 20px; padding:0; text-align:left; }
+  .prepay-inc li{ position:relative; padding: 9px 0 9px 28px; border-top:1px solid var(--line); font-size:.96rem; line-height:1.4; }
+  .prepay-inc li:last-child{ border-bottom:1px solid var(--line); }
+  .prepay-inc li::before{ content:''; position:absolute; left:4px; top:13px; width:10px; height:6px; border-left:2px solid var(--brass); border-bottom:2px solid var(--brass); transform: rotate(-45deg); }
+  .prepay-secure{ margin: 10px 0 6px; font-size:.76rem; color: var(--muted); }
+  #screen-pay{ padding: 34px 0 40px; }
+
+  .delivery-box{ margin: 6px 0 26px; padding: 16px; border:1px solid var(--line); border-radius:14px; background: rgba(255,255,255,.03); text-align:center; }
+  .delivery-line{ font-size:.88rem; line-height:1.5; color: var(--parchment); margin: 0 0 10px; }
+  .btn-outline-soft{ appearance:none; border:1px solid var(--brass-dim); background:transparent; color: var(--brass); border-radius:999px; padding:9px 16px; font:500 .84rem 'Work Sans',sans-serif; cursor:pointer; margin: 0 0 14px; }
+  .email-title{ margin: 0 0 8px; font-size:.88rem; color: var(--muted); }
+  .email-row{ display:flex; gap:8px; }
+  .email-row input{ flex:1 1 auto; min-width:0; border:1px solid var(--line); background: rgba(0,0,0,.25); color: var(--parchment); border-radius:12px; padding:12px; font:1rem 'Work Sans',sans-serif; }
+  .email-row .song-go{ width:auto; flex:0 0 auto; padding: 12px 16px; font-size:.9rem; }
+  .email-msg{ margin: 8px 0 0; font-size:.82rem; color: var(--brass); }
+  .test-banner{ position:fixed; left:0; right:0; top:0; z-index:50; text-align:center; font-size:.7rem; color:#c6a358; background: rgba(22,17,31,.94); padding:5px 8px; }
+  #paypal-button-container{ min-height: 48px; margin: 0 0 8px; }
 </style>
 </head>
 <body>
-
 <div class="shell">
   <div id="progress" class="is-hidden"><div id="progressFill"></div></div>
 
-  <!-- ===================== PORTADA ===================== -->
   <section id="screen-cover" class="screen is-active">
     <div class="mask-wrap">
       <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -316,137 +414,164 @@
         <circle cx="66" cy="42" r="2.4" fill="#c6a358"/>
       </svg>
     </div>
-    <h1 class="display">¿Quién eres en realidad?</h1>
-    <!-- Antes decía "¿Quieres saber quién se esconde detrás de tu máscara?"
-         — genérico comparado con el reto del anuncio de Facebook ("16
-         preguntas que casi nadie se atreve a hacerte"). Se cambió para
-         repetir ESE mismo reto casi textual: si el anuncio ya generó el
-         impulso, la landing no debe bajarle el tono justo antes del botón
-         "Empezar". -->
-    <p class="sub">No es un test cualquiera. Son 50 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.</p>
-    <!-- Antes decía "16 preguntas · 5 minutos" acá — se quitó a propósito:
-         anunciar cuánto esfuerzo vas a pedir ANTES de generar curiosidad es
-         justo lo que hace que alguien calcule "no tengo tiempo" y se vaya
-         sin haber visto nada. La cantidad de preguntas ya se siente sola,
-         una por una, con la barra de progreso — no hace falta advertirla
-         en la puerta. Acá solo queda la promesa (gratis, sin cuenta) y la
-         recompensa (un resultado hecho a su medida), no el costo. -->
-    <p class="meta-line">Gratis para empezar · Sin registrarte</p>
-    <button id="btnStart" class="btn btn-primary">Empezar</button>
+    <h1 class="display" data-t="cover_title"></h1>
+    <p class="sub" data-t="cover_sub"></p>
+    <p class="meta-line" data-t="cover_meta"></p>
+    <button id="btnStart" class="btn btn-primary" data-t="btn_start"></button>
     <button id="btnResume" class="btn-ghost is-hidden" style="margin-top:14px;"></button>
   </section>
 
-  <!-- ===================== CUESTIONARIO ===================== -->
   <section id="screen-quiz" class="screen">
-    <div class="quiz-top">
-      <button id="btnBack" aria-label="Anterior">‹</button>
-    </div>
+    <div class="quiz-top"><button id="btnBack" data-aria="back_aria">‹</button></div>
     <div class="quiz-body">
       <p id="qAct" class="q-act"></p>
       <p id="qPrompt" class="q-prompt display"></p>
       <div id="qBody"></div>
     </div>
     <div class="quiz-bottom">
-      <button id="btnNext" class="btn btn-primary" disabled>Siguiente</button>
+      <button id="btnNext" class="btn btn-primary" disabled data-t="btn_next"></button>
       <div id="finishEarly" class="finish-early is-hidden">
-        <p>Cada respuesta más hace tu lectura más profunda. Si prefieres, puedes verla ya.</p>
-        <button type="button" id="btnFinishEarly" class="btn-ghost">Ya tengo suficiente: ver mi lectura ahora</button>
+        <p data-t="finish_early_note"></p>
+        <button type="button" id="btnFinishEarly" class="btn-ghost" data-t="finish_early_btn"></button>
       </div>
     </div>
   </section>
 
-  <!-- ===================== CARGANDO ===================== -->
   <section id="screen-loading" class="screen">
     <svg class="pulse-mask" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4"/>
       <path d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
-    <p id="loadingLabel" class="display">Interpretando tus respuestas…</p>
+    <p id="loadingLabel" class="display"></p>
   </section>
 
-  <!-- ===================== ERROR ===================== -->
   <section id="screen-error" class="screen">
     <div class="error-box">
       <p id="errorMsg" class="display" style="font-size:1.2rem; color:var(--parchment);"></p>
       <p id="errorDetail"></p>
-      <button id="btnRetry" class="btn btn-primary">Intentar de nuevo</button>
+      <button id="btnRetry" class="btn btn-primary" data-t="err_retry"></button>
     </div>
   </section>
 
-  <!-- ===================== REVELACIÓN: EL MAPA ===================== -->
   <section id="screen-reveal" class="screen">
-    <div class="reveal-layout">
-    <div class="reveal-main">
     <h2 id="archetypeName" class="archetype-name display"></h2>
     <div class="rule"></div>
     <p id="hookLine" class="hook-line" style="margin-bottom:20px;"></p>
 
+    <div id="profileBox" class="profile-box is-hidden"></div>
+
     <div id="chapters" class="chapters"></div>
-    <div id="fullContainer">
+    <div id="lockedList" class="locked-list is-hidden"></div>
+
+    <div id="fullContainer" class="is-hidden">
+      <p class="unlocked-badge" data-t="unlocked_badge"></p>
       <p id="closingLine" class="closing-line"></p>
+      <div id="deliveryBox" class="delivery-box">
+        <p id="emailedLine" class="delivery-line is-hidden"></p>
+        <button type="button" id="btnCopyLink" class="btn-outline-soft"></button>
+        <form id="emailForm" class="email-form" novalidate>
+          <p class="email-title" id="emailTitle"></p>
+          <div class="email-row"><input type="email" id="emailInput" autocomplete="email" inputmode="email"><button type="submit" id="emailBtn" class="song-go"></button></div>
+          <p id="emailMsg" class="email-msg is-hidden" role="status"></p>
+        </form>
+      </div>
       <div class="reveal-actions">
-        <button id="btnRestart" class="btn-ghost">Hacer el cuestionario de nuevo</button>
+        <button id="btnRestart" class="btn-ghost" data-t="redo_btn"></button>
       </div>
     </div>
-
 
     <div class="reveal-actions" style="margin-top:26px;">
-      <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);">Compartir mi arquetipo</button>
+      <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);" data-t="share_btn"></button>
     </div>
+    <p class="disclaimer" data-t="disclaimer"></p>
+  </section>
 
-    <p class="disclaimer">Esta lectura es una experiencia de autoconocimiento con fines de entretenimiento, inspirada en tus respuestas — no es un diagnóstico psicológico.</p>
+  <div id="unlockCta" class="unlock-cta is-hidden">
+    <button type="button" id="btnSeeAll" class="btn btn-primary cta-btn" data-t="n_cta"></button>
+    <p class="cta-sub" data-t="n_cta_sub"></p>
+  </div>
+
+  <section id="screen-prepay" class="screen">
+    <div class="prepay">
+      <svg class="prepay-mask" viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4"/><path d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h2 class="prepay-title display" data-t="n_pp_title"></h2>
+      <p id="ppP1" class="prepay-p"></p>
+      <p class="prepay-inc-title" data-t="n_pp_inc_title"></p>
+      <ul id="ppInc" class="prepay-inc"></ul>
+      <p id="ppP2" class="prepay-p"></p>
+      <p id="ppP3" class="prepay-p prepay-soft"></p>
+      <button type="button" id="btnPrepayGo" class="btn btn-primary cta-btn" data-t="n_pp_btn"></button>
+      <p class="prepay-secure" data-t="n_pp_secure"></p>
+      <button type="button" id="btnPrepayBack" class="btn-ghost" data-t="n_pp_back"></button>
     </div>
-    <aside id="songOffer" class="song-offer is-hidden" aria-label="Convierte tu lectura en canción">
-      <button type="button" id="songClose" class="song-close" aria-label="Cerrar">×</button>
-      <h3 class="display">¿Y si tu lectura fuera una canción?</h3>
-      <div id="songTeaser">
-        <p id="songTeaserText">Con lo que descubrimos de ti escribo la letra y te hago una muestra para que la escuches. Sin compromiso: hablamos de precio solo después de que la oigas.</p>
-        <button type="button" id="btnSongOpen" class="song-go">Quiero mi canción</button>
-      </div>
-      <form id="songForm" class="song-form is-hidden" novalidate>
-        <p class="song-label">¿En qué estilo la quieres?</p>
-        <div class="song-styles" role="group" aria-label="Estilo de la canción">
-          <button type="button" class="song-chip" data-style="Balada suave" aria-pressed="false">Balada suave</button>
-          <button type="button" class="song-chip" data-style="Pop" aria-pressed="false">Pop</button>
-          <button type="button" class="song-chip" data-style="Acústica" aria-pressed="false">Acústica</button>
-          <button type="button" class="song-chip" data-style="Rock suave" aria-pressed="false">Rock suave</button>
-          <button type="button" class="song-chip" data-style="Bolero" aria-pressed="false">Bolero</button>
-          <button type="button" class="song-chip" data-style="Urbano suave" aria-pressed="false">Urbano suave</button>
-          <button type="button" class="song-chip" data-style="Sorpréndeme" aria-pressed="true">Sorpréndeme</button>
+  </section>
+
+  <section id="screen-pay" class="screen">
+    <div id="paywall" class="paywall">
+      <div id="payBlock">
+        <p id="paywallCommitment" class="paywall-commitment"></p>
+        <p class="paywall-label display" data-t="n_pay_title"></p>
+        <p class="paywall-price"><span data-t="n_pay_price_pre"></span> <b id="priceLabel"></b></p>
+        <p id="payCovers" class="pay-covers"></p>
+        <p id="payChecking" class="pay-note" data-t="pay_checking_country"></p>
+
+        <div id="payCR" class="pay-panel is-hidden">
+          <p class="pay-title display" data-t="sinpe_title"></p>
+          <ul class="pay-steps">
+            <li data-n="1" id="sinpeStep1"></li>
+            <li data-n="2" data-t="sinpe_step2"></li>
+            <li data-n="3" data-t="sinpe_step3"></li>
+          </ul>
+          <button type="button" id="btnCopyPhone" class="pay-copy" data-t="sinpe_copy"></button>
+          <input type="file" id="sinpeFile" accept="image/*" hidden>
+          <button type="button" id="btnSinpeUpload" class="pay-upload" data-t="sinpe_upload"></button>
+          <p id="sinpeMsg" class="pay-msg is-hidden" role="status"></p>
+          <p class="pay-note" data-t="sinpe_note"></p>
         </div>
-        <label class="song-check"><input type="checkbox" id="songWantName"> <span>Quiero que la canción lleve mi nombre</span></label>
-        <input id="songName" class="song-name is-hidden" type="text" enterkeyhint="next" autocomplete="given-name" placeholder="Tu nombre" maxlength="30" aria-label="Tu nombre">
-        <a id="songWaBtn" class="song-go song-wa" href="https://wa.me/50687772993" target="_blank" rel="noopener">Pedirla por WhatsApp</a>
-        <p class="song-fine song-wa-note">Se abre WhatsApp con el mensaje ya escrito: solo tienes que enviarlo y te respondo ahí con tu muestra.</p>
-        <p class="song-or">o prefieres que te escriba yo</p>
-        <p class="song-label"><label for="songPhone">Tu WhatsApp, para enviarte la muestra</label></p>
-        <div class="song-phone">
-          <select id="songDial" aria-label="Código de país">
-            <option value="+506">CR +506</option><option value="+598">UY +598</option><option value="+52">MX +52</option>
-            <option value="+54">AR +54</option><option value="+57">CO +57</option><option value="+56">CL +56</option>
-            <option value="+51">PE +51</option><option value="+593">EC +593</option><option value="+507">PA +507</option>
-            <option value="+502">GT +502</option><option value="+503">SV +503</option><option value="+504">HN +504</option>
-            <option value="+505">NI +505</option><option value="+58">VE +58</option><option value="+591">BO +591</option>
-            <option value="+595">PY +595</option><option value="+34">ES +34</option><option value="+1">US/CA/RD +1</option>
-            <option value="">Otro (escribe +código)</option>
-          </select>
-          <input id="songPhone" type="tel" inputmode="tel" enterkeyhint="send" autocomplete="tel-national" placeholder="Tu número" maxlength="24">
+
+        <div id="payIntl" class="pay-panel is-hidden">
+          <div id="paypal-button-container"></div>
+          <p id="paypalMsg" class="pay-msg is-hidden" role="status"></p>
+          <p id="paypalNote" class="pay-note"></p>
         </div>
-        <p class="song-fine">Solo usaré tu número para escribirte por WhatsApp con tu muestra. No lo comparto ni te enviaré otra cosa.</p>
-        <button type="submit" id="btnSongSend" class="song-go song-go-alt">Que me escriban a mi número</button>
-        <p id="songError" class="song-error is-hidden" role="alert"></p>
-      </form>
-      <div id="songDone" class="song-done is-hidden" role="status">
-        <p class="song-title display">¡Listo!</p>
-        <p id="songDoneText"></p>
-        <p class="song-fine"><a id="songWaAgain" class="is-hidden" href="https://wa.me/50687772993" target="_blank" rel="noopener">Abrir WhatsApp otra vez</a></p>
+
+        <div id="payTest" class="pay-panel is-hidden">
+          <p class="pay-note" style="margin:0 0 12px" data-t="n_test_note"></p>
+          <button type="button" id="btnTestSend" class="pay-upload" data-t="n_test_btn"></button>
+          <p id="testMsg" class="pay-msg is-hidden" role="status"></p>
+          <button type="button" id="btnTestReal" class="pay-copy" style="margin:14px 0 0" data-t="n_test_real"></button>
+        </div>
+
+        <p class="pay-help"><span data-t="help_lead"></span><br><a id="helpWa" href="#" target="_blank" rel="noopener" data-t="help_wa"></a>·<a id="helpMail" href="#" data-t="help_mail"></a></p>
+        <button id="btnSkipPaywall" class="btn-outline" data-t="skip_btn"></button>
       </div>
-    </aside>
+
+      <div id="skippedNote" class="is-hidden">
+        <p class="skipped-text" data-t="skipped_text"></p>
+        <p class="skipped-text" style="font-size:0.85rem"><span data-t="skipped_help"></span>
+          <a id="helpWa2" href="#" target="_blank" rel="noopener" style="color:#f6e7de" data-t="help_wa"></a> ·
+          <a id="helpMail2" href="#" style="color:#f6e7de" data-t="help_mail"></a></p>
+        <div id="reasonBlock" class="reason-block">
+          <p class="reason-title" data-t="reason_title"></p>
+          <div id="skipReasonBox" class="reason-list">
+            <button class="reason-btn skip-reason" data-reason="precio"></button>
+            <button class="reason-btn skip-reason" data-reason="metodo_pago"></button>
+            <button class="reason-btn skip-reason" data-reason="solo_ver"></button>
+            <button class="reason-btn skip-reason" data-reason="sin_interes"></button>
+          </div>
+          <p id="skipReasonThanks" class="is-hidden reason-thanks" data-t="reason_thanks"></p>
+        </div>
+        <button id="btnShowPay" class="btn-outline" data-t="show_pay_btn"></button>
+        <button id="btnRestartFromSkip" class="btn-ghost" data-t="redo_btn"></button>
+      </div>
     </div>
   </section>
 </div>
 
-<div style="position:fixed;left:0;right:0;top:0;text-align:center;font-size:.7rem;color:#8a7343;background:rgba(22,17,31,.92);padding:5px 8px;z-index:50;">Modo prueba · respuestas de ejemplo · no se registran eventos · la canción sí se envía de verdad · <a href="" style="color:#c6a358;">generar de nuevo</a></div>
-<script src="app.js"></script>
+<script src="/qer-shared/qer-pay-config.js"></script>
+<script src="/qer-shared/qer-strings.js"></script>
+<script>window.QER_TEST = { ownerEmail: "bonillapretiz@gmail.com", key: (new URLSearchParams(location.search).get("k") || ""), answers: ["Busco a alguien conocido y me pego a esa persona", "Serio", "Digo que sí y lo hago con gusto", "«Con mucho trabajo, pero aquí vamos»", "Que todo está bien y que yo puedo con todo.", "Lo digo días después, ya más tranquilo", "Que estoy triste", "«Nadie lo haría como yo»", "Duermo o me aíslo", "Dije que sí a ayudar con algo cuando lo único que quería era dormir.", "Veo series una tras otra", "Pongo música alta y canto", "Revisar perfiles de gente de mi pasado", "Todo lo que me falta por hacer", "Que mi familia me pide demasiado y no sé decir que no.", "Que me escuchen sin darme consejos", "Un abrazo", "Ganas de devolver el favor enseguida", "Que me busque sin motivo", "El cansancio que traigo; me ven siempre sonriendo y a punto.", "Mi relación de pareja", "La falta de dinero", "Un resentimiento", "Que fui auténtico", "Que me gustaría que alguien me preguntara dos veces cómo estoy."] };</script>
+<script src="../config.js"></script>
+<script src="/qer-shared/qer-app.js"></script>
 </body>
 </html>

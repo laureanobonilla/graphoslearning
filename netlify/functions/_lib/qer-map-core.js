@@ -216,29 +216,54 @@ const FORMATS = {
     map:     { freeCount: FREE_COUNT,         themes: THEMES,         chunkPrompt, axisPrompt,                   nodesSchema: NODES_SCHEMA,         minChars: () => 250 },
     reading: { freeCount: READING_OPEN_COUNT, themes: READING_THEMES, chunkPrompt: readingChunkPrompt, axisPrompt: readingAxisPrompt, nodesSchema: READING_NODES_SCHEMA, minChars: (idx) => (idx < READING_FREE_COUNT ? 500 : 650) }
 };
-// ---- Formatos CON MURO DE PAGO (3 de 10 capítulos abiertos), uno por app: quien-eres, who-are-you,
+// ---- Formatos CON MURO DE PAGO (todos los capítulos cerrados), uno por app: quien-eres, who-are-you,
 // quien-es-tu-pareja, who-is-your-partner. Cada uno trae su propio idioma/tema de prompts. ----
 const PAID_FREE_COUNT = 0; // todos los capítulos salen cerrados (solo se ve un adelanto de 10 palabras)
 const paidMin = (idx) => (idx < PAID_FREE_COUNT ? 500 : 650);
+
+// PERFIL (gráfica de rasgos + palabra + frase): se pide en el mismo paso del eje, como campos OPCIONALES (si el
+// modelo no los devuelve, el resultado sale igual, solo sin la gráfica). Antes de pagar el navegador recibe nada
+// más los nombres de los rasgos y el rasgo más fuerte; las cifras completas salen solo al desbloquear.
+const PROFILE_PROPS = (lang) => ({
+    traits: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
+        name: { type: 'STRING', description: lang === 'en' ? 'Trait name: 1 or 2 plain, everyday words (e.g. "Loyalty", "Hidden tiredness"). Max 22 characters.' : 'Nombre del rasgo: 1 o 2 palabras sencillas y cotidianas (ej. "Lealtad", "Cansancio oculto"). Máx. 22 caracteres.' },
+        score: { type: 'INTEGER', description: lang === 'en' ? 'Intensity from 20 to 95 this trait shows in the answers (vary them: not all similar).' : 'Intensidad de 20 a 95 con que aparece ese rasgo en las respuestas (varía los valores: no todos parecidos).' }
+    }, required: ['name', 'score'] }, description: lang === 'en' ? 'Exactly 5 traits for the profile chart, each backed by the answers.' : 'Exactamente 5 rasgos para la gráfica de perfil, cada uno apoyado en las respuestas.' },
+    keyword: { type: 'STRING', description: lang === 'en' ? 'ONE single word that sums up this person (a plain noun or adjective, not the archetype name).' : 'UNA sola palabra que resume a esta persona (sustantivo o adjetivo sencillo, no el nombre del arquetipo).' },
+    quote: { type: 'STRING', description: lang === 'en' ? 'One sentence of 10 to 18 words that defines this person, memorable, in the same voice as the reading.' : 'Una frase de 10 a 18 palabras que define a esta persona, memorable, en la misma voz de la lectura.' }
+});
+const PROFILE_NOTE = (lang) => lang === 'en'
+    ? '\n\nAlso fill "traits" (exactly 5), "keyword" (one word) and "quote" (one defining sentence): they feed the profile chart. Base them only on the answers; no clinical labels.'
+    : '\n\nRellena también "traits" (exactamente 5), "keyword" (una palabra) y "quote" (una frase que la define): alimentan la gráfica de perfil. Básalos solo en las respuestas; sin etiquetas clínicas.';
+function withProfile(schema, lang) { return { ...schema, properties: { ...schema.properties, ...PROFILE_PROPS(lang) } }; }
+// Deja el perfil limpio y acotado (lo genera un modelo: no se confía en su forma).
+function cleanProfile(d) {
+    if (!d || !Array.isArray(d.traits)) return null;
+    const traits = d.traits.map(t => ({ name: String(t && t.name || '').trim().slice(0, 24), score: Math.max(5, Math.min(99, Math.round(Number(t && t.score) || 0))) }))
+        .filter(t => t.name && t.score).slice(0, 6);
+    if (traits.length < 3) return null;
+    return { traits, keyword: String(d.keyword || '').trim().split(/\s+/)[0].slice(0, 24), quote: String(d.quote || '').trim().slice(0, 220) };
+}
+
 const PAID_ES_NOTE = '\n\nNOTA SOBRE LAS RESPUESTAS: la mayoría son opciones elegidas de una lista (a veces escritas por la persona) más 5 respuestas abiertas, que pesan más. No cites ni repitas literalmente las opciones como si fueran frases suyas (nada de «elegiste…»): lee los PATRONES entre ellas y conviértelos en imágenes y metáforas sorprendentes. Cuando cites, usa sobre todo lo que la persona escribió.';
 FORMATS['paid-self-es'] = {
-    freeCount: PAID_FREE_COUNT, themes: READING_THEMES, transcriptOf, axisSchema: AXIS_SCHEMA,
-    axisPrompt: (t) => readingAxisPrompt(t).replace(/\b50 respuestas/g, '25 respuestas') + PAID_ES_NOTE, nodesSchema: READING_NODES_SCHEMA, minChars: paidMin,
+    freeCount: PAID_FREE_COUNT, themes: READING_THEMES, transcriptOf, axisSchema: withProfile(AXIS_SCHEMA, 'es'),
+    axisPrompt: (t) => readingAxisPrompt(t).replace(/\b50 respuestas/g, '25 respuestas') + PAID_ES_NOTE + PROFILE_NOTE('es'), nodesSchema: READING_NODES_SCHEMA, minChars: paidMin,
     chunkPrompt: (t, a, i) => readingChunkPrompt(t, a, i, { freeCount: PAID_FREE_COUNT, paywall: true }) + PAID_ES_NOTE
 };
-function registerPaid(name, file) {
+function registerPaid(name, file, lang) {
     try {
         const m = require(file);
         FORMATS[name] = {
-            freeCount: PAID_FREE_COUNT, transcriptOf: m.transcriptOf, axisSchema: m.AXIS_SCHEMA,
-            axisPrompt: m.axisPrompt, nodesSchema: m.NODES_SCHEMA, minChars: paidMin,
+            freeCount: PAID_FREE_COUNT, transcriptOf: m.transcriptOf, axisSchema: withProfile(m.AXIS_SCHEMA, lang),
+            axisPrompt: (t) => m.axisPrompt(t) + PROFILE_NOTE(lang), nodesSchema: m.NODES_SCHEMA, minChars: paidMin,
             chunkPrompt: (t, a, i) => m.chunkPrompt(t, a, i, { freeCount: PAID_FREE_COUNT })
         };
     } catch (err) { console.error('[qer-map-core] formato', name, 'no disponible:', err.message); }
 }
-registerPaid('paid-self-en', './qer-prompts/self-en');
-registerPaid('paid-partner-es', './qer-prompts/partner-es');
-registerPaid('paid-partner-en', './qer-prompts/partner-en');
+registerPaid('paid-self-en', './qer-prompts/self-en', 'en');
+registerPaid('paid-partner-es', './qer-prompts/partner-es', 'es');
+registerPaid('paid-partner-en', './qer-prompts/partner-en', 'en');
 const formatOf = (name) => FORMATS[name] || FORMATS.map;
 const isKnownFormat = (name) => Object.prototype.hasOwnProperty.call(FORMATS, name);
 
@@ -251,4 +276,4 @@ function publicNodes(nodes) {
         : { id: n.id, label: n.label, hook: n.hook, free: false, words: wordCount(n.text) });
 }
 
-module.exports = { isKnownFormat, formatOf, wordCount, READING_FREE_COUNT, FREE_COUNT, TIME_BUDGET_MS, TOTAL_NODES, UUID_RE, json, THEMES, CHUNKS, transcriptOf, AXIS_SCHEMA, validAxis, axisPrompt, NODES_SCHEMA, chunkPrompt, publicNodes };
+module.exports = { isKnownFormat, formatOf, wordCount, READING_FREE_COUNT, FREE_COUNT, TIME_BUDGET_MS, TOTAL_NODES, UUID_RE, json, THEMES, CHUNKS, transcriptOf, AXIS_SCHEMA, validAxis, axisPrompt, NODES_SCHEMA, chunkPrompt, publicNodes, cleanProfile };

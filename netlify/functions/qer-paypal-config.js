@@ -31,6 +31,5 @@ exports.handler = async (event) => {
     // sin tener que mantenerla a mano y sincronizada en el HTML.
     // `classicBusiness`: correo de la cuenta que cobra, para el botón que abre la página de PayPal (acepta
     // tarjeta como invitado y avisa por IPN, ver qer-paypal-ipn.js). Si no está definido, ese botón no se muestra.
-    const classicBusiness = String(process.env.PAYPAL_RECEIVER_EMAIL || '').trim() || undefined;
-    return json(200, { clientId, priceUsd: READING_PRICE_USD, classicBusiness });
+    return json(200, { clientId, priceUsd: READING_PRICE_USD });
 };

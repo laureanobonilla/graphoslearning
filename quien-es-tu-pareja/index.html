@@ -334,6 +334,70 @@
   .finish-early.is-hidden{ display:none; }
   .finish-early p{ margin: 0 0 6px; font-size: .8rem; line-height:1.45; color: var(--muted); }
   .finish-early .btn-ghost{ color: var(--parchment); font-size: .9rem; text-decoration: underline; text-decoration-color: var(--brass-dim); text-underline-offset: 3px; padding: 8px 6px; }
+  .pay-covers{ text-align:center; margin: -8px 0 14px; font-size:.88rem; color:#fff; font-weight:500; }
+  .locked-teaser{ margin: 4px 0 6px; font-size:.95rem; line-height:1.5; color: var(--parchment); }
+  .read-more{ appearance:none; background:none; border:none; padding:2px 0; cursor:pointer; font: inherit; font-size:.88rem; font-weight:600; color: var(--brass); text-decoration: underline; text-underline-offset: 3px; }
+  #paywall.pay-flash{ animation: payflash 1.6s ease-out 1; }
+  @keyframes payflash{ 0%{ box-shadow: 0 0 0 0 rgba(255,217,168,.9);} 100%{ box-shadow: 0 0 0 22px rgba(255,217,168,0);} }
+  @media (prefers-reduced-motion: reduce){ #paywall.pay-flash{ animation:none; } }
+
+  /* ===================== FLUJO CERRADO → MOTIVACIÓN → PAGO ===================== */
+  .profile-box.is-hidden, .unlock-cta.is-hidden, .delivery-line.is-hidden, .email-msg.is-hidden, #payTest.is-hidden, #payChecking.is-hidden{ display:none; }
+  .profile-box{ margin: 0 0 26px; padding: 18px 16px 20px; border: 1px solid var(--brass-dim); border-radius: 16px; background: rgba(198,163,88,.06); }
+  .profile-head{ display:flex; align-items:baseline; justify-content:space-between; margin: 0 0 4px; }
+  .profile-title{ font-size: 1.12rem; color: var(--brass); margin: 0; font-weight: 500; }
+  .profile-lock-note{ font-size: .74rem; color: var(--brass-dim); display:flex; align-items:center; gap:5px; }
+  .profile-lock-note svg{ width:13px; height:13px; fill:none; stroke: var(--brass-dim); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .radar-wrap{ position:relative; margin: 0 auto; max-width: 340px; }
+  .radar-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .radar-grid{ fill:none; stroke: var(--line); stroke-width:1; }
+  .radar-axis{ stroke: var(--line); stroke-width:1; }
+  .radar-shape{ fill: rgba(198,163,88,.30); stroke: var(--brass); stroke-width:1.6; stroke-linejoin:round; }
+  .radar-dot{ fill: var(--brass); }
+  .radar-val{ fill: var(--parchment); font-size: 10px; font-family:'Work Sans',sans-serif; text-anchor:middle; }
+  .radar-label{ fill: var(--parchment); font-size: 11px; font-family:'Work Sans',sans-serif; }
+  .radar-wrap.is-locked .radar-shape-g{ filter: blur(7px); opacity:.9; }
+  .radar-pad{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:44px; height:44px; border-radius:50%; background: var(--ink-2); border:1px solid var(--brass-dim); display:flex; align-items:center; justify-content:center; }
+  .radar-pad svg{ width:20px; height:20px; fill:none; stroke: var(--brass); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .profile-rows{ margin: 10px 0 0; display:flex; flex-direction:column; gap:10px; }
+  .profile-row{ font-size:.92rem; line-height:1.45; color: var(--parchment); }
+  .profile-row .k{ display:block; color: var(--muted); font-size:.76rem; margin-bottom:2px; }
+  .profile-row b{ color: var(--brass); font-weight:600; }
+  .redact{ display:inline-block; vertical-align:middle; height:.8em; border-radius:3px; background: rgba(242,236,223,.16); margin: 0 3px 2px 0; filter: blur(1.5px); }
+  .profile-word{ font-family:'Fraunces',serif; font-size:1.5rem; color: var(--parchment); }
+  .profile-quote{ font-family:'Fraunces',serif; font-style:italic; font-size:1.06rem; line-height:1.5; }
+  .profile-stats{ margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size:.8rem; color: var(--brass); text-align:center; }
+  .profile-closing{ margin: 6px 0 0; font-size:.8rem; color: var(--muted); text-align:center; font-style:italic; }
+
+  .unlock-cta{ position:fixed; left:0; right:0; bottom:0; z-index:15; margin:0 auto; max-width:480px; padding: 22px 28px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, rgba(22,17,31,0), var(--ink) 38%); text-align:center; }
+  .cta-btn{ width:100%; padding: 16px 20px; font-size: 1.02rem; }
+  .cta-sub{ margin: 8px 0 0; font-size:.76rem; color: var(--muted); }
+  #screen-reveal.has-cta{ padding-bottom: 150px; }
+
+  #screen-prepay{ padding: 38px 0 40px; }
+  .prepay{ text-align:center; }
+  .prepay-mask{ width:64px; height:64px; margin: 0 auto 14px; display:block; opacity:.9; }
+  .prepay-title{ font-size:1.7rem; line-height:1.2; font-weight:500; margin: 0 0 16px; }
+  .prepay-p{ font-size:1rem; line-height:1.65; margin: 0 0 16px; text-align:left; }
+  .prepay-soft{ color:#d9d0bd; }
+  .prepay-inc-title{ text-align:left; margin: 6px 0 8px; font-size:.9rem; color: var(--brass); }
+  .prepay-inc{ list-style:none; margin:0 0 20px; padding:0; text-align:left; }
+  .prepay-inc li{ position:relative; padding: 9px 0 9px 28px; border-top:1px solid var(--line); font-size:.96rem; line-height:1.4; }
+  .prepay-inc li:last-child{ border-bottom:1px solid var(--line); }
+  .prepay-inc li::before{ content:''; position:absolute; left:4px; top:13px; width:10px; height:6px; border-left:2px solid var(--brass); border-bottom:2px solid var(--brass); transform: rotate(-45deg); }
+  .prepay-secure{ margin: 10px 0 6px; font-size:.76rem; color: var(--muted); }
+  #screen-pay{ padding: 34px 0 40px; }
+
+  .delivery-box{ margin: 6px 0 26px; padding: 16px; border:1px solid var(--line); border-radius:14px; background: rgba(255,255,255,.03); text-align:center; }
+  .delivery-line{ font-size:.88rem; line-height:1.5; color: var(--parchment); margin: 0 0 10px; }
+  .btn-outline-soft{ appearance:none; border:1px solid var(--brass-dim); background:transparent; color: var(--brass); border-radius:999px; padding:9px 16px; font:500 .84rem 'Work Sans',sans-serif; cursor:pointer; margin: 0 0 14px; }
+  .email-title{ margin: 0 0 8px; font-size:.88rem; color: var(--muted); }
+  .email-row{ display:flex; gap:8px; }
+  .email-row input{ flex:1 1 auto; min-width:0; border:1px solid var(--line); background: rgba(0,0,0,.25); color: var(--parchment); border-radius:12px; padding:12px; font:1rem 'Work Sans',sans-serif; }
+  .email-row .song-go{ width:auto; flex:0 0 auto; padding: 12px 16px; font-size:.9rem; }
+  .email-msg{ margin: 8px 0 0; font-size:.82rem; color: var(--brass); }
+  .test-banner{ position:fixed; left:0; right:0; top:0; z-index:50; text-align:center; font-size:.7rem; color:#c6a358; background: rgba(22,17,31,.94); padding:5px 8px; }
+  #paypal-button-container{ min-height: 48px; margin: 0 0 8px; }
 </style>
 </head>
 <body>
@@ -393,14 +457,61 @@
     <div class="rule"></div>
     <p id="hookLine" class="hook-line" style="margin-bottom:20px;"></p>
 
+    <div id="profileBox" class="profile-box is-hidden"></div>
+
     <div id="chapters" class="chapters"></div>
     <div id="lockedList" class="locked-list is-hidden"></div>
 
+    <div id="fullContainer" class="is-hidden">
+      <p class="unlocked-badge" data-t="unlocked_badge"></p>
+      <p id="closingLine" class="closing-line"></p>
+      <div id="deliveryBox" class="delivery-box">
+        <p id="emailedLine" class="delivery-line is-hidden"></p>
+        <button type="button" id="btnCopyLink" class="btn-outline-soft"></button>
+        <form id="emailForm" class="email-form" novalidate>
+          <p class="email-title" id="emailTitle"></p>
+          <div class="email-row"><input type="email" id="emailInput" autocomplete="email" inputmode="email"><button type="submit" id="emailBtn" class="song-go"></button></div>
+          <p id="emailMsg" class="email-msg is-hidden" role="status"></p>
+        </form>
+      </div>
+      <div class="reveal-actions">
+        <button id="btnRestart" class="btn-ghost" data-t="redo_btn"></button>
+      </div>
+    </div>
+
+    <div class="reveal-actions" style="margin-top:26px;">
+      <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);" data-t="share_btn"></button>
+    </div>
+    <p class="disclaimer" data-t="disclaimer"></p>
+  </section>
+
+  <div id="unlockCta" class="unlock-cta is-hidden">
+    <button type="button" id="btnSeeAll" class="btn btn-primary cta-btn" data-t="n_cta"></button>
+    <p class="cta-sub" data-t="n_cta_sub"></p>
+  </div>
+
+  <section id="screen-prepay" class="screen">
+    <div class="prepay">
+      <svg class="prepay-mask" viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M50 8C27 8 14 26 14 48c0 19 11 33 17 40 4 4.5 9.5 1 11-2 1.5 3 4 6 8 6s6.5-3 8-6c1.5 3 7 6.5 11 2 6-7 17-21 17-40C86 26 73 8 50 8Z" stroke="#c6a358" stroke-width="1.4"/><path d="M50 10 L46 34 L54 42 L44 58 L56 70 L48 92" stroke="#c6a358" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h2 class="prepay-title display" data-t="n_pp_title"></h2>
+      <p id="ppP1" class="prepay-p"></p>
+      <p class="prepay-inc-title" data-t="n_pp_inc_title"></p>
+      <ul id="ppInc" class="prepay-inc"></ul>
+      <p id="ppP2" class="prepay-p"></p>
+      <p id="ppP3" class="prepay-p prepay-soft"></p>
+      <button type="button" id="btnPrepayGo" class="btn btn-primary cta-btn" data-t="n_pp_btn"></button>
+      <p class="prepay-secure" data-t="n_pp_secure"></p>
+      <button type="button" id="btnPrepayBack" class="btn-ghost" data-t="n_pp_back"></button>
+    </div>
+  </section>
+
+  <section id="screen-pay" class="screen">
     <div id="paywall" class="paywall">
       <div id="payBlock">
         <p id="paywallCommitment" class="paywall-commitment"></p>
-        <p id="paywallHook" class="paywall-label display"></p>
-        <p class="paywall-price"><span data-t="pay_price_pre"></span> <b id="priceLabel"></b></p>
+        <p class="paywall-label display" data-t="n_pay_title"></p>
+        <p class="paywall-price"><span data-t="n_pay_price_pre"></span> <b id="priceLabel"></b></p>
+        <p id="payCovers" class="pay-covers"></p>
         <p id="payChecking" class="pay-note" data-t="pay_checking_country"></p>
 
         <div id="payCR" class="pay-panel is-hidden">
@@ -418,9 +529,16 @@
         </div>
 
         <div id="payIntl" class="pay-panel is-hidden">
-          <button type="button" id="btnPaypal" class="pay-upload"></button>
+          <div id="paypal-button-container"></div>
           <p id="paypalMsg" class="pay-msg is-hidden" role="status"></p>
           <p id="paypalNote" class="pay-note"></p>
+        </div>
+
+        <div id="payTest" class="pay-panel is-hidden">
+          <p class="pay-note" style="margin:0 0 12px" data-t="n_test_note"></p>
+          <button type="button" id="btnTestSend" class="pay-upload" data-t="n_test_btn"></button>
+          <p id="testMsg" class="pay-msg is-hidden" role="status"></p>
+          <button type="button" id="btnTestReal" class="pay-copy" style="margin:14px 0 0" data-t="n_test_real"></button>
         </div>
 
         <p class="pay-help"><span data-t="help_lead"></span><br><a id="helpWa" href="#" target="_blank" rel="noopener" data-t="help_wa"></a>·<a id="helpMail" href="#" data-t="help_mail"></a></p>
@@ -446,23 +564,12 @@
         <button id="btnRestartFromSkip" class="btn-ghost" data-t="redo_btn"></button>
       </div>
     </div>
-
-    <div id="fullContainer" class="is-hidden">
-      <p class="unlocked-badge" data-t="unlocked_badge"></p>
-      <p id="closingLine" class="closing-line"></p>
-      <div class="reveal-actions">
-        <button id="btnRestart" class="btn-ghost" data-t="redo_btn"></button>
-      </div>
-    </div>
-
-    <div class="reveal-actions" style="margin-top:26px;">
-      <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);" data-t="share_btn"></button>
-    </div>
-    <p class="disclaimer" data-t="disclaimer"></p>
   </section>
 </div>
 
 <script src="/qer-shared/qer-pay-config.js"></script>
+<script src="/qer-shared/qer-strings.js"></script>
+
 <script src="config.js"></script>
 <script src="/qer-shared/qer-app.js"></script>
 </body>

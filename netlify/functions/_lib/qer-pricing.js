@@ -1,9 +1,9 @@
-// Precio de la lectura completa. Un solo producto (no un catálogo de
-// paquetes como en la otra app) — se puede ajustar desde Netlify sin tocar
-// código (variable de entorno READING_PRICE_USD), pero si no está puesta
-// usa este valor por default. $9.99 desde el 2026-10-04 (antes $2.99, un precio de impulso, que no convirtió):
-// la idea es que decidir pagar sea una decisión pequeña, no una compra que
-// alguien se detenga a pensar.
-const READING_PRICE_USD = process.env.READING_PRICE_USD || '9.99';
+// Precio de la lectura completa (un solo producto). Se cambia desde Netlify sin tocar código con la variable de
+// entorno QER_PRICE_USD (o la antigua READING_PRICE_USD); si no hay ninguna, US$2.00 — el mismo precio que
+// anunciaba el cliente antes de que el servidor verificara el pago. El cliente lee este valor de
+// /.netlify/functions/qer-paypal-config, así que servidor y pantalla nunca se desincronizan.
+const raw = String(process.env.QER_PRICE_USD || process.env.READING_PRICE_USD || '2.00').trim();
+const n = Number(raw);
+const READING_PRICE_USD = Number.isFinite(n) && n >= 0.5 ? n.toFixed(2) : '2.00';
 
 module.exports = { READING_PRICE_USD };
