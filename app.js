@@ -3977,12 +3977,12 @@ document.getElementById('btnEditContext')?.addEventListener('click', () => {
 function openReaderPanel() {
     readerPanel.classList.remove('hidden');
     readerPanel.style.zIndex = String(500 + (++floatingPanelCount));
-    btnToggleReader.innerHTML = '<span>📖</span> Ocultar Modo Lector';
+    btnToggleReader.innerHTML = (I18N.lang === 'en') ? '<span>📄</span> Hide my text' : '<span>📄</span> Ocultar mi texto';
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
 }
 function closeReaderPanel() {
     readerPanel.classList.add('hidden');
-    btnToggleReader.innerHTML = '<span>📖</span> Pegar documento / enlace (Modo Lector)';
+    btnToggleReader.innerHTML = (I18N.lang === 'en') ? '<span>📄</span> Have a text, link or PDF? Paste it here' : '<span>📄</span> ¿Tienes un texto, enlace o PDF? Pégalo aquí';
     setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
 }
 
@@ -4624,7 +4624,7 @@ function createExtraReaderPanel() {
 
     const n = extraReaderPanelCount;
     const titleEl = clone.querySelector('[data-role="title"]');
-    if (titleEl) titleEl.innerText = `📖 Modo Lector ${n + 1}`;
+    if (titleEl) titleEl.innerText = `📄 ${I18N.lang === 'en' ? 'My text' : 'Mi texto'} ${n + 1}`;
     const cascade = n % 8;
     clone.style.left = `${56 + cascade * 44}px`;
     clone.style.top = `${136 + cascade * 44}px`;
@@ -6128,7 +6128,6 @@ function toggleFocusMode() {
     const importantIds = new Set(sorted.slice(0, topCount).map(d => d.id));
     nodes.update(all.map(n => ({ id: n.id, opacity: importantIds.has(n.id) ? 1 : 0.22 })));
 }
-document.getElementById('btnFocusMode')?.addEventListener('click', toggleFocusMode);
 
 // --- Modo presentación: oculta toda la interfaz, deja solo el lienzo ---
 let presentationModeActive = false;
@@ -7945,7 +7944,6 @@ async function exportReportRtf() {
     hideLoader(); reportBusy = false;
   }
 }
-document.getElementById('btnExportReport')?.addEventListener('click', exportReportRtf);
 
 // ==========================================
 // VER DEFINICIONES (escritorio). Botón dentro del lienzo (arriba a la derecha) que abre
@@ -8220,12 +8218,19 @@ wireGenGate(document.getElementById('readerPanel'));
     window.__gkSetReaderMode = setMode;
 })();
 
-// Botón "＋ Crear" de la cabecera: abre el panel de crear (texto/enlace/PDF o solo un tema).
-document.getElementById('btnCreate')?.addEventListener('click', () => {
-    if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
-    openReaderPanel();
-    if (typeof window.__gkSetReaderMode === 'function') window.__gkSetReaderMode('text');
-    track('create_clicked');
-    setTimeout(() => { try { readerTextMode.focus(); } catch (_e) { /* ok */ } }, 80);
-});
-if (typeof I18N !== 'undefined' && I18N.lang === 'en') { const sp = document.querySelector('#btnCreate span:last-child'); if (sp) sp.textContent = 'Create'; }
+// Campo de tema de la cabecera: el camino principal para empezar (el texto/enlace/PDF va en «Mi texto»).
+(function wireStartTopic() {
+    const inp = document.getElementById('startTopic'), btn = document.getElementById('btnStartTopic');
+    if (!inp || !btn) return;
+    const go = async () => {
+        const topic = (inp.value || '').trim();
+        if (topic.length < 2) { inp.focus(); return; }
+        if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
+        track('start_topic_submit', { length: topic.length });
+        inp.value = '';
+        await generateFullSchemaFromTopic(topic, {});
+    };
+    btn.addEventListener('click', go);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+    if (I18N.lang === 'en') { inp.placeholder = 'What topic do you want a map of? E.g.: The French Revolution'; btn.textContent = 'Create map'; }
+})();

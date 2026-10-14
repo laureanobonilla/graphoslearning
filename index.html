@@ -531,7 +531,9 @@
 
             <!-- Buscador: el momento protagonista de la barra -->
             <div class="flex gap-2 flex-1 min-w-0">
-                <button id="btnCreate" type="button" title="Crear: empezar con un texto, un enlace, un PDF o solo con un tema" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0 flex items-center gap-1.5"><span class="text-base leading-none">＋</span><span>Crear</span></button>
+                <!-- Empezar con un tema: el camino principal. Con un texto, enlace o PDF se usa «Mi texto» (fila de abajo). -->
+                <input type="text" id="startTopic" autocomplete="off" placeholder="¿Sobre qué tema quieres un esquema? Ej.: La Revolución Francesa" data-i18n-placeholder="ui.start_topic_ph" class="flex-1 min-w-0 bg-[#0f1428] border border-[#2c3458] rounded-lg px-4 py-2 text-sm text-[#eef1fb] placeholder-[#6a7399] focus:outline-none focus:border-[#4fd1c5]">
+                <button id="btnStartTopic" type="button" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0" data-i18n="ui.start_topic_btn">Crear esquema</button>
                 <input type="text" id="topicInput" hidden placeholder="Escribe algo y crea un nodo nuevo con eso..." title="Crea un solo nodo en el lienzo con exactamente lo que escribas aquí. Para generar un esquema completo a partir de un tema, un texto largo o un enlace a una página web, usa el Modo Lector." class="w-full bg-[#161c35] border border-[#2c3458] rounded-lg pl-3.5 pr-2 py-2.5 md:py-2 text-sm text-[#eef1fb] placeholder-[#6670948f] focus:outline-none focus:border-[#4fd1c5] focus:shadow-[0_0_0_3px_rgba(79,209,197,0.18)] transition-shadow font-sans flex-1" data-i18n-placeholder="ui.escribe_algo_y_crea_un" data-i18n-title="ui.crea_un_solo_nodo_en">
                 <button id="btnGenerate" hidden class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-5 py-2.5 md:py-2 rounded-lg font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95 shrink-0" data-i18n="ui.generar">
                     Generar
@@ -569,9 +571,8 @@
         <!-- Fila 2: Controles secundarios, discretos -->
         <div class="flex items-center gap-2 w-full">
             <button id="btnToggleReader" class="text-[#c9b37a] hover:text-[#e4cf96] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n="ui.ocultar_modo_lector">
-                <span>📖</span> Ocultar Modo Lector
+                <span>📄</span> ¿Tienes un texto, enlace o PDF? Pégalo aquí
             </button>
-            <span class="text-[10px] text-[#5b6388] hidden lg:inline truncate" data-i18n="ui.generar_crea_un_nodo_suelto">💡 "Generar" crea un nodo suelto · Para un esquema completo (tema, texto largo o enlace), usa el Modo Lector</span>
             <div class="flex-1"></div>
 
             <!-- Modo de acomodo del esquema: cómo se ubican ramas/sub-ramas al generar
@@ -598,18 +599,10 @@
             <button id="btnSearchNodes" title="Buscar un nodo (Ctrl/Cmd+K)" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.buscar_un_nodo_ctrl_cmd">
                 <span>🔍</span> <span class="hidden md:inline" data-i18n="ui.buscar">Buscar</span>
             </button>
-            <button id="btnFocusMode" title="Modo foco: resalta los conceptos más conectados del esquema" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.modo_foco_resalta_los_conceptos">
-                <span>🎯</span> <span class="hidden md:inline" data-i18n="ui.modo_foco">Modo foco</span>
-            </button>
             <!-- Recorrido, Replay y Quiz se quitaron de la cabecera (2026-10-04). El Recorrido
                  sigue existiendo por dentro porque el modo móvil lo usa. -->
             <button id="btnPresentationMode" title="Modo presentación: oculta toda la interfaz y deja solo el lienzo" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.modo_presentacion_oculta_toda_la">
                 <span>🖥️</span> <span class="hidden md:inline" data-i18n="ui.presentacion">Presentación</span>
-            </button>
-            <!-- Informe: descarga un .rtf con un subtítulo por nodo (más grande el central), su
-                 definición, explicación sencilla y ejemplo práctico. Ver exportReportRtf en app.js. -->
-            <button id="btnExportReport" title="Descargar un informe (.rtf) del esquema actual" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.descargar_un_informe_rtf_del">
-                <span>📄</span> <span class="hidden md:inline" data-i18n="ui.informe">Informe</span>
             </button>
             <button id="btnSoundToggle" title="Sonido al crear nodos: encendido" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.sonido_al_crear_nodos_encendido">
                 <span id="soundToggleIcon">🔊</span>
@@ -721,10 +714,10 @@
              partida recomendado para el usuario, así que debe verse de una vez,
              con una forma más cuadrada que antes (antes era un rectángulo muy
              alto y angosto). -->
-        <div id="readerPanel" data-role="panel" class="reader-panel-instance absolute w-[480px] max-w-[92vw] h-[560px] max-h-[82vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px; z-index: 501;">
+        <div id="readerPanel" data-role="panel" class="hidden reader-panel-instance absolute w-[480px] max-w-[92vw] h-[560px] max-h-[82vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px; z-index: 501;">
             <div id="readerPanelHeader" data-role="header" class="px-3 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 select-none cursor-move">
                 <div class="flex items-center justify-between gap-2">
-                    <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider" data-i18n="ui.modo_lector">📖 Modo Lector</h3>
+                    <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider" data-i18n="ui.modo_lector">📄 Mi texto</h3>
                     <div class="flex items-center gap-1.5">
                         <!-- A propósito NO es un ícono gris más entre los demás botones: subir un
                              PDF es una función importante y poco común, así que lleva color sólido
