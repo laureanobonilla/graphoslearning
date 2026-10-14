@@ -504,24 +504,31 @@ async function mountPaypal(forReadingId) {
   if (cfg.error) { say('n_pp_error'); track('paypal_config_error', { paywallVersion: PAYWALL_VERSION }); return; }
   try { await loadPaypalSdk(cfg.clientId); } catch { say('n_pp_error'); track('paypal_sdk_error', { paywallVersion: PAYWALL_VERSION }); return; }
   msg.classList.add('is-hidden');
-  window.paypal.Buttons({
-    style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'paypal', height: 48 },
-    createOrder: async () => {
-      track('paypal_button_clicked', { secondsSincePanel: Math.round((Date.now() - payShownAt) / 1000), paywallVersion: PAYWALL_VERSION });
-      const d = await postFn('qer-paypal-create-order', { readingId: forReadingId });
-      return d.orderID;
-    },
-    onApprove: async (data) => {
-      say('n_pp_paying');
-      try {
-        const view = await postFn('qer-paypal-capture-order', { orderID: data.orderID, readingId: forReadingId, app: APP });
-        track('payment_verified_client', { method: 'paypal_orders', country, paywallVersion: PAYWALL_VERSION });
-        unlockReading(view);
-      } catch (err) { track('payment_capture_failed', { reason: String(err.message).slice(0, 200), paywallVersion: PAYWALL_VERSION }); say('n_pp_failed'); }
-    },
-    onCancel: () => track('paypal_cancelled', { paywallVersion: PAYWALL_VERSION }),
-    onError: (err) => { track('paypal_error', { reason: String(err && err.message || err).slice(0, 200), paywallVersion: PAYWALL_VERSION }); say('n_pp_failed'); }
-  }).render('#paypal-button-container');
+  const make = (fs, sel, isCard) => {
+    const btn = window.paypal.Buttons({
+        fundingSource: fs,
+        style: isCard ? { layout: 'vertical', color: 'black', shape: 'pill', height: 48 } : { layout: 'vertical', color: 'gold', shape: 'pill', label: 'paypal', height: 48 },
+      createOrder: async () => {
+        track('paypal_button_clicked', { secondsSincePanel: Math.round((Date.now() - payShownAt) / 1000), paywallVersion: PAYWALL_VERSION });
+        const d = await postFn('qer-paypal-create-order', { readingId: forReadingId });
+        return d.orderID;
+      },
+      onApprove: async (data) => {
+        say('n_pp_paying');
+        try {
+          const view = await postFn('qer-paypal-capture-order', { orderID: data.orderID, readingId: forReadingId, app: APP });
+          track('payment_verified_client', { method: 'paypal_orders', country, paywallVersion: PAYWALL_VERSION });
+          unlockReading(view);
+        } catch (err) { track('payment_capture_failed', { reason: String(err.message).slice(0, 200), paywallVersion: PAYWALL_VERSION }); say('n_pp_failed'); }
+      },
+      onCancel: () => track('paypal_cancelled', { paywallVersion: PAYWALL_VERSION }),
+      onError: (err) => { track('paypal_error', { reason: String(err && err.message || err).slice(0, 200), paywallVersion: PAYWALL_VERSION }); say('n_pp_failed'); }
+    });
+    if (btn.isEligible()) btn.render(sel); else if (isCard) { $('paypal-card-container').classList.add('is-hidden'); document.querySelector('.card-or').classList.add('is-hidden'); document.querySelector('.card-brands').classList.add('is-hidden'); }
+  };
+  box.innerHTML = ''; $('paypal-card-container').innerHTML = '';
+  make(window.paypal.FUNDING ? window.paypal.FUNDING.PAYPAL : undefined, '#paypal-button-container', false);
+  make(window.paypal.FUNDING ? window.paypal.FUNDING.CARD : undefined, '#paypal-card-container', true);
 }
 // --- lectura abierta ---
 const PAID_KEY = `qer_paid_${APP}`;
