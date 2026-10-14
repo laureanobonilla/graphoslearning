@@ -143,7 +143,7 @@ CS.mountOrder = function (opts) {
     videoCard = el('div', 'cs-card', `<h3>¿Quieres también el video?</h3><p>${opts.videoCopy || 'El video eres tú cantando tu canción. Por eso necesitamos una foto clara de tu rostro.'}</p>
       <div class="cs-pick" role="radiogroup" aria-label="¿Quieres video?">
         <label class="opt"><input type="radio" name="csvideo" value="no"><span>Solo la canción</span></label>
-        <label class="opt"><input type="radio" name="csvideo" value="yes"><span>Canción con video<small>Eres tú cantando tu canción</small></span></label>
+        <label class="opt"><input type="radio" name="csvideo" value="yes"><span>Canción con video<small>En el video saldrías tú cantando la canción</small></span></label>
       </div>
       <div class="is-hidden" data-v="photoBox" style="margin-top:12px">
         <p class="strong">Sube una foto de tu rostro, de frente y con buena luz. Sin foto de tu rostro no podemos hacer el video.</p>
