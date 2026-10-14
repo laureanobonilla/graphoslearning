@@ -375,7 +375,7 @@
   .cta-sub{ margin: 8px 0 0; font-size:.76rem; color: var(--muted); }
   #screen-reveal.has-cta{ padding-bottom: 150px; }
 
-  #screen-prepay{ padding: 38px 0 40px; }
+  #screen-prepay{ padding: 38px 0 150px; }
   .prepay{ text-align:center; }
   .prepay-mask{ width:64px; height:64px; margin: 0 auto 14px; display:block; opacity:.9; }
   .prepay-title{ font-size:1.7rem; line-height:1.2; font-weight:500; margin: 0 0 16px; }
@@ -500,9 +500,11 @@
       <ul id="ppInc" class="prepay-inc"></ul>
       <p id="ppP2" class="prepay-p"></p>
       <p id="ppP3" class="prepay-p prepay-soft"></p>
-      <button type="button" id="btnPrepayGo" class="btn btn-primary cta-btn" data-t="n_pp_btn"></button>
-      <p class="prepay-secure" data-t="n_pp_secure"></p>
       <button type="button" id="btnPrepayBack" class="btn-ghost" data-t="n_pp_back"></button>
+    </div>
+    <div class="unlock-cta prepay-bar">
+      <button type="button" id="btnPrepayGo" class="btn btn-primary cta-btn" data-t="n_pp_btn"></button>
+      <p class="cta-sub" data-t="n_pp_secure"></p>
     </div>
   </section>
 
