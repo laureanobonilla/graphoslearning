@@ -29,11 +29,14 @@ for a in APPS:
     for q in cfg['questions']:
         if q['type'] == 'choice': answers.append(q['options'][min(1, len(q['options']) - 1)])
         else: answers.append(opens[k % len(opens)]); k += 1
-    test = ('<script>window.QER_TEST = { ownerEmail: "bonillapretiz@gmail.com", key: (new URLSearchParams(location.search).get("k") || ""), answers: '
+    test = ('<script>window.QER_TEST = { ownerEmail: "bonillapretiz@gmail.com", key: (function(){try{var k=new URLSearchParams(location.search).get("k");if(k){localStorage.setItem("qer_test_key",k);return k;}return localStorage.getItem("qer_test_key")||"";}catch(e){return "";}})(), answers: '
             + json.dumps(answers, ensure_ascii=False) + ' };</script>')
     out = fill(tpl, test).replace('<title>', '<meta name="robots" content="noindex, nofollow">\n<title>Prueba · ', 1)
-    # la carpeta prueba/ usa el config.js de la app (ruta relativa ../config.js)
-    out = out.replace('<script src="config.js"></script>', '<script src="../config.js"></script>')
+    # ruta absoluta al config.js de la app: la misma página sirve en /<app>/prueba/ y en /prueba/
+    out = out.replace('<script src="config.js"></script>', f'<script src="/{a}/config.js"></script>')
+    if a == 'quien-eres':
+        os.makedirs('prueba', exist_ok=True)
+        open('prueba/index.html', 'w', encoding='utf8').write(out.replace('<title>Prueba · ' + html.escape(cfg['t']['doc_title']) + '</title>', '<title>Prueba</title>'))
     os.makedirs(f'{a}/prueba', exist_ok=True)
     for stale in ('app.js',):
         p = f'{a}/prueba/{stale}'
