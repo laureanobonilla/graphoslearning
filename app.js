@@ -1499,7 +1499,15 @@ const topicUI = (() => {
         const text = own.schemaText; const taken = [];
         const cands = ownedNodes(owner).map(n => ({ n, label: clean(n) })).filter(c => c.label.length >= 3).sort((a, b) => b.label.length - a.label.length);
         const low = text.toLowerCase();
-        cands.forEach(c => {
+        // Esquemas hechos de un texto: cada nodo con cita se subraya por su cita exacta en el texto.
+        ownedNodes(owner).forEach(n => {
+            const q = String(n.sourceQuote || '').trim(); if (q.length < 8) return;
+            const at = low.indexOf(q.toLowerCase()); if (at === -1) return;
+            const end = at + q.length;
+            if (!taken.some(t => at < t.end && end > t.start)) taken.push({ start: at, end, id: n.id, color: (n.color && n.color.border) || '#4fd1c5', quote: true });
+        });
+        const quoted = new Set(taken.map(t => String(t.id)));
+        cands.filter(c => !quoted.has(String(c.n.id))).forEach(c => {
             const l = c.label.toLowerCase(); let from = 0, at = -1;
             while ((at = low.indexOf(l, from)) !== -1) {
                 const end = at + l.length;
@@ -1552,7 +1560,7 @@ const topicUI = (() => {
     nodes.on('update', (_ev, p) => { if (ownerId != null && p && p.items && p.items.some(i => String(i) === String(ownerId)) && nodes.get(ownerId)?.schemaText) render(ownerId); });
     // Al abrir un proyecto guardado: mostrar el texto de su esquema (el que se guardó con él). Los proyectos viejos no lo
     // tienen: se genera una vez para la raíz (gratis) y queda guardado con el proyecto.
-    function onLoaded() {
+    function onLoaded(noGen) {
         ownerId = null; open = false; paint();
         const all = nodes.get(); if (!all.length || !isDesktopFolding()) return;
         const hasIn = new Set(edges.get().map(e => String(e.to)));
@@ -1560,7 +1568,7 @@ const topicUI = (() => {
         const owner = withText.find(n => !hasIn.has(String(n.id))) || withText[0];
         if (owner) { show(owner.id, false); return; }
         const root = all.filter(n => !hasIn.has(String(n.id)) && !n.isSubscheme).sort((a, b) => (a.depthLevel ?? 0) - (b.depthLevel ?? 0))[0];
-        if (!root || all.length < 3) return;
+        if (noGen || !root || all.length < 3) return;
         const lab = (n) => ({ label: clean(n) });
         const rest = all.filter(n => n.id !== root.id && !n.isSubscheme).map(lab);
         attachTopicText(root.id, clean(root), { root: lab(root), branches: rest, subBranches: [] });
@@ -1568,6 +1576,13 @@ const topicUI = (() => {
     return { show, ownerOf, setOpen, onLoaded };
 })();
 
+// Esquema hecho a partir de un texto pegado: ese mismo texto queda como el texto del esquema (solo lectura, a la izquierda).
+function setSourceTextAsSchemaText(ownerId, text) {
+    if (!topicUI || !nodes.get(ownerId)) return;
+    isApplyingUndo = true;
+    try { nodes.update({ id: ownerId, schemaText: String(text).replace(/\r/g, '').trim().slice(0, 20000) }); } finally { isApplyingUndo = false; }
+    topicUI.show(ownerId, true);
+}
 async function attachTopicText(ownerId, topic, data) {
     if (!topicUI) return;
     try {
@@ -1630,7 +1645,10 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview });
         // Escritorio: el esquema nace con su propio texto de solo lectura (panel izquierdo), sin bloquear al usuario.
-        if (!isLong && !originPanelId && !welcome && isDesktopFolding()) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
+        if (isDesktopFolding() && !welcome) {
+            if (!isLong && !originPanelId) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
+            else if (isLong) setSourceTextAsSchemaText(attachToNodeId || data.root.id, topicText);
+        }
     } catch (err) {
         console.error(err);
         track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
@@ -1690,6 +1708,7 @@ async function generateTextAnalysis(textContent, analysisType, customType, opts 
         await renderThreeLevelTree(data, { originPanelId, attachToNodeId });
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_analyze_success', { analysisType, nodes: totalNodes, topicPreview });
+        if (isDesktopFolding()) setSourceTextAsSchemaText(attachToNodeId || data.root.id, textContent);
     } catch (err) {
         console.error(err);
         track('schema_analyze_error', { analysisType, message: String(err?.message || '').slice(0, 120), topicPreview });
@@ -2721,6 +2740,25 @@ function enterSubscheme(nodeId) {
     actionMenu.classList.add('hidden');
     updateSchemeBreadcrumb();
     setTimeout(() => network.fit({ animation: { duration: 500 } }), 50);
+    if (typeof topicUI !== 'undefined' && topicUI) topicUI.onLoaded(true);
+}
+
+// Proyecto completo a partir del lienzo actual y la pila de subesquemas (sin tocar lo que se ve).
+function composeFullProject() {
+    let curNodes = nodes.get(), curEdges = plainEdges();
+    const pos = (() => { try { return network.getPositions(curNodes.map(n => n.id)); } catch (_e) { return {}; } })();
+    for (let i = schemeStack.length - 1; i >= 0; i--) {
+        const frame = schemeStack[i], innermost = i === schemeStack.length - 1;
+        const inner = curNodes, innerEdges = curEdges;
+        curNodes = frame.nodes.map(n => {
+            if (n.id !== frame.collapsedNodeId) return n;
+            const upd = { ...n, subSchemeData: { nodes: inner, edges: innerEdges } };
+            if (innermost) { try { upd.image = generateSubschemeThumbnail(inner, innerEdges, pos); } catch (_e) { /* se queda la miniatura anterior */ } }
+            return upd;
+        });
+        curEdges = frame.edges;
+    }
+    return { nodes: curNodes, edges: curEdges };
 }
 
 // Vuelve al nivel anterior, guardando dentro del nodo colapsado lo que haya
@@ -2757,7 +2795,8 @@ function exitSubscheme() {
 
     // Solo se guarda en la nube/local cuando se está de vuelta en el nivel raíz
     // (ver guardas en triggerAutoSave/saveCurrentProjectToBin más abajo).
-    if (schemeStack.length === 0) triggerAutoSave();
+    if (typeof topicUI !== 'undefined' && topicUI) topicUI.onLoaded(true);
+    triggerAutoSave();
 }
 
 document.getElementById('btnMakeSubscheme')?.addEventListener('click', convertSelectionToSubscheme);
@@ -7112,12 +7151,15 @@ async function saveCurrentProjectToBin() {
     // se ve en el lienzo es solo ESE fragmento, no el proyecto completo: guardarlo
     // tal cual sobrescribiría el esquema principal con el subesquema. Se guarda
     // de nuevo automáticamente en cuanto se vuelve al nivel raíz (ver exitSubscheme).
-    if (isClearingCanvas || schemeStack.length > 0 || nodes.length === 0) return;
+    if (isClearingCanvas || nodes.length === 0) return;
 
     showSaveFeedback('saving');
     const userKey = getActiveUserKey();
-    const allNodes = nodes.get();
-    const allEdges = plainEdges();
+    // Dentro de un subesquema el lienzo muestra solo un fragmento: se arma el proyecto completo (el fragmento va
+    // dentro de su nodo colapsado) para no perder lo que se genere ahí si se sale sin pulsar «Volver».
+    const full = schemeStack.length > 0 ? composeFullProject() : null;
+    const allNodes = full ? full.nodes : nodes.get();
+    const allEdges = full ? full.edges : plainEdges();
 
     const firstNode = allNodes[0];
     const projectTitle = firstNode.baseTitle || firstNode.label?.replace(/\*/g, '').split('\n')[0] || tr("js.mi_esquema");
@@ -7208,7 +7250,7 @@ async function saveCurrentProjectToBin() {
 }
 
 function triggerAutoSave() {
-    if (isClearingCanvas || schemeStack.length > 0 || nodes.length === 0) return;
+    if (isClearingCanvas || nodes.length === 0) return;
     clearTimeout(window._binSaveTimer);
     window._binSaveTimer = setTimeout(() => saveCurrentProjectToBin(), 1200);
 }
@@ -8205,17 +8247,17 @@ async function exportReportRtf() {
     window.addEventListener('resize', () => { if (isOpen()) view.style.setProperty('--dv-top', (document.getElementById('mainHeader')?.getBoundingClientRect().bottom || 64) + 'px'); });
     // Por defecto aparece junto al esquema (escritorio). Si lo cierras tú, se queda cerrado hasta que lo abras.
     // Cuando el mapa cambia (se genera, se despliega una rama…) se vuelve a armar con lo que está a la vista.
-    let syncTimer = null;
+    let syncTimer = null, toTop = false;
     const syncSoon = () => {
         if (window.innerWidth <= 780) return;
         clearTimeout(syncTimer);
         syncTimer = setTimeout(() => {
-            if (isOpen()) { const l = render(); loadMissing(l, ++loadMissing.token); return; }
+            if (isOpen()) { const l = render(); if (toTop) { view.querySelector('.dv-scroll').scrollTop = 0; toTop = false; } loadMissing(l, ++loadMissing.token); return; }
             let closed = false; try { closed = localStorage.getItem('gk_defs_closed') === '1'; } catch (_e) { /* ok */ }
             if (!closed && nodes.length > 1) open(true);
         }, 700);
     };
-    nodes.on('add', syncSoon); nodes.on('remove', syncSoon);
+    nodes.on('add', () => { toTop = true; syncSoon(); }); nodes.on('remove', syncSoon);
     // Solo cuando cambia lo plegado/desplegado del mapa (no cuando llegan definiciones, que también disparan 'update').
     nodes.on('update', (_ev, p) => { if (p && p.data && p.data.some((d, i) => d && (!!d.hidden !== !!(p.oldData && p.oldData[i] && p.oldData[i].hidden)))) syncSoon(); });
     setTimeout(syncSoon, 1500);
