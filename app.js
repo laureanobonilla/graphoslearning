@@ -1449,6 +1449,118 @@ async function resumePendingGen(source) {
     } finally { resumingGen = false; }
 }
 
+
+// ==========================================
+// PANEL DEL TEMA (escritorio): el texto de solo lectura de cada esquema generado desde un tema. Cada esquema
+// (también los que salen de otro) guarda su PROPIO texto en el nodo que lo origina (`schemaText`). Se ve a la
+// izquierda, contraído por defecto; los conceptos subrayados llevan al nodo y, al elegir un nodo, el texto sigue.
+// ==========================================
+const topicUI = (() => {
+    const panel = document.getElementById('topicPanel'), tab = document.getElementById('topicTab');
+    const body = document.getElementById('topicBody'), title = document.getElementById('topicTitle');
+    const pinBtn = document.getElementById('topicPin'), closeBtn = document.getElementById('topicClose');
+    if (!panel || !tab || !body) return null;
+    const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
+    if (en) { document.getElementById('topicTabLbl').textContent = 'View text'; document.getElementById('topicHint').textContent = 'Tap an underlined concept to see it on the map.'; pinBtn.title = 'Pin to the left (the map adjusts)'; closeBtn.title = 'Collapse'; }
+    let open = false, pinned = false, ownerId = null;
+    try { pinned = localStorage.getItem('gk_topic_pin') === '1'; } catch (_e) { /* ok */ }
+    const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
+    const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    function ownerOf(nodeId) {
+        let cur = nodes.get(nodeId), guard = 0;
+        while (cur && guard++ < 30) {
+            if (cur.schemaText) return cur.id;
+            const pe = edges.get().find(e => String(e.to) === String(cur.id) && !(isRelatedEdgeLabel && isRelatedEdgeLabel(e.label)));
+            cur = pe ? nodes.get(pe.from) : null;
+        }
+        return null;
+    }
+    function ownedNodes(owner) { // el dueño y todo lo que cuelga de él, salvo los esquemas derivados con texto propio
+        const out = [], seen = new Set([String(owner)]);
+        const walk = (id) => childEdgesOf(id).forEach(e => {
+            const k = nodes.get(e.to); if (!k || seen.has(String(k.id))) return; seen.add(String(k.id));
+            if (k.schemaText) return; out.push(k); walk(k.id);
+        });
+        out.push(nodes.get(owner)); walk(owner);
+        return out.filter(Boolean);
+    }
+    function paint() {
+        panel.classList.toggle('on', open); panel.classList.toggle('pinned', open && pinned);
+        tab.classList.toggle('on', !open && !!ownerId);
+        pinBtn.classList.toggle('on', pinned);
+        const w = open && pinned ? panel.getBoundingClientRect().width || 380 : 0;
+        container.style.marginLeft = w ? w + 'px' : '';
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
+    }
+    function render(owner) {
+        const own = nodes.get(owner); if (!own || !own.schemaText) return false;
+        ownerId = owner;
+        const text = own.schemaText; const taken = [];
+        const cands = ownedNodes(owner).map(n => ({ n, label: clean(n) })).filter(c => c.label.length >= 3).sort((a, b) => b.label.length - a.label.length);
+        const low = text.toLowerCase();
+        cands.forEach(c => {
+            const l = c.label.toLowerCase(); let from = 0, at = -1;
+            while ((at = low.indexOf(l, from)) !== -1) {
+                const end = at + l.length;
+                const before = low[at - 1], after = low[end];
+                const wordish = (ch) => ch && /[a-záéíóúüñ0-9]/i.test(ch);
+                if (!wordish(before) && !wordish(after) && !taken.some(t => at < t.end && end > t.start)) { taken.push({ start: at, end, id: c.n.id, color: (c.n.color && c.n.color.border) || '#4fd1c5' }); break; }
+                from = at + 1;
+            }
+        });
+        taken.sort((a, b) => a.start - b.start);
+        let html = '', pos = 0;
+        taken.forEach(t => { html += esc(text.slice(pos, t.start)) + `<mark class="tp-mark" data-node="${String(t.id).replace(/"/g, '')}" style="--mc:${typeof t.color === 'string' ? t.color : '#4fd1c5'}">${esc(text.slice(t.start, t.end))}</mark>`; pos = t.end; });
+        html += esc(text.slice(pos));
+        body.innerHTML = html.split(/\n{2,}/).map(par => '<p>' + par.replace(/\n/g, '<br>') + '</p>').join('');
+        title.textContent = clean(own);
+        return true;
+    }
+    function show(owner, fresh) {
+        if (!render(owner)) return;
+        paint();
+        if (fresh) { tab.classList.add('fresh'); setTimeout(() => tab.classList.remove('fresh'), 5200); }
+    }
+    function setOpen(v) { open = v; paint(); if (v) track('topic_text_open', { pinned }); }
+    tab.addEventListener('click', () => setOpen(true));
+    closeBtn.addEventListener('click', () => { setOpen(false); });
+    pinBtn.addEventListener('click', () => { pinned = !pinned; try { localStorage.setItem('gk_topic_pin', pinned ? '1' : '0'); } catch (_e) { /* ok */ } paint(); track('topic_text_pin', { pinned }); });
+    body.addEventListener('click', (e) => {
+        const m = e.target.closest('mark.tp-mark'); if (!m) return;
+        const id = m.dataset.node; const nd = nodes.get(id) || nodes.get(Number(id)); if (!nd) return;
+        revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); flashNewNode(nd.id);
+    });
+    // Mapa → texto: al elegir un nodo, el panel pasa al texto de su esquema y marca el concepto.
+    network.on('selectNode', (params) => {
+        const id = params.nodes && params.nodes[0]; if (id == null) return;
+        const owner = ownerOf(id); if (owner == null) return;
+        if (String(owner) !== String(ownerId)) render(owner);
+        tab.classList.toggle('on', !open && !!ownerId);
+        const m = Array.from(body.querySelectorAll('mark.tp-mark')).find(x => String(x.dataset.node) === String(id));
+        body.querySelectorAll('mark.flash').forEach(x => x.classList.remove('flash'));
+        if (m && open) { m.classList.add('flash'); m.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    });
+    nodes.on('remove', () => { if (ownerId != null && !nodes.get(ownerId)) { ownerId = null; open = false; paint(); } });
+    nodes.on('update', (_ev, p) => { if (ownerId != null && p && p.items && p.items.some(i => String(i) === String(ownerId)) && nodes.get(ownerId)?.schemaText) render(ownerId); });
+    return { show, ownerOf, setOpen };
+})();
+
+async function attachTopicText(ownerId, topic, data) {
+    if (!topicUI) return;
+    try {
+        const labels = [data.root, ...(data.branches || []), ...(data.subBranches || [])].map(n => String(n && n.label || '').trim()).filter(Boolean);
+        const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'topic_text', topic, text: labels.join('\n') }) });
+        const d = await res.json();
+        if (!res.ok || !d.text) return;
+        if (!nodes.get(ownerId)) return;
+        isApplyingUndo = true;
+        try { nodes.update({ id: ownerId, schemaText: d.text }); } finally { isApplyingUndo = false; }
+        topicUI.show(ownerId, true);
+        track('topic_text_ready', { words: d.text.split(/\s+/).length });
+    } catch (_e) { /* el texto es un extra: si falla, el esquema sigue igual */ }
+}
+
 async function generateFullSchemaFromTopic(topicText, opts = {}) {
     if (!topicText) return;
     const { originPanelId = null, attachToNodeId = null, welcome = false } = opts;
@@ -1495,6 +1607,8 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         await renderThreeLevelTree(data, { originPanelId, attachToNodeId });
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview });
+        // Escritorio: el esquema nace con su propio texto de solo lectura (panel izquierdo), sin bloquear al usuario.
+        if (!isLong && !originPanelId && !welcome && isDesktopFolding()) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
     } catch (err) {
         console.error(err);
         track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });

@@ -426,6 +426,26 @@
         #defsView .dv-err { max-width: 1280px; margin: 24px auto; text-align: center; color: #ff8a9b; }
         #defsView .dv-err button { margin-left: 10px; padding: 6px 14px; border-radius: 999px; border: 1px solid #2c3458; background: #161c35; color: #eef1fb; cursor: pointer; }
         @media (max-width: 780px) { #btnDefsView, #defsView { display: none !important; } }
+        /* --- PANEL DEL TEMA (escritorio): texto de solo lectura de un esquema, a la izquierda --- */
+        #topicPanel, #topicTab { display: none; }
+        @media (min-width: 781px) {
+            #topicTab.on { display: flex; position: absolute; left: 0; top: 96px; z-index: 26; align-items: center; gap: 6px; padding: 10px 12px 10px 10px; border-radius: 0 12px 12px 0; border: 1px solid #2c3458; border-left: 0; background: #161c35; color: #4fd1c5; font: 700 12px 'Sora', sans-serif; cursor: pointer; writing-mode: horizontal-tb; }
+            #topicTab.on:hover { background: #1e2747; }
+            #topicTab.fresh { animation: tpPulse 1.6s ease-in-out 3; }
+            @keyframes tpPulse { 50% { box-shadow: 0 0 0 6px rgba(79,209,197,.25); } }
+            #topicPanel.on { display: flex; position: absolute; left: 0; top: 0; bottom: 0; width: 380px; max-width: 46vw; z-index: 27; flex-direction: column; background: #0d1226; border-right: 1px solid #2c3458; box-shadow: 8px 0 24px rgba(0,0,0,.35); color: #e3e7f7; }
+            #topicPanel.pinned { box-shadow: none; }
+            #topicPanel .tp-head { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 16px; border-bottom: 1px solid #262c47; }
+            #topicPanel .tp-title { flex: 1; font: 700 14px/1.3 'Sora', sans-serif; overflow-wrap: anywhere; }
+            #topicPanel .tp-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2c3458; background: #161c35; color: #aab2d3; cursor: pointer; font-size: 14px; }
+            #topicPanel .tp-btn:hover { color: #4fd1c5; border-color: #4fd1c5; }
+            #topicPanel .tp-btn.on { color: #06222a; background: #4fd1c5; border-color: #4fd1c5; }
+            #topicPanel .tp-hint { padding: 8px 16px 0; font: 400 12px/1.4 'Inter', sans-serif; color: #8a92b2; }
+            #topicPanel .tp-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 18px 40px; font: 400 15.5px/1.75 'Inter', sans-serif; user-select: text; }
+            #topicPanel .tp-body p { margin: 0 0 14px; }
+            #topicPanel mark.tp-mark { background: transparent; color: inherit; text-decoration: underline; text-decoration-color: var(--mc, #4fd1c5); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: pointer; border-radius: 3px; }
+            #topicPanel mark.tp-mark:hover, #topicPanel mark.tp-mark.flash { background: rgba(79,209,197,.22); }
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
@@ -830,6 +850,16 @@
     </div>
 
     <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
+    <button id="topicTab" type="button" title="Ver el texto de este esquema">📖 <span id="topicTabLbl">Ver texto</span></button>
+    <aside id="topicPanel" aria-label="Texto del tema">
+        <div class="tp-head">
+            <div id="topicTitle" class="tp-title"></div>
+            <button id="topicPin" type="button" class="tp-btn" title="Fijar a la izquierda (el mapa se ajusta)">📌</button>
+            <button id="topicClose" type="button" class="tp-btn" title="Contraer">✕</button>
+        </div>
+        <div id="topicHint" class="tp-hint">Toca un concepto subrayado para verlo en el mapa.</div>
+        <div id="topicBody" class="tp-body"></div>
+    </aside>
     <div id="schemeBreadcrumb" class="hidden">
         <button id="btnExitSubscheme" type="button" class="gk-canvas-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Volver</span></button>
         <span id="schemeBreadcrumbLabel"></span>

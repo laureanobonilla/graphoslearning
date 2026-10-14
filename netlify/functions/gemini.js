@@ -884,6 +884,35 @@ REGLAS:
         }
 
         // ==========================================
+        // TEXTO DEL TEMA (escritorio) — un texto breve y de solo lectura que acompaña al esquema generado desde un
+        // tema. Cada concepto del esquema aparece nombrado tal cual para poder subrayarlo y navegar al mapa.
+        // Sin autores, citas, cifras ni fechas inventadas. Gratis; cuenta para el límite por hora.
+        // ==========================================
+        if (action === 'topic_text') {
+            const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+            const tema = clipS(topic, 160);
+            const terms = String(text || '').split('\n').map(t => clipS(t, 80)).filter(Boolean).slice(0, 30);
+            if (!tema || terms.length < 2) return { statusCode: 400, body: JSON.stringify({ error: 'Faltan datos' }) };
+            const schema = { type: 'OBJECT', properties: { text: { type: 'STRING', description: 'El texto, en párrafos separados por una línea en blanco.' } }, required: ['text'] };
+            const response = await generateWithFallback({
+                contents: `Escribe un texto explicativo breve (entre 250 y 450 palabras, de 3 a 5 párrafos) sobre «${tema}», en el mismo idioma del tema. Es el texto que acompaña a un mapa conceptual.
+CONCEPTOS DEL MAPA (cada uno debe aparecer en el texto con sus palabras EXACTAS, al menos una vez, de forma natural):
+${terms.map(t => `- ${t}`).join('\n')}
+
+REGLAS:
+1. Prosa clara y didáctica; sin títulos, listas, viñetas ni markdown.
+2. Cuenta cada concepto en el orden en que aparecen arriba, con una o dos oraciones que lo expliquen, conectándolos entre sí.
+3. NO inventes autores, obras, citas textuales, cifras ni fechas. Si no estás seguro de un dato concreto, no lo menciones; explica la idea en general.
+4. No menciones que es un texto generado ni el mapa.`,
+                config: { responseMimeType: 'application/json', responseSchema: schema }
+            });
+            let d; try { d = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) }; }
+            const out = String(d.text || '').replace(/[*#`]/g, '').replace(/\r/g, '').trim().slice(0, 5000);
+            if (out.split(/\s+/).length < 60) return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) };
+            return { statusCode: 200, body: JSON.stringify({ text: out }) };
+        }
+
+        // ==========================================
         // GLOSARIO — definición, explicación sencilla y ejemplo de VARIOS términos de una vez
         // (pantalla "Ver definiciones" de móvil y de escritorio). Gratis; cuenta para el límite por hora.
         // ==========================================
