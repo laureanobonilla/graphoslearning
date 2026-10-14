@@ -429,7 +429,9 @@
         #defsView .dv-term { font: 700 16px/1.3 'Sora', sans-serif; overflow-wrap: anywhere; border-left: 4px solid var(--c, #4fd1c5); padding-left: 12px; }
         #defsView .dv-cell { font-size: 15.5px; line-height: 1.6; color: #d4d9ee; }
         #defsView .dv-below { margin-top: 8px; font: 400 12.5px/1.4 'Inter', sans-serif; color: #8a92b2; }
-        #defsView .dv-row.dv-child { background: rgba(79,209,197,.035); }
+        #defsView .dv-row.dv-child { background: rgba(79,209,197,.035); border-left: 2px solid rgba(79,209,197,.35); padding-left: 14px; }
+        #defsView .dv-foot { grid-column: 1 / -1; margin: 10px 0 0 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+        #defsView .dv-foot .dv-below, #defsView .dv-foot .dv-more { margin-top: 0; }
         #defsView .dv-row.dv-child .dv-term { opacity: .95; }
         #defsView .dv-more { margin-top: 8px; padding: 5px 12px; border-radius: 999px; border: 1px solid #2c3458; background: #161c35; color: #4fd1c5; font: 600 12px 'Sora', sans-serif; cursor: pointer; }
         #defsView .dv-more:hover { border-color: #4fd1c5; }

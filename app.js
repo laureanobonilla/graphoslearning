@@ -8012,7 +8012,7 @@ async function exportReportRtf() {
         const term = document.createElement('div'); term.className = 'dv-term';
         const name = document.createElement('div'); name.textContent = cleanLabel(n); term.appendChild(name);
         const col = (n.color && (n.color.border || n.color.background)) || '#4fd1c5'; term.style.setProperty('--c', typeof col === 'string' ? col : '#4fd1c5');
-        if (depth > 0) { term.style.marginLeft = Math.min(depth, 5) * 30 + 'px'; row.classList.add('dv-child'); term.style.fontSize = Math.max(13, 16 - depth * 1.2) + 'px'; }
+        if (depth > 0) { row.style.marginLeft = Math.min(depth, 5) * 26 + 'px'; row.classList.add('dv-child'); term.style.fontSize = Math.max(13.5, 16 - depth * 1) + 'px'; }
         row.appendChild(term);
         row._cells = [T.def, T.simple, T.ex].map((lbl) => { const c = document.createElement('div'); c.className = 'dv-cell'; c.dataset.l = lbl; row.appendChild(c); return c; });
         const vals = [n.definition, n.simple, n.example];
@@ -8037,7 +8037,7 @@ async function exportReportRtf() {
                 track('defs_view_more', { depth: depth + 1, count: list.length });
                 loadMissing(list, loadMissing.token);
             });
-            term.appendChild(note); term.appendChild(more);
+            const foot = document.createElement('div'); foot.className = 'dv-foot'; foot.appendChild(note); foot.appendChild(more); row.appendChild(foot);
         }
         row._depth = depth; rowOf.set(String(n.id), row);
         return row;
