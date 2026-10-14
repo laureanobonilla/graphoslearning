@@ -25,6 +25,7 @@ create table if not exists public.aud_jobs (
   downloads      integer not null default 0,
   last_adjust    jsonb                             -- tono/velocidad/recorte con que se descargó
 );
+alter table public.aud_jobs add column if not exists admin_note text;   -- nota tuya (pantalla /mantenimiento/)
 alter table public.aud_jobs enable row level security;
 create index if not exists aud_jobs_created on public.aud_jobs (created_at desc);
 create index if not exists aud_jobs_order on public.aud_jobs (paypal_order);

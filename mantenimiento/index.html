@@ -57,6 +57,8 @@
   .msg{ padding:10px 12px; border-radius:12px; background:#fff3cd; margin:0 0 12px; }
   .msg.err{ background:#fde7e4; color:var(--warn); }
   .saved{ color:var(--ok); font-weight:600; font-size:.88rem; }
+  .del{ background:none; border:1.5px solid var(--warn); color:var(--warn); border-radius:999px; padding:6px 12px; font-weight:600; cursor:pointer; margin-left:auto; }
+  .bulk{ text-align:right; margin:0 0 10px; }
   .empty{ text-align:center; color:var(--muted); padding:30px; }
 </style>
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
@@ -65,7 +67,7 @@
 <div class="wrap">
   <div id="loginView" class="login" hidden>
     <h1>Mantenimiento</h1>
-    <p>Entra con tu correo para ver y actualizar los pedidos de canciones.</p>
+    <p>Entra con tu correo para ver y actualizar los pedidos de canciones y de tu-audio.</p>
     <button class="btn" id="btnLogin" type="button">Entrar</button>
   </div>
 
@@ -89,12 +91,12 @@
 <script>
 (function () {
   var FN = '/.netlify/functions/mnt-orders';
-  var APPS = [['all', 'Todas'], ['tu-cancion', 'tu-cancion'], ['tu-voz', 'tu-voz'], ['tu-voz-video', 'tu-voz-video'], ['tu-cancion-video', 'tu-cancion-video']];
+  var APPS = [['all', 'Todas'], ['tu-cancion', 'tu-cancion'], ['tu-voz', 'tu-voz'], ['tu-voz-video', 'tu-voz-video'], ['tu-cancion-video', 'tu-cancion-video'], ['tu-audio', 'tu-audio']];
   var STATUS_LABEL = { nuevo: 'Nuevo', contactado: 'Contactado', muestra_enviada: 'Muestra enviada', pagado: 'Pagado', entregado: 'Entregado', cancelado: 'Cancelado' };
   var state = { orders: [], app: 'all', statuses: [] };
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  function money(n, cur) { var s = String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return (cur === 'CRC' || !cur ? '₡' : '') + s + (cur && cur !== 'CRC' ? ' ' + cur : ''); }
+  function money(n, cur) { if (cur === 'USD') return 'US$' + Number(n || 0).toFixed(2); var s = String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '.'); return (cur === 'CRC' || !cur ? '₡' : '') + s + (cur && cur !== 'CRC' ? ' ' + cur : ''); }
   function fmtDate(iso) { try { return new Date(iso).toLocaleString('es-CR', { timeZone: 'America/Costa_Rica', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return iso; } }
 
   function user() { try { return netlifyIdentity.currentUser(); } catch (e) { return null; } }
@@ -162,7 +164,23 @@
     var rows = state.orders.filter(visible); renderTotals(rows);
     var box = $('list'); box.textContent = '';
     if (!rows.length) { box.appendChild(el('p', 'empty', 'No hay pedidos con estos filtros.')); return; }
+    var bulk = el('div', 'bulk'), bb = el('button', 'del', 'Borrar los ' + rows.length + ' que se ven'); bb.type = 'button'; bb.style.marginLeft = '0';
+    bb.addEventListener('click', function () {
+      if (!confirm('¿Borrar ' + rows.length + ' pedido(s)? Se borran también sus audios y fotos. No se puede deshacer.')) return;
+      removeOrders(rows, bb);
+    });
+    bulk.appendChild(bb); box.appendChild(bulk);
     rows.forEach(function (o) { box.appendChild(card(o)); });
+  }
+  async function removeOrders(rows, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Borrando…'; }
+    try {
+      var d = await call('POST', '', { action: 'delete', items: rows.slice(0, 200).map(function (o) { return { app: o.app, id: o.id }; }) });
+      var gone = {}; rows.slice(0, 200).forEach(function (o) { gone[o.app + ':' + o.id] = 1; });
+      state.orders = state.orders.filter(function (o) { return !gone[o.app + ':' + o.id]; });
+      renderAll();
+      var n = $('notice'); n.textContent = ''; n.appendChild(el('p', 'msg', d.deleted + ' pedido(s) borrado(s).' + (rows.length > 200 ? ' Quedan más: repite para borrar el resto.' : '') + (d.filesFailed ? ' Algunos archivos no se pudieron borrar de Cloudinary.' : '')));
+    } catch (e) { if (btn) { btn.disabled = false; btn.textContent = 'Reintentar borrar'; } var n2 = $('notice'); n2.textContent = ''; n2.appendChild(el('p', 'msg err', e.message || 'No se pudo borrar.')); }
   }
 
   function card(o) {
@@ -201,12 +219,16 @@
       });
       links.appendChild(lb);
     }
-    foot.appendChild(links); c.appendChild(foot);
+    foot.appendChild(links);
+    var del = el('button', 'del', 'Borrar'); del.type = 'button';
+    del.addEventListener('click', function () { if (confirm('¿Borrar el pedido de ' + (o.name || o.phone || o.email || 'esta persona') + '? Se borran también sus audios y fotos. No se puede deshacer.')) removeOrders([o], del); });
+    foot.appendChild(del); c.appendChild(foot);
 
     if (o.notes) { var dn = document.createElement('details'); dn.appendChild(el('summary', '', 'Lo que escribió la persona')); dn.appendChild(el('pre', '', o.notes)); c.appendChild(dn); }
     if (o.lyrics) { var dl = document.createElement('details'); dl.appendChild(el('summary', '', 'Letra')); dl.appendChild(el('pre', '', o.lyrics)); c.appendChild(dl); }
 
     // Al marcar «Pagó» sin monto, se propone el precio de lista; al marcar estado «pagado», se marca «Pagó».
+    if (o.auto) { st.disabled = true; pc.disabled = true; am.disabled = true; stL.title = 'En tu-audio el estado y el pago se llenan solos'; }
     pc.addEventListener('change', function () { if (pc.checked && !am.value && o.price_amount) am.value = o.price_amount; if (pc.checked && st.value !== 'entregado') st.value = 'pagado'; });
     st.addEventListener('change', function () { if (st.value === 'pagado' && !pc.checked) { pc.checked = true; if (!am.value && o.price_amount) am.value = o.price_amount; } });
     save.addEventListener('click', async function () {
