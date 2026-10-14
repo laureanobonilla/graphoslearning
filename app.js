@@ -1030,6 +1030,81 @@ function computeSolarClearance(positions, attachId, movingIds, needed) {
     return { dx: ux * d, dy: uy * d };
 }
 
+// ==========================================
+// PLEGADO POR NIVEL (solo escritorio): una rama con sub-ramas preparadas lleva una burbuja "+N" (o "−" si ya está
+// desplegada) bajo el nodo. El primer despliegue pertenece al mismo mapa; ir más allá crea mapas aparte.
+// ==========================================
+function isDesktopFolding() { return window.innerWidth > 780; }
+function childEdgesOf(id) { return edges.get().filter(e => String(e.from) === String(id) && !(isRelatedEdgeLabel && isRelatedEdgeLabel(e.label))); }
+function setFolded(id, folded) {
+    const kids = childEdgesOf(id);
+    const nodeUpd = [], edgeUpd = [];
+    const hideDeep = (nid) => childEdgesOf(nid).forEach(e => { nodeUpd.push({ id: e.to, hidden: true }); edgeUpd.push({ id: e.id, hidden: true }); hideDeep(e.to); });
+    kids.forEach(e => {
+        nodeUpd.push({ id: e.to, hidden: folded }); edgeUpd.push({ id: e.id, hidden: folded });
+        if (folded) hideDeep(e.to);
+    });
+    if (nodeUpd.length) { nodes.update(nodeUpd); edges.update(edgeUpd); }
+}
+// Si un nodo está plegado, despliega a sus ancestros para que se pueda ver/enfocar (lector ↔ mapa, definiciones…).
+function revealNode(nodeId) {
+    let guard = 0, cur = nodes.get(nodeId);
+    while (cur && cur.hidden && guard++ < 10) {
+        const pe = edges.get().find(e => String(e.to) === String(cur.id));
+        if (!pe) { nodes.update({ id: cur.id, hidden: false }); break; }
+        setFolded(pe.from, false);
+        cur = nodes.get(pe.from);
+    }
+}
+const foldBubbles = []; // {id, x, y, r} de la última pasada de dibujo
+network.on('afterDrawing', (ctx) => {
+    foldBubbles.length = 0;
+    if (!isDesktopFolding()) return;
+    const scale = network.getScale();
+    const r = Math.min(24, Math.max(11, 13 / scale));
+    nodes.get().forEach(n => {
+        if (!n.foldable || n.hidden) return;
+        const kids = childEdgesOf(n.id).map(e => nodes.get(e.to)).filter(Boolean);
+        if (!kids.length) return;
+        const hiddenCount = kids.filter(k => k.hidden).length;
+        let bb; try { bb = network.getBoundingBox(n.id); } catch (_e) { return; }
+        if (!bb) return;
+        const x = (bb.left + bb.right) / 2, y = bb.bottom + r + 3;
+        foldBubbles.push({ id: n.id, x, y, r });
+        ctx.save();
+        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = hiddenCount ? '#4fd1c5' : '#1e2747';
+        ctx.fill();
+        ctx.lineWidth = Math.max(1.5, r / 8); ctx.strokeStyle = '#4fd1c5'; ctx.stroke();
+        ctx.fillStyle = hiddenCount ? '#06222a' : '#4fd1c5';
+        ctx.font = `700 ${Math.round(r * 1.0)}px Sora, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(hiddenCount ? '+' + hiddenCount : '−', x, y + 1);
+        ctx.restore();
+    });
+});
+function foldBubbleAt(canvasPt) {
+    return foldBubbles.find(b => Math.hypot(canvasPt.x - b.x, canvasPt.y - b.y) <= b.r + 3) || null;
+}
+network.on('click', (params) => {
+    const b = params.pointer && params.pointer.canvas ? foldBubbleAt(params.pointer.canvas) : null;
+    if (!b) return;
+    const n = nodes.get(b.id); if (!n) return;
+    const hiddenNow = childEdgesOf(b.id).some(e => (nodes.get(e.to) || {}).hidden);
+    setFolded(b.id, !hiddenNow);
+    track(hiddenNow ? 'branch_unfold' : 'branch_fold', {});
+    network.redraw();
+});
+(function () {
+    const c = container;
+    if (!c) return;
+    c.addEventListener('mousemove', (e) => {
+        if (!foldBubbles.length) return;
+        const r = c.getBoundingClientRect();
+        const pt = network.DOMtoCanvas({ x: e.clientX - r.left, y: e.clientY - r.top });
+        c.style.cursor = foldBubbleAt(pt) ? 'pointer' : '';
+    });
+})();
+
 async function renderThreeLevelTree(data, opts = {}) {
     const { originPanelId = null, attachToNodeId = null } = opts;
     // Si hay más de un panel de lectura registrado, coloreamos el borde de
@@ -1263,6 +1338,10 @@ async function renderThreeLevelTree(data, opts = {}) {
         newNodeIds.push(branch.id);
 
         const subs = childrenByBranch[branch.id];
+        // Escritorio: el mapa muestra un solo nivel; las sub-ramas ya vienen preparadas pero plegadas dentro de su rama
+        // (se despliegan con la burbuja "+N"). En móvil todo sigue como siempre.
+        const foldSubs = isDesktopFolding() && subs.length > 0;
+        if (foldSubs) nodes.update({ id: branch.id, foldable: true });
         const subSpread = isSolarMode && subs.length > 1 ? Math.min(maxSubSpread, (subs.length - 1) * 0.55) : 0;
         const subCols = !isSolarMode ? (subs.length <= 1 ? 1 : 2) : null;
 
@@ -1294,10 +1373,10 @@ async function renderThreeLevelTree(data, opts = {}) {
                 widthConstraint: { minimum: 120, maximum: 185 },
                 sourceQuote: sub.sourceQuote || '', originPanelId: originPanelId,
                 highlightColorIdx: subAppearance.highlightColorIdx, depthLevel: 2,
-                gaps: subGaps,
+                gaps: subGaps, ...(foldSubs ? { hidden: true } : {}),
                 ...(subGaps.length ? { shapeProperties: { borderDashes: [7, 4] } } : {})
             });
-            edges.add({ from: branch.id, to: sub.id, label: sub.relationship });
+            edges.add({ from: branch.id, to: sub.id, label: sub.relationship, ...(foldSubs ? { hidden: true } : {}) });
             trackNodeUsage(sub.label);
             newNodeIds.push(sub.id);
         });
@@ -2941,6 +3020,7 @@ function isNodeVisibleOnCanvas(nodeId, margin = 30) {
 // hacia el espacio libre del lienzo que SÍ se ve, para que el nodo termine
 // visible y no oculto bajo el panel.
 function focusNodeAvoidingOverlays(nodeId, opts = {}) {
+    revealNode(nodeId);
     const { scale: fixedScale = 1.25, duration = 500, keepScale = false } = opts;
     const scale = keepScale ? network.getScale() : fixedScale;
     const positions = network.getPositions([nodeId]);
@@ -3011,6 +3091,7 @@ function wireMarkClickToFocusNode(textEl) {
         if (!mark) return;
         const nodeId = mark.dataset.nodeId;
         if (!nodeId || !nodes.get(nodeId)) return;
+        revealNode(nodeId);
         network.selectNodes([nodeId]);
         focusNodeAvoidingOverlays(nodeId, { scale: 1.25, duration: 500 });
         flashNewNode(nodeId);
@@ -6504,8 +6585,6 @@ minimapCanvas?.addEventListener('click', (e) => {
     const worldY = (clickY - offsetY) / b.scale + b.minY;
     network.moveTo({ position: { x: worldX, y: worldY }, animation: { duration: 350, easingFunction: 'easeInOutQuad' } });
 });
-network.on('afterDrawing', () => drawMinimap());
-setInterval(drawMinimap, 1500);
 
 // --- Zoom semántico: al acercar mucho la cámara a un nodo con definición,
 // aparece un adelanto de esa definición sin tener que abrir nada ---
@@ -7782,15 +7861,20 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
     setTimeout(refreshBtn, 900); setTimeout(refreshBtn, 3000);
 
     const cleanLabel = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '').replace(/^📦\s*/, '').split('\n')[0] || '').trim();
-    let byId = new Map(), kids = new Map();
+    let byId = new Map(), kids = new Map(), allById = new Map(), hiddenKids = new Map();
     function buildTree() {
-        const all = nodes.get().filter(n => !n.isSubscheme);
-        byId = new Map(all.map(n => [String(n.id), n])); kids = new Map();
+        const every = nodes.get().filter(n => !n.isSubscheme);
+        allById = new Map(every.map(n => [String(n.id), n]));
+        // Solo entran las definiciones de lo que está desplegado en el mapa; lo plegado queda preparado tras "Ver más".
+        const all = every.filter(n => !n.hidden);
+        byId = new Map(all.map(n => [String(n.id), n])); kids = new Map(); hiddenKids = new Map();
         const hasIn = new Set();
         plainEdges().forEach(e => {
             if (isRelatedEdgeLabel && isRelatedEdgeLabel(e.label)) return;
             const a = String(e.from), b = String(e.to);
-            if (!byId.has(a) || !byId.has(b) || a === b) return;
+            if (!allById.has(a) || !allById.has(b) || a === b) return;
+            if (!byId.has(b)) { if (!hiddenKids.has(a)) hiddenKids.set(a, []); hiddenKids.get(a).push(b); return; }
+            if (!byId.has(a)) return;
             if (!kids.has(a)) kids.set(a, []);
             kids.get(a).push(b); hasIn.add(b);
         });
@@ -7814,25 +7898,26 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
         const term = document.createElement('div'); term.className = 'dv-term';
         const name = document.createElement('div'); name.textContent = cleanLabel(n); term.appendChild(name);
         const col = (n.color && (n.color.border || n.color.background)) || '#4fd1c5'; term.style.setProperty('--c', typeof col === 'string' ? col : '#4fd1c5');
-        if (depth > 0) term.style.marginLeft = Math.min(depth, 4) * 14 + 'px';
+        if (depth > 0) { term.style.marginLeft = Math.min(depth, 5) * 30 + 'px'; row.classList.add('dv-sub'); term.style.fontSize = Math.max(13, 16 - depth * 1.2) + 'px'; }
         row.appendChild(term);
         row._cells = [0, 1, 2].map(() => { const c = document.createElement('div'); c.className = 'dv-cell'; row.appendChild(c); return c; });
         const vals = [n.definition, n.simple, n.example];
         row._cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; else c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
         // Nodos de más abajo: citados junto al término, con "Ver más".
-        const childIds = (kids.get(String(n.id)) || []);
-        if (depth >= MAX_LEVELS - 1 && childIds.length) {
-            const names = childIds.map(c => cleanLabel(byId.get(c))).filter(Boolean);
+        const childIds = [...(depth >= MAX_LEVELS - 1 ? (kids.get(String(n.id)) || []) : []), ...(hiddenKids.get(String(n.id)) || [])];
+        if (childIds.length) {
+            const names = childIds.map(c => cleanLabel(allById.get(c))).filter(Boolean);
             const note = document.createElement('div'); note.className = 'dv-below';
             const shown = names.slice(0, 4).join(', ') + (names.length > 4 ? ' +' + (names.length - 4) : '');
             note.textContent = T.below + ' ' + shown;
-            const more = document.createElement('button'); more.type = 'button'; more.className = 'dv-more'; more.textContent = T.more;
+            const moreLbl = T.more + ' (' + childIds.length + ')';
+            const more = document.createElement('button'); more.type = 'button'; more.className = 'dv-more'; more.textContent = moreLbl;
             more.addEventListener('click', () => {
                 if (more._open) { // ocultar lo desplegado
-                    let nx = row.nextElementSibling; while (nx && nx._depth > depth) { const t = nx.nextElementSibling; nx.remove(); nx = t; } more._rows = []; more._open = false; more.textContent = T.more; return;
+                    let nx = row.nextElementSibling; while (nx && nx._depth > depth) { const t = nx.nextElementSibling; nx.remove(); nx = t; } more._rows = []; more._open = false; more.textContent = moreLbl; return;
                 }
                 const newRows = []; let anchor = row;
-                const list = childIds.map(c => ({ n: byId.get(c), depth: depth + 1 }));
+                const list = childIds.map(c => ({ n: allById.get(c), depth: depth + 1 })).filter(x => x.n);
                 list.forEach(({ n: cn, depth: d }) => { const r = makeRow(cn, d, anchor); anchor.after(r); anchor = r; newRows.push(r); });
                 more._rows = newRows; more._open = true; more.textContent = T.hide;
                 track('defs_view_more', { depth: depth + 1, count: list.length });
