@@ -8153,7 +8153,8 @@ async function exportReportRtf() {
         }, 700);
     };
     nodes.on('add', syncSoon); nodes.on('remove', syncSoon);
-    nodes.on('update', (_ev, p) => { if (p && p.data && p.data.some(d => d && d.hidden !== undefined) ) syncSoon(); });
+    // Solo cuando cambia lo plegado/desplegado del mapa (no cuando llegan definiciones, que también disparan 'update').
+    nodes.on('update', (_ev, p) => { if (p && p.data && p.data.some((d, i) => d && (!!d.hidden !== !!(p.oldData && p.oldData[i] && p.oldData[i].hidden)))) syncSoon(); });
     setTimeout(syncSoon, 1500);
 })();
 if (typeof I18N !== 'undefined' && I18N.lang === 'en') { const sp = document.querySelector('#btnExitSubscheme span'); if (sp) sp.textContent = 'Back'; }
