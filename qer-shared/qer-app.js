@@ -384,9 +384,9 @@ function drawProfile() {
     <p class="profile-others">${escapeHtml(tt('n_prev_other', { k: others }))}</p>
     <div class="profile-rows">
       ${pv.top ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_top'))}</span><b>${escapeHtml(pv.top.name)}</b> · ${Number(pv.top.score) || 0}%</div>` : ''}
-      ${pv.keywordLen ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_word'))}</span><span class="profile-riddle">${escapeHtml(tt('n_prev_word_riddle', { i: (pv.keywordInitial || '').toUpperCase(), n: pv.keywordLen }))}</span></div>` : ''}
-      ${pv.quoteWords ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_quote'))}</span><span class="profile-riddle">${escapeHtml(tt('n_prev_quote_riddle', { n: pv.quoteWords, head: pv.quoteHead || '' }))}</span></div>` : ''}
-      ${pv.closingHead ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_closing_k'))}</span><span class="profile-riddle">${escapeHtml(tt('n_prev_closing', { head: pv.closingHead }))}</span></div>` : ''}
+      ${pv.keywordLen ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_word'))}</span><span class="profile-riddle">${LOCK_SVG}${escapeHtml(tt('n_prev_unlock'))}</span></div>` : ''}
+      ${pv.quoteWords ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_quote'))}</span><span class="profile-riddle">${LOCK_SVG}${escapeHtml(tt('n_prev_unlock'))}</span></div>` : ''}
+      ${pv.closingHead ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_closing_k'))}</span><span class="profile-riddle">${LOCK_SVG}${escapeHtml(tt('n_prev_unlock'))}</span></div>` : ''}
     </div>
     <p class="profile-stats">${escapeHtml(tt('n_prev_stats', { n: chapters.length, w: fmtInt(words), m: Math.max(1, Math.round(words / 200)) }))}</p>`;
   box.classList.remove('is-hidden');
@@ -522,7 +522,7 @@ async function mountPaypal(forReadingId) {
   const make = (fs, sel, isCard) => {
     const btn = window.paypal.Buttons({
         fundingSource: fs,
-        style: isCard ? { layout: 'vertical', color: 'black', shape: 'pill', height: 48 } : { layout: 'vertical', color: 'gold', shape: 'pill', label: 'paypal', height: 48 },
+        style: isCard ? { layout: 'vertical', color: 'black', shape: 'pill', label: 'pay', height: 55 } : { layout: 'vertical', color: 'gold', shape: 'pill', label: 'paypal', height: 48 },
       createOrder: async () => {
         track('paypal_button_clicked', { secondsSincePanel: Math.round((Date.now() - payShownAt) / 1000), paywallVersion: PAYWALL_VERSION });
         const d = await postFn('qer-paypal-create-order', { readingId: forReadingId });
@@ -539,11 +539,11 @@ async function mountPaypal(forReadingId) {
       onCancel: () => track('paypal_cancelled', { paywallVersion: PAYWALL_VERSION }),
       onError: (err) => { track('paypal_error', { reason: String(err && err.message || err).slice(0, 200), paywallVersion: PAYWALL_VERSION }); say('n_pp_failed'); }
     });
-    if (btn.isEligible()) btn.render(sel); else if (isCard) { $('paypal-card-container').classList.add('is-hidden'); document.querySelector('.card-or').classList.add('is-hidden'); document.querySelector('.card-brands').classList.add('is-hidden'); }
+    if (btn.isEligible()) btn.render(sel); else if (isCard) { $('paypal-card-container').classList.add('is-hidden'); document.querySelector('.card-or').classList.add('is-hidden'); $('cardBox').classList.add('is-hidden'); }
   };
   box.innerHTML = ''; $('paypal-card-container').innerHTML = '';
-  make(window.paypal.FUNDING ? window.paypal.FUNDING.PAYPAL : undefined, '#paypal-button-container', false);
   make(window.paypal.FUNDING ? window.paypal.FUNDING.CARD : undefined, '#paypal-card-container', true);
+  make(window.paypal.FUNDING ? window.paypal.FUNDING.PAYPAL : undefined, '#paypal-button-container', false);
 }
 // --- lectura abierta ---
 const PAID_KEY = `qer_paid_${APP}`;

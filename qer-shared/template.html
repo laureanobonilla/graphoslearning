@@ -342,7 +342,7 @@
   @media (prefers-reduced-motion: reduce){ #paywall.pay-flash{ animation:none; } }
 
   /* ===================== FLUJO CERRADO → MOTIVACIÓN → PAGO ===================== */
-  .profile-box.is-hidden, .unlock-cta.is-hidden, .delivery-line.is-hidden, .email-msg.is-hidden, #payTest.is-hidden, #payChecking.is-hidden, #paypal-card-container.is-hidden, .card-or.is-hidden, .card-brands.is-hidden{ display:none; }
+  .profile-box.is-hidden, .unlock-cta.is-hidden, .delivery-line.is-hidden, .email-msg.is-hidden, #payTest.is-hidden, #payChecking.is-hidden, #paypal-card-container.is-hidden, .card-or.is-hidden, .card-brands.is-hidden, .card-box.is-hidden{ display:none; }
   .profile-box{ margin: 0 0 26px; padding: 18px 16px 20px; border: 1px solid var(--brass-dim); border-radius: 16px; background: rgba(198,163,88,.06); }
   .profile-head{ display:flex; align-items:baseline; justify-content:space-between; margin: 0 0 4px; }
   .profile-title{ font-size: 1.12rem; color: var(--brass); margin: 0; font-weight: 500; }
@@ -406,10 +406,12 @@
   .email-msg{ margin: 8px 0 0; font-size:.82rem; color: var(--brass); }
   .test-banner{ position:fixed; left:0; right:0; top:0; z-index:50; text-align:center; font-size:.7rem; color:#c6a358; background: rgba(22,17,31,.94); padding:5px 8px; }
   #paypal-button-container{ min-height: 48px; margin: 0 0 8px; }
-  #paypal-card-container{ min-height: 48px; margin: 0 0 8px; }
+  #paypal-card-container{ min-height: 55px; margin: 0 0 4px; }
+  .card-box{ background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.75); border-radius: 18px; padding: 14px 14px 12px; margin: 0 0 4px; }
+  .card-title{ margin: 0 0 8px; font-size: 1.15rem; font-weight: 700; text-align: center; color:#fff; }
   .card-or{ margin: 14px 0 10px; font-size:.86rem; color:#f6e7de; display:flex; align-items:center; gap:10px; }
   .card-or::before, .card-or::after{ content:''; flex:1; height:1px; background: rgba(255,255,255,.3); }
-  .card-brands{ list-style:none; margin: 0 0 10px; padding:0; display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+  .card-brands{ list-style:none; margin: 0 0 12px; padding:0; display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
   .card-brands li{ font-size:.68rem; font-weight:600; letter-spacing:.03em; color:#fff; border:1px solid rgba(255,255,255,.5); border-radius:6px; padding:3px 8px; background: rgba(255,255,255,.08); }
 </style>
 </head>
@@ -530,10 +532,13 @@
         <p id="payChecking" class="pay-note" data-t="pay_checking_country"></p>
 
         <div id="payIntl" class="pay-panel is-hidden">
-          <div id="paypal-button-container"></div>
+          <div class="card-box" id="cardBox">
+            <p class="card-title display" data-t="n_card_title"></p>
+            <ul class="card-brands" aria-label="Visa, Mastercard, American Express"><li>VISA</li><li>Mastercard</li><li>AMEX</li><li data-t="n_card_debit"></li></ul>
+            <div id="paypal-card-container"></div>
+          </div>
           <p class="card-or" data-t="n_card_or"></p>
-          <div id="paypal-card-container"></div>
-          <ul class="card-brands" aria-label="Visa, Mastercard, American Express"><li>VISA</li><li>Mastercard</li><li>AMEX</li><li data-t="n_card_debit"></li></ul>
+          <div id="paypal-button-container"></div>
           <p id="paypalMsg" class="pay-msg is-hidden" role="status"></p>
           <p id="paypalNote" class="pay-note"></p>
         </div>
