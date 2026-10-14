@@ -405,6 +405,10 @@
         #defsView { position: fixed; top: var(--dv-top, 64px); right: 0; bottom: 0; width: 400px; max-width: 60vw; z-index: 60; background: #0a0e1a; border-left: 1px solid #2c3458; box-shadow: -8px 0 24px rgba(0,0,0,.35); display: flex; flex-direction: column; font-family: 'Inter', sans-serif; color: #eef1fb; }
         #defsView.dv-wide { width: min(68vw, 1000px); max-width: 80vw; }
         #defsView.dv-pinned { box-shadow: none; }
+        #defsView .dv-row[data-id] { cursor: pointer; transition: background .3s; }
+        #defsView .dv-row.dv-flash { background: rgba(79,209,197,.2) !important; }
+        #dvSelBtn { position: fixed; z-index: 200; display: none; padding: 7px 12px; border-radius: 999px; border: 1px solid #4fd1c5; background: #0f2e2c; color: #4fd1c5; font: 600 12.5px 'Sora', sans-serif; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+        #dvSelBtn:hover { background: #164443; }
         #defsView .dv-tools { display: flex; gap: 6px; }
         #defsView .dv-tool { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2c3458; background: #161c35; color: #aab2d3; cursor: pointer; font-size: 14px; }
         #defsView .dv-tool:hover { color: #4fd1c5; border-color: #4fd1c5; }
@@ -449,6 +453,7 @@
             @keyframes tpPulse { 50% { box-shadow: 0 0 0 6px rgba(79,209,197,.25); } }
             #topicPanel.on { display: flex; position: absolute; left: 0; top: 0; bottom: 0; width: 380px; max-width: 46vw; z-index: 27; flex-direction: column; background: #0d1226; border-right: 1px solid #2c3458; box-shadow: 8px 0 24px rgba(0,0,0,.35); color: #e3e7f7; }
             #topicPanel.pinned { box-shadow: none; }
+            #topicPanel.wide { width: min(58vw, 860px); max-width: 70vw; }
             #topicPanel .tp-head { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 16px; border-bottom: 1px solid #262c47; }
             #topicPanel .tp-title { flex: 1; font: 700 14px/1.3 'Sora', sans-serif; overflow-wrap: anywhere; }
             #topicPanel .tp-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2c3458; background: #161c35; color: #aab2d3; cursor: pointer; font-size: 14px; }
@@ -861,6 +866,7 @@
     <aside id="topicPanel" aria-label="Texto del tema">
         <div class="tp-head">
             <div id="topicTitle" class="tp-title"></div>
+            <button id="topicWide" type="button" class="tp-btn" title="Ampliar hacia la derecha">⇥</button>
             <button id="topicPin" type="button" class="tp-btn" title="Fijar a la izquierda (el mapa se ajusta)">📌</button>
             <button id="topicClose" type="button" class="tp-btn" title="Contraer">✕</button>
         </div>
@@ -1083,14 +1089,8 @@
          envolviendo a 2 líneas en vez de ensanchar el menú, pero ya no se ve
          angosto) y filas más altas y con letra más grande (px-3.5 py-2.5
          text-sm) para que cada opción sea un blanco de clic cómodo. -->
-    <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col w-[220px] shadow-xl">
+    <div id="actionMenu" class="hidden absolute glass-dock rounded-xl z-50 flex flex-col w-[220px] shadow-xl" style="z-index:90">
         <div class="py-1">
-            <button id="btnMenuOpenPanel" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors" data-i18n="ui.ver_definicion">
-                Ver definición
-            </button>
-            <button id="btnMenuSimpleExplain" class="w-full px-3.5 py-2.5 hover:bg-[#1c2a1a] text-lime-300 font-medium text-sm text-left transition-colors" data-i18n="ui.explicacion_sencilla">
-                Explicación sencilla
-            </button>
             <!-- "Recorrido desde aquí" y "Autoevaluarme desde aquí" se quitaron del menú
                  contextual (2026-10-04); siguen disponibles en la cabecera (Recorrido / Quiz). -->
 
@@ -1137,9 +1137,6 @@
                     <button id="btnMenuSynergy" class="w-full px-3.5 py-2.5 hover:bg-[#2a1a33] text-fuchsia-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.generar_sinergia_con">
                         Generar Sinergia con...
                     </button>
-                    <button id="btnMenuLocateText" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.ver_en_el_texto">
-                        Ver en el texto
-                    </button>
                 </div>
             </div>
 
@@ -1150,17 +1147,11 @@
                     <span class="text-[#5b6388] text-sm">›</span>
                 </button>
                 <div id="submenuGenerate" class="hidden gk-submenu absolute top-0 glass-dock rounded-xl overflow-hidden w-[200px] shadow-xl z-50">
-                    <button id="btnMenuExpand" class="w-full px-3.5 py-2.5 hover:bg-[#1d2442] text-[#eef1fb] font-medium text-sm text-left transition-colors" data-i18n="ui.conceptos_relacionados">
-                        Conceptos Relacionados
-                    </button>
                     <button id="btnMenuAntithesis" class="w-full px-3.5 py-2.5 hover:bg-[#2a1620] text-rose-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.cuestionar_antitesis">
                         Cuestionar / Antítesis
                     </button>
                     <button id="btnMenuChallenge" class="w-full px-3.5 py-2.5 hover:bg-[#122a22] text-emerald-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.ponme_a_prueba">
                         Ponme a prueba
-                    </button>
-                    <button id="btnMenuExamples" class="w-full px-3.5 py-2.5 hover:bg-[#2a2314] text-amber-300 font-medium text-sm text-left transition-colors border-t border-[#2c3458]" data-i18n="ui.ejemplos_practicos">
-                        Ejemplos Prácticos
                     </button>
                 </div>
             </div>

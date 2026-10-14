@@ -1458,11 +1458,11 @@ async function resumePendingGen(source) {
 const topicUI = (() => {
     const panel = document.getElementById('topicPanel'), tab = document.getElementById('topicTab');
     const body = document.getElementById('topicBody'), title = document.getElementById('topicTitle');
-    const pinBtn = document.getElementById('topicPin'), closeBtn = document.getElementById('topicClose');
+    const pinBtn = document.getElementById('topicPin'), closeBtn = document.getElementById('topicClose'), wideBtn = document.getElementById('topicWide');
     if (!panel || !tab || !body) return null;
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
-    if (en) { document.getElementById('topicTabLbl').textContent = 'View text'; document.getElementById('topicHint').textContent = 'Tap an underlined concept to see it on the map.'; pinBtn.title = 'Pin to the left (the map adjusts)'; closeBtn.title = 'Collapse'; }
-    let open = false, pinned = false, ownerId = null;
+    if (en) { document.getElementById('topicTabLbl').textContent = 'View text'; document.getElementById('topicHint').textContent = 'Tap an underlined concept to see it on the map.'; pinBtn.title = 'Pin to the left (the map adjusts)'; closeBtn.title = 'Collapse'; wideBtn.title = 'Expand to the right'; }
+    let open = false, pinned = false, wide = false, ownerId = null;
     try { pinned = localStorage.getItem('gk_topic_pin') === '1'; } catch (_e) { /* ok */ }
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1486,7 +1486,7 @@ const topicUI = (() => {
         return out.filter(Boolean);
     }
     function paint() {
-        panel.classList.toggle('on', open); panel.classList.toggle('pinned', open && pinned);
+        panel.classList.toggle('on', open); panel.classList.toggle('pinned', open && pinned); panel.classList.toggle('wide', wide); wideBtn.classList.toggle('on', wide);
         tab.classList.toggle('on', !open && !!ownerId);
         pinBtn.classList.toggle('on', pinned);
         const w = open && pinned ? panel.getBoundingClientRect().width || 380 : 0;
@@ -1519,12 +1519,19 @@ const topicUI = (() => {
     }
     function show(owner, fresh) {
         if (!render(owner)) return;
+        // Igual que las definiciones: aparece abierto junto al esquema; si lo cierras tú, queda cerrado hasta que lo abras.
+        let closedByUser = false; try { closedByUser = localStorage.getItem('gk_topic_closed') === '1'; } catch (_e) { /* ok */ }
+        if (!closedByUser) open = true;
         paint();
-        if (fresh) { tab.classList.add('fresh'); setTimeout(() => tab.classList.remove('fresh'), 5200); }
+        if (fresh && !open) { tab.classList.add('fresh'); setTimeout(() => tab.classList.remove('fresh'), 5200); }
     }
-    function setOpen(v) { open = v; paint(); if (v) track('topic_text_open', { pinned }); }
+    function setOpen(v, byUser) {
+        open = v; paint(); if (v) track('topic_text_open', { pinned });
+        try { if (v) localStorage.removeItem('gk_topic_closed'); else if (byUser) localStorage.setItem('gk_topic_closed', '1'); } catch (_e) { /* ok */ }
+    }
     tab.addEventListener('click', () => setOpen(true));
-    closeBtn.addEventListener('click', () => { setOpen(false); });
+    wideBtn.addEventListener('click', () => { wide = !wide; if (en) wideBtn.title = wide ? 'Narrow' : 'Expand to the right'; paint(); });
+    closeBtn.addEventListener('click', () => { setOpen(false, true); });
     pinBtn.addEventListener('click', () => { pinned = !pinned; try { localStorage.setItem('gk_topic_pin', pinned ? '1' : '0'); } catch (_e) { /* ok */ } paint(); track('topic_text_pin', { pinned }); });
     body.addEventListener('click', (e) => {
         const m = e.target.closest('mark.tp-mark'); if (!m) return;
@@ -8109,6 +8116,46 @@ async function exportReportRtf() {
         } else track('defs_view_ok', { ms: Date.now() - started, terms: list.length });
     }
     loadMissing.token = 0;
+    // Mapa ↔ definiciones: elegir un nodo lleva a su definición, y tocar una definición lleva a su nodo.
+    function flashRow(row) { if (!row) return; row.classList.add('dv-flash'); setTimeout(() => row.classList.remove('dv-flash'), 1400); }
+    network.on('selectNode', (params) => {
+        if (!isOpen()) return;
+        const id = params.nodes && params.nodes[0]; if (id == null) return;
+        const row = rowOf.get(String(id)); if (!row) return;
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' }); flashRow(row);
+    });
+    grid.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const sel = window.getSelection && String(window.getSelection()).trim(); if (sel) return; // seleccionando texto: no navegar
+        const row = e.target.closest('.dv-row[data-id]'); if (!row) return;
+        const nd = nodes.get(row.dataset.id) || nodes.get(Number(row.dataset.id)); if (!nd) return;
+        revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); flashNewNode(nd.id); flashRow(row);
+    });
+    // Texto elegido en una definición → esquema que parte del nodo de esa definición.
+    const selBtn = document.createElement('button'); selBtn.id = 'dvSelBtn'; selBtn.type = 'button';
+    selBtn.textContent = en ? '🌱 Make a map from this' : '🌱 Crear esquema con esto'; document.body.appendChild(selBtn);
+    let selInfo = null;
+    const hideSel = () => { selBtn.style.display = 'none'; selInfo = null; };
+    grid.addEventListener('mouseup', () => {
+        setTimeout(() => {
+            const s = window.getSelection(); const t = s ? String(s).trim() : '';
+            const anchor = s && s.anchorNode ? (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentElement) : null;
+            const cell = anchor && anchor.closest ? anchor.closest('.dv-cell') : null; const row = cell && cell.closest('.dv-row[data-id]');
+            if (!t || t.length < 3 || !row) { hideSel(); return; }
+            const r = s.getRangeAt(0).getBoundingClientRect();
+            selInfo = { text: t.slice(0, 4000), nodeId: row.dataset.id };
+            selBtn.style.left = Math.max(8, Math.min(window.innerWidth - 230, r.left)) + 'px'; selBtn.style.top = Math.max(8, r.top - 42) + 'px'; selBtn.style.display = 'block';
+        }, 0);
+    });
+    document.addEventListener('mousedown', (e) => { if (e.target !== selBtn) hideSel(); });
+    selBtn.addEventListener('mousedown', (e) => e.preventDefault());
+    selBtn.addEventListener('click', () => {
+        if (!selInfo) return; const info = selInfo; hideSel();
+        const nd = nodes.get(info.nodeId) || nodes.get(Number(info.nodeId)); if (!nd) return;
+        revealNode(nd.id);
+        track('defs_selection_schema', { length: info.text.length });
+        generateFullSchemaFromTopic(info.text, { attachToNodeId: nd.id });
+    });
     let wide = false, pinned = false;
     try { pinned = localStorage.getItem('gk_defs_pin') === '1'; } catch (_e) { /* ok */ }
     function layout() {
