@@ -1550,7 +1550,22 @@ const topicUI = (() => {
     });
     nodes.on('remove', () => { if (ownerId != null && !nodes.get(ownerId)) { ownerId = null; open = false; paint(); } });
     nodes.on('update', (_ev, p) => { if (ownerId != null && p && p.items && p.items.some(i => String(i) === String(ownerId)) && nodes.get(ownerId)?.schemaText) render(ownerId); });
-    return { show, ownerOf, setOpen };
+    // Al abrir un proyecto guardado: mostrar el texto de su esquema (el que se guardó con él). Los proyectos viejos no lo
+    // tienen: se genera una vez para la raíz (gratis) y queda guardado con el proyecto.
+    function onLoaded() {
+        ownerId = null; open = false; paint();
+        const all = nodes.get(); if (!all.length || !isDesktopFolding()) return;
+        const hasIn = new Set(edges.get().map(e => String(e.to)));
+        const withText = all.filter(n => n.schemaText);
+        const owner = withText.find(n => !hasIn.has(String(n.id))) || withText[0];
+        if (owner) { show(owner.id, false); return; }
+        const root = all.filter(n => !hasIn.has(String(n.id)) && !n.isSubscheme).sort((a, b) => (a.depthLevel ?? 0) - (b.depthLevel ?? 0))[0];
+        if (!root || all.length < 3) return;
+        const lab = (n) => ({ label: clean(n) });
+        const rest = all.filter(n => n.id !== root.id && !n.isSubscheme).map(lab);
+        attachTopicText(root.id, clean(root), { root: lab(root), branches: rest, subBranches: [] });
+    }
+    return { show, ownerOf, setOpen, onLoaded };
 })();
 
 async function attachTopicText(ownerId, topic, data) {
@@ -7331,6 +7346,7 @@ function applyLoadedProject(projectId, record) {
     localStorage.setItem('gk_current_project_id', currentProjectId);
     isClearingCanvas = false;
     network.fit({ animation: { duration: 600 } });
+    if (typeof topicUI !== 'undefined' && topicUI) topicUI.onLoaded();
 }
 
 document.getElementById('btnNewProject')?.addEventListener('click', async () => {
