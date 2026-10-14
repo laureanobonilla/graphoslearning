@@ -327,7 +327,7 @@ const LOCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11"
 // Gráfica de rasgos (radar). Con `scores` dibuja la forma real; sin ellos (resultado cerrado) una forma decorativa que
 // luego se desenfoca: el navegador nunca recibe las cifras reales antes del pago.
 function seeded(seedStr) { let h = 2166136261; for (let i = 0; i < seedStr.length; i++) { h ^= seedStr.charCodeAt(i); h = Math.imul(h, 16777619); } return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 1000) / 1000; }; }
-function radarSvg(names, scores) {
+function radarSvg(names, scores, teaser) {
   const n = names.length, cx = 190, cy = 140, R = 84;
   const pt = (r, i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / n; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
   const poly = (pts) => pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
@@ -336,15 +336,28 @@ function radarSvg(names, scores) {
   let g = '';
   [0.34, 0.67, 1].forEach(k => { g += `<polygon class="radar-grid" points="${poly(names.map((_, i) => pt(R * k, i)))}"/>`; });
   names.forEach((_, i) => { const p = pt(R, i); g += `<line class="radar-axis" x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}"/>`; });
-  const shapePts = names.map((_, i) => pt(R * vals[i] / 100, i));
-  let shape = `<polygon class="radar-shape" points="${poly(shapePts)}"/>`;
-  if (scores) shapePts.forEach((p, i) => { shape += `<circle class="radar-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3"/><text class="radar-val" x="${p[0].toFixed(1)}" y="${(p[1] - 7).toFixed(1)}">${vals[i]}</text>`; });
+  let shape = '', shapePts = [];
+  if (teaser) {
+    // Adelanto: solo el rasgo más fuerte se ve completo; los demás son «?» claros sobre su eje (nada borroso).
+    names.forEach((nm, i) => {
+      const isTop = i === teaser.topIndex, p = pt(R * (isTop ? teaser.score / 100 : 0.62), i), o = pt(R, i);
+      if (isTop) shape += `<line class="radar-top" x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}"/><circle class="radar-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="5"/><text class="radar-val" x="${p[0].toFixed(1)}" y="${(p[1] - 10).toFixed(1)}" style="font-size:12px;font-weight:600">${teaser.score}</text>`;
+      else shape += `<line class="radar-dash" x1="${cx}" y1="${cy}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}"/><circle class="radar-q" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="9"/><text class="radar-qt" x="${p[0].toFixed(1)}" y="${(p[1] + 4).toFixed(1)}">?</text>`;
+    });
+  } else {
+    shapePts = names.map((_, i) => pt(R * vals[i] / 100, i));
+    shape = `<polygon class="radar-shape" points="${poly(shapePts)}"/>`;
+  }
+  if (scores && !teaser) shapePts.forEach((p, i) => { shape += `<circle class="radar-dot" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3"/><text class="radar-val" x="${p[0].toFixed(1)}" y="${(p[1] - 7).toFixed(1)}">${vals[i]}</text>`; });
   let labels = '';
   names.forEach((nm, i) => {
     const p = pt(R + 16, i), c = Math.cos(-Math.PI / 2 + i * 2 * Math.PI / n);
     const anchor = c > 0.3 ? 'start' : (c < -0.3 ? 'end' : 'middle');
-    const t = nm.length > 16 ? nm.slice(0, 15) + '…' : nm;
-    labels += `<text class="radar-label" x="${p[0].toFixed(1)}" y="${(p[1] + 4).toFixed(1)}" text-anchor="${anchor}">${escapeHtml(t)}</text>`;
+    // Nombres largos: se parten en dos líneas (nunca se cortan con «…», parecería un error)
+    let l1 = nm, l2 = '';
+    if (nm.length > 14 && nm.includes(' ')) { const words = nm.split(' '); let k = Math.ceil(words.length / 2); if (words.length === 3 && words[0].length + words[1].length < 12) k = 2; l1 = words.slice(0, k).join(' '); l2 = words.slice(k).join(' '); }
+    const x = p[0].toFixed(1), y = p[1] + 4 - (l2 ? 6 : 0);
+    labels += `<text class="radar-label" x="${x}" y="${y.toFixed(1)}" text-anchor="${anchor}">${escapeHtml(l1)}${l2 ? `<tspan x="${x}" dy="12">${escapeHtml(l2)}</tspan>` : ''}</text>`;
   });
   return `<svg viewBox="0 0 380 290" role="img" aria-label="${escapeHtml(tt('n_prev_title'))}">${g}<g class="radar-shape-g">${shape}</g>${labels}</svg>`;
 }
@@ -364,16 +377,18 @@ function drawProfile() {
   const pv = previewData;
   if (!pv || !Array.isArray(pv.traits) || pv.traits.length < 3) { box.classList.add('is-hidden'); box.innerHTML = ''; return; }
   const words = statsData ? Number(statsData.hiddenWords) || 0 : 0;
-  const rest = Math.max(0, (pv.quoteWords || 0) - (pv.quoteHead ? pv.quoteHead.split(/\s+/).length : 0));
+  const topIndex = Math.max(0, pv.traits.indexOf(pv.top && pv.top.name));
+  const others = pv.traits.length - 1;
   box.innerHTML = `<div class="profile-head"><h3 class="profile-title display">${escapeHtml(tt('n_prev_title'))}</h3><span class="profile-lock-note">${LOCK_SVG}${escapeHtml(tt('n_prev_locked'))}</span></div>
-    <div class="radar-wrap is-locked">${radarSvg(pv.traits, null)}<div class="radar-pad">${LOCK_SVG}</div></div>
+    <div class="radar-wrap">${radarSvg(pv.traits, null, { topIndex, score: Number(pv.top && pv.top.score) || 0 })}</div>
+    <p class="profile-others">${escapeHtml(tt('n_prev_other', { k: others }))}</p>
     <div class="profile-rows">
       ${pv.top ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_top'))}</span><b>${escapeHtml(pv.top.name)}</b> · ${Number(pv.top.score) || 0}%</div>` : ''}
-      ${pv.keywordLen ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_word'))}</span><span class="profile-word">${escapeHtml(pv.keywordInitial || '')}</span><span class="redact" style="width:${(pv.keywordLen * 0.62).toFixed(1)}em;height:1em"></span></div>` : ''}
-      ${pv.quoteWords ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_quote'))}</span><span class="profile-quote">«${escapeHtml(pv.quoteHead || '')} </span>${redactBars(Math.min(rest, 6), String(readingId))}<span class="profile-quote">»</span></div>` : ''}
+      ${pv.keywordLen ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_word'))}</span><span class="profile-riddle">${escapeHtml(tt('n_prev_word_riddle', { i: (pv.keywordInitial || '').toUpperCase(), n: pv.keywordLen }))}</span></div>` : ''}
+      ${pv.quoteWords ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_quote'))}</span><span class="profile-riddle">${escapeHtml(tt('n_prev_quote_riddle', { n: pv.quoteWords, head: pv.quoteHead || '' }))}</span></div>` : ''}
+      ${pv.closingHead ? `<div class="profile-row"><span class="k">${escapeHtml(tt('n_prev_closing_k'))}</span><span class="profile-riddle">${escapeHtml(tt('n_prev_closing', { head: pv.closingHead }))}</span></div>` : ''}
     </div>
-    <p class="profile-stats">${escapeHtml(tt('n_prev_stats', { n: chapters.length, w: fmtInt(words) }))}</p>
-    ${pv.closingHead ? `<p class="profile-closing">${escapeHtml(tt('n_prev_closing', { head: pv.closingHead }))}</p>` : ''}`;
+    <p class="profile-stats">${escapeHtml(tt('n_prev_stats', { n: chapters.length, w: fmtInt(words), m: Math.max(1, Math.round(words / 200)) }))}</p>`;
   box.classList.remove('is-hidden');
 }
 function drawChapters() {
@@ -382,12 +397,12 @@ function drawChapters() {
   const list = $('lockedList');
   if (!closed.length) { list.innerHTML = ''; list.classList.add('is-hidden'); return; }
   list.classList.remove('is-hidden');
-  list.innerHTML = `<p class="locked-intro">${escapeHtml(tt('locked_intro'))}</p>` + closed.map((c, i) => `
+  list.innerHTML = `<p class="locked-intro">${escapeHtml(tt('n_chapters_intro', { n: closed.length }))}</p>` + closed.map((c, i) => `
     <div class="locked-item">
       ${LOCK_SVG.replace('<svg ', '<svg class="lock-ico" ')}
-      <div><p class="locked-title display">${escapeHtml(c.label)}</p>
-      <p class="locked-teaser">${escapeHtml(c.teaser || c.hook)}</p>
-      <button type="button" class="read-more" data-i="${i}">${escapeHtml(tt('read_more'))}</button></div>
+      <div><p class="locked-title display">${escapeHtml(c.label)}<span class="closed-chip">${escapeHtml(tt('n_chapter_closed'))}</span></p>
+      <p class="locked-teaser">${escapeHtml(c.hook || c.teaser)}</p>
+      <button type="button" class="read-more" data-i="${i}">${escapeHtml(tt('n_open_chapter'))}</button></div>
     </div>`).join('');
   list.querySelectorAll('.read-more').forEach(b => b.addEventListener('click', () => goSeeAll('chapter_' + (Number(b.dataset.i) + 1))));
 }
