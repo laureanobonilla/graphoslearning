@@ -23,6 +23,8 @@ function countryOf(event) {
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+    // DESACTIVADO (2026-10-14): el cobro ahora lo verifica el servidor (qer-paypal-capture-order). Este desbloqueo "de confianza" regalaba la lectura a quien lo llamara.
+    if (process.env.QER_ALLOW_TRUST_UNLOCK !== 'true') return json(410, { error: 'Unlock by payment only. / Solo se desbloquea pagando.' });
     let body;
     try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
     const readingId = String(body.readingId || '');

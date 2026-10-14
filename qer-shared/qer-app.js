@@ -62,7 +62,7 @@ const pageStartedAt = Date.now();
 
 // --- país ---
 const TZ_COUNTRY = { 'America/Costa_Rica': 'CR', 'Europe/Madrid': 'ES', 'Atlantic/Canary': 'ES', 'America/Mexico_City': 'MX', 'America/Bogota': 'CO', 'America/Lima': 'PE', 'America/Santiago': 'CL', 'America/Argentina/Buenos_Aires': 'AR', 'America/Montevideo': 'UY', 'America/Panama': 'PA', 'America/Guatemala': 'GT', 'America/El_Salvador': 'SV', 'America/Tegucigalpa': 'HN', 'America/Managua': 'NI', 'America/Guayaquil': 'EC', 'America/Caracas': 'VE', 'America/La_Paz': 'BO', 'America/Asuncion': 'PY', 'America/New_York': 'US', 'America/Chicago': 'US', 'America/Denver': 'US', 'America/Los_Angeles': 'US', 'America/Phoenix': 'US', 'America/Toronto': 'CA', 'Europe/London': 'GB', 'Europe/Berlin': 'DE', 'Europe/Paris': 'FR', 'Europe/Rome': 'IT', 'Australia/Sydney': 'AU' };
-const COUNTRY_CUR = { US: 'USD', EC: 'USD', SV: 'USD', PA: 'USD', PR: 'USD', CA: 'CAD', MX: 'MXN', CO: 'COP', PE: 'PEN', CL: 'CLP', AR: 'ARS', UY: 'UYU', BO: 'BOB', PY: 'PYG', VE: 'VES', GT: 'GTQ', HN: 'HNL', NI: 'NIO', DO: 'DOP', CU: 'CUP', BR: 'BRL', GB: 'GBP', IE: 'EUR', ES: 'EUR', FR: 'EUR', DE: 'EUR', IT: 'EUR', PT: 'EUR', NL: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN', CZ: 'CZK', HU: 'HUF', RO: 'RON', AU: 'AUD', NZ: 'NZD', JP: 'JPY', KR: 'KRW', CN: 'CNY', IN: 'INR', SG: 'SGD', HK: 'HKD', PH: 'PHP', TH: 'THB', MY: 'MYR', ID: 'IDR', VN: 'VND', AE: 'AED', SA: 'SAR', IL: 'ILS', TR: 'TRY', ZA: 'ZAR', NG: 'NGN', EG: 'EGP', MA: 'MAD', KE: 'KES' };
+const COUNTRY_CUR = { CR: 'CRC', US: 'USD', EC: 'USD', SV: 'USD', PA: 'USD', PR: 'USD', CA: 'CAD', MX: 'MXN', CO: 'COP', PE: 'PEN', CL: 'CLP', AR: 'ARS', UY: 'UYU', BO: 'BOB', PY: 'PYG', VE: 'VES', GT: 'GTQ', HN: 'HNL', NI: 'NIO', DO: 'DOP', CU: 'CUP', BR: 'BRL', GB: 'GBP', IE: 'EUR', ES: 'EUR', FR: 'EUR', DE: 'EUR', IT: 'EUR', PT: 'EUR', NL: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN', CZ: 'CZK', HU: 'HUF', RO: 'RON', AU: 'AUD', NZ: 'NZD', JP: 'JPY', KR: 'KRW', CN: 'CNY', IN: 'INR', SG: 'SGD', HK: 'HKD', PH: 'PHP', TH: 'THB', MY: 'MYR', ID: 'IDR', VN: 'VND', AE: 'AED', SA: 'SAR', IL: 'ILS', TR: 'TRY', ZA: 'ZAR', NG: 'NGN', EG: 'EGP', MA: 'MAD', KE: 'KES' };
 let country = null, countrySource = '';
 async function detectCountry() {
   try {
@@ -96,12 +96,12 @@ async function getRates() {
   return null;
 }
 function money(amount, cur) {
+  if (cur === 'CRC') return '₡' + Math.round(amount).toLocaleString('de-DE');
   try {
     const big = amount >= 100;
     return new Intl.NumberFormat(CFG.locale, { style: 'currency', currency: cur, currencyDisplay: cur === 'USD' && CFG.lang === 'es' ? 'code' : 'symbol', maximumFractionDigits: big ? 0 : 2, minimumFractionDigits: big ? 0 : 2 }).format(amount).replace(/ /g, ' ');
   } catch { return `${amount.toFixed(2)} ${cur}`; }
 }
-const crcText = () => '₡' + PAY.sinpe.amountCRC.toLocaleString('de-DE');
 
 // --- navegación ---
 let currentScreenName = 'cover';
@@ -124,7 +124,7 @@ function syncCta() {
 // --- estado ---
 let currentIndex = 0;
 const answers = new Array(TOTAL).fill(null);
-let readingId = null, archetypeNameForShare = '', chapters = [], readUnlocked = false, previewData = null, statsData = null, profileFull = null;
+let unlocking = false, readingId = null, archetypeNameForShare = '', chapters = [], readUnlocked = false, previewData = null, statsData = null, profileFull = null;
 
 // --- cuestionario ---
 const qPromptEl = $('qPrompt'), qBodyEl = $('qBody'), btnNext = $('btnNext'), btnBack = $('btnBack'), progressFill = $('progressFill');
@@ -424,17 +424,16 @@ async function getPayCfg() {
   } catch { /* sigue */ }
   return { error: true }; // no se guarda: se reintenta la próxima vez
 }
-// Precio que se muestra: el del servidor (qer-paypal-config) para PayPal, el de SINPE en Costa Rica.
+// Precio que se muestra: el del servidor (qer-paypal-config, en dólares) y, si el país tiene otra moneda, su equivalente aproximado.
 async function priceInfo() {
   if (!country) country = await detectCountry();
-  if (country === 'CR') return { isCR: true, shown: crcText(), full: crcText() };
   const cfg = await getPayCfg();
   const usd = Number(cfg.priceUsd) || PAY.usd.amount;
   const amountText = 'US$' + usd.toFixed(2);
   let local = '';
   const cur = COUNTRY_CUR[country];
   if (cur && cur !== 'USD') { const rates = await getRates(); if (rates && rates[cur]) local = money(usd * rates[cur], cur); }
-  return { isCR: false, usd, amountText, local, shown: local || amountText, full: local ? `${amountText} (≈ ${local})` : amountText };
+  return { usd, amountText, local, shown: local || amountText, full: local ? `${amountText} (≈ ${local})` : amountText };
 }
 function goSeeAll(from) {
   if (currentScreenName !== 'reveal' || readUnlocked) return;
@@ -464,7 +463,7 @@ function showPay(forceReal) {
   track('paywall_shown', { archetypeName: archetypeNameForShare, paywallVersion: PAYWALL_VERSION, freeChapters: 0, totalChapters: chapters.length });
   watchPaywallInView();
   if (TEST && !forceReal) {
-    $('payCR').classList.add('is-hidden'); $('payIntl').classList.add('is-hidden'); $('payChecking').classList.add('is-hidden');
+    $('payIntl').classList.add('is-hidden'); $('payChecking').classList.add('is-hidden');
     $('payTest').classList.remove('is-hidden');
     priceInfo().then(i => { $('priceLabel').textContent = i.shown; });
     return;
@@ -474,31 +473,17 @@ function showPay(forceReal) {
 }
 
 // --- cobro ---
-let payShownAt = 0, sinpeAttempts = 0, phoneCopied = false, unlocking = false;
+let payShownAt = 0;
 async function setupPay(forReadingId) {
-  $('payCR').classList.add('is-hidden'); $('payIntl').classList.add('is-hidden'); $('payChecking').classList.remove('is-hidden');
+  $('payIntl').classList.add('is-hidden'); $('payChecking').classList.remove('is-hidden');
   const info = await priceInfo();
   $('payChecking').classList.add('is-hidden');
-  payShownAt = Date.now(); sinpeAttempts = 0; phoneCopied = false;
+  payShownAt = Date.now();
   $('priceLabel').textContent = info.shown;
-  if (info.isCR) {
-    $('sinpeStep1').textContent = tt('sinpe_step1', { amount: crcText(), phone: PAY.sinpe.phone });
-    $('payCR').classList.remove('is-hidden');
-    $('btnCopyPhone').onclick = async () => {
-      phoneCopied = true;
-      try { await navigator.clipboard.writeText(PAY.sinpe.phone.replace(/\D/g, '')); } catch { /* ok */ }
-      $('btnCopyPhone').textContent = tt('sinpe_copied');
-      track('sinpe_phone_copied', { paywallVersion: PAYWALL_VERSION });
-    };
-    $('btnSinpeUpload').onclick = () => { track('sinpe_upload_clicked', { paywallVersion: PAYWALL_VERSION }); $('sinpeFile').click(); };
-    $('sinpeFile').onchange = (ev) => onSinpeFile(ev.target.files && ev.target.files[0], forReadingId);
-    track('sinpe_shown', { country, countrySource, paywallVersion: PAYWALL_VERSION });
-  } else {
-    $('paypalNote').textContent = info.local ? tt('n_pp_local', { amount: info.amountText, local: info.local }) : tt('n_pp_note');
-    $('payIntl').classList.remove('is-hidden');
-    track('paypal_shown', { country, countrySource, method: 'paypal_orders', shownAmount: info.shown, converted: !!info.local, paywallVersion: PAYWALL_VERSION });
-    mountPaypal(forReadingId);
-  }
+  $('paypalNote').textContent = info.local ? tt('n_pp_local', { amount: info.amountText, local: info.local }) : tt('n_pp_note');
+  $('payIntl').classList.remove('is-hidden');
+  track('paypal_shown', { country, countrySource, method: 'paypal_orders', shownAmount: info.shown, converted: !!info.local, paywallVersion: PAYWALL_VERSION });
+  mountPaypal(forReadingId);
 }
 function loadPaypalSdk(clientId) {
   if (window.paypal && window.paypal.Buttons) return Promise.resolve();
@@ -538,49 +523,6 @@ async function mountPaypal(forReadingId) {
     onError: (err) => { track('paypal_error', { reason: String(err && err.message || err).slice(0, 200), paywallVersion: PAYWALL_VERSION }); say('n_pp_failed'); }
   }).render('#paypal-button-container');
 }
-function imageInfo(file) {
-  return new Promise(resolve => {
-    try {
-      const url = URL.createObjectURL(file); const img = new Image();
-      img.onload = () => { const o = { w: img.naturalWidth, h: img.naturalHeight }; URL.revokeObjectURL(url); resolve(o); };
-      img.onerror = () => { URL.revokeObjectURL(url); resolve({ w: 0, h: 0, unreadable: true }); };
-      img.src = url;
-    } catch { resolve({}); }
-  });
-}
-async function onSinpeFile(file, forReadingId) {
-  const msg = $('sinpeMsg'); msg.classList.add('is-hidden');
-  if (!file || unlocking) return;
-  sinpeAttempts++;
-  const info = await imageInfo(file);
-  const evidence = {
-    attempt: sinpeAttempts, secondsSincePanel: Math.round((Date.now() - payShownAt) / 1000), copiedPhone: phoneCopied,
-    type: file.type || '', size: file.size, name: String(file.name || '').slice(0, 60),
-    ageMin: file.lastModified ? Math.round((Date.now() - file.lastModified) / 60000) : null,
-    w: info.w || 0, h: info.h || 0, unreadable: !!info.unreadable
-  };
-  if (!/^image\//.test(file.type || '') || info.unreadable) {
-    track('sinpe_file_rejected', { ...evidence, paywallVersion: PAYWALL_VERSION });
-    msg.textContent = tt('sinpe_bad_file'); msg.classList.remove('is-hidden'); $('sinpeFile').value = ''; return;
-  }
-  track('sinpe_photo_selected', { ...evidence, paywallVersion: PAYWALL_VERSION });
-  $('btnSinpeUpload').disabled = true; msg.textContent = tt('sinpe_receiving'); msg.classList.remove('is-hidden');
-  await new Promise(r => setTimeout(r, 1200));
-  const ok = await doUnlock(forReadingId, 'sinpe_photo', crcText(), evidence);
-  if (!ok) { $('btnSinpeUpload').disabled = false; msg.textContent = tt('unlock_error'); }
-}
-async function doUnlock(forReadingId, method, shown, evidence) {
-  unlocking = true;
-  try {
-    const data = await postWithOneRetry('qer-unlock', { readingId: forReadingId, method, app: APP, clientCountry: country || '', shownAmount: shown, evidence });
-    if (data.paid && (data.nodes || data.mapTexts)) {
-      track('payment_unlocked_client', { method, country, paywallVersion: PAYWALL_VERSION });
-      unlockReading(data); return true;
-    }
-  } catch (err) { track('unlock_failed', { method, reason: String(err.message).slice(0, 200), paywallVersion: PAYWALL_VERSION }); }
-  unlocking = false; return false;
-}
-
 // --- lectura abierta ---
 const PAID_KEY = `qer_paid_${APP}`;
 function readingLink() { return `${location.origin}/${APP}/?r=${encodeURIComponent(readingId)}`; }
