@@ -7967,6 +7967,8 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
         ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', loading: 'loading', more: 'See more', below: 'Continues below:', hide: 'Hide' }
         : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', loading: 'cargando', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
     document.getElementById('dvBackLbl').textContent = T.back;
+    const dvBackBtn = document.getElementById('dvBack'), dvWideBtn = document.getElementById('dvWide'), dvPinBtn = document.getElementById('dvPin');
+    dvBackBtn.title = en ? 'Collapse' : 'Contraer'; dvWideBtn.title = en ? 'Expand to the left' : 'Ampliar hacia la izquierda'; dvPinBtn.title = en ? 'Pin to the right (the map adjusts)' : 'Fijar a la derecha (el mapa se ajusta)';
     if (en) btn.firstElementChild.textContent = 'View definitions';
     const isOpen = () => !view.classList.contains('hidden');
 
@@ -8012,9 +8014,9 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
         const term = document.createElement('div'); term.className = 'dv-term';
         const name = document.createElement('div'); name.textContent = cleanLabel(n); term.appendChild(name);
         const col = (n.color && (n.color.border || n.color.background)) || '#4fd1c5'; term.style.setProperty('--c', typeof col === 'string' ? col : '#4fd1c5');
-        if (depth > 0) { term.style.marginLeft = Math.min(depth, 5) * 30 + 'px'; row.classList.add('dv-sub'); term.style.fontSize = Math.max(13, 16 - depth * 1.2) + 'px'; }
+        if (depth > 0) { term.style.marginLeft = Math.min(depth, 5) * 30 + 'px'; row.classList.add('dv-child'); term.style.fontSize = Math.max(13, 16 - depth * 1.2) + 'px'; }
         row.appendChild(term);
-        row._cells = [0, 1, 2].map(() => { const c = document.createElement('div'); c.className = 'dv-cell'; row.appendChild(c); return c; });
+        row._cells = [T.def, T.simple, T.ex].map((lbl) => { const c = document.createElement('div'); c.className = 'dv-cell'; c.dataset.l = lbl; row.appendChild(c); return c; });
         const vals = [n.definition, n.simple, n.example];
         row._cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; else c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
         // Nodos de más abajo: citados junto al término, con "Ver más".
@@ -8109,20 +8111,52 @@ document.getElementById('btnExportReport')?.addEventListener('click', exportRepo
         } else track('defs_view_ok', { ms: Date.now() - started, terms: list.length });
     }
     loadMissing.token = 0;
-    function open() {
+    let wide = false, pinned = false;
+    try { pinned = localStorage.getItem('gk_defs_pin') === '1'; } catch (_e) { /* ok */ }
+    function layout() {
+        const hd = document.getElementById('mainHeader');
+        view.style.setProperty('--dv-top', (hd ? Math.round(hd.getBoundingClientRect().bottom) : 64) + 'px');
+        view.classList.toggle('dv-wide', wide); view.classList.toggle('dv-pinned', pinned);
+        dvWideBtn.classList.toggle('on', wide); dvPinBtn.classList.toggle('on', pinned);
+        const w = isOpen() && pinned ? view.getBoundingClientRect().width : 0;
+        container.style.marginRight = w ? w + 'px' : '';
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
+    }
+    function open(auto) {
         if (nodes.length === 0) return;
-        track('defs_view_opened', { nodes: nodes.length, in_subscheme: schemeStack.length > 0 });
+        track('defs_view_opened', { nodes: nodes.length, in_subscheme: schemeStack.length > 0, auto: auto === true });
+        try { localStorage.removeItem('gk_defs_closed'); } catch (_e) { /* ok */ }
         pendingRows = 0;
+        view.classList.remove('hidden'); layout();
         const list = render();
-        view.classList.remove('hidden'); refreshBtn();
+        refreshBtn();
         view.querySelector('.dv-scroll').scrollTop = 0;
         loadMissing(list, ++loadMissing.token);
-        document.getElementById('dvBack').focus();
     }
-    function close() { view.classList.add('hidden'); loadMissing.token++; refreshBtn(); }
-    btn.addEventListener('click', open);
-    document.getElementById('dvBack').addEventListener('click', close);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen()) close(); });
+    function close(byUser) {
+        view.classList.add('hidden'); loadMissing.token++; refreshBtn(); layout();
+        if (byUser === true) { try { localStorage.setItem('gk_defs_closed', '1'); } catch (_e) { /* ok */ } }
+    }
+    btn.addEventListener('click', () => open());
+    dvBackBtn.addEventListener('click', () => close(true));
+    dvWideBtn.addEventListener('click', () => { wide = !wide; layout(); if (isOpen()) { const l = render(); loadMissing(l, ++loadMissing.token); } });
+    dvPinBtn.addEventListener('click', () => { pinned = !pinned; try { localStorage.setItem('gk_defs_pin', pinned ? '1' : '0'); } catch (_e) { /* ok */ } layout(); track('defs_view_pin', { pinned }); });
+    window.addEventListener('resize', () => { if (isOpen()) view.style.setProperty('--dv-top', (document.getElementById('mainHeader')?.getBoundingClientRect().bottom || 64) + 'px'); });
+    // Por defecto aparece junto al esquema (escritorio). Si lo cierras tú, se queda cerrado hasta que lo abras.
+    // Cuando el mapa cambia (se genera, se despliega una rama…) se vuelve a armar con lo que está a la vista.
+    let syncTimer = null;
+    const syncSoon = () => {
+        if (window.innerWidth <= 780) return;
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(() => {
+            if (isOpen()) { const l = render(); loadMissing(l, ++loadMissing.token); return; }
+            let closed = false; try { closed = localStorage.getItem('gk_defs_closed') === '1'; } catch (_e) { /* ok */ }
+            if (!closed && nodes.length > 1) open(true);
+        }, 700);
+    };
+    nodes.on('add', syncSoon); nodes.on('remove', syncSoon);
+    nodes.on('update', (_ev, p) => { if (p && p.data && p.data.some(d => d && d.hidden !== undefined) ) syncSoon(); });
+    setTimeout(syncSoon, 1500);
 })();
 if (typeof I18N !== 'undefined' && I18N.lang === 'en') { const sp = document.querySelector('#btnExitSubscheme span'); if (sp) sp.textContent = 'Back'; }
 
