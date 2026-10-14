@@ -1573,7 +1573,18 @@ const topicUI = (() => {
         const rest = all.filter(n => n.id !== root.id && !n.isSubscheme).map(lab);
         attachTopicText(root.id, clean(root), { root: lab(root), branches: rest, subBranches: [] });
     }
-    return { show, ownerOf, setOpen, onLoaded };
+    // Mientras se escribe el texto: aviso a la izquierda (con el tema) y el panel NO se muestra hasta que esté listo.
+    const loadingEl = document.getElementById('topicLoading');
+    function setLoading(on, topic) {
+        if (!loadingEl) return;
+        if (on) {
+            const t = String(topic || '').slice(0, 60);
+            document.getElementById('topicLoadingLbl').textContent = en ? `Writing the text${t ? ' for “' + t + '”' : ''}…` : `Escribiendo el texto${t ? ' de «' + t + '»' : ''}…`;
+        }
+        if (on) { open = false; paint(); }
+        loadingEl.classList.toggle('on', !!on);
+    }
+    return { show, ownerOf, setOpen, onLoaded, setLoading };
 })();
 
 // Esquema hecho a partir de un texto pegado: ese mismo texto queda como el texto del esquema (solo lectura, a la izquierda).
@@ -1585,6 +1596,7 @@ function setSourceTextAsSchemaText(ownerId, text) {
 }
 async function attachTopicText(ownerId, topic, data) {
     if (!topicUI) return;
+    topicUI.setLoading(true, topic);
     try {
         const labels = [data.root, ...(data.branches || []), ...(data.subBranches || [])].map(n => String(n && n.label || '').trim()).filter(Boolean);
         const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'topic_text', topic, text: labels.join('\n') }) });
@@ -1596,6 +1608,7 @@ async function attachTopicText(ownerId, topic, data) {
         topicUI.show(ownerId, true);
         track('topic_text_ready', { words: d.text.split(/\s+/).length });
     } catch (_e) { /* el texto es un extra: si falla, el esquema sigue igual */ }
+    finally { topicUI.setLoading(false); }
 }
 
 async function generateFullSchemaFromTopic(topicText, opts = {}) {
