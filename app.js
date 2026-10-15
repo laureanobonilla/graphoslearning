@@ -1460,7 +1460,9 @@ async function renderThreeLevelTree(data, opts = {}) {
         if (attachToNodeId) {
             network.focus(attachToNodeId, { scale: 0.85, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
         } else {
+            window.__gkLastAutoFit = Date.now();
             network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+            freshSchemaUntil = Date.now() + 25000;   // los paneles que abren enseguida vuelven a encuadrar
         }
     }, 60);
 
@@ -1535,11 +1537,23 @@ function makeEdgeResizable(handle, panel, side, { key, cssVar, min = 300, maxFra
 }
 
 // Zona izquierda compartida: solo un panel (Mi texto o el texto del tema) ocupa el lado; el mapa se ajusta a su ancho.
+// Reencuadre del esquema recién creado: los paneles (texto a la izquierda, definiciones a la derecha) abren DESPUÉS del
+// primer encuadre y achican el lienzo; sin esto, parte del mapa queda debajo de ellos. Solo vale los primeros segundos
+// y se cancela si la persona mueve o acerca el mapa por su cuenta.
+let freshSchemaUntil = 0, refitTimer = 0;
+function refitIfFresh() {
+    if (Date.now() > freshSchemaUntil) return;
+    clearTimeout(refitTimer);
+    refitTimer = setTimeout(() => { if (Date.now() > freshSchemaUntil) return; window.__gkLastAutoFit = Date.now(); try { network.fit({ animation: { duration: 450, easingFunction: 'easeInOutQuad' } }); } catch (_e) { /* ok */ } }, 220);
+}
+network.on('dragStart', () => { freshSchemaUntil = 0; });
+network.on('zoom', (p) => { if (p && p.direction && Date.now() - (window.__gkLastAutoFit || 0) > 1500) freshSchemaUntil = 0; });
 function updateLeftReserve() {
     const rp = (typeof readerPanel !== 'undefined' && readerPanel && !readerPanel.classList.contains('hidden') && isDesktopFolding()) ? readerPanel : null;
     const tp = document.getElementById('topicPanel'); const tpOn = tp && tp.classList.contains('on');
     const w = rp ? rp.getBoundingClientRect().width : (tpOn ? tp.getBoundingClientRect().width : 0);
     container.style.marginLeft = w ? Math.round(w) + 'px' : '';
+    refitIfFresh();
 }
 const topicUI = (() => {
     const panel = document.getElementById('topicPanel'), tab = document.getElementById('topicTab');
@@ -8830,6 +8844,7 @@ async function exportReportRtf() {
         view.classList.toggle('dv-wide', wNow >= WIDE_AT); view.classList.toggle('dv-pinned', pinned);
         const w = isOpen() && pinned ? wNow : 0;
         container.style.marginRight = w ? w + 'px' : '';
+        refitIfFresh();
         setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
     }
     function open(auto) {
