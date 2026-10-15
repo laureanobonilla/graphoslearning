@@ -1721,8 +1721,8 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview });
         // Escritorio: el esquema nace con su propio texto de solo lectura (panel izquierdo), sin bloquear al usuario.
-        if (isDesktopFolding() && !welcome) {
-            if (!isLong && !originPanelId) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
+        if (isDesktopFolding() && (!welcome || opts.topicText)) {
+            if (!isLong && (!originPanelId || opts.topicText)) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
             else if (isLong) setSourceTextAsSchemaText(attachToNodeId || data.root.id, topicText);
         }
     } catch (err) {
@@ -6301,7 +6301,7 @@ async function runAprendeHandoff() {
         if (!globalDocumentContext) { globalDocumentContext = title || topic; if (docContextInput) docContextInput.value = globalDocumentContext; updateDocContextChip(); }
     } else { currentDocumentText = topic; }
     track('aprende_schema_start', { sid, withText: text.length >= 200 });
-    await generateFullSchemaFromTopic(textForSchema, { originPanelId: 'main', welcome: true });
+    await generateFullSchemaFromTopic(textForSchema, { originPanelId: 'main', welcome: true, topicText: text.length < 200 });
     if (text.length >= 200) openReaderPanel();
     showOnbExampleNote();
     if (typeof maybeStartCoachTour === 'function') maybeStartCoachTour('aprende');
