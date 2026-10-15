@@ -108,6 +108,35 @@
         #readerContentContainer::-webkit-scrollbar, [data-role="contentContainer"]::-webkit-scrollbar { width: 10px; }
         #readerContentContainer::-webkit-scrollbar-thumb, [data-role="contentContainer"]::-webkit-scrollbar-thumb { background: #2c3458; border-radius: 8px; border: 2px solid #0b1022; }
         #readerContentContainer::-webkit-scrollbar-track, [data-role="contentContainer"]::-webkit-scrollbar-track { background: transparent; }
+        /* ===== «MI TEXTO» CON EL MISMO LIENZO DE LECTURA QUE EL TEXTO DEL TEMA ===== */
+        /* Mismas variables, tipografía (serif ~17.5px/1.75) y medida (~34em) que #topicPanel, para que pegar un texto
+           propio se sienta como la otra forma de llegar al mismo lugar, no como otra herramienta. Se quitan PDF, «Solo un tema»
+           y la barra de formato (el texto se guarda como párrafos simples, igual que el generado). */
+        .reader-panel-instance { --p-bg: #f7f6f1; --p-head: #fbfaf6; --p-ink: #1d2330; --p-mute: #5f6879; --p-rule: #dcd9ce; --p-acc: #0e857c; background: var(--p-bg) !important; border-color: var(--p-rule) !important; color: var(--p-ink); }
+        .reader-panel-instance [data-role="btnImportPdf"], .reader-panel-instance [data-role="pdfFileInput"], .reader-panel-instance [data-role="pdfRangeBar"],
+        .reader-panel-instance [data-role="modeTabs"], .reader-panel-instance [data-role="topicCard"], .reader-panel-instance [data-role="rtfToolbar"] { display: none !important; }
+        .reader-panel-instance [data-role="header"] { background: var(--p-head) !important; border-bottom: 1px solid var(--p-rule) !important; }
+        .reader-panel-instance [data-role="title"] { color: var(--p-ink) !important; font: 700 15px/1.3 'Sora', sans-serif !important; text-transform: none !important; letter-spacing: 0 !important; }
+        .reader-panel-instance [data-role="header"] button { background: #fff !important; border: 1px solid var(--p-rule) !important; color: var(--p-mute) !important; }
+        .reader-panel-instance [data-role="header"] button:hover { color: var(--p-acc) !important; border-color: var(--p-acc) !important; }
+        .reader-panel-instance [data-role="docContextChip"], .reader-panel-instance [data-role="docContextChip"] .text-slate-400 { color: var(--p-mute) !important; }
+        #readerContentContainer, [data-role="contentContainer"] { background-color: var(--p-bg, #f7f6f1) !important; }
+        #readerContentContainer::-webkit-scrollbar-thumb, [data-role="contentContainer"]::-webkit-scrollbar-thumb { background: #c9c5b7; border-color: #f7f6f1; }
+        #readerTextMode, [data-role="textMode"] { background-color: transparent !important; color: #1d2330 !important; border: 0 !important; box-shadow: none !important; padding: .25rem 0 !important; border-radius: 0 !important;
+            font: 400 17.5px/1.75 Charter, 'Iowan Old Style', 'Source Serif 4', Georgia, serif !important; letter-spacing: 0 !important; max-width: 34em; margin: 0 auto; }
+        #readerTextMode h1, #readerTextMode h2, #readerTextMode h3, #readerTextMode h4, [data-role="textMode"] h1, [data-role="textMode"] h2, [data-role="textMode"] h3 { color: #1d2330 !important; font-family: 'Sora', sans-serif; }
+        #readerTextMode blockquote { border-left-color: #cfcbbd; color: #3a4254; }
+        #readerTextMode a { color: #0e857c; }
+        #readerTextMode ::selection, [data-role="textMode"] ::selection { background: rgba(14,133,124,.25); }
+        #readerEmptyHint .text-slate-400, [data-role="emptyHint"] .text-slate-400 { color: #8a8f9c !important; font-family: Charter, Georgia, serif; }
+        #readerEmptyHint .text-indigo-600, [data-role="emptyHint"] .text-indigo-600 { color: #0e857c !important; }
+        .reader-panel-instance [data-role="emptyHint"] { left: 50%; right: auto; transform: translateX(-50%); width: min(34em, calc(100% - 3rem)); }
+        .reader-panel-instance [data-role="readerFooter"] { background: var(--p-head) !important; border-top: 1px solid var(--p-rule) !important; }
+        .reader-panel-instance [data-role="btnGenerate"] { background: var(--p-acc) !important; }
+        .reader-panel-instance [data-role="btnGenerate"]:hover { filter: brightness(1.08); }
+        .reader-panel-instance [data-role="btnAnalyzeText"] { background: #fff !important; color: var(--p-acc) !important; border: 1px solid var(--p-acc) !important; box-shadow: none !important; }
+        .reader-panel-instance [data-role="genHint"] { color: var(--p-mute) !important; }
+        .reader-panel-instance.gk-view-dock [data-role="textMode"], .reader-panel-instance.gk-view-full [data-role="textMode"] { zoom: 1; max-width: 34em; }
         /* Selector "Modo" y campos de la cabecera: más finos */
         #schemaLayoutMode { appearance: none; -webkit-appearance: none; padding-right: 1.6rem !important; cursor: pointer;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238a92b2' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E");
