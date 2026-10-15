@@ -1636,7 +1636,7 @@ const topicUI = (() => {
 function setSourceTextAsSchemaText(ownerId, text) {
     if (!topicUI || !nodes.get(ownerId)) return;
     isApplyingUndo = true;
-    try { nodes.update({ id: ownerId, schemaText: String(text).replace(/\r/g, '').trim().slice(0, 20000) }); } finally { isApplyingUndo = false; }
+    try { nodes.update({ id: ownerId, schemaText: String(text).replace(/\r/g, '').trim().slice(0, 30000) }); } finally { isApplyingUndo = false; }
     topicUI.show(ownerId, true);
 }
 async function attachTopicText(ownerId, topic, data) {
@@ -4479,7 +4479,7 @@ async function extractPdfRangeIntoReader(fromPage, toPage) {
 // (índice del PDF → títulos de capítulo → partes iguales) y se crea un proyecto con la lista de partes. Cada parte se
 // convierte, a pedido, en un subesquema dentro del mismo proyecto. Cuántas páginas entran a la vez depende de lo comprado.
 // ==========================================
-const PART_MAX_CHARS = 18000, PART_MIN_CHARS = 5000, PARTS_MODE_MIN_CHARS = 30000;
+const PART_MAX_CHARS = 28000, PART_MIN_CHARS = 5000, PARTS_MODE_MIN_CHARS = 30000;
 let docCache = { file: '', total: 0, pages: new Map() }; // texto de cada página, solo en memoria
 const LL = (es, en) => (typeof I18N !== 'undefined' && I18N.lang === 'en' ? en : es);
 
@@ -4513,7 +4513,10 @@ async function analyzePdfPages(doc, from, to, onProgress) {
         });
         flush();
         const text = paras.join('\n\n');
-        return { p, text, chars: text.length, heads };
+        const raw = lines.map(l => l.t);
+        // Una página de ÍNDICE: varias líneas «Capítulo… 26» / «1. Título, 26;» con números de página.
+        const tocHits = raw.filter(t => /^(cap[ií]tulo|chapter|parte|part|\d{1,2}\.)\b.*\s\d(\s?\d){0,3}\s*$/i.test(t) || /\.{3,}\s*\d+\s*$/.test(t)).length + (text.match(/,\s*\d{1,4}\s*[;.]/g) || []).length;
+        return { p, text, chars: text.length, heads, top: raw.slice(0, 5), raw: (p - from) < 40 ? raw : null, toc: tocHits >= 4, short: raw.filter(t => t.length < 90).slice(0, 80) };
     });
 }
 async function pdfOutlineEntries(doc, from, to) {
@@ -4532,6 +4535,101 @@ async function pdfOutlineEntries(doc, from, to) {
     }
     out.sort((a, b) => a.page - b.page);
     const seen = new Set(); return out.filter(e => { if (!e.title || seen.has(e.page)) return false; seen.add(e.page); return true; });
+}
+const ORD_WORDS = { primero: 1, primer: 1, primera: 1, segundo: 2, segunda: 2, tercero: 3, tercer: 3, tercera: 3, cuarto: 4, cuarta: 4, quinto: 5, quinta: 5, sexto: 6, sexta: 6, septimo: 7, septima: 7, octavo: 8, octava: 8, noveno: 9, novena: 9, decimo: 10, decima: 10, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+const normTxt = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/([a-z])-\s+([a-z])/g, '$1$2').replace(/[^a-z0-9ñ]+/g, ' ').trim();
+function prettyHeading(t) {
+    let x = String(t || '').replace(/\s+/g, ' ').replace(/\s*\d{1,4}\s*$/, '').trim();
+    if (x === x.toUpperCase()) {
+        x = x.toLowerCase().replace(/(^|[:.]\s+)(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+        x = x.replace(/^(cap[ií]tulo|chapter|parte|part)\s+([ivxlcdm]{1,7})\b/i, (m, a, b) => a + ' ' + b.toUpperCase());
+    }
+    return x.slice(0, 90);
+}
+// Estructura a partir del TEXTO de las páginas (no depende del tamaño de letra, que en libros escaneados es igual en todo):
+// «CAPÍTULO I / IV / 3 / QUINTO», «PARTE 2», portadillas «UNO», y secciones con nombre (Prefacio, Introducción, Conclusiones…).
+function pdfBodyHeadingEntries(pages) {
+    const reCh = /^(cap[ií]tulo|chapter|parte|part|libro|book|unidad|unit|lecci[oó]n|m[oó]dulo)\s+(?:([ivxlcdm]{1,7})|(\d{1,3})|([a-záéíóú]{3,10}))\b[\s:.\-—]*(.{0,50})$/i;
+    const reNamed = /^(prefacio|pr[oó]logo|prologue|preface|introducci[oó]n|introduction|conclusi[oó]n(es)?|conclusions?|ep[ií]logo|epilogue|ap[eé]ndices?|appendix|anexos?|bibliograf[ií]a|bibliography|glosario|glossary|notas)\s*\d{0,4}$/i;
+    const reDivider = /^(uno|dos|tres|cuatro|one|two|three|four)$/i;
+    const out = [];
+    pages.forEach(pg => {
+        if (pg.toc) return;
+        const top = pg.top || []; let hit = null;
+        for (let i = 0; i < Math.min(4, top.length) && !hit; i++) {
+            const t = top[i]; if (!t || t.length > 90) continue;
+            const m = reCh.exec(t);
+            if (m && (m[2] || m[3] || ORD_WORDS[normTxt(m[4])])) {
+                const rest = (m[5] || '').trim(); const nxt = top[i + 1] || '';
+                let title = t.replace(/\s*\d{1,4}\s*$/, '').trim();
+                if (!rest && nxt && nxt.length < 60 && !/\d\s*$/.test(nxt) && !/[.,;]$/.test(nxt) && !/^[a-záéíóú]/.test(nxt)) title += ': ' + nxt;
+                hit = { title: prettyHeading(title), page: pg.p, kind: 'chapter' };
+            } else if (i < 2 && reNamed.test(t) && !/^notas?\b/i.test(t)) hit = { title: prettyHeading(t.replace(/\s*\d{1,4}$/, '')), page: pg.p, kind: 'named' };
+            else if (i === 0 && reDivider.test(t) && pg.chars < 400) hit = { title: LL('Parte ', 'Part ') + t.toUpperCase(), page: pg.p, kind: 'divider' };
+        }
+        if (hit) out.push(hit);
+    });
+    // Los encabezados que se repiten en cada página («PREFACIO 9», «PREFACIO 13»…) cuentan una sola vez.
+    const dd = []; out.forEach(e => { const k = normTxt(e.title); if (dd.length && normTxt(dd[dd.length - 1].title) === k) return; dd.push(e); });
+    return dd;
+}
+// Si el índice impreso del libro trae las secciones de cada capítulo («1. Las cuatro similitudes, 26; 2. …»), se buscan en el
+// texto, siempre hacia adelante dentro del capítulo, y cada sección se vuelve una parte propia.
+function pdfRefineWithToc(pages, entries) {
+    const tocPages = pages.filter(pg => pg.toc && pg.raw); if (!tocPages.length) return entries;
+    const lines = tocPages.flatMap(pg => pg.raw);
+    const blocks = []; let cur = null;
+    lines.forEach(l => { if (/^(cap[ií]tulo|chapter)\b/i.test(l)) { cur = { head: l, text: '' }; blocks.push(cur); } else if (cur && !/^(\[[^\]]*\]|[ivxlcdm]{1,7}|\d{1,3})$/i.test(l) && !/^[ií]ndice$/i.test(l)) cur.text += ' ' + l; });
+    const chs = entries.filter(e => e.kind === 'chapter');
+    if (blocks.length < 2 || blocks.length !== chs.length) return entries;
+    const byPage = new Map(pages.map(pg => [pg.p, pg])); const lastPage = pages[pages.length - 1].p;
+    const out = [];
+    entries.forEach((e, idx) => {
+        if (e.kind !== 'chapter') { out.push(e); return; }
+        const ci = chs.indexOf(e), blk = blocks[ci];
+        const nextEntry = entries[idx + 1]; const end = nextEntry ? nextEntry.page - 1 : lastPage;
+        // título del índice si el del cuerpo no trae el nombre
+        let title = e.title; if (!/[:·]/.test(title)) { const tt = prettyHeading(blk.head); if (tt.length > title.length) title = tt; }
+        const pts = [{ page: e.page, title, kind: 'chapter' }];
+        const secs = []; blk.text.replace(/(\d{1,2})\s*\.\s+(.{3,90}?)\s*[,;]\s*(\d{1,4})(?=\s*(?:;\s*)?(?:\d{1,2}\s*\.\s|\.?\s*$))/g, (m, n, t, pn) => { secs.push({ n, t: t.replace(/\s*\b(?:[ivxlcdm]{1,6}\s+)?[íi]ndice\b/gi, '').replace(/\s+/g, ' ').replace(/-\s+(\p{L})/gu, '$1').trim(), pn: +pn }); return m; });
+        const found = []; let from = e.page;
+        secs.forEach(sc => {
+            const key = normTxt(sc.t).slice(0, 28); if (key.length < 6) return;
+            let hit = 0;   // 1.º como título (una línea corta que lo contiene); si no, en cualquier parte del texto
+            for (let pass = 0; pass < 2 && !hit; pass++) for (let p = from; p <= end; p++) {
+                const pg = byPage.get(p); if (!pg) continue;
+                if (pass === 0) { pg.sn = pg.sn || (pg.short || []).map(normTxt); if (pg.sn.some(l => l.length <= key.length + 14 && l.includes(key))) { hit = p; break; } }
+                else { pg.norm = pg.norm || normTxt(pg.text); if (pg.norm.includes(key)) { hit = p; break; } }
+            }
+            if (hit) { found.push({ n: sc.n, t: sc.t, page: hit, pn: sc.pn }); from = hit; }
+        });
+        if (secs.length >= 2 && found.length >= Math.max(2, Math.ceil(secs.length * 0.6))) {
+            // Las que el OCR no dejó encontrar se ubican con la página impresa del índice + el desfase que muestran las demás.
+            const offs = found.map(f => f.page - f.pn).sort((x, y) => x - y); const off = offs[Math.floor(offs.length / 2)];
+            const all = secs.map(sc => found.find(f => f.n === sc.n) || { n: sc.n, t: sc.t, page: sc.pn + off, guess: true });
+            let lastP = e.page - 1; const ok = [];
+            all.forEach(f => { if (f.page > lastP && f.page <= end) { ok.push(f); lastP = f.page; } });
+            ok.forEach(f => {
+                const last = pts[pts.length - 1];
+                const t = `${f.n}. ${f.t}`.slice(0, 90);
+                if (f.page <= last.page) { last.title = t; last.sec = true; } else pts.push({ page: f.page, title: t, kind: 'section', sec: true });
+            });
+        }
+        pts.forEach(x => { x.chapter = title; });
+        pts.forEach(x => out.push(x));
+    });
+    return out;
+}
+// Une la jerarquía: las portadillas «UNO / DOS» pasan a ser el grupo «Parte» de lo que sigue (y su página se suma al capítulo).
+function pdfAssignHierarchy(entries) {
+    const out = []; let part = '', carry = null;
+    entries.forEach(e => {
+        if (e.kind === 'divider') { part = e.title; carry = e.page; return; }
+        const x = { ...e }; if (carry != null) { x.page = Math.min(x.page, carry); carry = null; }
+        x.part = e.kind === 'named' ? '' : part; if (e.kind === 'named') part = '';
+        out.push(x);
+    });
+    return out;
 }
 function pdfHeadingEntries(pages) {
     // Títulos de estructura: «Capítulo 3», «Unidad 2»…, secciones con nombre propio (Introducción, Conclusiones…) y «1. Título» en letra grande.
@@ -4554,22 +4652,22 @@ function buildPdfParts(pages, entries, from, to) {
     let segs = [];
     if (entries.length >= 2) {
         const es = entries.slice(); if (es[0].page > from) es.unshift({ title: LL('Inicio', 'Start'), page: from });
-        es.forEach((e, i) => segs.push({ title: e.title, from: e.page, to: (i + 1 < es.length ? es[i + 1].page - 1 : to) }));
+        es.forEach((e, i) => segs.push({ title: e.sec ? e.title : (e.chapter || e.title), group: [e.part, e.sec ? e.chapter : ''].filter(Boolean).join(' · '), from: e.page, to: (i + 1 < es.length ? es[i + 1].page - 1 : to) }));
     } else segs = [{ title: '', from, to }];
     const out = [];
     segs.forEach(sg => {   // lo demasiado grande se parte en trozos iguales de páginas
         const n = sg.to - sg.from + 1, k = Math.min(n, Math.max(1, Math.ceil(charsOf(sg.from, sg.to) / (PART_MAX_CHARS * 0.85))));
         if (k <= 1) { out.push({ ...sg }); return; }
-        for (let i = 0; i < k; i++) { const a = sg.from + Math.round(i * n / k), b = sg.from + Math.round((i + 1) * n / k) - 1; if (b < a) continue; out.push({ title: sg.title ? `${sg.title} · ${i + 1}/${k}` : '', from: a, to: b }); }
+        for (let i = 0; i < k; i++) { const a = sg.from + Math.round(i * n / k), b = sg.from + Math.round((i + 1) * n / k) - 1; if (b < a) continue; out.push({ title: sg.title ? `${sg.title} (${i + 1}/${k})` : '', group: sg.group, from: a, to: b }); }
     });
     const merged = [];   // lo diminuto se une con lo que sigue
     out.forEach(sg => {
         const last = merged[merged.length - 1];
         if (last && charsOf(last.from, last.to) < PART_MIN_CHARS && charsOf(last.from, sg.to) <= PART_MAX_CHARS) {
-            last.to = sg.to; if (sg.title && last.title && last.title !== sg.title) last.title = (last.title + ' – ' + sg.title).slice(0, 80);
+            last.to = sg.to; if (sg.group !== last.group) { last.title = sg.title; last.group = sg.group; } else if (sg.title && last.title && last.title !== sg.title) last.title = (last.title + ' – ' + sg.title).slice(0, 80);
         } else merged.push({ ...sg });
     });
-    return merged.filter(sg => charsOf(sg.from, sg.to) >= 200).map((sg, i) => ({ id: 'p' + (i + 1), title: sg.title || LL(`Páginas ${sg.from}–${sg.to}`, `Pages ${sg.from}–${sg.to}`), from: sg.from, to: sg.to, chars: charsOf(sg.from, sg.to), sub: null }));
+    return merged.filter(sg => charsOf(sg.from, sg.to) >= 200).map((sg, i) => ({ id: 'p' + (i + 1), title: sg.title || LL(`Páginas ${sg.from}–${sg.to}`, `Pages ${sg.from}–${sg.to}`), from: sg.from, to: sg.to, chars: charsOf(sg.from, sg.to), group: sg.group || '', sub: null }));
 }
 async function startDocumentProject(doc, fileName, from, to, parts, by) {
     const title = String(fileName || 'PDF').replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 70) || LL('Documento', 'Document');
@@ -4627,7 +4725,7 @@ async function generateDocPart(hostId, partId, overrideText) {
     if (part.sub && nodes.get(part.sub)) { enterSubscheme(part.sub); return; }
     docPartBusy = true;
     try {
-    const text = (overrideText && overrideText.trim().length > 200) ? overrideText.trim().slice(0, 20000) : await ensurePartText(d, part);
+    const text = (overrideText && overrideText.trim().length > 200) ? overrideText.trim().slice(0, 30000) : await ensurePartText(d, part);
     if (!text) return;
     track('pdf_part_generate', { part: d.parts.indexOf(part) + 1, of: d.parts.length, chars: text.length });
     await generateSubschemeFromNode(hostId, {
@@ -4663,6 +4761,7 @@ btnPdfRangeLoad?.addEventListener('click', async () => {
     showLoader(LL('Buscando las partes del documento…', 'Finding the parts of the document…'));
     let by = 'outline', entries = [];
     try { entries = await pdfOutlineEntries(doc, from, to); } catch (_e) { entries = []; }
+    if (entries.length < 2) { by = 'headings'; entries = pdfBodyHeadingEntries(pages); if (entries.length >= 2) entries = pdfAssignHierarchy(pdfRefineWithToc(pages, entries)); }
     if (entries.length < 2) { by = 'headings'; entries = pdfHeadingEntries(pages); }
     if (entries.length < 2) { by = 'equal'; entries = []; }
     const parts = buildPdfParts(pages, entries, from, to);
@@ -5137,7 +5236,7 @@ async function generateSubschemeFromNode(nodeId, opts = {}) {
     const fromText = typeof opts.text === 'string' && opts.text.trim();
     const existing = fromText ? null : findPointerFor(nodeId);
     if (existing) { track('subscheme_pointer_opened', { source: 'menu' }); enterSubscheme(existing.id); return existing.id; }
-    const topic = fromText ? opts.text.trim().slice(0, 12000) : (node.baseTitle || String(node.label || '').replace(/\*/g, '').trim());
+    const topic = fromText ? opts.text.trim().slice(0, 30000) : (node.baseTitle || String(node.label || '').replace(/\*/g, '').trim());
     const title = String(opts.title || topic).replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!topic || !checkBalance(1)) return null;
     track('schema_generate_attempt', { mode: 'from_node', length: topic.length, layoutMode: schemaLayoutMode, topicPreview: topic.slice(0, 60) });
@@ -8956,7 +9055,7 @@ const readerParts = (() => {
         document.getElementById('rpBar').style.width = Math.round(done / n * 100) + '%';
         const how = d.by === 'outline' ? LL('según el índice del PDF', 'from the PDF index') : d.by === 'headings' ? LL('según los títulos del documento', 'from the document headings') : LL('en partes iguales', 'in equal parts');
         document.getElementById('rpHow').textContent = LL(`Dividido ${how}`, `Split ${how}`);
-        list.innerHTML = d.parts.map((p, i) => `<div class="rp-row${p.id === selId ? ' sel' : ''}${isDone(p) ? ' done' : ''}" role="radio" aria-checked="${p.id === selId}" tabindex="0" data-id="${esc(p.id)}"><span class="rp-radio"></span><span class="rp-t"><b>${esc(p.title)}</b><small>${esc(LL('págs.', 'pp.'))} ${p.from}–${p.to}</small></span>${isDone(p) ? '<span class="rp-ok" title="' + esc(LL('Ya tiene esquema', 'Already mapped')) + '">✓</span>' : ''}</div>`).join('');
+        let lastG = null; list.innerHTML = d.parts.map((p, i) => (p.group && p.group !== lastG ? (lastG = p.group, `<div class="rp-grp">${esc(p.group)}</div>`) : '') + `<div class="rp-row${p.id === selId ? ' sel' : ''}${isDone(p) ? ' done' : ''}" role="radio" aria-checked="${p.id === selId}" tabindex="0" data-id="${esc(p.id)}"><span class="rp-radio"></span><span class="rp-t"><b>${esc(p.title)}</b><small>${esc(LL('págs.', 'pp.'))} ${p.from}–${p.to}</small></span>${isDone(p) ? '<span class="rp-ok" title="' + esc(LL('Ya tiene esquema', 'Already mapped')) + '">✓</span>' : ''}</div>`).join('');
         labels();
     }
     const pickRow = (id) => {
