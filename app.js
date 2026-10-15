@@ -7490,6 +7490,39 @@ document.getElementById('btnClearReader')?.addEventListener('click', async () =>
     }
 });
 
+
+// EXPORTAR A POWERPOINT (escritorio): el esquema visible + sus definiciones, en una presentación ordenada (ver pptx-export.js).
+function buildPptxModel() {
+    const real = (n) => n && !n.isSubscheme && !n.isPointer;
+    const label = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).replace(/\s+/g, ' ').trim();
+    const hasIn = new Set(edges.get().map(e => String(e.to)));
+    const roots = nodes.get().filter(n => real(n) && !hasIn.has(String(n.id)) && label(n)).sort((a, b) => (a.depthLevel ?? 0) - (b.depthLevel ?? 0));
+    if (!roots.length) return null;
+    const seen = new Set();
+    const conv = (n) => {
+        seen.add(String(n.id));
+        const kids = childEdgesOf(n.id).map(e => nodes.get(e.to)).filter(k => real(k) && label(k) && !seen.has(String(k.id)));
+        return { label: label(n), def: n.definition || '', simple: n.simple || n.simpleExplanation || '', example: n.example || '', children: kids.map(conv) };
+    };
+    const trees = roots.map(conv);
+    const projName = (typeof currentProjectName !== 'undefined' && currentProjectName) ? String(currentProjectName) : '';
+    const root = trees.length === 1 ? trees[0] : { label: projName || trees[0].label, def: '', simple: '', example: '', children: trees };
+    return { title: root.label, lang: (typeof I18N !== 'undefined' && I18N.lang === 'en') ? 'en' : 'es', date: new Date().toISOString().slice(0, 10), root };
+}
+document.getElementById('btnExportPptx')?.addEventListener('click', async () => {
+    if (nodes.length === 0) { appAlert(tr("js.el_lienzo_esta_vacio")); return; }
+    const model = buildPptxModel(); if (!model || typeof GKPptx === 'undefined') { appAlert(LL('No se pudo preparar la presentación.', 'Could not prepare the presentation.')); return; }
+    showLoader(LL('Preparando la presentación…', 'Preparing the presentation…'));
+    try {
+        const blob = await GKPptx.toBlob(model);
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = (model.title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60) || 'Graphikosmos') + '.pptx';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+        const total = (function c(n) { return 1 + n.children.reduce((t, x) => t + c(x), 0); })(model.root);
+        track('pptx_export', { nodes: total, withDefs: nodes.get().filter(n => n.definition).length });
+    } catch (err) { console.error(err); appAlert(LL('No se pudo crear la presentación.', 'Could not create the presentation.')); } finally { hideLoader(); }
+});
+
 document.getElementById('btnCapture')?.addEventListener('click', () => {
     if (nodes.length === 0) {
         appAlert(tr("js.el_lienzo_esta_vacio"));
