@@ -2,7 +2,7 @@
 //   pista (quitar la voz), voz (solo la voz), limpiar (quitar ruido) → Replicate; letra → Replicate (Whisper);
 //   ajustar (tono, velocidad, recorte, MP3) → todo en el navegador de la persona, aquí solo se registra el pago.
 // Tabla aud_jobs: supabase/tu-audio.sql. Variables: REPLICATE_API_TOKEN (+ opcionales REPLICATE_MODEL, REPLICATE_WHISPER_MODEL,
-// REPLICATE_DENOISE_MODEL [sin ella, «limpiar» no aparece], REPLICATE_DENOISE_INPUT, AUD_PRICE_*).
+// REPLICATE_DENOISE_MODEL [opcional: otro modelo para «limpiar»; por defecto resemble-ai/resemble-enhance], REPLICATE_DENOISE_INPUT, AUD_PRICE_*).
 const crypto = require('crypto');
 const ins = require('./ins-core');
 const cs = ins;
@@ -10,7 +10,7 @@ const cs = ins;
 const TOOLS = {
     pista:   { price: process.env.AUD_PRICE_PISTA   || '4.99', server: true,  kind: 'audio' },
     voz:     { price: process.env.AUD_PRICE_VOZ     || '4.99', server: true,  kind: 'audio' },
-    limpiar: { price: process.env.AUD_PRICE_LIMPIAR || '4.99', server: true,  kind: 'audio', needs: 'REPLICATE_DENOISE_MODEL' },
+    limpiar: { price: process.env.AUD_PRICE_LIMPIAR || '4.99', server: true,  kind: 'audio' },
     letra:   { price: process.env.AUD_PRICE_LETRA   || '1.99', server: true,  kind: 'text' },
     ajustar: { price: process.env.AUD_PRICE_AJUSTAR || '1.99', server: false, kind: 'local' }
 };
@@ -46,8 +46,11 @@ async function versionOf(model, override) {
 function replicateInput(tool, audioUrl) {
     if (tool === 'pista' || tool === 'voz') return { model: process.env.REPLICATE_MODEL || 'ryan5453/demucs', version: process.env.REPLICATE_VERSION, input: { audio: audioUrl, stem: 'vocals', output_format: 'mp3', mp3_bitrate: 192 } };
     if (tool === 'letra') return { model: process.env.REPLICATE_WHISPER_MODEL || 'openai/whisper', version: process.env.REPLICATE_WHISPER_VERSION, input: { audio: audioUrl, transcription: 'plain text', translate: false, language: 'auto' } };
+    // «Limpiar ruido»: por defecto resemble-ai/resemble-enhance con denoise_flag (solo quita el ruido, no regenera la voz).
+    // Si se define REPLICATE_DENOISE_MODEL se usa ese otro modelo (entrada: «audio» + lo de REPLICATE_DENOISE_INPUT).
     let extra = {}; try { extra = JSON.parse(process.env.REPLICATE_DENOISE_INPUT || '{}'); } catch (_e) { /* se ignora */ }
-    return { model: process.env.REPLICATE_DENOISE_MODEL, version: process.env.REPLICATE_DENOISE_VERSION, input: { audio: audioUrl, ...extra } };
+    if (process.env.REPLICATE_DENOISE_MODEL) return { model: process.env.REPLICATE_DENOISE_MODEL, version: process.env.REPLICATE_DENOISE_VERSION, input: { audio: audioUrl, ...extra } };
+    return { model: 'resemble-ai/resemble-enhance', version: process.env.REPLICATE_DENOISE_VERSION, input: { input_audio: audioUrl, denoise_flag: true, ...extra } };
 }
 async function startPrediction(tool, audioUrl) {
     const r = replicateInput(tool, audioUrl), version = await versionOf(r.model, r.version);
