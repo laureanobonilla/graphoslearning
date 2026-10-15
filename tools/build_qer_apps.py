@@ -42,4 +42,13 @@ for a in APPS:
         p = f'{a}/prueba/{stale}'
         if os.path.exists(p): os.remove(p)
     open(f'{a}/prueba/index.html', 'w', encoding='utf8').write(out)
+    if a == 'quien-eres':
+        # --- variante «sellada»: sin ningún resultado a la vista, una frase y el pago directo (ver SEALED en qer-shared/qer-app.js) ---
+        sealed = '<script>window.QER_SEALED = ' + json.dumps({'phrase': 'Hay algo que respondiste sin darte cuenta, y dice más de ti que todo lo demás.', 'lead': 'Ver mi lectura completa'}, ensure_ascii=False) + ';</script>'
+        cfgabs = lambda s: s.replace('<script src="config.js"></script>', f'<script src="/{a}/config.js"></script>')
+        os.makedirs(f'{a}/sellado/prueba', exist_ok=True)
+        s1 = cfgabs(fill(tpl, sealed)).replace('<title>', '<meta name="robots" content="noindex, nofollow">\n<title>', 1)
+        open(f'{a}/sellado/index.html', 'w', encoding='utf8').write(s1)
+        s2 = cfgabs(fill(tpl, test + sealed)).replace('<title>', '<meta name="robots" content="noindex, nofollow">\n<title>Prueba sellada · ', 1)
+        open(f'{a}/sellado/prueba/index.html', 'w', encoding='utf8').write(s2)
     print('ok', a)

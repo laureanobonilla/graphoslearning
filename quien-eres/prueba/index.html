@@ -165,6 +165,11 @@
   /* Ancla de compromiso: deliberadamente discreta (no es el gancho, es el
      contexto antes del gancho) — letra chica, en mayúsculas espaciadas como
      una "credencial" ganada, no como un titular. */
+  /* Variante «sellada» (window.QER_SEALED): sin ningún resultado a la vista; una frase y el pago. */
+  .sealed-phrase{ display:none; text-align:center; font-size:1.4rem; line-height:1.4; font-weight:500; color:#fff; margin: 4px 0 26px; }
+  body.sealed .sealed-phrase{ display:block; }
+  body.sealed .paywall-commitment, body.sealed .paywall-label, body.sealed .pay-covers, body.sealed #btnSkipPaywall{ display:none; }
+  body.sealed .paywall-price{ font-size: 1.02rem; }
   .paywall-commitment{ text-align:center; color: #c9a08f; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px; opacity: 0.85; }
   .paywall-label{ font-family:'Fraunces', serif; font-size: 1.15rem; line-height: 1.35; font-weight:500; text-align:center; margin: 0 0 10px; }
   .paywall-price{ text-align:center; color: #e9c9ba; font-size: 0.92rem; margin-bottom: 20px; }
@@ -527,6 +532,7 @@
   <section id="screen-pay" class="screen">
     <div id="paywall" class="paywall">
       <div id="payBlock">
+        <p id="sealedPhrase" class="sealed-phrase display"></p>
         <p id="paywallCommitment" class="paywall-commitment"></p>
         <p class="paywall-label display" data-t="n_pay_title"></p>
         <p class="paywall-price"><span data-t="n_pay_price_pre"></span> <b id="priceLabel"></b></p>

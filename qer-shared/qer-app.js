@@ -14,10 +14,10 @@
 // ==========================================
 (function () {
 'use strict';
-const CFG = window.QER_CFG, PAY = window.QER_PAY, TEST = window.QER_TEST || null;
+const CFG = window.QER_CFG, PAY = window.QER_PAY, TEST = window.QER_TEST || null, SEALED = window.QER_SEALED || null;
 const STR = (window.QER_STR || {})[window.QER_CFG.lang] || {};
 const APP = CFG.app, QUESTIONS = CFG.questions, TOTAL = QUESTIONS.length;
-const PAYWALL_VERSION = 'paid1';
+const PAYWALL_VERSION = SEALED ? 'sealed1' : 'paid1';   // sealed1 = ningún resultado a la vista: una frase y el pago (quien-eres/sellado/)
 const $ = (id) => document.getElementById(id);
 
 // --- textos ---
@@ -50,7 +50,7 @@ function track(eventName, metadata) {
   try {
     fetch('/.netlify/functions/qer-track-event', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: eventName, anonId, app: APP, metadata: { ...(metadata || {}), variant: 'paid', lang: CFG.lang, kind: CFG.kind, ...(eventName === 'landing_viewed' ? utm : {}) } })
+      body: JSON.stringify({ event: eventName, anonId, app: APP, metadata: { ...(metadata || {}), variant: SEALED ? 'sealed' : 'paid', lang: CFG.lang, kind: CFG.kind, ...(eventName === 'landing_viewed' ? utm : {}) } })
     }).catch(() => {});
   } catch { /* no crítico */ }
 }
@@ -419,6 +419,14 @@ function renderReveal(data, opts) {
   if (opts && opts.skipPaywall) return;
   savePending({ readingId: data.readingId, format: CFG.format, archetypeName: data.archetypeName, hookLine: data.hookLine, nodes: chapters, preview: previewData, stats: statsData });
   track('reveal_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION, hasPreview: !!previewData, totalChapters: chapters.length });
+  if (SEALED) showSealed();
+}
+// Variante sellada: el resultado existe pero no se enseña nada; solo una frase y directo al pago (PayPal).
+function showSealed() {
+  document.body.classList.add('sealed');
+  $('sealedPhrase').textContent = SEALED.phrase || '';
+  track('sealed_shown', { paywallVersion: PAYWALL_VERSION });
+  showPay();
 }
 function setupHelpLinks(id, arch) {
   const msg = tt('help_wa_msg', { arch: arch ? ` "${arch}"` : '', id });
@@ -474,10 +482,11 @@ function showPay(forceReal) {
   $('skippedNote').classList.add('is-hidden'); $('payBlock').classList.remove('is-hidden');
   $('paywallCommitment').textContent = tt('pay_commitment', { n: TOTAL });
   $('payCovers').textContent = tt('n_pay_covers', { c: chapters.length });
+  if (SEALED && SEALED.lead) { const pre = document.querySelector('.paywall-price span'); if (pre) pre.textContent = SEALED.lead; }
   showScreen('pay');
   track('paywall_shown', { archetypeName: archetypeNameForShare, paywallVersion: PAYWALL_VERSION, freeChapters: 0, totalChapters: chapters.length });
   watchPaywallInView();
-  if (TEST && !forceReal) {
+  if (TEST && !forceReal && !SEALED) {
     $('payIntl').classList.add('is-hidden'); $('payChecking').classList.add('is-hidden');
     $('payTest').classList.remove('is-hidden');
     priceInfo().then(i => { $('priceLabel').textContent = i.shown; });
@@ -549,7 +558,7 @@ async function mountPaypal(forReadingId) {
 const PAID_KEY = `qer_paid_${APP}`;
 function readingLink() { return `${location.origin}/${APP}/?r=${encodeURIComponent(readingId)}`; }
 function unlockReading(view) {
-  unlocking = false; clearPending(); readUnlocked = true;
+  unlocking = false; clearPending(); readUnlocked = true; document.body.classList.remove('sealed');
   if (view.readingId) readingId = view.readingId;
   const list = Array.isArray(view.nodes) ? view.nodes : null;
   if (!chapters.length && list) chapters = list.map(n => ({ id: n.id, label: n.label, hook: '', teaser: '', text: n.text }));

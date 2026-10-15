@@ -215,3 +215,6 @@ Resultado cerrado con candado + adelantos (perfil borroso, rasgo más fuerte, t�
 PayPal por la API de pedidos (el servidor verifica y manda la lectura por correo); SINPE (Costa Rica) sigue como desbloqueo de confianza.
 Variables: PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET (/ PAYPAL_ENV), QER_PRICE_USD (def. 2.00), RESEND_API_KEY, QER_FROM_EMAIL (dominio verificado en Resend para escribir a clientes), QER_TEST_KEY (opcional, página de prueba).
 Prueba del dueño: /quien-eres/prueba/?k=QER_TEST_KEY. Se reconstruye con `python3 tools/build_qer_apps.py`.
+
+## Variante «sellada» (2026-10-15)
+`/quien-eres/sellado/` (noindex): al terminar el cuestionario no se muestra ningún resultado; solo una frase (`QER_SEALED.phrase`, en `tools/build_qer_apps.py`) y los botones de PayPal con el precio del servidor. Al pagar se abre la lectura completa como siempre. Eventos con `variant:'sealed'`, `paywallVersion:'sealed1'`, más `sealed_shown`. Versión de prueba (respuestas cargadas, sin eventos): `/quien-eres/sellado/prueba/`.
