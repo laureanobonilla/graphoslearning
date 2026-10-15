@@ -54,6 +54,7 @@ let edges = new vis.DataSet([]);
 const MAX_UNDO_STEPS = 40;
 let undoStack = [];
 let isApplyingUndo = false;
+let pdfMaxPages = 40; // páginas de PDF que puede cargar a la vez; el servidor lo manda en /balance según lo comprado
 let undoSnapshotWindowOpen = false;
 
 function snapshotSchemaState() {
@@ -792,6 +793,7 @@ async function refreshBalanceFromServer() {
     isAdmin = data.kind === 'admin';
     isGuestUser = data.kind === 'guest';
     availableNodes = typeof data.balance === 'number' ? data.balance : 0;
+    if (typeof data.pdfMaxPages === 'number') pdfMaxPages = data.pdfMaxPages;
     balanceKnown = true;
     updateCounterDisplay();
 }
@@ -4278,7 +4280,10 @@ async function handlePdfFileSelected(file) {
         if (pdfRangeFileName) pdfRangeFileName.textContent = file.name;
         if (pdfRangeTotal) pdfRangeTotal.textContent = String(doc.numPages);
         if (pdfRangeFrom) { pdfRangeFrom.max = String(doc.numPages); pdfRangeFrom.value = '1'; }
-        if (pdfRangeTo) { pdfRangeTo.max = String(doc.numPages); pdfRangeTo.value = String(Math.min(doc.numPages, MAX_PDF_DEFAULT_PAGES)); }
+        try { await refreshBalanceFromServer(); } catch (_e) { /* se usa el último límite conocido */ }
+        if (pdfRangeTo) { pdfRangeTo.max = String(doc.numPages); pdfRangeTo.value = String(Math.min(doc.numPages, MAX_PDF_DEFAULT_PAGES, pdfMaxPages)); }
+        const lim = document.getElementById('pdfLimitHint');
+        if (lim) lim.textContent = (I18N.lang === 'en' ? 'Your limit: up to ' : 'Tu límite: hasta ') + pdfMaxPages + (I18N.lang === 'en' ? ' pages at a time. ' : ' páginas a la vez. ') + (doc.numPages > pdfMaxPages ? (I18N.lang === 'en' ? 'This PDF has ' + doc.numPages + '; load it in ranges.' : 'Este PDF tiene ' + doc.numPages + '; cárgalo por rangos.') : '');
         pdfRangeBar?.classList.remove('hidden');
         pdfRangeBar?.classList.add('flex');
         track('pdf_import_selected', { pages: doc.numPages, sizeKb: Math.round(file.size / 1024) });
@@ -4469,13 +4474,183 @@ async function extractPdfRangeIntoReader(fromPage, toPage) {
     }
 }
 
-btnPdfRangeLoad?.addEventListener('click', () => {
+// ==========================================
+// PDF POR PARTES. Un PDF largo no se vuelca en un solo esquema: se lee entero (en el navegador), se busca su estructura
+// (índice del PDF → títulos de capítulo → partes iguales) y se crea un proyecto con la lista de partes. Cada parte se
+// convierte, a pedido, en un subesquema dentro del mismo proyecto. Cuántas páginas entran a la vez depende de lo comprado.
+// ==========================================
+const PART_MAX_CHARS = 18000, PART_MIN_CHARS = 5000, PARTS_MODE_MIN_CHARS = 30000;
+let docCache = { file: '', total: 0, pages: new Map() }; // texto de cada página, solo en memoria
+const LL = (es, en) => (typeof I18N !== 'undefined' && I18N.lang === 'en' ? en : es);
+
+function pdfLineText(line) {
+    let out = '', prevEnd = null;
+    line.items.forEach(e => {
+        const t = e.item.str || '';
+        if (!t) { prevEnd = e.x + (e.item.width || 0); return; }
+        if (prevEnd != null && !/^\s/.test(t) && !out.endsWith(' ') && (e.x - prevEnd) > e.height * 0.22) out += ' ';
+        out += t; prevEnd = e.x + (e.item.width || 0);
+    });
+    return out.replace(/\s+/g, ' ').trim();
+}
+async function analyzePdfPages(doc, from, to, onProgress) {
+    const raw = [], heights = [];
+    for (let p = from; p <= to; p++) {
+        const page = await doc.getPage(p); const content = await page.getTextContent();
+        const lines = groupPdfItemsIntoLines(content.items).map(l => ({ y: l.y, h: Math.max(...l.items.map(i => i.height)), t: pdfLineText(l) })).filter(l => l.t);
+        lines.forEach(l => heights.push(l.h)); raw.push({ p, lines });
+        try { page.cleanup(); } catch (_e) { /* ok */ }
+        if (onProgress) onProgress(p - from + 1, to - from + 1);
+    }
+    const body = medianOfNumbers(heights) || 10;
+    return raw.map(({ p, lines }) => {
+        const paras = [], heads = []; let cur = [], prevY = null;
+        const flush = () => { if (cur.length) { paras.push(cur.join(' ')); cur = []; } };
+        lines.forEach((l, i) => {
+            if (l.h > body * 1.18 && l.t.length < 140) { flush(); paras.push(l.t); if (i < 6) heads.push({ t: l.t, ratio: l.h / body }); prevY = l.y; return; }
+            if (prevY != null && (prevY - l.y) > body * 1.6) flush();
+            cur.push(l.t); prevY = l.y;
+        });
+        flush();
+        const text = paras.join('\n\n');
+        return { p, text, chars: text.length, heads };
+    });
+}
+async function pdfOutlineEntries(doc, from, to) {
+    let ol = null; try { ol = await doc.getOutline(); } catch (_e) { return []; }
+    if (!ol || !ol.length) return [];
+    let list = ol; if (list.length === 1 && list[0].items && list[0].items.length >= 2) list = list[0].items;
+    const out = [];
+    for (const it of list) {
+        let idx = null;
+        try {
+            let d = it.dest; if (typeof d === 'string') d = await doc.getDestination(d);
+            if (Array.isArray(d)) { const ref = d[0]; idx = (typeof ref === 'number') ? ref : await doc.getPageIndex(ref); }
+        } catch (_e) { /* destino ilegible: se salta */ }
+        if (idx == null) continue; const page = idx + 1; if (page < from || page > to) continue;
+        out.push({ title: String(it.title || '').replace(/\s+/g, ' ').trim(), page });
+    }
+    out.sort((a, b) => a.page - b.page);
+    const seen = new Set(); return out.filter(e => { if (!e.title || seen.has(e.page)) return false; seen.add(e.page); return true; });
+}
+function pdfHeadingEntries(pages) {
+    const re = /^(cap[ií]tulo|chapter|parte|part|unidad|unit|tema|lecci[oó]n|secci[oó]n|m[oó]dulo)\s+([ivxlcdm]+|\d+)/i, out = [];
+    pages.forEach(pg => { const h = pg.heads.find(x => x.ratio > 1.35 && re.test(x.t)); if (h) out.push({ title: h.t.slice(0, 80), page: pg.p }); });
+    return out;
+}
+function buildPdfParts(pages, entries, from, to) {
+    const charsOf = (a, b) => pages.filter(x => x.p >= a && x.p <= b).reduce((t, x) => t + x.chars, 0);
+    let segs = [];
+    if (entries.length >= 2) {
+        const es = entries.slice(); if (es[0].page > from) es.unshift({ title: LL('Inicio', 'Start'), page: from });
+        es.forEach((e, i) => segs.push({ title: e.title, from: e.page, to: (i + 1 < es.length ? es[i + 1].page - 1 : to) }));
+    } else segs = [{ title: '', from, to }];
+    const out = [];
+    segs.forEach(sg => {   // lo demasiado grande se parte en trozos iguales de páginas
+        const n = sg.to - sg.from + 1, k = Math.min(n, Math.max(1, Math.ceil(charsOf(sg.from, sg.to) / (PART_MAX_CHARS * 0.85))));
+        if (k <= 1) { out.push({ ...sg }); return; }
+        for (let i = 0; i < k; i++) { const a = sg.from + Math.round(i * n / k), b = sg.from + Math.round((i + 1) * n / k) - 1; if (b < a) continue; out.push({ title: sg.title ? `${sg.title} · ${i + 1}/${k}` : '', from: a, to: b }); }
+    });
+    const merged = [];   // lo diminuto se une con lo que sigue
+    out.forEach(sg => {
+        const last = merged[merged.length - 1];
+        if (last && charsOf(last.from, last.to) < PART_MIN_CHARS && charsOf(last.from, sg.to) <= PART_MAX_CHARS) {
+            last.to = sg.to; if (sg.title && last.title && last.title !== sg.title) last.title = (last.title + ' – ' + sg.title).slice(0, 80);
+        } else merged.push({ ...sg });
+    });
+    return merged.filter(sg => charsOf(sg.from, sg.to) >= 200).map((sg, i) => ({ id: 'p' + (i + 1), title: sg.title || LL(`Páginas ${sg.from}–${sg.to}`, `Pages ${sg.from}–${sg.to}`), from: sg.from, to: sg.to, chars: charsOf(sg.from, sg.to), sub: null }));
+}
+async function startDocumentProject(doc, fileName, from, to, parts, by) {
+    const title = String(fileName || 'PDF').replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 70) || LL('Documento', 'Document');
+    let x, y; const vc = network.getViewPosition();
+    if (nodes.length > 0) {
+        const clear = schemeStack.length === 0 && await appConfirm(tr("js.ya_tienes_un_esquema_en"), { title: tr("js.limpiar_el_lienzo"), okText: tr("js.si_crear_proyecto_nuevo"), cancelText: tr("js.no_agregar_al_actual") });
+        if (clear) {
+            isClearingCanvas = true; clearTimeout(window._binSaveTimer); currentProjectId = null; localStorage.removeItem('gk_current_project_id');
+            nodes.clear(); edges.clear(); isClearingCanvas = false; x = vc.x; y = vc.y;
+        } else {
+            const xs = Object.values(network.getPositions()).map(pp => pp.x); x = (xs.length ? Math.max(...xs) : vc.x) + 420; y = vc.y;
+        }
+    } else { x = vc.x; y = vc.y; }
+    const id = 'doc_' + Date.now().toString(36);
+    nodes.add({
+        id, label: `*${title}*`, baseTitle: title, color: colorForDepth(0), x, y, fixed: { x: false, y: false },
+        widthConstraint: { minimum: 140, maximum: 220 }, depthLevel: 0,
+        docParts: { file: fileName || 'PDF', total: doc.numPages, from, to, by, parts }
+    });
+    setTimeout(() => { try { network.fit({ animation: { duration: 400 } }); } catch (_e) { /* ok */ } }, 80);
+    track('pdf_parts_start', { pages: to - from + 1, parts: parts.length, by });
+    if (typeof vizUI !== 'undefined' && vizUI) setTimeout(() => vizUI.openParts(), 300);
+}
+function pickPdfFile() {
+    return new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'application/pdf'; i.onchange = () => res((i.files && i.files[0]) || null); i.oncancel = () => res(null); i.click(); });
+}
+async function ensurePartText(d, part) {
+    const get = () => {
+        if (docCache.file !== d.file || docCache.total !== d.total) return null;
+        const t = []; for (let p = part.from; p <= part.to; p++) { const x = docCache.pages.get(p); if (x == null) return null; t.push(x); }
+        return t.join('\n\n').trim();
+    };
+    const have = get(); if (have) return have;
+    const ok = await appConfirm(LL(`Para crear esta parte necesito el PDF «${d.file}» otra vez (no se guarda dentro del proyecto). ¿Lo eliges ahora?`, `To build this part I need the PDF “${d.file}” again (it is not stored in the project). Choose it now?`), { title: LL('Elige el PDF', 'Choose the PDF'), okText: LL('Elegir PDF', 'Choose PDF'), cancelText: LL('Ahora no', 'Not now') });
+    if (!ok) return null;
+    const file = await pickPdfFile(); if (!file) return null;
+    showLoader(LL('Leyendo el PDF…', 'Reading the PDF…'));
+    try {
+        const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+        if (doc.numPages !== d.total) { appAlert(LL(`Ese PDF tiene ${doc.numPages} páginas y el del proyecto tenía ${d.total}. Elige el mismo archivo.`, `That PDF has ${doc.numPages} pages but the project's had ${d.total}. Choose the same file.`)); return null; }
+        const pages = await analyzePdfPages(doc, d.from, d.to, (a, b) => showLoader(LL(`Leyendo página ${a} de ${b}…`, `Reading page ${a} of ${b}…`)));
+        docCache = { file: d.file, total: d.total, pages: new Map(pages.map(pg => [pg.p, pg.text])) };
+    } catch (_e) { appAlert(tr("js.no_se_pudo_leer_ese")); return null; } finally { hideLoader(); }
+    return get();
+}
+async function generateDocPart(hostId, partId) {
+    const host = nodes.get(hostId), d = host && host.docParts; if (!d) return;
+    const part = d.parts.find(x => x.id === partId); if (!part) return;
+    if (part.sub && nodes.get(part.sub)) { enterSubscheme(part.sub); return; }
+    const text = await ensurePartText(d, part); if (!text) return;
+    track('pdf_part_generate', { part: d.parts.indexOf(part) + 1, of: d.parts.length, chars: text.length });
+    await generateSubschemeFromNode(hostId, {
+        text, title: `${d.parts.indexOf(part) + 1}. ${part.title}`,
+        onPointer: (ptr) => {
+            const h = nodes.get(hostId); if (!h || !h.docParts) return;
+            isApplyingUndo = true;
+            try { nodes.update({ id: hostId, docParts: { ...h.docParts, parts: h.docParts.parts.map(x => x.id === partId ? { ...x, sub: ptr } : x) } }); } finally { isApplyingUndo = false; }
+        }
+    });
+}
+
+btnPdfRangeLoad?.addEventListener('click', async () => {
     if (!activePdfDoc) return;
-    const total = activePdfDoc.numPages;
+    const doc = activePdfDoc, total = doc.numPages;
     let from = Math.max(1, Math.min(total, parseInt(pdfRangeFrom?.value, 10) || 1));
     let to = Math.max(1, Math.min(total, parseInt(pdfRangeTo?.value, 10) || total));
     if (from > to) { const t = from; from = to; to = t; }
-    extractPdfRangeIntoReader(from, to);
+    if (to - from + 1 > pdfMaxPages) {
+        const newTo = from + pdfMaxPages - 1;
+        const ok = await appConfirm(LL(`Tu plan permite cargar hasta ${pdfMaxPages} páginas a la vez y elegiste ${to - from + 1}. Cargo de la ${from} a la ${newTo}; el resto lo puedes cargar después, en otro rango.${isAdmin || pdfMaxPages >= 400 ? '' : ' Con una compra de gemas (o un paquete mayor) puedes cargar más páginas a la vez.'}`, `Your plan allows up to ${pdfMaxPages} pages at a time and you chose ${to - from + 1}. I'll load pages ${from} to ${newTo}; load the rest later as another range.${isAdmin || pdfMaxPages >= 400 ? '' : ' Buying gems (or a bigger pack) raises the limit.'}`), { title: LL('Límite de páginas', 'Page limit'), okText: LL(`Cargar ${pdfMaxPages} páginas`, `Load ${pdfMaxPages} pages`), cancelText: LL('Cancelar', 'Cancel') });
+        if (!ok) return;
+        to = newTo; if (pdfRangeTo) pdfRangeTo.value = String(to);
+    }
+    let pages;
+    showLoader(LL('Leyendo el documento…', 'Reading the document…'));
+    try { pages = await analyzePdfPages(doc, from, to, (a, b) => showLoader(LL(`Leyendo página ${a} de ${b}…`, `Reading page ${a} of ${b}…`))); }
+    catch (err) { console.error(err); hideLoader(); appAlert(tr("js.no_se_pudo_extraer_el")); track('pdf_import_error', { stage: 'analyze', message: String(err?.message || '').slice(0, 120) }); return; }
+    const chars = pages.reduce((t, x) => t + x.chars, 0);
+    if (chars < 200) { hideLoader(); appAlert(tr("js.no_se_encontro_texto_en")); track('pdf_import_error', { stage: 'extract', message: 'empty' }); return; }
+    if (chars <= PARTS_MODE_MIN_CHARS) { hideLoader(); extractPdfRangeIntoReader(from, to); return; }   // corto: va al editor como siempre
+    showLoader(LL('Buscando las partes del documento…', 'Finding the parts of the document…'));
+    let by = 'outline', entries = [];
+    try { entries = await pdfOutlineEntries(doc, from, to); } catch (_e) { entries = []; }
+    if (entries.length < 2) { by = 'headings'; entries = pdfHeadingEntries(pages); }
+    if (entries.length < 2) { by = 'equal'; entries = []; }
+    const parts = buildPdfParts(pages, entries, from, to);
+    hideLoader();
+    if (parts.length < 2) { extractPdfRangeIntoReader(from, to); return; }
+    docCache = { file: pdfCurrentFileName || 'PDF', total, pages: new Map(pages.map(pg => [pg.p, pg.text])) };
+    pdfRangeBar?.classList.add('hidden'); pdfRangeBar?.classList.remove('flex'); activePdfDoc = null;
+    track('pdf_import_success', { pages: to - from + 1, mode: 'parts' });
+    await startDocumentProject(doc, pdfCurrentFileName || 'PDF', from, to, parts, by);
 });
 
 container.addEventListener('dragover', (e) => { e.preventDefault(); });
@@ -4961,12 +5136,15 @@ async function generateSubschemeFromNode(nodeId, opts = {}) {
         cx /= (allIds.length || 1); cy /= (allIds.length || 1);
         let dx = me.x - cx, dy = me.y - cy; const len = Math.hypot(dx, dy);
         if (len < 1) { dx = 1; dy = -0.6; } else { dx /= len; dy /= len; }
+        // Varios subesquemas del mismo nodo (partes de un PDF, notas): cada uno en su ángulo y en anillos, para que no se encimen.
+        const sibs = nodes.get({ filter: n => n.isPointer && String(n.pointerHost) === String(nodeId) }).length;
+        if (sibs) { const ang = Math.atan2(dy, dx) + (sibs % 2 ? 1 : -1) * Math.ceil(sibs / 2) * 0.62; const ring = 1 + Math.floor(sibs / 10) * 0.55; dx = Math.cos(ang) * ring; dy = Math.sin(ang) * ring; }
         const ptrId = `subscheme_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         nodes.add({
             id: ptrId,
             label: `📦 ${title}`,
             baseTitle: title,
-            isSubscheme: true, isPointer: true, pointerFor: fromText ? null : nodeId,
+            isSubscheme: true, isPointer: true, pointerFor: fromText ? null : nodeId, pointerHost: nodeId,
             subSchemeData: { nodes: [], edges: [] },
             x: me.x + dx * 130, y: me.y + dy * 130,
             shape: 'image', image: generateSubschemeThumbnail([], [], {}), size: 34,
@@ -8402,7 +8580,7 @@ const vizUI = (() => {
     const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const KINDS = [
-        { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
+        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
         { k: 'cause_effect', i: '🔗', es: 'Causa → efecto', en: 'Cause → effect' }, { k: 'process', i: '🧭', es: 'Proceso', en: 'Process' },
         { k: 'compare', i: '⚖️', es: 'Comparar', en: 'Compare' }, { k: 'actors', i: '👥', es: 'Actores', en: 'Actors' },
         { k: 'figures', i: '📊', es: 'Cifras', en: 'Figures' }, { k: 'places', i: '📍', es: 'Lugares', en: 'Places' },
@@ -8441,6 +8619,7 @@ const vizUI = (() => {
     const cardNodes = () => nodes.get().filter(n => !n.isSubscheme && (String(n.definition || '').trim() || String(n.simple || '').trim()));
     function availability() {
         const v = currentViews() || {}; const out = [{ k: 'notes', n: getNotes().length }];
+        const dh = docHost(); if (dh) { const dp = dh.docParts.parts; out.unshift({ k: 'parts', n: dp.filter(x => x.sub && nodes.get(x.sub)).length + '/' + dp.length }); }
         ['timeline', 'cause_effect', 'process', 'compare', 'actors', 'figures', 'places'].forEach(k => {
             if (!v[k]) return;
             const n = k === 'compare' ? v.compare.items.length : k === 'actors' ? v.actors.actors.length : v[k].length; out.push({ k, n });
@@ -8450,7 +8629,8 @@ const vizUI = (() => {
     }
 
     // ---------- diseño del panel ----------
-    const visible = () => isDesktopFolding() && nodes.length > 1 && notesHostId() != null;
+    const docHost = () => nodes.get().find(n => n.docParts) || null;
+    const visible = () => isDesktopFolding() && (nodes.length > 1 || !!docHost()) && notesHostId() != null;
     function layout() {
         const on = visible(); open = open && on;
         panel.classList.toggle('on', on); panel.classList.toggle('open', open);
@@ -8471,7 +8651,7 @@ const vizUI = (() => {
     function pickTab(k) { tab = k; if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
 
     function paint() {
-        const av = availability(); if (!av.some(a => a.k === tab)) tab = 'notes';
+        const av = availability(); if (!av.some(a => a.k === tab)) tab = av[0].k;
         layout();
         tabsEl.innerHTML = av.map(a => { const k = KINDS.find(x => x.k === a.k); return `<button type="button" class="vz-tab${a.k === tab ? ' on' : ''}" role="tab" data-k="${a.k}">${k.i} ${esc(L(k.es, k.en))}${a.k !== 'notes' || a.n ? `<span class="n">${a.n}</span>` : ''}</button>`; }).join('');
         statusEl.textContent = detectToken && detecting ? L('🔎 Buscando más vistas…', '🔎 Looking for more views…') : (partial ? L('Algunas vistas no se pudieron buscar', 'Some views could not be searched') : '');
@@ -8523,6 +8703,18 @@ const vizUI = (() => {
             const go = card.querySelector('[data-go]');
             if (go) go.addEventListener('click', () => { const nd = nodes.get(go.dataset.go) || nodes.get(Number(go.dataset.go)); if (!nd) return; revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); flashNewNode(nd.id); });
         });
+    }
+
+    // ---------- partes de un PDF ----------
+    function renderParts() {
+        const host = docHost(); if (!host) { bodyEl.innerHTML = ''; return; }
+        const d = host.docParts, n = d.parts.length;
+        const isDone = (p) => !!(p.sub && nodes.get(p.sub));
+        const done = d.parts.filter(isDone).length, next = d.parts.find(p => !isDone(p));
+        const how = d.by === 'outline' ? L('según el índice del PDF', 'from the PDF index') : d.by === 'headings' ? L('según los títulos de capítulo', 'from chapter headings') : L('en partes iguales', 'in equal parts');
+        bodyEl.innerHTML = `<div class="vz-pt-h"><div><b>${esc(d.file)}</b><span> · ${esc(L('páginas', 'pages'))} ${d.from}–${d.to} · ${n} ${esc(L('partes', 'parts'))} (${esc(how)})</span></div><div class="vz-pt-bar" title="${done}/${n}"><i style="width:${Math.round(done / n * 100)}%"></i></div><span class="vz-pt-c">${esc(L(done + ' de ' + n + ' con esquema', done + ' of ' + n + ' mapped'))}</span>${next ? `<button type="button" class="vz-primary" data-next="${esc(next.id)}">${esc(L('Crear la siguiente', 'Make the next one'))}</button>` : ''}</div>`
+            + `<div class="vz-parts">${d.parts.map((p, i) => `<div class="vz-part${isDone(p) ? ' done' : ''}${next && next.id === p.id ? ' next' : ''}"><span class="num">${isDone(p) ? '✓' : i + 1}</span><div class="t"><b>${esc(p.title)}</b><small>${esc(L('págs.', 'pp.'))} ${p.from}–${p.to}</small></div><button type="button" class="vz-ghost" data-part="${esc(p.id)}">${esc(isDone(p) ? L('📦 Abrir', '📦 Open') : L('🌱 Crear esquema', '🌱 Make a map'))}</button></div>`).join('')}</div>`;
+        bodyEl.querySelectorAll('[data-part],[data-next]').forEach(b => b.addEventListener('click', () => generateDocPart(host.id, b.dataset.part || b.dataset.next)));
     }
 
     // ---------- vistas ----------
@@ -8635,6 +8827,7 @@ const vizUI = (() => {
     function renderBody() {
         showQuote(null);
         const v = currentViews() || {};
+        if (tab === 'parts') return renderParts();
         if (tab === 'notes') return renderNotes();
         if (tab === 'timeline' && v.timeline) return renderTimeline(v.timeline);
         if (tab === 'cause_effect' && v.cause_effect) return renderCauseEffect(v.cause_effect);
@@ -8694,7 +8887,7 @@ const vizUI = (() => {
         const ro = new ResizeObserver(layoutSoon); ['topicPanel', 'defsView', 'readerPanel'].forEach(id => { const el = document.getElementById(id); if (el) { ro.observe(el); new MutationObserver(layoutSoon).observe(el, { attributes: true, attributeFilter: ['class'] }); } });
     } catch (_e) { /* sin observadores: se ajusta con resize */ }
     setTimeout(() => refresh(), 1500);
-    return { refresh };
+    return { refresh, repaint: paint, openParts: () => { tab = 'parts'; lastGeo = ''; setOpen(true); } };
 })();
 
 // ==========================================

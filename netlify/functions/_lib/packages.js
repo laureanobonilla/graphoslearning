@@ -36,9 +36,24 @@ function envNodes(name, fallback) {
 const freeGuestNodes = () => envNodes('GUEST_FREE_NODES', 60);
 const freeUserNodes = () => envNodes('INITIAL_FREE_NODES', 0);
 
+// Páginas de PDF que se pueden cargar A LA VEZ según lo comprado (el pago más alto que la persona haya hecho define el nivel).
+// Quien nunca ha comprado tiene el límite base. Se puede ajustar con variables de entorno de Netlify.
+const PDF_PAGES_BASE = () => envNodes('PDF_PAGES_FREE', 40);
+const PDF_PAGE_TIERS = () => [
+    { minUsd: 19.99, pages: envNodes('PDF_PAGES_T3', 1000) },
+    { minUsd: 9.99, pages: envNodes('PDF_PAGES_T2', 400) },
+    { minUsd: 4.99, pages: envNodes('PDF_PAGES_T1', 150) }
+];
+function pdfMaxPages(maxPaidUsd, isAdmin) {
+    if (isAdmin) return 5000;
+    const v = Number(maxPaidUsd) || 0;
+    const t = PDF_PAGE_TIERS().find((x) => v + 0.001 >= x.minUsd);
+    return t ? t.pages : PDF_PAGES_BASE();
+}
+
 function findGemPackageByToken(token) {
     const t = String(token || '');
     return Object.values(GEM_PACKAGES).find((p) => p.token === t) || null;
 }
 
-module.exports = { PACKAGES, GEMS_PER_NODE, GEM_PACKAGES, findGemPackageByToken, freeGuestNodes, freeUserNodes };
+module.exports = { pdfMaxPages, PACKAGES, GEMS_PER_NODE, GEM_PACKAGES, findGemPackageByToken, freeGuestNodes, freeUserNodes };

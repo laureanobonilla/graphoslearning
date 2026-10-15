@@ -597,6 +597,20 @@
             #vizPanel .vz-bars .tr i { display: block; height: 100%; border-radius: 6px; background: var(--p-acc); opacity: .85; min-width: 3px; }
             #vizPanel .vz-bars .tr b { position: absolute; left: 8px; top: 0; line-height: 26px; font: 700 12.5px 'Inter', sans-serif; color: var(--p-ink); text-shadow: 0 0 4px var(--p-bg); }
             #vizPanel .vz-units { display: flex; gap: 6px; margin-bottom: 10px; }
+            #vizPanel .vz-pt-h { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; font: 400 13.5px 'Inter', sans-serif; color: var(--p-mute); }
+            #vizPanel .vz-pt-h b { color: var(--p-ink); font: 700 14.5px 'Sora', sans-serif; }
+            #vizPanel .vz-pt-bar { width: 160px; height: 8px; border-radius: 6px; background: var(--p-bg2); overflow: hidden; }
+            #vizPanel .vz-pt-bar i { display: block; height: 100%; background: var(--p-acc); }
+            #vizPanel .vz-pt-c { font-weight: 600; color: var(--p-ink2); }
+            #vizPanel .vz-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+            #vizPanel .vz-part { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid var(--p-rule); border-radius: 12px; padding: 10px 12px; }
+            #vizPanel .vz-part.next { border-color: var(--p-acc); box-shadow: 0 0 0 2px var(--p-acc-bg); }
+            #vizPanel .vz-part.done { background: #f1f8f6; }
+            #vizPanel .vz-part .num { flex: 0 0 26px; height: 26px; border-radius: 50%; background: var(--p-bg2); color: var(--p-mute); font: 700 12px/26px 'Inter', sans-serif; text-align: center; }
+            #vizPanel .vz-part.done .num { background: var(--p-acc); color: #fff; }
+            #vizPanel .vz-part .t { flex: 1; min-width: 0; }
+            #vizPanel .vz-part .t b { display: block; font: 600 13.5px/1.35 'Inter', sans-serif; overflow-wrap: anywhere; }
+            #vizPanel .vz-part .t small { color: var(--p-mute); font: 400 12px 'Inter', sans-serif; }
             /* lugares */
             #vizPanel .vz-places { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
             #vizPanel .vz-place { background: #fff; border: 1px solid var(--p-rule); border-radius: 12px; padding: 11px 14px; }
@@ -930,6 +944,7 @@
                     <input type="number" id="pdfRangeTo" min="1" value="1" class="w-12 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-[11px] text-slate-100 focus:outline-none focus:border-indigo-400">
                     <span class="text-slate-500"><span data-i18n="ui.de">de</span> <span id="pdfRangeTotal">1</span></span>
                     <div class="flex-1"></div>
+                    <span id="pdfLimitHint" class="w-full text-[10px] text-slate-500"></span>
                     <button id="btnPdfRangeLoad" class="bg-indigo-500/25 hover:bg-indigo-500/40 border border-indigo-400/40 text-indigo-100 px-2.5 py-1 rounded-md font-semibold transition-colors" data-i18n="ui.cargar">Cargar</button>
                     <button id="btnPdfRangeCancel" class="bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white px-2 py-1 rounded-md transition-colors">✕</button>
                 </div>

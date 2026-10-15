@@ -107,6 +107,11 @@ module.exports = {
         const rows = await table(`payments?user_id=eq.${encodeURIComponent(userId)}&select=amount,created_at&order=created_at.desc&limit=1`);
         return Array.isArray(rows) && rows[0] ? rows[0] : null;
     },
+    // Pago más alto (en USD) que ha hecho esta persona; 0 si nunca ha comprado. Define cuántas páginas de PDF puede cargar.
+    async maxPaymentUsd(userId) {
+        const rows = await table(`payments?user_id=eq.${encodeURIComponent(userId)}&select=amount&order=amount.desc&limit=1`);
+        return Array.isArray(rows) && rows[0] ? Number(rows[0].amount) || 0 : 0;
+    },
     async countEventsSince(actorId, eventName, sinceIso) {
         const rows = await table(`events?actor_id=eq.${encodeURIComponent(actorId)}&event_name=eq.${encodeURIComponent(eventName)}&created_at=gte.${encodeURIComponent(sinceIso)}&select=id`);
         return Array.isArray(rows) ? rows.length : 0;
