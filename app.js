@@ -1234,8 +1234,8 @@ const depthView = (() => {
     }));
 
     network.on('afterDrawing', safe((ctx) => {
-        if (!S.on || !(ctx.filter !== undefined)) return;
-        const k = S.k, pr = dpr(), H = container.clientHeight, lv = levels(), cvs = ctx.canvas;
+        if (!S.on) return;
+        const k = S.k, pr = dpr(), H = container.clientHeight, lv = levels();
         nodes.get().forEach(n => {
             if (n.hidden) return; const l = lv.get(String(n.id)); if (l == null) return;
             let bb; try { bb = network.getBoundingBox(n.id); } catch (_e) { return; } if (!bb) return;
@@ -1248,10 +1248,8 @@ const depthView = (() => {
             const pad = 3 * pr;
             ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
             ctx.beginPath(); ctx.roundRect(x - pad, y - pad, w + pad * 2, h + pad * 2, 12 * pr); ctx.clip();
-            ctx.filter = `blur(${(d * 2.4 * pr).toFixed(2)}px)`;
-            try { ctx.drawImage(cvs, x - pad, y - pad, w + pad * 2, h + pad * 2, x - pad, y - pad, w + pad * 2, h + pad * 2); } catch (_e) { /* ok */ }
-            ctx.filter = 'none';
-            ctx.fillStyle = `rgba(6,9,30,${(d * 0.5).toFixed(3)})`; ctx.fillRect(x - pad, y - pad, w + pad * 2, h + pad * 2);
+            // Nada de desenfoque: todo el texto se lee siempre. Lo lejano solo se atenúa apenas.
+            ctx.fillStyle = `rgba(6,9,30,${(d * 0.14).toFixed(3)})`; ctx.fillRect(x - pad, y - pad, w + pad * 2, h + pad * 2);
             ctx.restore();
         });
     }));
@@ -7839,6 +7837,21 @@ function showSaveFeedback(state) {
     }
 }
 
+// Copia local del proyecto. Si el navegador se queda sin espacio, antes se abortaba el guardado y al reabrir volvía una copia
+// vieja (sin el texto del tema, por ejemplo): ahora se liberan copias de otros proyectos y se reintenta.
+function putSnapshot(id, data) {
+    const key = `gk_proj_snapshot_${id}`, json = JSON.stringify(data);
+    for (let i = 0; i < 8; i++) {
+        try { localStorage.setItem(key, json); return true; } catch (_e) { /* sin espacio */ }
+        const others = Object.keys(localStorage).filter(k => k.startsWith('gk_proj_snapshot_') && !k.startsWith('gk_proj_snapshot_local_') && k !== key);   // solo copias de la nube (se pueden volver a bajar); nunca las locales de invitados
+        if (!others.length) break;
+        let big = others[0], bs = 0; others.forEach(k => { const s = (localStorage.getItem(k) || '').length; if (s > bs) { bs = s; big = k; } });
+        try { localStorage.removeItem(big); } catch (_e) { break; }
+    }
+    try { track('snapshot_save_failed', { size: json.length }); } catch (_e) { /* ok */ }
+    return false;
+}
+
 async function saveCurrentProjectToBin() {
     // Mientras se navega dentro de un subesquema (schemeStack no vacío), lo que
     // se ve en el lienzo es solo ESE fragmento, no el proyecto completo: guardarlo
@@ -7898,7 +7911,7 @@ async function saveCurrentProjectToBin() {
     }
 
     localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(catalog));
-    localStorage.setItem(`gk_proj_snapshot_${targetProjectId}`, JSON.stringify(projectData));
+    putSnapshot(targetProjectId, projectData);
 
     // 2. Sincronización en la nube (JSONBin) si está logueado
     if (currentUser) {
@@ -7926,7 +7939,8 @@ async function saveCurrentProjectToBin() {
                     freshCatalog[idx].id = cloudId;
                     localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(freshCatalog));
                 }
-                localStorage.setItem(`gk_proj_snapshot_${cloudId}`, JSON.stringify(projectData));
+                putSnapshot(cloudId, projectData);
+                if (cloudId !== targetProjectId) { try { localStorage.removeItem(`gk_proj_snapshot_${targetProjectId}`); } catch (_e) { /* ok */ } }
 
                 // Solo actualizar currentProjectId si el usuario sigue trabajando en este mismo mapa
                 if (currentProjectId === targetProjectId) {
@@ -8081,7 +8095,7 @@ function applyLoadedProject(projectId, record) {
     localStorage.setItem('gk_current_project_id', currentProjectId);
     isClearingCanvas = false;
     network.fit({ animation: { duration: 600 } });
-    if (typeof topicUI !== 'undefined' && topicUI) topicUI.onLoaded();
+    if (typeof topicUI !== 'undefined' && topicUI) topicUI.onLoaded(true);   // solo trae el texto ya guardado; nunca lo reescribe
 }
 
 document.getElementById('btnNewProject')?.addEventListener('click', async () => {
