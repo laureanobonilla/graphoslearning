@@ -4667,6 +4667,36 @@ function pdfHeadingEntries(pages) {
     pages.forEach(pg => { const h = pg.heads[0]; if (h && h.ratio > 1.6 && h.t.length < 90) big.push({ title: h.t.slice(0, 80), page: pg.p }); });
     return (big.length >= 3 && big.length <= 60) ? big : [];
 }
+// Cuando un capítulo/sección empieza a mitad de página, el texto de arriba es del anterior: se busca el título dentro de la página.
+const stripHeadWord = (t) => String(t || '').replace(/^\d{1,2}\.\s*/, '').replace(/^(cap[ií]tulo|chapter|parte|part)\s+[^\s:]+:?\s*/i, '').replace(/\s*\(\d+\/\d+\)\s*$/, '').trim();
+function headingAnchors(sg, prev) {
+    const a = [];
+    const gl = String(sg.group || '').split(' · ').filter(Boolean).pop();
+    if (gl && (!prev || prev.group !== sg.group)) a.push(stripHeadWord(gl));
+    if (sg.title) a.push(stripHeadWord(sg.title));
+    return a.filter(x => normTxt(x).length >= 5);
+}
+function findHeadingAt(text, anchors) {
+    if (!text || !anchors || !anchors.length) return -1;
+    const chars = [], map = [];
+    for (let i = 0; i < text.length; i++) {
+        const n = text[i].normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        if (/[a-z0-9ñ]/.test(n)) { chars.push(n[0]); map.push(i); } else if (chars.length && chars[chars.length - 1] !== ' ') { chars.push(' '); map.push(i); }
+    }
+    const norm = chars.join(''); let best = -1;
+    anchors.forEach(an => {
+        const key = normTxt(an); if (key.length < 5) return;
+        let from = 0;
+        for (;;) {
+            const k = norm.indexOf(key, from); if (k < 0) break;
+            const oi = map[k]; const m = /(\d{1,3}\.?\s*)$/.exec(text.slice(Math.max(0, oi - 12), oi));
+            const start = m ? oi - m[1].length : oi; const before = text.slice(0, start).trimEnd();
+            if (!before || /[.!?;:»”)\]\d]$/.test(before) || text[start - 1] === '\n') { if (best < 0 || start < best) best = start; break; }   // un título sigue a un final de frase, no a media frase
+            from = k + 1;
+        }
+    });
+    return best;
+}
 function buildPdfParts(pages, entries, from, to) {
     const charsOf = (a, b) => pages.filter(x => x.p >= a && x.p <= b).reduce((t, x) => t + x.chars, 0);
     let segs = [];
@@ -4674,20 +4704,22 @@ function buildPdfParts(pages, entries, from, to) {
         const es = entries.slice(); if (es[0].page > from) es.unshift({ title: LL('Inicio', 'Start'), page: from });
         es.forEach((e, i) => segs.push({ title: (e.group != null || e.sec) ? e.title : (e.chapter || e.title), group: e.group != null ? e.group : [e.part, e.sec ? e.chapter : ''].filter(Boolean).join(' · '), from: e.page, to: (i + 1 < es.length ? es[i + 1].page - 1 : to) }));
     } else segs = [{ title: '', from, to }];
+    segs.forEach((sg, i) => { sg.a = headingAnchors(sg, segs[i - 1]); });
+    segs.forEach((sg, i) => { sg.na = (segs[i + 1] && segs[i + 1].a) || []; });
     const out = [];
     segs.forEach(sg => {   // lo demasiado grande se parte en trozos iguales de páginas
         const n = sg.to - sg.from + 1, k = Math.min(n, Math.max(1, Math.ceil(charsOf(sg.from, sg.to) / (PART_MAX_CHARS * 0.85))));
-        if (k <= 1) { out.push({ ...sg }); return; }
-        for (let i = 0; i < k; i++) { const a = sg.from + Math.round(i * n / k), b = sg.from + Math.round((i + 1) * n / k) - 1; if (b < a) continue; out.push({ title: sg.title ? `${sg.title} (${i + 1}/${k})` : '', group: sg.group, from: a, to: b }); }
+        if (k <= 1) { out.push({ ...sg }); return; }   // (a = títulos con que empieza; na = con los que empieza lo siguiente)
+        for (let i = 0; i < k; i++) { const a = sg.from + Math.round(i * n / k), b = sg.from + Math.round((i + 1) * n / k) - 1; if (b < a) continue; out.push({ title: sg.title ? `${sg.title} (${i + 1}/${k})` : '', group: sg.group, from: a, to: b, a: i === 0 ? sg.a : [], na: i === k - 1 ? sg.na : [] }); }
     });
     const merged = [];   // lo diminuto se une con lo que sigue
     out.forEach(sg => {
         const last = merged[merged.length - 1];
         if (last && sg.group === last.group && charsOf(last.from, last.to) < PART_MIN_CHARS && charsOf(last.from, sg.to) <= PART_MAX_CHARS) {   // nunca se junta lo de dos capítulos distintos
-            last.to = sg.to; if (sg.title && last.title && last.title !== sg.title) last.title = (last.title + ' – ' + sg.title).slice(0, 80);
+            last.to = sg.to; last.na = sg.na; if (sg.title && last.title && last.title !== sg.title) last.title = (last.title + ' – ' + sg.title).slice(0, 80);
         } else merged.push({ ...sg });
     });
-    return merged.filter(sg => charsOf(sg.from, sg.to) >= 200).map((sg, i) => ({ id: 'p' + (i + 1), title: sg.title || LL(`Páginas ${sg.from}–${sg.to}`, `Pages ${sg.from}–${sg.to}`), from: sg.from, to: sg.to, chars: charsOf(sg.from, sg.to), group: sg.group || '', sub: null }));
+    return merged.filter(sg => charsOf(sg.from, sg.to) >= 200).map((sg, i) => ({ id: 'p' + (i + 1), title: sg.title || LL(`Páginas ${sg.from}–${sg.to}`, `Pages ${sg.from}–${sg.to}`), from: sg.from, to: sg.to, chars: charsOf(sg.from, sg.to), group: sg.group || '', a: sg.a || [], na: sg.na || [], sub: null }));
 }
 async function startDocumentProject(doc, fileName, from, to, parts, by) {
     const title = String(fileName || 'PDF').replace(/\.pdf$/i, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 70) || LL('Documento', 'Document');
@@ -4717,6 +4749,17 @@ function pickPdfFile() {
 function cachedPartText(d, part) {
     if (!d || !part || docCache.file !== d.file || docCache.total !== d.total) return null;
     const t = []; for (let p = part.from; p <= part.to; p++) { const x = docCache.pages.get(p); if (x == null) return null; t.push(x); }
+    // Si la parte empieza a mitad de página se quita lo de arriba (es del capítulo anterior); si la siguiente empieza a mitad de página, se añade lo que queda arriba de ella.
+    if (part.a && part.a.length) {
+        const i = findHeadingAt(t[0], part.a);
+        if (i > 0) t[0] = t[0].slice(i);
+        else if (i < 0) { const pv = docCache.pages.get(part.from - 1); const k = pv ? findHeadingAt(pv, part.a) : -1; if (k > 0) t.unshift(pv.slice(k)); }   // el marcador del PDF cae una página después del título
+    }
+    if (part.na && part.na.length) {
+        const li = t.length - 1, k = findHeadingAt(t[li], part.na);
+        if (k > 0 && t.length > 1) t[li] = t[li].slice(0, k);   // lo siguiente ya empieza dentro de la última página
+        else if (k < 0) { const nx = docCache.pages.get(part.to + 1); if (nx) { const j = findHeadingAt(nx, part.na); if (j > 0) t.push(nx.slice(0, j)); } }
+    }
     return t.join('\n\n').trim();
 }
 // Pide el mismo PDF otra vez (no se guarda en el proyecto) y deja el texto de sus páginas en memoria.
