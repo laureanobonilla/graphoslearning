@@ -1476,6 +1476,13 @@ function makeEdgeResizable(handle, panel, side, { key, cssVar, min = 300, maxFra
     });
 }
 
+// Zona izquierda compartida: solo un panel (Mi texto o el texto del tema) ocupa el lado; el mapa se ajusta a su ancho.
+function updateLeftReserve() {
+    const rp = (typeof readerPanel !== 'undefined' && readerPanel && !readerPanel.classList.contains('hidden') && isDesktopFolding()) ? readerPanel : null;
+    const tp = document.getElementById('topicPanel'); const tpOn = tp && tp.classList.contains('on');
+    const w = rp ? rp.getBoundingClientRect().width : (tpOn ? tp.getBoundingClientRect().width : 0);
+    container.style.marginLeft = w ? Math.round(w) + 'px' : '';
+}
 const topicUI = (() => {
     const panel = document.getElementById('topicPanel'), tab = document.getElementById('topicTab');
     const body = document.getElementById('topicBody'), title = document.getElementById('topicTitle');
@@ -1484,7 +1491,7 @@ const topicUI = (() => {
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
     if (en) { document.getElementById('topicTabLbl').textContent = 'View text'; document.getElementById('topicHint').textContent = 'Tap an underlined concept to see it on the map.'; closeBtn.title = 'Collapse'; }
     let open = false, ownerId = null; const pinned = true; // abierto, el mapa se ajusta (no tapa)
-    const reserve = () => { container.style.marginLeft = (open && pinned) ? (panel.getBoundingClientRect().width || 440) + 'px' : ''; };
+    const reserve = () => updateLeftReserve();
     makeEdgeResizable(document.getElementById('tpResize'), panel, 'right', { key: 'gk_topic_w', cssVar: '--tp-w', onResize: reserve });
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1549,11 +1556,12 @@ const topicUI = (() => {
         if (!render(owner)) return;
         // Igual que las definiciones: aparece abierto junto al esquema; si lo cierras tú, queda cerrado hasta que lo abras.
         let closedByUser = false; try { closedByUser = localStorage.getItem('gk_topic_closed') === '1'; } catch (_e) { /* ok */ }
-        if (!closedByUser) open = true;
+        if (!closedByUser) { open = true; if (isDesktopFolding() && typeof closeReaderPanel === 'function' && readerPanel && !readerPanel.classList.contains('hidden')) closeReaderPanel(); }
         paint();
         if (fresh && !open) { tab.classList.add('fresh'); setTimeout(() => tab.classList.remove('fresh'), 5200); }
     }
     function setOpen(v, byUser) {
+        if (v && isDesktopFolding() && typeof closeReaderPanel === 'function' && readerPanel && !readerPanel.classList.contains('hidden')) closeReaderPanel();
         open = v; paint(); if (v) track('topic_text_open', { pinned });
         try { if (v) localStorage.removeItem('gk_topic_closed'); else if (byUser) localStorage.setItem('gk_topic_closed', '1'); } catch (_e) { /* ok */ }
     }
@@ -4084,15 +4092,18 @@ document.getElementById('btnEditContext')?.addEventListener('click', () => {
 // espíritu que los paneles flotantes de definición, pero con su propio marcado
 // estático en el HTML en vez de crearse dinámicamente.
 function openReaderPanel() {
+    if (isDesktopFolding() && typeof topicUI !== 'undefined' && topicUI) topicUI.setOpen(false); // el lado izquierdo es de uno solo
     readerPanel.classList.remove('hidden');
     readerPanel.style.zIndex = String(500 + (++floatingPanelCount));
     btnToggleReader.innerHTML = (I18N.lang === 'en') ? '<span>📄</span> Hide my text' : '<span>📄</span> Ocultar mi texto';
-    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
+    updateLeftReserve();
+    setTimeout(() => { window.dispatchEvent(new Event('resize')); if (typeof network !== 'undefined') network.redraw(); }, 120);
 }
 function closeReaderPanel() {
     readerPanel.classList.add('hidden');
     btnToggleReader.innerHTML = (I18N.lang === 'en') ? '<span>📄</span> Have a text, link or PDF? Paste it here' : '<span>📄</span> ¿Tienes un texto, enlace o PDF? Pégalo aquí';
-    setTimeout(() => { if (typeof network !== 'undefined') network.redraw(); }, 200);
+    updateLeftReserve();
+    setTimeout(() => { window.dispatchEvent(new Event('resize')); if (typeof network !== 'undefined') network.redraw(); }, 120);
 }
 
 btnToggleReader?.addEventListener('click', () => {
@@ -4133,6 +4144,7 @@ function wireResizeRedraw(el) {
     }).observe(el);
 }
 wireResizeRedraw(readerPanel);
+makeEdgeResizable(document.getElementById('rpResize'), readerPanel, 'right', { key: 'gk_reader_w', cssVar: '--rp-w', onResize: () => updateLeftReserve() });
 
 const readerEmptyHint = document.getElementById('readerEmptyHint');
 function updateReaderEmptyHint() {
@@ -8445,7 +8457,8 @@ const vizUI = (() => {
         const maxH = Math.round(window.innerHeight * 0.7);
         const h = !on ? 0 : (open ? Math.max(170, Math.min(H, maxH)) : STRIP);
         const tp = document.getElementById('topicPanel'), dv = document.getElementById('defsView');
-        const l = tp && tp.classList.contains('on') ? Math.round(tp.getBoundingClientRect().width) : 0;
+        const rd = document.getElementById('readerPanel');
+        const l = (rd && !rd.classList.contains('hidden')) ? Math.round(rd.getBoundingClientRect().width) : (tp && tp.classList.contains('on') ? Math.round(tp.getBoundingClientRect().width) : 0);
         const r = dv && !dv.classList.contains('hidden') ? Math.round(dv.getBoundingClientRect().width) : 0;
         const geo = h + '|' + l + '|' + r; if (geo === lastGeo) return; lastGeo = geo;
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
@@ -8678,7 +8691,7 @@ const vizUI = (() => {
     network.on('selectNode', (params) => { const id = params.nodes && params.nodes[0]; if (id != null) { const o = topicUI ? topicUI.ownerOf(id) : null; if (o != null && o !== hostId) refreshSoon(id); } });
     window.addEventListener('resize', layoutSoon);
     try {
-        const ro = new ResizeObserver(layoutSoon); ['topicPanel', 'defsView'].forEach(id => { const el = document.getElementById(id); if (el) { ro.observe(el); new MutationObserver(layoutSoon).observe(el, { attributes: true, attributeFilter: ['class'] }); } });
+        const ro = new ResizeObserver(layoutSoon); ['topicPanel', 'defsView', 'readerPanel'].forEach(id => { const el = document.getElementById(id); if (el) { ro.observe(el); new MutationObserver(layoutSoon).observe(el, { attributes: true, attributeFilter: ['class'] }); } });
     } catch (_e) { /* sin observadores: se ajusta con resize */ }
     setTimeout(() => refresh(), 1500);
     return { refresh };

@@ -108,6 +108,16 @@
         #readerContentContainer::-webkit-scrollbar, [data-role="contentContainer"]::-webkit-scrollbar { width: 10px; }
         #readerContentContainer::-webkit-scrollbar-thumb, [data-role="contentContainer"]::-webkit-scrollbar-thumb { background: #2c3458; border-radius: 8px; border: 2px solid #0b1022; }
         #readerContentContainer::-webkit-scrollbar-track, [data-role="contentContainer"]::-webkit-scrollbar-track { background: transparent; }
+        /* ===== «MI TEXTO» PEGADO A LA IZQUIERDA (escritorio), igual que el texto del tema: ancho arrastrable, el mapa se ajusta, se contrae con ✕ ===== */
+        @media (min-width: 781px) {
+            #readerPanel:not(.hidden) { position: absolute !important; left: 0 !important; top: 0 !important; bottom: 0 !important; height: auto !important; max-height: none !important; width: var(--rp-w, 440px) !important; min-width: 300px !important; max-width: 70vw !important; border-radius: 0 !important; resize: none !important; border-width: 0 1px 0 0 !important; box-shadow: none !important; z-index: 27 !important; }
+            #readerPanel [data-role="btnViewDock"], #readerPanel [data-role="btnViewFull"] { display: none !important; }
+            #readerPanelHeader { cursor: default !important; }
+            #readerPanel .rz { position: absolute; top: 0; bottom: 0; right: 0; width: 12px; cursor: col-resize; z-index: 6; touch-action: none; }
+            #readerPanel .rz::after { content: ''; position: absolute; top: 50%; right: 3px; width: 4px; height: 44px; margin-top: -22px; border-radius: 4px; background: var(--p-rule, #dcd9ce); transition: background .15s, height .15s; }
+            #readerPanel .rz:hover::after, body.gk-resizing #readerPanel .rz::after { background: var(--p-acc, #0e857c); height: 72px; margin-top: -36px; }
+        }
+        @media (max-width: 780px) { #readerPanel .rz { display: none; } }
         /* ===== «MI TEXTO» CON EL MISMO LIENZO DE LECTURA QUE EL TEXTO DEL TEMA ===== */
         /* Mismas variables, tipografía (serif ~17.5px/1.75) y medida (~34em) que #topicPanel, para que pegar un texto
            propio se sienta como la otra forma de llegar al mismo lugar, no como otra herramienta. Se quitan PDF, «Solo un tema»
@@ -881,6 +891,7 @@
              con una forma más cuadrada que antes (antes era un rectángulo muy
              alto y angosto). -->
         <div id="readerPanel" data-role="panel" class="hidden reader-panel-instance absolute w-[480px] max-w-[92vw] h-[560px] max-h-[82vh] min-w-[280px] min-h-[220px] bg-slate-900 border border-slate-700 rounded-xl flex flex-col shadow-2xl resize overflow-hidden pointer-events-auto" style="left:16px; top:96px; z-index: 501;">
+            <div class="rz" id="rpResize" title="Arrastra para ajustar el ancho"></div>
             <div id="readerPanelHeader" data-role="header" class="px-3 py-2.5 bg-slate-950 border-b border-slate-800 flex flex-col gap-2 select-none cursor-move">
                 <div class="flex items-center justify-between gap-2">
                     <h3 data-role="title" class="text-xs font-bold font-heading text-indigo-300 uppercase tracking-wider" data-i18n="ui.modo_lector">📄 Mi texto</h3>
