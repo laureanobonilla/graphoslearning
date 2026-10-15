@@ -45,6 +45,9 @@
   .seg button[aria-pressed="true"]{ background:var(--acc); color:var(--acc-ink); }
   .seg button:focus-visible, .btn:focus-visible, input:focus-visible{ outline:3px solid var(--acc); outline-offset:2px; }
   input[type=range]{ width:100%; accent-color:var(--acc); }
+  label.chk{ display:block; margin-top:14px; font:600 13px 'Sora',sans-serif; cursor:pointer; }
+  label.chk input{ margin-right:8px; accent-color:var(--acc); }
+  label.chk .hint{ font:400 13px 'Inter',sans-serif; margin:3px 0 0 24px; }
   .row{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
   .row output{ font:600 14px 'Sora',sans-serif; min-width:2.2em; text-align:right; }
   .num{ width:84px; padding:8px 10px; border:1px solid var(--rule); border-radius:8px; background:var(--card); color:var(--ink); font:inherit; }
@@ -71,6 +74,7 @@
   .recipe{ margin:10px 0 0; padding:9px 11px; border-radius:9px; background:var(--acc-soft); font-size:14px; }
   .recipe small{ display:block; color:var(--mute); font-size:12px; margin-top:2px; }
   .gridbox{ position:relative; padding:12px; background:var(--bg); display:flex; align-items:center; justify-content:center; min-width:0; }
+  .gridbox.scroll{ overflow:auto; justify-content:flex-start; }
   .gridbox canvas{ max-width:100%; height:auto; border-radius:6px; background:#fff; display:block; box-shadow:0 1px 0 var(--rule); }
   .layer.locked canvas{ opacity:.55; }
   .lock{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; text-align:center; padding:16px; background:color-mix(in srgb, var(--bg) 55%, transparent); }
@@ -123,8 +127,9 @@
         <div class="row"><input id="k" type="range" min="4" max="24" value="10"><output id="kOut">10</output></div>
 
         <label class="f" for="cols">Cuadros a lo ancho</label>
-        <div class="row"><input id="cols" type="range" min="8" max="60" value="24"><output id="colsOut">24</output></div>
-        <p class="hint">Menos cuadros = más fácil y más rápido. Más cuadros = más detalle.</p>
+        <div class="row"><input id="cols" type="range" min="8" max="120" value="32"><output id="colsOut">32</output></div>
+        <p class="hint" id="detailHint"></p>
+        <label class="chk"><input id="clean" type="checkbox" checked> Limpiar cuadros sueltos<span class="hint">Une los cuadros aislados a su alrededor para que las capas sean más fáciles de pintar.</span></label>
 
         <label class="f">Tamaño del lienzo (opcional)</label>
         <div class="row" style="justify-content:flex-start">
@@ -155,7 +160,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var FREE_LAYERS = 2;               // capas visibles sin pagar
-  var CELL_PX = 26;                  // tamaño de un cuadro al dibujar cada capa
+  var MAX_W = 1500;                  // ancho máximo en píxeles de cada cuadrícula dibujada
   var unlocked = false;
   try { unlocked = /[?&]probar=1/.test(location.search) || localStorage.getItem('pintar_unlocked') === '1'; } catch (e) { /* ok */ }
 
@@ -231,7 +236,7 @@
   }
 
   // ---------- Procesar ----------
-  function analyse(img, cols, k, medium) {
+  function analyse(img, cols, k, medium, clean) {
     var rows = Math.max(4, Math.round(cols * img.naturalHeight / img.naturalWidth));
     // Reducción en pasos: promedia mejor que un solo salto.
     var w = img.naturalWidth, h = img.naturalHeight, cur = document.createElement('canvas'); cur.width = w; cur.height = h; cur.getContext('2d').drawImage(img, 0, 0);
@@ -250,6 +255,24 @@
     var groups = Object.keys(sum).map(function (g) {
       var rgb = sum[g].map(function (v) { return v / cnt[g]; }); return { id: +g, rgb: rgb, lab: rgb2lab(rgb[0], rgb[1], rgb[2]), count: cnt[g] };
     });
+    if (clean) {   // un cuadro sin ningún vecino de su color se une al color más común a su alrededor
+      for (var pass = 0; pass < 2; pass++) {
+        var nxt = Int32Array.from(asg);
+        for (var yy = 0; yy < rows; yy++) for (var xx = 0; xx < cols; xx++) {
+          var me = asg[yy * cols + xx], same = 0, tally = {};
+          for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+            if (!dx && !dy) continue; var ny = yy + dy, nx2 = xx + dx; if (ny < 0 || nx2 < 0 || ny >= rows || nx2 >= cols) continue;
+            var o = asg[ny * cols + nx2]; if (o === me) same++; tally[o] = (tally[o] || 0) + 1;
+          }
+          if (same === 0) { var bo = me, bc = 0; for (var kk2 in tally) if (tally[kk2] > bc) { bc = tally[kk2]; bo = +kk2; } nxt[yy * cols + xx] = bo; }
+        }
+        asg = nxt;
+      }
+      // recalcular el color de cada grupo con los cuadros que le quedaron
+      sum = {}; cnt = {};
+      for (var j2 = 0; j2 < n; j2++) { var g2 = asg[j2]; if (!sum[g2]) { sum[g2] = [0, 0, 0]; cnt[g2] = 0; } sum[g2][0] += px[j2 * 4]; sum[g2][1] += px[j2 * 4 + 1]; sum[g2][2] += px[j2 * 4 + 2]; cnt[g2]++; }
+      groups = Object.keys(sum).map(function (g) { var rgb = sum[g].map(function (v) { return v / cnt[g]; }); return { id: +g, rgb: rgb, lab: rgb2lab(rgb[0], rgb[1], rgb[2]), count: cnt[g] }; });
+    }
     // Orden de pintura: óleo/acrílico de oscuro a claro; acuarela de claro a oscuro.
     groups.sort(function (a, b) { return medium === 'acuarela' ? b.lab[0] - a.lab[0] : a.lab[0] - b.lab[0]; });
     var order = {}; groups.forEach(function (g, idx) { order[g.id] = idx; });
@@ -260,7 +283,7 @@
   // ---------- Dibujo ----------
   function colLetter(i) { var s = ''; i++; while (i > 0) { var m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; }
   function drawLayer(res, idx, blank) {
-    var cols = res.cols, rows = res.rows, M = 22, cv = document.createElement('canvas');
+    var cols = res.cols, rows = res.rows, M = 22, CELL_PX = Math.max(10, Math.min(26, Math.floor((MAX_W - M) / cols))), cv = document.createElement('canvas');
     cv.width = cols * CELL_PX + M; cv.height = rows * CELL_PX + M;
     var c = cv.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, cv.width, cv.height);
     var mine = res.groups[idx].rgb;
@@ -275,13 +298,13 @@
     for (var gy = 0; gy <= rows; gy++) { c.moveTo(M, M + gy * CELL_PX + .5); c.lineTo(M + cols * CELL_PX, M + gy * CELL_PX + .5); }
     c.stroke();
     c.fillStyle = '#5d6878'; c.font = '600 11px Sora, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    var skipX = cols > 36 ? 2 : 1, skipY = rows > 36 ? 2 : 1;
+    var skipX = CELL_PX < 16 ? 2 : 1, skipY = CELL_PX < 16 ? 2 : 1; if (CELL_PX < 12) { skipX = 5; skipY = 5; }
     for (var lx = 0; lx < cols; lx += skipX) c.fillText(colLetter(lx), M + lx * CELL_PX + CELL_PX / 2, M / 2);
     for (var ly = 0; ly < rows; ly += skipY) c.fillText(String(ly + 1), M / 2, M + ly * CELL_PX + CELL_PX / 2);
     return cv;
   }
   function drawResult(res) {
-    var cv = document.createElement('canvas'), S2 = 10; cv.className = 'pv'; cv.width = res.cols * S2; cv.height = res.rows * S2;
+    var cv = document.createElement('canvas'), S2 = Math.max(4, Math.min(12, Math.floor(1000 / res.cols))); cv.className = 'pv'; cv.width = res.cols * S2; cv.height = res.rows * S2;
     var c = cv.getContext('2d');
     for (var y = 0; y < res.rows; y++) for (var x = 0; x < res.cols; x++) { c.fillStyle = hex(res.groups[res.cell[y * res.cols + x]].rgb); c.fillRect(x * S2, y * S2, S2, S2); }
     return cv;
@@ -324,7 +347,7 @@
         var rgb = g.rgb.map(Math.round); var p = document.createElement('p'); p.className = 'small'; p.style.marginTop = '8px'; p.textContent = 'RGB ' + rgb.join(', '); meta.appendChild(p);
       }
       var gb = document.createElement('div'); gb.className = 'gridbox';
-      var cv = drawLayer(res, idx, locked); cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'Cuadrícula de la capa ' + (idx + 1)); gb.appendChild(cv);
+      var cv = drawLayer(res, idx, locked); if (res.cols > 50) { cv.style.maxWidth = 'none'; gb.classList.add('scroll'); } cv.setAttribute('role', 'img'); cv.setAttribute('aria-label', 'Cuadrícula de la capa ' + (idx + 1)); gb.appendChild(cv);
       if (locked) {
         var lk = document.createElement('div'); lk.className = 'lock';
         lk.innerHTML = '<b>Capa ' + (idx + 1) + ' bloqueada</b><span class="small">Desbloquea las ' + (res.groups.length - FREE_LAYERS) + ' capas restantes para ver sus cuadrículas.</span>';
@@ -353,12 +376,16 @@
   seg('segMedium', function (v) { S.medium = v; hints(); });
   seg('segLevel', function (v) { S.level = v; hints(); });
   hints();
-  [['k', 'kOut'], ['cols', 'colsOut']].forEach(function (p) { $(p[0]).addEventListener('input', function () { $(p[1]).textContent = $(p[0]).value; cellHint(); }); });
+  [['k', 'kOut'], ['cols', 'colsOut']].forEach(function (p) { $(p[0]).addEventListener('input', function () { $(p[1]).textContent = $(p[0]).value; cellHint(); detailHint(); }); });
+  function detailHint() {
+    var c = +$('cols').value, t = c < 20 ? 'Muy sencillo: pocos cuadros grandes, ideal para empezar.' : c < 40 ? 'Sencillo: se reconoce bien la imagen sin demasiado trabajo.' : c < 70 ? 'Detallado: más fiel, pero pide más paciencia.' : 'Muy fino: casi como la foto; pensado para lienzos grandes y mucho tiempo.';
+    $('detailHint').textContent = t;
+  }
   function cellHint() {
     var w = +$('wcm').value, cols = +$('cols').value, el = $('cellHint');
     el.textContent = w > 0 ? 'Cada cuadro mide unos ' + (w / cols).toFixed(1).replace('.', ',') + ' cm de lado.' : '';
   }
-  $('wcm').addEventListener('input', cellHint);
+  $('wcm').addEventListener('input', cellHint); detailHint();
 
   function load(file) {
     if (!file || !/^image\//.test(file.type)) return;
@@ -376,7 +403,7 @@
     if (!S.img) return;
     var busy = $('busy'); busy.classList.add('on'); $('go').disabled = true;
     setTimeout(function () {   // deja pintar el aviso antes del cálculo
-      try { render(analyse(S.img, +$('cols').value, +$('k').value, S.medium)); }
+      try { render(analyse(S.img, +$('cols').value, +$('k').value, S.medium, $('clean').checked)); }
       catch (err) { console.error(err); alert('Algo falló al procesar la imagen. Prueba con otra foto.'); }
       finally { busy.classList.remove('on'); $('go').disabled = false; }
     }, 40);
