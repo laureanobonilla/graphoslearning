@@ -1200,12 +1200,6 @@ const depthView = (() => {
         const px = (f, amp) => -vp.x * sc * f - S.mx * amp, py = (f, amp) => -vp.y * sc * f - S.my * amp;
         neb(W * 0.78 + px(0.06, 14), H * 0.28 + py(0.06, 10), Math.max(W, H) * 0.42, '120,90,230', 0.20);
         neb(W * 0.22 + px(0.08, 18), H * 0.78 + py(0.08, 12), Math.max(W, H) * 0.38, '40,200,190', 0.15);
-        // planeta lejano, arriba a la izquierda
-        { const R = Math.min(W, H) * 0.11 * (1 + (sc - 1) * 0.04), cx = W * 0.13 + px(0.04, 26), cy = H * 0.16 + py(0.04, 20);
-          const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-          g.addColorStop(0, `rgba(176,184,226,${(0.95 * k).toFixed(3)})`); g.addColorStop(0.55, `rgba(88,98,160,${(0.95 * k).toFixed(3)})`); g.addColorStop(1, `rgba(20,24,66,${(0.95 * k).toFixed(3)})`);
-          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = `rgba(140,160,255,${(0.35 * k).toFixed(3)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, R, -2.6, -0.4); ctx.stroke(); }
         // estrellas en 3 capas: las lejanas casi no se mueven, las cercanas acompañan más al mapa
         LAYERS.forEach((L, li) => {
             const ox = px(L.f, 10 + li * 16), oy = py(L.f, 8 + li * 12);
