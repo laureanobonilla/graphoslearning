@@ -25,22 +25,22 @@ const PHOTOS = [
     tip: 'Luz natural, sin filtros, sin gafas de sol y con el cabello recogido si puedes.' },
   { slot: 'frente', title: 'Cuerpo entero, de frente', guide: 'img/guia-frente.png',
     why: 'Muestra tus proporciones: hombros, cintura, caderas y largo de piernas. Con eso elegimos los cortes, largos y alturas de cintura que te favorecen.',
-    tip: 'Ropa algo ajustada (no holgada), de pie, brazos relajados y el cuerpo completo dentro del cuadro.' },
+    tip: 'El cuerpo completo dentro del cuadro.' },
   { slot: 'espalda', title: 'Cuerpo entero, de espaldas', guide: 'img/guia-espalda.png',
     why: 'La espalda y los hombros cambian cómo cae una chaqueta o un vestido. Con esta foto vemos el ancho de tus hombros y la línea de tu espalda.',
-    tip: 'Ropa algo ajustada, de pie y derecho/a, con el cuerpo completo dentro del cuadro.' },
+    tip: 'Con el cuerpo completo dentro del cuadro.' },
   { slot: 'perfil', title: 'Cuerpo entero, de perfil', guide: 'img/guia-perfil.png',
     why: 'El perfil muestra tu postura y cómo caen las telas por delante y por detrás. Ayuda a elegir largos y qué tanta estructura necesita una prenda.',
-    tip: 'Ropa algo ajustada, mirando hacia un lado, brazos relajados y el cuerpo completo dentro del cuadro.' },
+    tip: 'Mirando hacia un lado, con el cuerpo completo dentro del cuadro.' },
   { slot: 'torso', title: 'De la cintura para arriba, de frente', guide: 'img/guia-torso.png',
     why: 'Hombros, cuello y largo del torso deciden qué escotes, cuellos y mangas te quedan mejor.',
-    tip: 'Con camiseta o top liso puesto, de frente. No hace falta ninguna foto sin ropa: si una foto muestra desnudez, se descarta.' }
+    tip: '' }
 ];
 
 const STEPS = [...QUESTIONS.map(q => ({ kind: 'q', q })), ...PHOTOS.map(p => ({ kind: 'photo', p }))]; // 15
 const answers = new Array(QUESTIONS.length).fill(null);
 const photos = {};          // slot → data URI JPEG (solo en memoria)
-let consentOk = false, adultOk = false;
+let consentOk = true, adultOk = false; // el aviso de consentimiento se quitó: queda la casilla de mayoría de edad
 // Las fotos se suben una a una en cuanto se eligen. En el navegador solo se recuerda el id de la
 // sesión y qué fotos ya están subidas (nunca las imágenes).
 let sessionId = null; const uploaded = {};
@@ -50,7 +50,7 @@ function loadSession() {
   try {
     const d = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
     if (!d || !d.sessionId || Date.now() - (d.savedAt || 0) > 3 * 86400000) return;
-    sessionId = d.sessionId; (d.uploaded || []).forEach(sl => { uploaded[sl] = true; }); consentOk = !!d.consentOk; adultOk = !!d.adultOk;
+    sessionId = d.sessionId; (d.uploaded || []).forEach(sl => { uploaded[sl] = true; }); consentOk = true; adultOk = !!d.adultOk;
   } catch { /* no crítico */ }
 }
 function clearSession() { sessionId = null; Object.keys(uploaded).forEach(k => delete uploaded[k]); try { localStorage.removeItem(SESSION_KEY); } catch { /* no crítico */ } }
@@ -151,11 +151,9 @@ function renderPhotoStep(p, help) {
   if (isFirstPhoto) {
     const c = document.createElement('div'); c.className = 'consent';
     c.innerHTML = `<p><b>Antes de subir fotos</b></p>
-      <label><input type="checkbox" id="chkAdult"${adultOk ? ' checked' : ''}><span>Tengo 18 años o más.</span></label>
-      <label><input type="checkbox" id="chkConsent"${consentOk ? ' checked' : ''}><span>Acepto que cada foto se suba a un espacio privado en cuanto la elija, se use solo para armar mi recomendación y se conserven hasta 30 días. Puedo borrarlas cuando quiera desde mi resultado.</span></label>`;
+      <label><input type="checkbox" id="chkAdult"${adultOk ? ' checked' : ''}><span>Tengo 18 años o más.</span></label>`;
     wrap.appendChild(c);
     c.querySelector('#chkAdult').addEventListener('change', e => { adultOk = e.target.checked; if (adultOk) track('adult_confirmed', {}); refreshNext(); if (photos[p.slot] && !uploaded[p.slot]) upload(); });
-    c.querySelector('#chkConsent').addEventListener('change', e => { consentOk = e.target.checked; if (consentOk) track('consent_given', {}); refreshNext(); if (photos[p.slot] && !uploaded[p.slot]) upload(); });
   }
 
   const frame = document.createElement('div'); frame.className = 'frame';
@@ -165,7 +163,7 @@ function renderPhotoStep(p, help) {
   wrap.appendChild(frame);
 
   const why = document.createElement('div'); why.className = 'photo-why';
-  why.innerHTML = `<p>${escapeHtml(p.why)}</p><p class="tip">${escapeHtml(p.tip)}</p>`;
+  why.innerHTML = `<p>${escapeHtml(p.why)}</p>${p.tip ? `<p class="tip">${escapeHtml(p.tip)}</p>` : ''}`;
   wrap.appendChild(why);
 
   const row = document.createElement('div'); row.className = 'upload-row';
@@ -214,7 +212,7 @@ function renderPhotoStep(p, help) {
   }
   async function upload() {
     if (!photos[p.slot]) return;
-    if (!(consentOk && adultOk)) { status.textContent = 'Marca las dos casillas de arriba para guardar tu foto.'; refreshNext(); return; }
+    if (!(consentOk && adultOk)) { status.textContent = 'Marca la casilla de arriba para guardar tu foto.'; refreshNext(); return; }
     if (uploading) return;
     uploading = true; err.textContent = ''; status.textContent = 'Guardando tu foto…'; refreshNext();
     try {
