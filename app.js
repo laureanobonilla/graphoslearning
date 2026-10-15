@@ -8814,7 +8814,7 @@ const vizUI = (() => {
     const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const KINDS = [
-        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'rhizome', i: '🌿', es: 'Rizoma', en: 'Rhizome' }, { k: 'relief', i: '⛰️', es: 'Relieve', en: 'Relief' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
+        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'rhizome', i: '🌿', es: 'Rizoma', en: 'Rhizome' }, { k: 'relief', i: '⛰️', es: 'Relieve', en: 'Relief' }, { k: 'net', i: '🧠', es: 'Red', en: 'Network' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
         { k: 'cause_effect', i: '🔗', es: 'Causa → efecto', en: 'Cause → effect' }, { k: 'process', i: '🧭', es: 'Proceso', en: 'Process' },
         { k: 'compare', i: '⚖️', es: 'Comparar', en: 'Compare' }, { k: 'actors', i: '👥', es: 'Actores', en: 'Actors' },
         { k: 'figures', i: '📊', es: 'Cifras', en: 'Figures' }, { k: 'places', i: '📍', es: 'Lugares', en: 'Places' },
@@ -8853,7 +8853,7 @@ const vizUI = (() => {
     const cardNodes = () => nodes.get().filter(n => !n.isSubscheme && (String(n.definition || '').trim() || String(n.simple || '').trim()));
     function availability() {
         const v = currentViews() || {}; const out = [{ k: 'notes', n: getNotes().length }];
-        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) { out.push({ k: 'rhizome', n: '' }); out.push({ k: 'relief', n: '' }); }
+        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) { out.push({ k: 'rhizome', n: '' }); out.push({ k: 'relief', n: '' }); out.push({ k: 'net', n: '' }); }
         const dh = docHost(); if (dh) { const dp = dh.docParts.parts; out.unshift({ k: 'parts', n: dp.filter(x => x.sub && nodes.get(x.sub)).length + '/' + dp.length }); }
         ['timeline', 'cause_effect', 'process', 'compare', 'actors', 'figures', 'places'].forEach(k => {
             if (!v[k]) return;
@@ -8879,11 +8879,11 @@ const vizUI = (() => {
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
         container.style.height = h ? 'calc(100% - ' + h + 'px)' : ''; container.style.alignSelf = h ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
-        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); if (tab === 'relief') reliefResize(); }, 60);
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); if (tab === 'relief') reliefResize(); if (tab === 'net') netResize(); }, 60);
     }
     let layoutT = null; const layoutSoon = () => { clearTimeout(layoutT); layoutT = setTimeout(layout, 40); };
     function setOpen(v) { open = v; try { localStorage.setItem('gk_viz_open', v ? '1' : '0'); } catch (_e) { /* ok */ } lastGeo = ''; paint(); if (v) track('viz_open', { tab }); }
-    function pickTab(k) { tab = k; if (k === 'rhizome' || k === 'relief') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
+    function pickTab(k) { tab = k; if (k === 'rhizome' || k === 'relief' || k === 'net') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
 
     function paint() {
         const av = availability(); if (!av.some(a => a.k === tab)) tab = av[0].k;
@@ -9260,13 +9260,106 @@ const vizUI = (() => {
         document.getElementById('vzRlReset').addEventListener('click', () => { R.az = 0.6; R.tilt = 0.95; R.zoom = 1; R.panX = 0; R.panY = 0; redraw(); });
         cv.style.cursor = 'grab'; reliefResize(); track('relief_view', { nodes: m.nodes.length });
     }
+    // ---------- red (neuronal) ----------
+    // El mapa como una red por capas: cada nivel del árbol es una capa; las sinapsis son las ramas y las conexiones transversales.
+    // Al tocar un concepto se «activa»: la señal viaja por las sinapsis y se va apagando con la distancia.
+    let nn = null;
+    function netStop() { if (!nn) return; try { nn.cv.removeEventListener('pointerdown', nn.onDown); nn.cv.removeEventListener('pointermove', nn.onMove); cancelAnimationFrame(nn.raf); } catch (_e) { /* ok */ } nn = null; }
+    function netBuild(m) {
+        const kids = new Map(); m.tree.forEach(e => { if (!kids.has(e.a)) kids.set(e.a, []); kids.get(e.a).push(e.b); });
+        const byId = new Map(m.nodes.map(n => [n.id, n])); const depth = new Map(), order = []; const brs = [];
+        const roots = m.nodes.filter(n => !m.parent.has(n.id));
+        const walk = (id, d, br) => { if (depth.has(id) || d > 12) return; depth.set(id, d); order.push(id); const n = byId.get(id); n.br = br; (kids.get(id) || []).forEach(c => walk(c, d + 1, d === 0 ? c : br)); };
+        roots.forEach(r => walk(r.id, 0, r.id));
+        m.nodes.forEach(n => { if (!depth.has(n.id)) { depth.set(n.id, 1); order.push(n.id); n.br = n.id; } });
+        const layers = []; order.forEach(id => { const d = depth.get(id); (layers[d] = layers[d] || []).push(id); });
+        const size = new Map(); const sz = (id, g) => { if (size.has(id)) return size.get(id); if (g > 40) return 1; let t = 1; (kids.get(id) || []).forEach(c => { t += sz(c, g + 1); }); size.set(id, t); return t; };
+        m.nodes.forEach(n => sz(n.id, 0));
+        const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
+        const cross = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links.filter(k => byId.has(k.a) && byId.has(k.b)) : [];
+        const edgesN = m.tree.filter(e => byId.has(e.a) && byId.has(e.b)).map(e => ({ a: e.a, b: e.b, kind: 'tree' })).concat(cross.map(k => ({ a: k.a, b: k.b, kind: 'cross', why: k.why })));
+        const adj = new Map(); m.nodes.forEach(n => adj.set(n.id, [])); edgesN.forEach((e, i) => { adj.get(e.a).push([e.b, i]); adj.get(e.b).push([e.a, i]); });
+        m.nodes.forEach(n => { if (!brs.includes(n.br)) brs.push(n.br); });
+        return { byId, depth, layers: layers.filter(Boolean), size, edges: edgesN, adj, brs };
+    }
+    function netLayout() {
+        const g = nn.g, W = nn.cv.clientWidth, L = g.layers.length; const maxN = Math.max(...g.layers.map(l => l.length));
+        const H = Math.max(nn.minH, maxN * 22 + 70); nn.dpr = Math.min(2, window.devicePixelRatio || 1);
+        nn.cv.style.height = H + 'px'; nn.cv.width = Math.round(W * nn.dpr); nn.cv.height = Math.round(H * nn.dpr);
+        const padL = 46, padR = Math.min(190, W * 0.16), colW = L > 1 ? (W - padL - padR) / (L - 1) : 0;
+        nn.pos = new Map();
+        g.layers.forEach((ids, li) => { const col = nn.flip ? (L - 1 - li) : li; ids.forEach((id, i) => nn.pos.set(id, { x: padL + col * colW, y: 40 + (ids.length === 1 ? (H - 80) / 2 : (H - 80) * i / (ids.length - 1)), li })); });
+        nn.H = H;
+    }
+    function netActivate(id) {
+        const g = nn.g; if (id == null) { nn.act = null; nn.t0 = 0; netDraw(); return; }
+        const dist = new Map([[id, 0]]); const q = [id]; while (q.length) { const u = q.shift(); if (dist.get(u) >= 4) continue; (g.adj.get(u) || []).forEach(([v]) => { if (!dist.has(v)) { dist.set(v, dist.get(u) + 1); q.push(v); } }); }
+        nn.act = { id, dist }; nn.t0 = performance.now(); nn.sel = id; netAnimate();
+    }
+    function netAnimate() { cancelAnimationFrame(nn.raf); const R = nn; const tick = () => { if (nn !== R) return; netDraw(); const T = performance.now() - R.t0; if (R.act && T < 4 * 240 + 900) R.raf = requestAnimationFrame(tick); }; tick(); }
+    function netDraw() {
+        if (!nn) return; const { cv, ctx, g } = nn, W = cv.clientWidth, H = nn.H, dpr = nn.dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+        ctx.fillStyle = '#fbfaf6'; ctx.fillRect(0, 0, W, H);
+        const T = nn.act ? performance.now() - nn.t0 : 0; const STEP = 240;
+        const level = (id) => { if (!nn.act) return 0; const d = nn.act.dist.get(id); if (d == null) return 0; const k = Math.max(0, Math.min(1, (T - d * STEP) / 320)); return Math.pow(0.66, d) * k * k * (3 - 2 * k); };
+        const colorOf = (id) => BRANCH_COLORS[g.brs.indexOf(g.byId.get(id).br) % BRANCH_COLORS.length];
+        // capas: columnas tenues con su nombre
+        const L = g.layers.length; const lx = g.layers.map((_ids, li) => { const any = nn.pos.get(g.layers[li][0]); return any.x; });
+        ctx.font = '600 11.5px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        lx.forEach((x, li) => { ctx.fillStyle = 'rgba(95,104,121,.07)'; ctx.fillRect(x - 16, 24, 32, H - 48); ctx.fillStyle = '#5f6879'; ctx.fillText(li === 0 ? L_('Tema', 'Topic') : L_('Nivel ', 'Level ') + li, x, 6); });
+        // sinapsis
+        g.edges.forEach((e, i) => {
+            const a = nn.pos.get(e.a), b = nn.pos.get(e.b); if (!a || !b) return;
+            const la = level(e.a), lb = level(e.b), hot = Math.min(la, lb); const same = Math.abs(a.x - b.x) < 1; const mx = same ? a.x + (nn.flip ? -70 : 70) : (a.x + b.x) / 2;
+            const w = e.kind === 'cross' ? 1.4 : 0.8 + Math.min(2.2, Math.log2(1 + (g.size.get(e.b) || 1)) * 0.5);
+            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(mx, a.y, mx, b.y, b.x, b.y);
+            if (e.kind === 'cross') ctx.setLineDash([5, 5]); else ctx.setLineDash([]);
+            ctx.lineWidth = w + hot * 3; ctx.strokeStyle = hot > 0.02 ? `rgba(14,133,124,${0.35 + hot * 0.6})` : (nn.act ? 'rgba(154,163,178,.22)' : (e.kind === 'cross' ? 'rgba(14,133,124,.45)' : 'rgba(154,163,178,.55)')); ctx.stroke(); ctx.setLineDash([]);
+            if (nn.act && hot > 0.02) { // pulso que viaja desde el lado más cercano a la fuente
+                const da = nn.act.dist.get(e.a), db = nn.act.dist.get(e.b); if (da == null || db == null) return;
+                const from = da <= db ? a : b, to = da <= db ? b : a, d0 = Math.min(da, db); const f = Math.max(0, Math.min(1, (T - d0 * STEP) / (STEP * 1.1)));
+                if (f > 0 && f < 1) { const t2 = f, u = 1 - t2; const px = u * u * u * from.x + 3 * u * u * t2 * mx + 3 * u * t2 * t2 * mx + t2 * t2 * t2 * to.x, py = u * u * u * from.y + 3 * u * u * t2 * from.y + 3 * u * t2 * t2 * to.y + t2 * t2 * t2 * to.y; ctx.fillStyle = '#0e857c'; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, 6.283); ctx.fill(); }
+            }
+        });
+        // neuronas
+        const pinned = []; g.layers.forEach(ids => ids.forEach(id => {
+            const p = nn.pos.get(id), n = g.byId.get(id), lv = level(id), rad = 5 + Math.min(9, Math.sqrt(g.size.get(id) || 1) * 1.6), c = colorOf(id), dim = nn.act && lv < 0.02 && id !== nn.sel;
+            if (lv > 0.02) { const gl = ctx.createRadialGradient(p.x, p.y, rad * 0.5, p.x, p.y, rad * (2 + 3 * lv)); gl.addColorStop(0, `rgba(79,209,197,${0.55 * lv})`); gl.addColorStop(1, 'rgba(79,209,197,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(p.x, p.y, rad * (2 + 3 * lv), 0, 6.283); ctx.fill(); }
+            ctx.globalAlpha = dim ? 0.35 : 1; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 6.283); ctx.fill(); ctx.lineWidth = id === nn.sel ? 3 : 2; ctx.strokeStyle = id === nn.sel ? '#1d2330' : '#fff'; ctx.stroke();
+            const lab = n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label; ctx.font = `${id === nn.sel || lv > 0.3 ? 700 : 500} 12px Inter, sans-serif`; ctx.textAlign = nn.flip ? 'right' : 'left'; ctx.textBaseline = 'middle';
+            const tx = p.x + (nn.flip ? -(rad + 6) : rad + 6); ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(251,250,246,.9)'; ctx.strokeText(lab, tx, p.y); ctx.fillStyle = '#1d2330'; ctx.fillText(lab, tx, p.y); ctx.globalAlpha = 1;
+            pinned.push({ id, x: p.x, y: p.y, r: rad + 4 });
+        })); nn.hit = pinned;
+    }
+    const L_ = (es, e2) => L(es, e2);
+    function netResize() { if (!nn) return; nn.minH = Math.max(240, bodyEl.clientHeight - 92); netLayout(); netDraw(); }
+    function renderNet() {
+        const m = rhizomeModel();
+        if (m.nodes.length < 5) { netStop(); bodyEl.innerHTML = `<div class="vz-empty">${esc(L('Necesitas al menos 5 conceptos para ver la red.', 'You need at least 5 concepts to see the network.'))}</div>`; return; }
+        const rootN = m.rootId != null ? nodes.get(m.rootId) : null; const hasX = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash;
+        const sig = m.hash + '|' + (hasX ? 'x' : '-'); if (nn && nn.sig === sig) return;
+        const keep = nn ? { flip: nn.flip } : { flip: false }; netStop();
+        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('Cada nivel del mapa es una capa y cada rama, una conexión. Toca un concepto para activarlo: la señal viaja por las conexiones y se va apagando con la distancia, así ves qué ideas lo rodean y lo alcanzan. Las líneas punteadas son conexiones transversales (se calculan en la pestaña Rizoma).', 'Each level of the map is a layer and each branch a connection. Tap a concept to activate it: the signal travels along the connections and fades with distance, showing which ideas surround it. Dashed lines are cross connections (computed in the Rhizome tab).'))}</div><div class="vz-rh-ctl"><button type="button" class="vz-ghost" id="vzNnFlip">${esc(L('Invertir dirección', 'Reverse direction'))}</button><button type="button" class="vz-ghost" id="vzNnClear">${esc(L('Apagar', 'Clear'))}</button></div></div><div class="vz-nn-wrap"><canvas class="vz-nn" id="vzNn"></canvas></div>`;
+        const cv = document.getElementById('vzNn');
+        nn = { cv, ctx: cv.getContext('2d'), g: netBuild(m), sig, flip: keep.flip, minH: Math.max(240, bodyEl.clientHeight - 92), pos: new Map(), hit: [], act: null, sel: null, t0: 0, raf: 0, dpr: 1, H: 300 };
+        const R = nn;
+        const at = (ev) => { const rc = cv.getBoundingClientRect(); const x = ev.clientX - rc.left, y = ev.clientY - rc.top; return R.hit.find(h => Math.hypot(h.x - x, h.y - y) <= h.r) || null; };
+        R.onDown = (ev) => { const h = at(ev); if (!h) { R.sel = null; netActivate(null); showQuote(null); return; } const n = R.g.byId.get(h.id); netActivate(h.id); showQuote(n.def || n.simple || n.path.concat(n.label).join(' › '), { noFind: true }); try { network.selectNodes([h.id]); } catch (_e) { /* ok */ } };
+        R.onMove = (ev) => { cv.style.cursor = at(ev) ? 'pointer' : 'default'; };
+        cv.addEventListener('pointerdown', R.onDown); cv.addEventListener('pointermove', R.onMove);
+        document.getElementById('vzNnFlip').addEventListener('click', () => { R.flip = !R.flip; netLayout(); netDraw(); });
+        document.getElementById('vzNnClear').addEventListener('click', () => { R.sel = null; netActivate(null); showQuote(null); });
+        netLayout(); netDraw(); track('net_view', { nodes: m.nodes.length, cross: hasX ? 1 : 0 });
+    }
     function renderBody() {
         showQuote(null);
         const v = currentViews() || {};
         if (tab !== 'rhizome' && rnet) { try { rnet.destroy(); } catch (_e) { /* ok */ } rnet = null; rSig = ''; }
         if (tab !== 'relief') reliefStop();
+        if (tab !== 'net') netStop();
         if (tab === 'rhizome') return renderRhizome();
         if (tab === 'relief') return renderRelief();
+        if (tab === 'net') return renderNet();
         if (tab === 'parts') return renderParts();
         if (tab === 'notes') return renderNotes();
         if (tab === 'timeline' && v.timeline) return renderTimeline(v.timeline);
