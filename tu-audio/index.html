@@ -157,6 +157,8 @@
   var ORDER = ['pista', 'voz', 'ajustar', 'letra', 'limpiar'];
   var state = { cfg: null, tool: null, file: null, seconds: null, jobId: null, paid: false, price: null, src: null, srcKind: null, det: null, st: 0, sp: 100, t0: 0, t1: 0 };
   var KEY = 'aud_job_v1', timer = null, prevUrl = null;
+  // Acceso libre del dueño: /tu-audio/?k=CLAVE (se recuerda en este navegador; el servidor decide si la clave vale).
+  var FREEKEY = null; try { var qk = new URLSearchParams(location.search).get('k'); if (qk) localStorage.setItem('aud_k', qk); FREEKEY = qk || localStorage.getItem('aud_k'); } catch (e) { /* ok */ }
   function view(name) { ['vPick', 'vUpload', 'vWork', 'vReady', 'vError'].forEach(function (v) { $(v).classList.toggle('is-hidden', v !== name); }); }
   function setErr(n, m) { n.textContent = m || ''; n.classList.toggle('is-hidden', !m); }
   function sget() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
@@ -218,7 +220,7 @@
     try {
       var up = await CS.uploadWith('aud-sign-upload', { jobId: jobId }, state.file, function (f) { $('prog').querySelector('i').style.width = Math.round(f * 100) + '%'; });
       $('prog').classList.add('is-hidden'); $('workTitle').textContent = m.work; $('workSub').textContent = 'Suele tardar un minuto o menos. No cierres esta página.';
-      await CS.postFn('aud-start', { jobId: jobId, tool: state.tool, audio: up, consent: true, audioSeconds: state.seconds || 0, anonId: CS.anonId });
+      await CS.postFn('aud-start', { jobId: jobId, tool: state.tool, audio: up, consent: true, audioSeconds: state.seconds || 0, anonId: CS.anonId, key: FREEKEY });
       sset({ jobId: jobId, at: Date.now() }); poll(jobId, 0);
     } catch (e) { CS.track(APP, 'submit_failed', { tool: state.tool, status: e.status || 0 }); fail(e.status ? e.message : 'Se cortó la conexión. Inténtalo de nuevo.'); }
   });
@@ -294,7 +296,7 @@
     try {
       state.src = await decode(await state.file.arrayBuffer());
       if (!state.jobId) state.jobId = CS.newId();
-      var d = await CS.postFn('aud-start', { jobId: state.jobId, tool: 'ajustar', audioSeconds: Math.round(state.src.dur), anonId: CS.anonId });
+      var d = await CS.postFn('aud-start', { jobId: state.jobId, tool: 'ajustar', audioSeconds: Math.round(state.src.dur), anonId: CS.anonId, key: FREEKEY });
       state.paid = !!d.paid; state.price = d.price; state.st = 0; state.sp = 100; $('spR').value = 100; sset({ jobId: state.jobId, at: Date.now() });
       showReady(state.jobId, d, true);
     } catch (e) { CS.track(APP, 'submit_failed', { tool: 'ajustar', status: e.status || 0 }); fail(e.status ? e.message : 'No pudimos abrir este audio. Prueba con un mp3 o m4a.'); }

@@ -7,6 +7,11 @@ const crypto = require('crypto');
 const ins = require('./ins-core');
 const cs = ins;
 
+// Acceso libre del dueño: abrir /tu-audio/?k=CLAVE (se recuerda en ese navegador). Con la clave correcta el trabajo nace como pagado.
+// Puede cambiarse con la variable AUD_FREE_KEY de Netlify; si no existe se usa esta.
+const FREE_KEY = process.env.AUD_FREE_KEY || 'aud-JTsodYbJsuMy';
+const freeKeyOk = (k) => { const a = Buffer.from(String(k || '')), b = Buffer.from(FREE_KEY); return a.length === b.length && crypto.timingSafeEqual(a, b); };
+
 const TOOLS = {
     pista:   { price: process.env.AUD_PRICE_PISTA   || '4.99', server: true,  kind: 'audio' },
     voz:     { price: process.env.AUD_PRICE_VOZ     || '4.99', server: true,  kind: 'audio' },
@@ -117,4 +122,4 @@ function textPreview(text) { const lines = String(text || '').split('\n').filter
 
 const publicJob = (j) => ({ id: j.id, tool: j.tool, status: j.status, paid: !!j.paid, price: j.price_usd != null ? String(j.price_usd) : null, seconds: j.seconds || null, error: j.status === 'failed' ? (j.error || 'No pudimos procesar este audio.') : null });
 
-module.exports = { ...ins, TOOLS, toolOk, availableTools, saveJob, getJob, startPrediction, getPrediction, pickStem, firstAudioUrl, pickText, deliveryUrl, wavSlice, isMp3, isWav, textPreview, publicJob };
+module.exports = { ...ins, freeKeyOk, TOOLS, toolOk, availableTools, saveJob, getJob, startPrediction, getPrediction, pickStem, firstAudioUrl, pickText, deliveryUrl, wavSlice, isMp3, isWav, textPreview, publicJob };
