@@ -1649,6 +1649,13 @@ const topicUI = (() => {
         }
         if (on) { open = false; paint(); }
         loadingEl.classList.toggle('on', !!on);
+        if (on) { loadingEl.classList.remove('fail'); loadingEl.onclick = null; }
+    }
+    // Si no se pudo escribir el texto, no se queda en silencio: aviso con botón para reintentar.
+    function setFailed(retry) {
+        if (!loadingEl) return;
+        document.getElementById('topicLoadingLbl').textContent = en ? 'The text could not be written. Tap to retry' : 'No se pudo escribir el texto. Toca para reintentar';
+        loadingEl.classList.add('on', 'fail'); loadingEl.onclick = () => { loadingEl.onclick = null; loadingEl.classList.remove('fail'); retry(); };
     }
     // Subraya en el texto una frase (de una vista) y lleva allí; usa el resaltado nativo (CSS Highlight) sin tocar el HTML.
     function highlightQuote(q, owner) {
@@ -1667,7 +1674,7 @@ const topicUI = (() => {
         const el = a.node.parentElement; if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         return true;
     }
-    return { show, ownerOf, setOpen, onLoaded, setLoading, highlightQuote };
+    return { show, ownerOf, setOpen, onLoaded, setLoading, setFailed, highlightQuote };
 })();
 
 // Esquema hecho a partir de un texto pegado: ese mismo texto queda como el texto del esquema (solo lectura, a la izquierda).
@@ -1680,18 +1687,29 @@ function setSourceTextAsSchemaText(ownerId, text) {
 async function attachTopicText(ownerId, topic, data) {
     if (!topicUI) return;
     topicUI.setLoading(true, topic);
+    let okDone = false;
     try {
         const labels = [data.root, ...(data.branches || []), ...(data.subBranches || [])].map(n => String(n && n.label || '').trim()).filter(Boolean);
-        const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'topic_text', topic, text: labels.join('\n') }) });
-        const d = await res.json();
-        if (!res.ok || !d.text) return;
-        if (!nodes.get(ownerId)) return;
-        isApplyingUndo = true;
-        try { nodes.update({ id: ownerId, schemaText: d.text }); } finally { isApplyingUndo = false; }
-        topicUI.show(ownerId, true);
-        track('topic_text_ready', { words: d.text.split(/\s+/).length });
+        // Hasta 3 intentos: el servidor puede tardar o devolver una respuesta inválida, y sin esto el texto quedaba sin escribirse.
+        for (let attempt = 0; attempt < 3 && !okDone; attempt++) {
+            if (!nodes.get(ownerId)) return;
+            try {
+                const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'topic_text', topic, text: labels.join('\n') }) });
+                const d = await res.json().catch(() => ({}));
+                if (!res.ok || !d.text) { await new Promise(r => setTimeout(r, 1200)); continue; }
+                if (!nodes.get(ownerId)) return;
+                isApplyingUndo = true;
+                try { nodes.update({ id: ownerId, schemaText: d.text }); } finally { isApplyingUndo = false; }
+                topicUI.show(ownerId, true);
+                track('topic_text_ready', { words: d.text.split(/\s+/).length, attempt });
+                okDone = true;
+            } catch (_e) { await new Promise(r => setTimeout(r, 1200)); }
+        }
     } catch (_e) { /* el texto es un extra: si falla, el esquema sigue igual */ }
-    finally { topicUI.setLoading(false); }
+    finally {
+        topicUI.setLoading(false);
+        if (!okDone && nodes.get(ownerId)) topicUI.setFailed(() => attachTopicText(ownerId, topic, data));
+    }
 }
 
 async function generateFullSchemaFromTopic(topicText, opts = {}) {
@@ -8542,8 +8560,8 @@ async function exportReportRtf() {
     const MAX_LEVELS = 1; // al inicio solo el primer nivel; lo demás (ya calculado en segundo plano) sale con «Ver más»
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
     const T = en
-        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', term1: 'term', loading: 'loading', more: 'See more', below: 'Continues below:', hide: 'Hide' }
-        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', term1: 'término', loading: 'cargando', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
+        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', term1: 'term', loading: 'loading', writing: 'Writing…', writingN: 'Writing definitions…', more: 'See more', below: 'Continues below:', hide: 'Hide' }
+        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', term1: 'término', loading: 'cargando', writing: 'Escribiendo…', writingN: 'Escribiendo definiciones…', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
     document.getElementById('dvBackLbl').textContent = T.back;
     const dvBackBtn = document.getElementById('dvBack');
     dvBackBtn.title = en ? 'Collapse' : 'Contraer';
@@ -8612,7 +8630,7 @@ async function exportReportRtf() {
         row.appendChild(term);
         row._cells = [T.def, T.simple, T.ex].map((lbl) => { const c = document.createElement('div'); c.className = 'dv-cell'; c.dataset.l = lbl; row.appendChild(c); return c; });
         const vals = [n.definition, n.simple, n.example]; row._rel = relOf.get(String(n.id)) || '';
-        row._cells.forEach((c, i) => { if (!putCell(row, i, vals[i])) c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
+        row._cells.forEach((c, i) => { if (!putCell(row, i, vals[i])) c.innerHTML = '<div class="dv-wr"><i></i>' + T.writing + '</div><div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
         // Nodos de más abajo: citados junto al término, con "Ver más".
         const childIds = [...(depth >= MAX_LEVELS - 1 ? (kids.get(String(n.id)) || []) : []), ...(hiddenKids.get(String(n.id)) || [])];
         if (childIds.length) {
@@ -8659,7 +8677,13 @@ async function exportReportRtf() {
         const sub = document.getElementById('dvSub'); if (!sub) return;
         const total = grid.querySelectorAll('.dv-row[data-id]').length;
         const skel = grid.querySelectorAll('.dv-row[data-id] .dv-skel').length;
-        sub.textContent = total + ' ' + (total === 1 ? T.term1 : T.terms) + (skel > 0 ? ' · ' + T.loading + '…' : '');
+        const done = Math.max(0, total - Math.ceil(skel / 3));   // cada fila pendiente tiene 3 huecos (definición, sencilla, ejemplo)
+        sub.textContent = ''; sub.classList.toggle('dv-busy', skel > 0);
+        if (skel > 0) { const sp = document.createElement('i'); sp.className = 'dv-spin'; sub.appendChild(sp); }
+        sub.appendChild(document.createTextNode(skel > 0 ? T.writingN + ' ' + done + ' / ' + total : total + ' ' + (total === 1 ? T.term1 : T.terms)));
+        let bar = document.getElementById('dvBar');
+        if (!bar) { bar = document.createElement('div'); bar.id = 'dvBar'; bar.appendChild(document.createElement('b')); const hd = view.querySelector('.dv-head'); if (hd) hd.appendChild(bar); }
+        bar.classList.toggle('on', skel > 0); bar.firstChild.style.width = (total ? Math.round(done / total * 100) : 0) + '%';
     }
     async function loadMissing(list, token) {
         const missing = list.filter(({ n }) => !(String(n.definition || '').trim() && String(n.simple || '').trim() && String(n.example || '').trim()));
@@ -8834,7 +8858,7 @@ const vizUI = (() => {
     const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const KINDS = [
-        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'rhizome', i: '🌿', es: 'Rizoma', en: 'Rhizome' }, { k: 'relief', i: '⛰️', es: 'Relieve', en: 'Relief' }, { k: 'net', i: '🧠', es: 'Red', en: 'Network' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
+        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'rhizome', i: '🌿', es: 'Rizoma', en: 'Rhizome' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
         { k: 'cause_effect', i: '🔗', es: 'Causa → efecto', en: 'Cause → effect' }, { k: 'process', i: '🧭', es: 'Proceso', en: 'Process' },
         { k: 'compare', i: '⚖️', es: 'Comparar', en: 'Compare' }, { k: 'actors', i: '👥', es: 'Actores', en: 'Actors' },
         { k: 'figures', i: '📊', es: 'Cifras', en: 'Figures' }, { k: 'places', i: '📍', es: 'Lugares', en: 'Places' },
@@ -8873,7 +8897,7 @@ const vizUI = (() => {
     const cardNodes = () => nodes.get().filter(n => !n.isSubscheme && (String(n.definition || '').trim() || String(n.simple || '').trim()));
     function availability() {
         const v = currentViews() || {}; const out = [{ k: 'notes', n: getNotes().length }];
-        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) { out.push({ k: 'rhizome', n: '' }); out.push({ k: 'relief', n: '' }); out.push({ k: 'net', n: '' }); }
+        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) { out.push({ k: 'rhizome', n: '' }); }
         const dh = docHost(); if (dh) { const dp = dh.docParts.parts; out.unshift({ k: 'parts', n: dp.filter(x => x.sub && nodes.get(x.sub)).length + '/' + dp.length }); }
         ['timeline', 'cause_effect', 'process', 'compare', 'actors', 'figures', 'places'].forEach(k => {
             if (!v[k]) return;
@@ -8899,11 +8923,11 @@ const vizUI = (() => {
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
         container.style.height = h ? 'calc(100% - ' + h + 'px)' : ''; container.style.alignSelf = h ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
-        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); if (tab === 'relief') reliefResize(); if (tab === 'net') netResize(); }, 60);
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); }, 60);
     }
     let layoutT = null; const layoutSoon = () => { clearTimeout(layoutT); layoutT = setTimeout(layout, 40); };
     function setOpen(v) { open = v; try { localStorage.setItem('gk_viz_open', v ? '1' : '0'); } catch (_e) { /* ok */ } lastGeo = ''; paint(); if (v) track('viz_open', { tab }); }
-    function pickTab(k) { tab = k; if (k === 'rhizome' || k === 'relief' || k === 'net') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
+    function pickTab(k) { tab = k; if (k === 'rhizome') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
 
     function paint() {
         const av = availability(); if (!av.some(a => a.k === tab)) tab = av[0].k;
@@ -9179,207 +9203,11 @@ const vizUI = (() => {
         el.style.height = Math.max(240, bodyEl.clientHeight - 92) + 'px';
         try { rnet.setSize('100%', el.style.height); rnet.redraw(); } catch (_e) { /* ok */ }
     }
-    // ---------- relieve ----------
-    // El mismo mapa como un terreno: la altura de cada concepto es su importancia (cuánto cuelga de él y cuántas conexiones tiene),
-    // las ramas forman cordilleras que unen padre e hijo, y la posición en el plano es la del lienzo.
-    let rl = null;   // { cv, ctx, grid, pins, az, tilt, zoom, ... }
-    function reliefStop() { if (!rl) return; try { rl.cv.removeEventListener('pointerdown', rl.onDown); window.removeEventListener('pointermove', rl.onMove); window.removeEventListener('pointerup', rl.onUp); rl.cv.removeEventListener('wheel', rl.onWheel); cancelAnimationFrame(rl.raf); } catch (_e) { /* ok */ } rl = null; }
-    function reliefData(m) {
-        const pos = network.getPositions(m.nodes.map(n => n.id));
-        const pts = m.nodes.map(n => ({ n, x: (pos[n.id] || { x: 0 }).x, y: (pos[n.id] || { y: 0 }).y }));
-        let l = Infinity, r = -Infinity, t = Infinity, b = -Infinity; pts.forEach(p => { l = Math.min(l, p.x); r = Math.max(r, p.x); t = Math.min(t, p.y); b = Math.max(b, p.y); });
-        const span = Math.max(r - l, b - t, 1), cx = (l + r) / 2, cy = (t + b) / 2;
-        pts.forEach(p => { p.u = (p.x - cx) / span * 1.7; p.v = (p.y - cy) / span * 1.7; });
-        const kids = new Map(); m.tree.forEach(e => { if (!kids.has(e.a)) kids.set(e.a, []); kids.get(e.a).push(e.b); });
-        const size = new Map(); const sz = (id, g) => { if (size.has(id)) return size.get(id); if (g > 40) return 1; let t2 = 1; (kids.get(id) || []).forEach(c => { t2 += sz(c, g + 1); }); size.set(id, t2); return t2; };
-        m.nodes.forEach(n => sz(n.id, 0));
-        const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
-        const cross = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links : [];
-        const deg = new Map(); cross.forEach(k => { deg.set(k.a, (deg.get(k.a) || 0) + 1); deg.set(k.b, (deg.get(k.b) || 0) + 1); });
-        let mx = 1; pts.forEach(p => { p.score = size.get(p.n.id) + 1.5 * (deg.get(p.n.id) || 0); mx = Math.max(mx, p.score); });
-        pts.forEach(p => { p.z = 0.1 + 0.9 * Math.sqrt(p.score / mx); });
-        const byId = new Map(pts.map(p => [p.n.id, p]));
-        // distancia típica al vecino más cercano → ancho de los picos
-        const nn = pts.map(p => { let d = Infinity; pts.forEach(q => { if (q !== p) d = Math.min(d, Math.hypot(p.u - q.u, p.v - q.v)); }); return isFinite(d) ? d : 0.3; }).sort((a, b2) => a - b2);
-        const dn = Math.max(0.08, nn[Math.floor(nn.length / 2)] || 0.2);
-        const src = []; // fuentes gaussianas: picos + puntos a lo largo de cada rama (cordilleras)
-        pts.forEach(p => src.push({ u: p.u, v: p.v, z: p.z, s: dn * (0.5 + 0.7 * p.z) }));
-        m.tree.forEach(e => { const a = byId.get(e.a), c = byId.get(e.b); if (!a || !c) return; for (let k = 1; k < 6; k++) { const f = k / 6; src.push({ u: a.u + (c.u - a.u) * f, v: a.v + (c.v - a.v) * f, z: (a.z + (c.z - a.z) * f) * 0.62, s: dn * 0.42 }); } });
-        const N = 72, lim = 1.0, Z = new Float32Array((N + 1) * (N + 1)); let zmax = 0;
-        for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
-            const u = -lim + 2 * lim * i / N, v = -lim + 2 * lim * j / N; let z = 0;
-            for (let k = 0; k < src.length; k++) { const q = src[k], d2 = (u - q.u) * (u - q.u) + (v - q.v) * (v - q.v); if (d2 > 9 * q.s * q.s) continue; const h = q.z * Math.exp(-d2 / (2 * q.s * q.s)); if (h > z) z = h; }
-            Z[i * (N + 1) + j] = z; if (z > zmax) zmax = z;
-        }
-        return { N, lim, Z, zmax: zmax || 1, pts };
-    }
-    const RAMP = [[0, [203, 223, 196]], [0.18, [160, 198, 143]], [0.4, [201, 184, 122]], [0.62, [166, 140, 106]], [0.82, [138, 143, 152]], [1, [247, 249, 251]]];
-    const rampAt = (e) => { for (let i = 1; i < RAMP.length; i++) if (e <= RAMP[i][0]) { const a = RAMP[i - 1], b = RAMP[i], f = (e - a[0]) / (b[0] - a[0]); return [a[1][0] + (b[1][0] - a[1][0]) * f, a[1][1] + (b[1][1] - a[1][1]) * f, a[1][2] + (b[1][2] - a[1][2]) * f]; } return RAMP[RAMP.length - 1][1]; };
-    function reliefDraw() {
-        if (!rl) return; const { cv, ctx, g } = rl; const W = cv.clientWidth, Hh = cv.clientHeight, dpr = rl.dpr;
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, Hh);
-        const grd = ctx.createLinearGradient(0, 0, 0, Hh); grd.addColorStop(0, '#eef3f4'); grd.addColorStop(1, '#fbfaf6'); ctx.fillStyle = grd; ctx.fillRect(0, 0, W, Hh);
-        const { N, lim, Z, zmax } = g, ca = Math.cos(rl.az), sa = Math.sin(rl.az), sp = Math.sin(rl.tilt), cp = Math.cos(rl.tilt);
-        const sc = Math.min(Hh * 0.36, W * 0.38) * rl.zoom, hz = 0.95, cx = W / 2 + rl.panX, cy = Hh * 0.56 + rl.panY;
-        const proj = (u, v, z) => { const xr = u * ca - v * sa, yr = u * sa + v * ca; return [cx + xr * sc, cy + (yr * sp - z * hz * cp) * sc, yr]; };
-        const V = (N + 1) * (N + 1), X = new Float32Array(V), Y = new Float32Array(V), D = new Float32Array(V);
-        for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) { const k = i * (N + 1) + j; const p = proj(-lim + 2 * lim * i / N, -lim + 2 * lim * j / N, Z[k]); X[k] = p[0]; Y[k] = p[1]; D[k] = p[2]; }
-        const cells = []; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { const a = i * (N + 1) + j; cells.push(a); }
-        const key = (a) => D[a] + D[a + 1] + D[a + N + 1] + D[a + N + 2];
-        cells.sort((p, q) => key(p) - key(q));
-        const step = 2 * lim / N;
-        for (let c = 0; c < cells.length; c++) {
-            const a = cells[c], b = a + 1, d = a + N + 1, e2 = a + N + 2;
-            const z = (Z[a] + Z[b] + Z[d] + Z[e2]) / 4;
-            const dzu = (Z[d] + Z[e2] - Z[a] - Z[b]) / (2 * step), dzv = (Z[b] + Z[e2] - Z[a] - Z[d]) / (2 * step);
-            const nl = Math.hypot(dzu, dzv, 1), lam = Math.max(0, (-dzu * -0.5 + -dzv * -0.6 + 1 * 0.62) / nl);
-            const base = rampAt(z / zmax), sh = 0.62 + 0.55 * lam;
-            const col = `rgb(${Math.min(255, base[0] * sh) | 0},${Math.min(255, base[1] * sh) | 0},${Math.min(255, base[2] * sh) | 0})`;
-            ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 0.6;
-            ctx.beginPath(); ctx.moveTo(X[a], Y[a]); ctx.lineTo(X[b], Y[b]); ctx.lineTo(X[e2], Y[e2]); ctx.lineTo(X[d], Y[d]); ctx.closePath(); ctx.fill(); ctx.stroke();
-        }
-        // pines con la etiqueta de cada concepto (en los mapas grandes, solo los más altos y el que se señala)
-        const pins = []; const order = g.pts.slice().sort((a, b) => b.z - a.z); const maxLabels = rl.zoom > 1.4 ? 70 : 34;
-        order.forEach((p, idx) => {
-            const top = proj(p.u, p.v, p.z + 0.05), base = proj(p.u, p.v, p.z);
-            pins.push({ p, x: top[0], y: top[1] });
-            const show = idx < maxLabels || rl.hover === p.n.id;
-            ctx.strokeStyle = 'rgba(29,35,48,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(top[0], top[1] - 8); ctx.stroke();
-            ctx.fillStyle = p.n.id === rl.sel ? '#0e857c' : '#1d2330'; ctx.beginPath(); ctx.arc(top[0], top[1] - 9, p.n.id === rl.sel ? 5 : 3.5, 0, 6.283); ctx.fill();
-            if (show) { const fs = idx === 0 ? 14 : (idx < 8 ? 12.5 : 11.5); ctx.font = `600 ${fs}px Inter, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(251,250,246,.92)'; ctx.strokeText(p.n.label.length > 26 ? p.n.label.slice(0, 25) + '…' : p.n.label, top[0], top[1] - 14); ctx.fillStyle = '#1d2330'; ctx.fillText(p.n.label.length > 26 ? p.n.label.slice(0, 25) + '…' : p.n.label, top[0], top[1] - 14); }
-        });
-        rl.pins = pins;
-    }
-    function reliefResize() { if (!rl) return; const wrap = rl.cv.parentElement; const w = wrap.clientWidth, h = Math.max(240, bodyEl.clientHeight - 92); rl.dpr = Math.min(2, window.devicePixelRatio || 1); rl.cv.style.height = h + 'px'; rl.cv.width = Math.round(w * rl.dpr); rl.cv.height = Math.round(h * rl.dpr); reliefDraw(); }
-    function renderRelief() {
-        const m = rhizomeModel();
-        if (m.nodes.length < 5) { reliefStop(); bodyEl.innerHTML = `<div class="vz-empty">${esc(L('Necesitas al menos 5 conceptos para ver el relieve.', 'You need at least 5 concepts to see the relief.'))}</div>`; return; }
-        const pp = network.getPositions(m.nodes.map(n => n.id)); const sig = m.hash + '|' + hashOf(m.nodes.map(n => { const q = pp[n.id] || { x: 0, y: 0 }; return Math.round(q.x / 20) + ',' + Math.round(q.y / 20); }).join(';'));
-        if (rl && rl.sig === sig) return;
-        const keep = rl ? { az: rl.az, tilt: rl.tilt, zoom: rl.zoom } : null; reliefStop();
-        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('La altura de cada concepto es su importancia: cuánto cuelga de él y cuántas conexiones tiene. Las ramas forman cordilleras. Arrastra para girar, usa la rueda para acercar y toca un pico para ver el concepto.', 'Each concept’s height is its importance: how much hangs from it and how many connections it has. Branches form ranges. Drag to rotate, use the wheel to zoom and tap a peak to see the concept.'))}</div><div class="vz-rh-ctl"><button type="button" class="vz-ghost" id="vzRlTop">${esc(L('Vista desde arriba', 'Top view'))}</button><button type="button" class="vz-ghost" id="vzRlReset">${esc(L('Restablecer vista', 'Reset view'))}</button></div></div><div class="vz-rl-wrap"><canvas class="vz-rl" id="vzRl"></canvas></div>`;
-        const cv = document.getElementById('vzRl');
-        rl = { cv, ctx: cv.getContext('2d'), g: reliefData(m), sig, az: keep ? keep.az : 0.6, tilt: keep ? keep.tilt : 0.95, zoom: keep ? keep.zoom : 1, panX: 0, panY: 0, pins: [], hover: null, sel: null, drag: null, raf: 0 };
-        const R = rl;
-        const redraw = () => { if (R.raf) return; R.raf = requestAnimationFrame(() => { R.raf = 0; if (rl === R) reliefDraw(); }); };
-        const pinAt = (x, y) => { let best = null, bd = 16; R.pins.forEach(pn => { const d = Math.hypot(pn.x - x, pn.y - 9 - y); if (d < bd) { bd = d; best = pn; } }); return best; };
-        R.onDown = (ev) => { R.drag = { x: ev.clientX, y: ev.clientY, az: R.az, tilt: R.tilt, moved: false, pan: ev.shiftKey || ev.button === 2, px: R.panX, py: R.panY }; try { cv.setPointerCapture(ev.pointerId); } catch (_e) { /* ok */ } };
-        R.onMove = (ev) => {
-            if (R.drag) { const dx = ev.clientX - R.drag.x, dy = ev.clientY - R.drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) R.drag.moved = true; if (R.drag.pan) { R.panX = R.drag.px + dx; R.panY = R.drag.py + dy; } else { R.az = R.drag.az + dx * 0.008; R.tilt = Math.max(0.35, Math.min(1.45, R.drag.tilt + dy * 0.006)); } redraw(); return; }
-            const rc = cv.getBoundingClientRect(); const pn = pinAt(ev.clientX - rc.left, ev.clientY - rc.top); const hv = pn ? pn.p.n.id : null; if (hv !== R.hover) { R.hover = hv; cv.style.cursor = hv ? 'pointer' : 'grab'; redraw(); }
-        };
-        R.onUp = (ev) => {
-            const d = R.drag; R.drag = null; if (!d || d.moved) return;
-            const rc = cv.getBoundingClientRect(); const pn = pinAt(ev.clientX - rc.left, ev.clientY - rc.top);
-            if (pn) { R.sel = pn.p.n.id; const n = pn.p.n; showQuote(n.def || n.simple || n.path.concat(n.label).join(' › '), { noFind: true }); try { network.selectNodes([n.id]); network.focus(n.id, { scale: 1, animation: { duration: 400 } }); } catch (_e) { /* ok */ } } else { R.sel = null; showQuote(null); }
-            redraw();
-        };
-        R.onWheel = (ev) => { ev.preventDefault(); R.zoom = Math.max(0.5, Math.min(3.2, R.zoom * (ev.deltaY < 0 ? 1.1 : 0.9))); redraw(); };
-        cv.addEventListener('pointerdown', R.onDown); window.addEventListener('pointermove', R.onMove); window.addEventListener('pointerup', R.onUp); cv.addEventListener('wheel', R.onWheel, { passive: false }); cv.addEventListener('contextmenu', (ev) => ev.preventDefault());
-        document.getElementById('vzRlTop').addEventListener('click', () => { R.tilt = 1.45; R.az = 0; redraw(); });
-        document.getElementById('vzRlReset').addEventListener('click', () => { R.az = 0.6; R.tilt = 0.95; R.zoom = 1; R.panX = 0; R.panY = 0; redraw(); });
-        cv.style.cursor = 'grab'; reliefResize(); track('relief_view', { nodes: m.nodes.length });
-    }
-    // ---------- red (neuronal) ----------
-    // El mapa como una red por capas: cada nivel del árbol es una capa; las sinapsis son las ramas y las conexiones transversales.
-    // Al tocar un concepto se «activa»: la señal viaja por las sinapsis y se va apagando con la distancia.
-    let nn = null;
-    function netStop() { if (!nn) return; try { nn.cv.removeEventListener('pointerdown', nn.onDown); nn.cv.removeEventListener('pointermove', nn.onMove); cancelAnimationFrame(nn.raf); } catch (_e) { /* ok */ } nn = null; }
-    function netBuild(m) {
-        const kids = new Map(); m.tree.forEach(e => { if (!kids.has(e.a)) kids.set(e.a, []); kids.get(e.a).push(e.b); });
-        const byId = new Map(m.nodes.map(n => [n.id, n])); const depth = new Map(), order = []; const brs = [];
-        const roots = m.nodes.filter(n => !m.parent.has(n.id));
-        const walk = (id, d, br) => { if (depth.has(id) || d > 12) return; depth.set(id, d); order.push(id); const n = byId.get(id); n.br = br; (kids.get(id) || []).forEach(c => walk(c, d + 1, d === 0 ? c : br)); };
-        roots.forEach(r => walk(r.id, 0, r.id));
-        m.nodes.forEach(n => { if (!depth.has(n.id)) { depth.set(n.id, 1); order.push(n.id); n.br = n.id; } });
-        const layers = []; order.forEach(id => { const d = depth.get(id); (layers[d] = layers[d] || []).push(id); });
-        const size = new Map(); const sz = (id, g) => { if (size.has(id)) return size.get(id); if (g > 40) return 1; let t = 1; (kids.get(id) || []).forEach(c => { t += sz(c, g + 1); }); size.set(id, t); return t; };
-        m.nodes.forEach(n => sz(n.id, 0));
-        const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
-        const cross = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links.filter(k => byId.has(k.a) && byId.has(k.b)) : [];
-        const edgesN = m.tree.filter(e => byId.has(e.a) && byId.has(e.b)).map(e => ({ a: e.a, b: e.b, kind: 'tree' })).concat(cross.map(k => ({ a: k.a, b: k.b, kind: 'cross', why: k.why })));
-        const adj = new Map(); m.nodes.forEach(n => adj.set(n.id, [])); edgesN.forEach((e, i) => { adj.get(e.a).push([e.b, i]); adj.get(e.b).push([e.a, i]); });
-        m.nodes.forEach(n => { if (!brs.includes(n.br)) brs.push(n.br); });
-        return { byId, depth, layers: layers.filter(Boolean), size, edges: edgesN, adj, brs };
-    }
-    function netLayout() {
-        const g = nn.g, W = nn.cv.clientWidth, L = g.layers.length; const maxN = Math.max(...g.layers.map(l => l.length));
-        const H = Math.max(nn.minH, maxN * 22 + 70); nn.dpr = Math.min(2, window.devicePixelRatio || 1);
-        nn.cv.style.height = H + 'px'; nn.cv.width = Math.round(W * nn.dpr); nn.cv.height = Math.round(H * nn.dpr);
-        const padL = 46, padR = Math.min(190, W * 0.16), colW = L > 1 ? (W - padL - padR) / (L - 1) : 0;
-        nn.pos = new Map();
-        g.layers.forEach((ids, li) => { const col = nn.flip ? (L - 1 - li) : li; ids.forEach((id, i) => nn.pos.set(id, { x: padL + col * colW, y: 40 + (ids.length === 1 ? (H - 80) / 2 : (H - 80) * i / (ids.length - 1)), li })); });
-        nn.H = H;
-    }
-    function netActivate(id) {
-        const g = nn.g; if (id == null) { nn.act = null; nn.t0 = 0; netDraw(); return; }
-        const dist = new Map([[id, 0]]); const q = [id]; while (q.length) { const u = q.shift(); if (dist.get(u) >= 4) continue; (g.adj.get(u) || []).forEach(([v]) => { if (!dist.has(v)) { dist.set(v, dist.get(u) + 1); q.push(v); } }); }
-        nn.act = { id, dist }; nn.t0 = performance.now(); nn.sel = id; netAnimate();
-    }
-    function netAnimate() { cancelAnimationFrame(nn.raf); const R = nn; const tick = () => { if (nn !== R) return; netDraw(); const T = performance.now() - R.t0; if (R.act && T < 4 * 240 + 900) R.raf = requestAnimationFrame(tick); }; tick(); }
-    function netDraw() {
-        if (!nn) return; const { cv, ctx, g } = nn, W = cv.clientWidth, H = nn.H, dpr = nn.dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = '#fbfaf6'; ctx.fillRect(0, 0, W, H);
-        const T = nn.act ? performance.now() - nn.t0 : 0; const STEP = 240;
-        const level = (id) => { if (!nn.act) return 0; const d = nn.act.dist.get(id); if (d == null) return 0; const k = Math.max(0, Math.min(1, (T - d * STEP) / 320)); return Math.pow(0.66, d) * k * k * (3 - 2 * k); };
-        const colorOf = (id) => BRANCH_COLORS[g.brs.indexOf(g.byId.get(id).br) % BRANCH_COLORS.length];
-        // capas: columnas tenues con su nombre
-        const L = g.layers.length; const lx = g.layers.map((_ids, li) => { const any = nn.pos.get(g.layers[li][0]); return any.x; });
-        ctx.font = '600 11.5px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
-        lx.forEach((x, li) => { ctx.fillStyle = 'rgba(95,104,121,.07)'; ctx.fillRect(x - 16, 24, 32, H - 48); ctx.fillStyle = '#5f6879'; ctx.fillText(li === 0 ? L_('Tema', 'Topic') : L_('Nivel ', 'Level ') + li, x, 6); });
-        // sinapsis
-        g.edges.forEach((e, i) => {
-            const a = nn.pos.get(e.a), b = nn.pos.get(e.b); if (!a || !b) return;
-            const la = level(e.a), lb = level(e.b), hot = Math.min(la, lb); const same = Math.abs(a.x - b.x) < 1; const mx = same ? a.x + (nn.flip ? -70 : 70) : (a.x + b.x) / 2;
-            const w = e.kind === 'cross' ? 1.4 : 0.8 + Math.min(2.2, Math.log2(1 + (g.size.get(e.b) || 1)) * 0.5);
-            ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.bezierCurveTo(mx, a.y, mx, b.y, b.x, b.y);
-            if (e.kind === 'cross') ctx.setLineDash([5, 5]); else ctx.setLineDash([]);
-            ctx.lineWidth = w + hot * 3; ctx.strokeStyle = hot > 0.02 ? `rgba(14,133,124,${0.35 + hot * 0.6})` : (nn.act ? 'rgba(154,163,178,.22)' : (e.kind === 'cross' ? 'rgba(14,133,124,.45)' : 'rgba(154,163,178,.55)')); ctx.stroke(); ctx.setLineDash([]);
-            if (nn.act && hot > 0.02) { // pulso que viaja desde el lado más cercano a la fuente
-                const da = nn.act.dist.get(e.a), db = nn.act.dist.get(e.b); if (da == null || db == null) return;
-                const from = da <= db ? a : b, to = da <= db ? b : a, d0 = Math.min(da, db); const f = Math.max(0, Math.min(1, (T - d0 * STEP) / (STEP * 1.1)));
-                if (f > 0 && f < 1) { const t2 = f, u = 1 - t2; const px = u * u * u * from.x + 3 * u * u * t2 * mx + 3 * u * t2 * t2 * mx + t2 * t2 * t2 * to.x, py = u * u * u * from.y + 3 * u * u * t2 * from.y + 3 * u * t2 * t2 * to.y + t2 * t2 * t2 * to.y; ctx.fillStyle = '#0e857c'; ctx.beginPath(); ctx.arc(px, py, 3.2, 0, 6.283); ctx.fill(); }
-            }
-        });
-        // neuronas
-        const pinned = []; g.layers.forEach(ids => ids.forEach(id => {
-            const p = nn.pos.get(id), n = g.byId.get(id), lv = level(id), rad = 5 + Math.min(9, Math.sqrt(g.size.get(id) || 1) * 1.6), c = colorOf(id), dim = nn.act && lv < 0.02 && id !== nn.sel;
-            if (lv > 0.02) { const gl = ctx.createRadialGradient(p.x, p.y, rad * 0.5, p.x, p.y, rad * (2 + 3 * lv)); gl.addColorStop(0, `rgba(79,209,197,${0.55 * lv})`); gl.addColorStop(1, 'rgba(79,209,197,0)'); ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(p.x, p.y, rad * (2 + 3 * lv), 0, 6.283); ctx.fill(); }
-            ctx.globalAlpha = dim ? 0.35 : 1; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 6.283); ctx.fill(); ctx.lineWidth = id === nn.sel ? 3 : 2; ctx.strokeStyle = id === nn.sel ? '#1d2330' : '#fff'; ctx.stroke();
-            const lab = n.label.length > 28 ? n.label.slice(0, 27) + '…' : n.label; ctx.font = `${id === nn.sel || lv > 0.3 ? 700 : 500} 12px Inter, sans-serif`; ctx.textAlign = nn.flip ? 'right' : 'left'; ctx.textBaseline = 'middle';
-            const tx = p.x + (nn.flip ? -(rad + 6) : rad + 6); ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(251,250,246,.9)'; ctx.strokeText(lab, tx, p.y); ctx.fillStyle = '#1d2330'; ctx.fillText(lab, tx, p.y); ctx.globalAlpha = 1;
-            pinned.push({ id, x: p.x, y: p.y, r: rad + 4 });
-        })); nn.hit = pinned;
-    }
-    const L_ = (es, e2) => L(es, e2);
-    function netResize() { if (!nn) return; nn.minH = Math.max(240, bodyEl.clientHeight - 92); netLayout(); netDraw(); }
-    function renderNet() {
-        const m = rhizomeModel();
-        if (m.nodes.length < 5) { netStop(); bodyEl.innerHTML = `<div class="vz-empty">${esc(L('Necesitas al menos 5 conceptos para ver la red.', 'You need at least 5 concepts to see the network.'))}</div>`; return; }
-        const rootN = m.rootId != null ? nodes.get(m.rootId) : null; const hasX = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash;
-        const sig = m.hash + '|' + (hasX ? 'x' : '-'); if (nn && nn.sig === sig) return;
-        const keep = nn ? { flip: nn.flip } : { flip: false }; netStop();
-        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('Cada nivel del mapa es una capa y cada rama, una conexión. Toca un concepto para activarlo: la señal viaja por las conexiones y se va apagando con la distancia, así ves qué ideas lo rodean y lo alcanzan. Las líneas punteadas son conexiones transversales (se calculan en la pestaña Rizoma).', 'Each level of the map is a layer and each branch a connection. Tap a concept to activate it: the signal travels along the connections and fades with distance, showing which ideas surround it. Dashed lines are cross connections (computed in the Rhizome tab).'))}</div><div class="vz-rh-ctl"><button type="button" class="vz-ghost" id="vzNnFlip">${esc(L('Invertir dirección', 'Reverse direction'))}</button><button type="button" class="vz-ghost" id="vzNnClear">${esc(L('Apagar', 'Clear'))}</button></div></div><div class="vz-nn-wrap"><canvas class="vz-nn" id="vzNn"></canvas></div>`;
-        const cv = document.getElementById('vzNn');
-        nn = { cv, ctx: cv.getContext('2d'), g: netBuild(m), sig, flip: keep.flip, minH: Math.max(240, bodyEl.clientHeight - 92), pos: new Map(), hit: [], act: null, sel: null, t0: 0, raf: 0, dpr: 1, H: 300 };
-        const R = nn;
-        const at = (ev) => { const rc = cv.getBoundingClientRect(); const x = ev.clientX - rc.left, y = ev.clientY - rc.top; return R.hit.find(h => Math.hypot(h.x - x, h.y - y) <= h.r) || null; };
-        R.onDown = (ev) => { const h = at(ev); if (!h) { R.sel = null; netActivate(null); showQuote(null); return; } const n = R.g.byId.get(h.id); netActivate(h.id); showQuote(n.def || n.simple || n.path.concat(n.label).join(' › '), { noFind: true }); try { network.selectNodes([h.id]); } catch (_e) { /* ok */ } };
-        R.onMove = (ev) => { cv.style.cursor = at(ev) ? 'pointer' : 'default'; };
-        cv.addEventListener('pointerdown', R.onDown); cv.addEventListener('pointermove', R.onMove);
-        document.getElementById('vzNnFlip').addEventListener('click', () => { R.flip = !R.flip; netLayout(); netDraw(); });
-        document.getElementById('vzNnClear').addEventListener('click', () => { R.sel = null; netActivate(null); showQuote(null); });
-        netLayout(); netDraw(); track('net_view', { nodes: m.nodes.length, cross: hasX ? 1 : 0 });
-    }
     function renderBody() {
         showQuote(null);
         const v = currentViews() || {};
         if (tab !== 'rhizome' && rnet) { try { rnet.destroy(); } catch (_e) { /* ok */ } rnet = null; rSig = ''; }
-        if (tab !== 'relief') reliefStop();
-        if (tab !== 'net') netStop();
         if (tab === 'rhizome') return renderRhizome();
-        if (tab === 'relief') return renderRelief();
-        if (tab === 'net') return renderNet();
         if (tab === 'parts') return renderParts();
         if (tab === 'notes') return renderNotes();
         if (tab === 'timeline' && v.timeline) return renderTimeline(v.timeline);
