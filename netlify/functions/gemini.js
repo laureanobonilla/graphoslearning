@@ -1011,7 +1011,7 @@ REGLAS (críticas):
                 properties: { items: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
                     id: { type: 'STRING', description: 'El id EXACTO del término recibido.' },
                     definition: { type: 'STRING', description: 'Definición precisa en 1 o 2 oraciones (máximo 45 palabras).' },
-                    simple: { type: 'STRING', description: 'Explicación MUY sencilla, sin jerga, con una comparación cotidiana, en 1 o 2 oraciones (máximo 40 palabras).' },
+                    simple: { type: 'STRING', description: 'Explicación MUY sencilla y directa, sin jerga, SIN analogías ni metáforas ni comparaciones, en 1 o 2 oraciones (máximo 40 palabras).' },
                     example: { type: 'STRING', description: 'Un ejemplo concreto y específico (máximo 35 palabras).' }
                 }, required: ['id', 'definition', 'simple', 'example'] } } },
                 required: ['items']
@@ -1024,7 +1024,7 @@ ${terms.map(t => `- ${t.id} → «${t.label}»`).join('\n')}
 REGLAS:
 1. Devuelve un elemento por cada término, con su "id" EXACTO.
 2. "definition": qué es exactamente, en el sentido que tiene dentro de «${tema || terms[0].label}». Precisa y sin relleno.
-3. "simple": como se lo explicarías a un amigo curioso que no sabe nada del tema; cero jerga; apóyate en una comparación de la vida diaria (cocinar, tráfico, deportes, una fiesta…), nunca en otro concepto técnico.
+3. "simple": dilo directamente con las palabras más comunes, como a un amigo curioso que no sabe nada del tema: qué es, qué hace o para qué sirve, en frases cortas y con una sola idea por frase. PROHIBIDO usar analogías, metáforas o comparaciones con otras cosas (nada de "es como…", "imagina…", "funciona igual que…"). No repitas la definición con otras palabras: aclárala (qué implica, cómo se nota o por qué importa).
 4. "example": un caso concreto y reconocible, nunca genérico ("en muchos casos…").
 5. No inventes cifras, fechas ni citas. Solo texto plano, sin asteriscos ni markdown.`,
                 config: { responseMimeType: 'application/json', responseSchema: schema }
