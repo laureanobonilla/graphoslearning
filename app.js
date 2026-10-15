@@ -8769,11 +8769,10 @@ async function exportReportRtf() {
         (kids.get(id) || []).forEach(c => collect(c, depth + 1, maxDepth, seen, out));
     }
 
-    // La primera celda (definición) lleva antes, discreta y entre paréntesis, la relación con su padre.
+    // La relación con su padre va entre paréntesis, discreta, antes del título del hijo (no antes de la definición).
     function putCell(row, i, text) {
         const t = String(text || '').trim(); if (!t) return false;
         const c = row._cells[i]; c.textContent = '';
-        if (i === 0 && row._rel) { const sp = document.createElement('span'); sp.className = 'dv-rel'; sp.textContent = '(' + row._rel + ') '; c.appendChild(sp); }
         c.appendChild(document.createTextNode(t)); return true;
     }
     function fillRow(row, n) {
@@ -8792,7 +8791,9 @@ async function exportReportRtf() {
     function makeRow(n, depth, afterEl) {
         const row = document.createElement('div'); row.className = 'dv-row'; row.dataset.id = String(n.id);
         const term = document.createElement('div'); term.className = 'dv-term';
-        const name = document.createElement('div'); name.textContent = cleanLabel(n); term.appendChild(name);
+        const name = document.createElement('div'); const rel0 = relOf.get(String(n.id)) || '';
+        if (rel0) { const sp = document.createElement('span'); sp.className = 'dv-rel'; sp.textContent = '(' + rel0 + ') '; name.appendChild(sp); }
+        name.appendChild(document.createTextNode(cleanLabel(n))); term.appendChild(name);
         const col = (n.color && (n.color.border || n.color.background)) || '#4fd1c5'; term.style.setProperty('--c', typeof col === 'string' ? col : '#4fd1c5');
         if (depth > 0) { row.style.marginLeft = Math.min(depth, 5) * 26 + 'px'; row.classList.add('dv-child'); term.style.fontSize = Math.max(13.5, 16 - depth * 1) + 'px'; }
         row.appendChild(term);
