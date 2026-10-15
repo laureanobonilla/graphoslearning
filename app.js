@@ -1163,6 +1163,129 @@ function fitMapAfterExpand() {
     });
 })();
 
+// ==========================================
+// VISTA «PROFUNDIDAD»: el mismo mapa dibujado con sensación de espacio. No toca los nodos ni lo que se guarda; solo se dibuja
+// por encima/por debajo con los ganchos del lienzo: fondo en capas (estrellas, nebulosas, un planeta) que se mueven más lento que
+// el mapa al desplazarlo y reaccionan al cursor, brillo y sombra bajo lo principal, y niebla + desenfoque en lo lejano
+// (lejos = nivel profundo del árbol y parte alta de la pantalla).
+// ==========================================
+const depthView = (() => {
+  try {
+    const sel = document.getElementById('viewMode');
+    const S = { on: false, k: 0, mx: 0, my: 0, tx: 0, ty: 0, raf: 0, level: new Map(), sig: '' };
+    const lyr = (n, seed) => { const o = []; let s = seed; const r = () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; for (let i = 0; i < n; i++) o.push({ u: r(), v: r(), z: 0.5 + r() * 1.3, a: 0.25 + r() * 0.6, hue: r() }); return o; };
+    const LAYERS = [{ f: 0.05, stars: lyr(70, 11) }, { f: 0.14, stars: lyr(46, 23) }, { f: 0.3, stars: lyr(26, 37) }];
+    const reduce = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function levels() {   // nivel de cada nodo (0 = raíz) siguiendo solo las flechas de jerarquía
+        const sig = nodes.length + ':' + edges.length;
+        if (sig === S.sig) return S.level;
+        S.sig = sig; S.level = new Map();
+        const all = nodes.get(); const hasIn = new Set(); const kids = new Map();
+        edges.get().forEach(e => { if (isRelatedEdgeLabel && isRelatedEdgeLabel(e.label)) return; hasIn.add(String(e.to)); const k = String(e.from); if (!kids.has(k)) kids.set(k, []); kids.get(k).push(String(e.to)); });
+        const q = []; all.forEach(n => { if (!hasIn.has(String(n.id))) { S.level.set(String(n.id), 0); q.push(String(n.id)); } });
+        while (q.length) { const id = q.shift(); (kids.get(id) || []).forEach(c => { if (!S.level.has(c)) { S.level.set(c, S.level.get(id) + 1); q.push(c); } }); }
+        return S.level;
+    }
+    function dpr() { const cv = network.canvas && network.canvas.frame && network.canvas.frame.canvas; return cv && cv.clientWidth ? cv.width / cv.clientWidth : 1; }
+
+    const safe = (fn) => (ctx) => { try { fn(ctx); } catch (e) { S.on = false; S.k = 0; container.classList.remove('depth-view'); if (sel) sel.value = 'flat'; try { track('view_mode_error', { why: String(e && e.message).slice(0, 80) }); } catch (_e) { /* ok */ } } };
+    network.on('beforeDrawing', safe((ctx) => {
+        if (!S.on) return;
+        const k = S.k, W = container.clientWidth, H = container.clientHeight, pr = dpr();
+        const vp = network.getViewPosition(), sc = network.getScale();
+        // --- fondo en pantalla (sin la transformación del mapa) ---
+        ctx.save(); ctx.setTransform(pr, 0, 0, pr, 0, 0);
+        const neb = (cx, cy, r, c1, a) => { const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, `rgba(${c1},${(a * k).toFixed(3)})`); g.addColorStop(1, `rgba(${c1},0)`); ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2); };
+        const px = (f, amp) => -vp.x * sc * f - S.mx * amp, py = (f, amp) => -vp.y * sc * f - S.my * amp;
+        neb(W * 0.78 + px(0.06, 14), H * 0.28 + py(0.06, 10), Math.max(W, H) * 0.42, '120,90,230', 0.20);
+        neb(W * 0.22 + px(0.08, 18), H * 0.78 + py(0.08, 12), Math.max(W, H) * 0.38, '40,200,190', 0.15);
+        // planeta lejano, arriba a la izquierda
+        { const R = Math.min(W, H) * 0.11 * (1 + (sc - 1) * 0.04), cx = W * 0.13 + px(0.04, 26), cy = H * 0.16 + py(0.04, 20);
+          const g = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+          g.addColorStop(0, `rgba(176,184,226,${(0.95 * k).toFixed(3)})`); g.addColorStop(0.55, `rgba(88,98,160,${(0.95 * k).toFixed(3)})`); g.addColorStop(1, `rgba(20,24,66,${(0.95 * k).toFixed(3)})`);
+          ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = `rgba(140,160,255,${(0.35 * k).toFixed(3)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(cx, cy, R, -2.6, -0.4); ctx.stroke(); }
+        // estrellas en 3 capas: las lejanas casi no se mueven, las cercanas acompañan más al mapa
+        LAYERS.forEach((L, li) => {
+            const ox = px(L.f, 10 + li * 16), oy = py(L.f, 8 + li * 12);
+            L.stars.forEach(s => {
+                const x = (((s.u * W + ox) % W) + W) % W, y = (((s.v * H + oy) % H) + H) % H;
+                ctx.fillStyle = s.hue > 0.8 ? `rgba(255,214,170,${(s.a * k).toFixed(3)})` : s.hue < 0.25 ? `rgba(160,200,255,${(s.a * k).toFixed(3)})` : `rgba(235,240,255,${(s.a * k).toFixed(3)})`;
+                const r = s.z * (0.6 + li * 0.55); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+            });
+        });
+        ctx.restore();
+        // --- bajo los nodos (en coordenadas del mapa): sombra y brillo de lo cercano ---
+        const lv = levels();
+        nodes.get().forEach(n => {
+            if (n.hidden) return; const l = lv.get(String(n.id)); if (l == null || l > 2) return;
+            let bb; try { bb = network.getBoundingBox(n.id); } catch (_e) { return; } if (!bb) return;
+            const w = bb.right - bb.left, hh = bb.bottom - bb.top, cx = (bb.left + bb.right) / 2, cy = (bb.top + bb.bottom) / 2;
+            const near = 1 - Math.min(1, l / 2.2);
+            // sombra suelta debajo: da la impresión de que flota sobre el fondo
+            ctx.save(); ctx.shadowColor = `rgba(0,0,12,${(0.55 * near * k).toFixed(3)})`; ctx.shadowBlur = (16 + 20 * near) * pr * sc; ctx.shadowOffsetX = 10000 * pr; ctx.shadowOffsetY = (10 + 16 * near) * pr * sc;
+            ctx.fillStyle = '#000'; ctx.beginPath(); ctx.roundRect(bb.left - 10000 / sc, bb.top, w, hh, 14); ctx.fill(); ctx.restore();
+            // brillo detrás de lo principal
+            if (l <= 1) { const R = Math.max(w, hh) * (l === 0 ? 1.5 : 1.0), g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R); const col = (n.color && n.color.border && typeof n.color.border === 'string' && n.color.border[0] === '#') ? n.color.border : '#4fd1c5';
+                const rgb = [1, 3, 5].map(i => parseInt(col.slice(i, i + 2), 16) || 80).join(',');
+                g.addColorStop(0, `rgba(${rgb},${((l === 0 ? 0.34 : 0.2) * k).toFixed(3)})`); g.addColorStop(1, `rgba(${rgb},0)`); ctx.fillStyle = g; ctx.fillRect(cx - R, cy - R, R * 2, R * 2); }
+        });
+    }));
+
+    network.on('afterDrawing', safe((ctx) => {
+        if (!S.on || !(ctx.filter !== undefined)) return;
+        const k = S.k, pr = dpr(), H = container.clientHeight, lv = levels(), cvs = ctx.canvas;
+        nodes.get().forEach(n => {
+            if (n.hidden) return; const l = lv.get(String(n.id)); if (l == null) return;
+            let bb; try { bb = network.getBoundingBox(n.id); } catch (_e) { return; } if (!bb) return;
+            const tl = network.canvasToDOM({ x: bb.left, y: bb.top }), br = network.canvasToDOM({ x: bb.right, y: bb.bottom });
+            const cyDom = (tl.y + br.y) / 2;
+            // lejanía: sube con el nivel y es mayor en la parte alta de la pantalla (como un plano inclinado)
+            const d = Math.max(0, Math.min(1, (l >= 3 ? 0.85 : l * 0.38) + (0.5 - cyDom / H) * 0.28)) * k;
+            if (d < 0.14) return;
+            const x = tl.x * pr, y = tl.y * pr, w = (br.x - tl.x) * pr, h = (br.y - tl.y) * pr; if (w < 4 || h < 4) return;
+            const pad = 3 * pr;
+            ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.beginPath(); ctx.roundRect(x - pad, y - pad, w + pad * 2, h + pad * 2, 12 * pr); ctx.clip();
+            ctx.filter = `blur(${(d * 2.4 * pr).toFixed(2)}px)`;
+            try { ctx.drawImage(cvs, x - pad, y - pad, w + pad * 2, h + pad * 2, x - pad, y - pad, w + pad * 2, h + pad * 2); } catch (_e) { /* ok */ }
+            ctx.filter = 'none';
+            ctx.fillStyle = `rgba(6,9,30,${(d * 0.5).toFixed(3)})`; ctx.fillRect(x - pad, y - pad, w + pad * 2, h + pad * 2);
+            ctx.restore();
+        });
+    }));
+
+    function tick() {   // suaviza el cursor y la entrada; solo redibuja mientras haya algo moviéndose
+        S.raf = 0; let moving = false;
+        const dx = S.tx - S.mx, dy = S.ty - S.my;
+        if (Math.abs(dx) > 0.002 || Math.abs(dy) > 0.002) { S.mx += dx * 0.14; S.my += dy * 0.14; moving = true; }
+        const goal = S.on ? 1 : 0;
+        if (Math.abs(goal - S.k) > 0.01) { S.k += (goal - S.k) * (reduce() ? 1 : 0.14); moving = true; } else S.k = goal;
+        try { network.redraw(); } catch (_e) { /* ok */ }
+        if (moving) S.raf = requestAnimationFrame(tick);
+    }
+    const kick = () => { if (!S.raf) S.raf = requestAnimationFrame(tick); };
+    container.addEventListener('mousemove', (e) => {
+        if (!S.on || reduce()) return; const r = container.getBoundingClientRect();
+        S.tx = ((e.clientX - r.left) / r.width - 0.5) * 2; S.ty = ((e.clientY - r.top) / r.height - 0.5) * 2; kick();
+    });
+    function set(mode, byUser) {
+        const on = mode === 'depth'; if (on === S.on && !byUser) return;
+        S.on = on; container.classList.toggle('depth-view', on);
+        if (sel) sel.value = on ? 'depth' : 'flat';
+        if (on) S.k = reduce() ? 1 : 0.0001;
+        try { localStorage.setItem('gk_view_mode', on ? 'depth' : 'flat'); } catch (_e) { /* ok */ }
+        if (byUser) track('view_mode', { mode: on ? 'depth' : 'flat', nodes: nodes.length });
+        kick();
+    }
+    sel?.addEventListener('change', (e) => set(e.target.value, true));
+    let saved = 'flat'; try { saved = localStorage.getItem('gk_view_mode') === 'depth' ? 'depth' : 'flat'; } catch (_e) { /* ok */ }
+    if (saved === 'depth') set('depth', false);
+    return { set };
+  } catch (_e) { return { set() {} }; }
+})();
+
 async function renderThreeLevelTree(data, opts = {}) {
     const { originPanelId = null, attachToNodeId = null } = opts;
     // Si hay más de un panel de lectura registrado, coloreamos el borde de
