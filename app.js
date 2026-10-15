@@ -4663,8 +4663,8 @@ function buildPdfParts(pages, entries, from, to) {
     const merged = [];   // lo diminuto se une con lo que sigue
     out.forEach(sg => {
         const last = merged[merged.length - 1];
-        if (last && charsOf(last.from, last.to) < PART_MIN_CHARS && charsOf(last.from, sg.to) <= PART_MAX_CHARS) {
-            last.to = sg.to; if (sg.group !== last.group) { last.title = sg.title; last.group = sg.group; } else if (sg.title && last.title && last.title !== sg.title) last.title = (last.title + ' – ' + sg.title).slice(0, 80);
+        if (last && sg.group === last.group && charsOf(last.from, last.to) < PART_MIN_CHARS && charsOf(last.from, sg.to) <= PART_MAX_CHARS) {   // nunca se junta lo de dos capítulos distintos
+            last.to = sg.to; if (sg.title && last.title && last.title !== sg.title) last.title = (last.title + ' – ' + sg.title).slice(0, 80);
         } else merged.push({ ...sg });
     });
     return merged.filter(sg => charsOf(sg.from, sg.to) >= 200).map((sg, i) => ({ id: 'p' + (i + 1), title: sg.title || LL(`Páginas ${sg.from}–${sg.to}`, `Pages ${sg.from}–${sg.to}`), from: sg.from, to: sg.to, chars: charsOf(sg.from, sg.to), group: sg.group || '', sub: null }));
