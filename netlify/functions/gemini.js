@@ -894,7 +894,7 @@ REGLAS:
             const terms = String(text || '').split('\n').map(t => clipS(t, 80)).filter(Boolean).slice(0, 30);
             if (!tema || terms.length < 2) return { statusCode: 400, body: JSON.stringify({ error: 'Faltan datos' }) };
             const schema = { type: 'OBJECT', properties: { text: { type: 'STRING', description: 'El texto, en párrafos separados por una línea en blanco.' } }, required: ['text'] };
-            const response = await generateWithFallback({
+            const ttPayload = (thinking) => ({
                 contents: `Escribe un texto explicativo breve (entre 250 y 450 palabras, de 3 a 5 párrafos) sobre «${tema}», en el mismo idioma del tema. Es el texto que acompaña a un mapa conceptual.
 CONCEPTOS DEL MAPA (cada uno debe aparecer en el texto con sus palabras EXACTAS, al menos una vez, de forma natural):
 ${terms.map(t => `- ${t}`).join('\n')}
@@ -904,8 +904,10 @@ REGLAS:
 2. Cuenta cada concepto en el orden en que aparecen arriba, con una o dos oraciones que lo expliquen, conectándolos entre sí.
 3. NO inventes autores, obras, citas textuales, cifras ni fechas. Si no estás seguro de un dato concreto, no lo menciones; explica la idea en general.
 4. No menciones que es un texto generado ni el mapa.`,
-                config: { responseMimeType: 'application/json', responseSchema: schema }
+                config: { responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 2500, ...(thinking ? { thinkingConfig: thinking } : {}) }
             });
+            // Sin "pensar" mucho el texto sale en pocos segundos; si el modelo rechaza esa configuración, se pide sin ella.
+            let response; try { response = await generateWithFallback(ttPayload({ thinkingLevel: 'minimal' })); } catch (e) { if (/thinking|level|budget/i.test(e.message || '')) response = await generateWithFallback(ttPayload(null)); else throw e; }
             let d; try { d = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) }; }
             const out = String(d.text || '').replace(/[*#`]/g, '').replace(/\r/g, '').trim().slice(0, 5000);
             if (out.split(/\s+/).length < 60) return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) };

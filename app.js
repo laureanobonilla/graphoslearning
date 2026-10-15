@@ -1690,11 +1690,12 @@ async function attachTopicText(ownerId, topic, data) {
     let okDone = false;
     try {
         const labels = [data.root, ...(data.branches || []), ...(data.subBranches || [])].map(n => String(n && n.label || '').trim()).filter(Boolean);
-        // Hasta 3 intentos: el servidor puede tardar o devolver una respuesta inválida, y sin esto el texto quedaba sin escribirse.
-        for (let attempt = 0; attempt < 3 && !okDone; attempt++) {
+        // Hasta 2 intentos de 30 s: el servidor puede tardar o devolver una respuesta inválida, y sin esto el texto quedaba sin escribirse.
+        for (let attempt = 0; attempt < 2 && !okDone; attempt++) {
             if (!nodes.get(ownerId)) return;
             try {
-                const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'topic_text', topic, text: labels.join('\n') }) });
+                const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 30000);
+                let res; try { res = await fetch('/.netlify/functions/gemini', { method: 'POST', signal: ac.signal, body: JSON.stringify({ action: 'topic_text', topic, text: labels.join('\n') }) }); } finally { clearTimeout(to); }
                 const d = await res.json().catch(() => ({}));
                 if (!res.ok || !d.text) { await new Promise(r => setTimeout(r, 1200)); continue; }
                 if (!nodes.get(ownerId)) return;
