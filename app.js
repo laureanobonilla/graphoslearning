@@ -4534,9 +4534,20 @@ async function pdfOutlineEntries(doc, from, to) {
     const seen = new Set(); return out.filter(e => { if (!e.title || seen.has(e.page)) return false; seen.add(e.page); return true; });
 }
 function pdfHeadingEntries(pages) {
-    const re = /^(cap[ií]tulo|chapter|parte|part|unidad|unit|tema|lecci[oó]n|secci[oó]n|m[oó]dulo)\s+([ivxlcdm]+|\d+)/i, out = [];
-    pages.forEach(pg => { const h = pg.heads.find(x => x.ratio > 1.35 && re.test(x.t)); if (h) out.push({ title: h.t.slice(0, 80), page: pg.p }); });
-    return out;
+    // Títulos de estructura: «Capítulo 3», «Unidad 2»…, secciones con nombre propio (Introducción, Conclusiones…) y «1. Título» en letra grande.
+    const reNum = /^(cap[ií]tulo|chapter|parte|part|unidad|unit|tema|lecci[oó]n|secci[oó]n|m[oó]dulo|libro|book)\s+([ivxlcdm]+|\d+)/i;
+    const reNamed = /^(introducci[oó]n|introduction|pr[oó]logo|prologue|prefacio|preface|presentaci[oó]n|conclusi[oó]n(es)?|conclusions?|ep[ií]logo|epilogue|ap[eé]ndices?|appendix|anexos?|bibliograf[ií]a|bibliography|glosario|glossary|resumen|abstract|objetivos|marco te[oó]rico|metodolog[ií]a|resultados|discusi[oó]n)\b/i;
+    const reNumbered = /^\d{1,2}[.)]?\s+[A-ZÁÉÍÓÚÑ]/;
+    const out = [];
+    pages.forEach(pg => {
+        const h = pg.heads.find(x => (x.ratio > 1.35 && reNum.test(x.t)) || (x.ratio > 1.25 && x.t.length < 70 && reNamed.test(x.t)) || (x.ratio > 1.4 && x.t.length < 90 && reNumbered.test(x.t)));
+        if (h) out.push({ title: h.t.slice(0, 80), page: pg.p });
+    });
+    if (out.length >= 2) return out;
+    // Último recurso con estructura: títulos muy grandes al inicio de página, repartidos por el documento.
+    const big = [];
+    pages.forEach(pg => { const h = pg.heads[0]; if (h && h.ratio > 1.6 && h.t.length < 90) big.push({ title: h.t.slice(0, 80), page: pg.p }); });
+    return (big.length >= 3 && big.length <= 60) ? big : [];
 }
 function buildPdfParts(pages, entries, from, to) {
     const charsOf = (a, b) => pages.filter(x => x.p >= a && x.p <= b).reduce((t, x) => t + x.chars, 0);
@@ -4580,35 +4591,44 @@ async function startDocumentProject(doc, fileName, from, to, parts, by) {
     });
     setTimeout(() => { try { network.fit({ animation: { duration: 400 } }); } catch (_e) { /* ok */ } }, 80);
     track('pdf_parts_start', { pages: to - from + 1, parts: parts.length, by });
-    if (typeof vizUI !== 'undefined' && vizUI) setTimeout(() => vizUI.openParts(), 300);
+    setTimeout(() => { if (typeof readerParts !== 'undefined') readerParts.refresh(true); }, 120);
 }
 function pickPdfFile() {
     return new Promise(res => { const i = document.createElement('input'); i.type = 'file'; i.accept = 'application/pdf'; i.onchange = () => res((i.files && i.files[0]) || null); i.oncancel = () => res(null); i.click(); });
 }
-async function ensurePartText(d, part) {
-    const get = () => {
-        if (docCache.file !== d.file || docCache.total !== d.total) return null;
-        const t = []; for (let p = part.from; p <= part.to; p++) { const x = docCache.pages.get(p); if (x == null) return null; t.push(x); }
-        return t.join('\n\n').trim();
-    };
-    const have = get(); if (have) return have;
-    const ok = await appConfirm(LL(`Para crear esta parte necesito el PDF «${d.file}» otra vez (no se guarda dentro del proyecto). ¿Lo eliges ahora?`, `To build this part I need the PDF “${d.file}” again (it is not stored in the project). Choose it now?`), { title: LL('Elige el PDF', 'Choose the PDF'), okText: LL('Elegir PDF', 'Choose PDF'), cancelText: LL('Ahora no', 'Not now') });
-    if (!ok) return null;
-    const file = await pickPdfFile(); if (!file) return null;
+function cachedPartText(d, part) {
+    if (!d || !part || docCache.file !== d.file || docCache.total !== d.total) return null;
+    const t = []; for (let p = part.from; p <= part.to; p++) { const x = docCache.pages.get(p); if (x == null) return null; t.push(x); }
+    return t.join('\n\n').trim();
+}
+// Pide el mismo PDF otra vez (no se guarda en el proyecto) y deja el texto de sus páginas en memoria.
+async function reloadDocPdf(d) {
+    const file = await pickPdfFile(); if (!file) return false;
     showLoader(LL('Leyendo el PDF…', 'Reading the PDF…'));
     try {
         const doc = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-        if (doc.numPages !== d.total) { appAlert(LL(`Ese PDF tiene ${doc.numPages} páginas y el del proyecto tenía ${d.total}. Elige el mismo archivo.`, `That PDF has ${doc.numPages} pages but the project's had ${d.total}. Choose the same file.`)); return null; }
+        if (doc.numPages !== d.total) { appAlert(LL(`Ese PDF tiene ${doc.numPages} páginas y el del proyecto tenía ${d.total}. Elige el mismo archivo.`, `That PDF has ${doc.numPages} pages but the project's had ${d.total}. Choose the same file.`)); return false; }
         const pages = await analyzePdfPages(doc, d.from, d.to, (a, b) => showLoader(LL(`Leyendo página ${a} de ${b}…`, `Reading page ${a} of ${b}…`)));
         docCache = { file: d.file, total: d.total, pages: new Map(pages.map(pg => [pg.p, pg.text])) };
-    } catch (_e) { appAlert(tr("js.no_se_pudo_leer_ese")); return null; } finally { hideLoader(); }
-    return get();
+        return true;
+    } catch (_e) { appAlert(tr("js.no_se_pudo_leer_ese")); return false; } finally { hideLoader(); }
 }
-async function generateDocPart(hostId, partId) {
+async function ensurePartText(d, part) {
+    const have = cachedPartText(d, part); if (have) return have;
+    const ok = await appConfirm(LL(`Para crear esta parte necesito el PDF «${d.file}» otra vez (no se guarda dentro del proyecto). ¿Lo eliges ahora?`, `To build this part I need the PDF “${d.file}” again (it is not stored in the project). Choose it now?`), { title: LL('Elige el PDF', 'Choose the PDF'), okText: LL('Elegir PDF', 'Choose PDF'), cancelText: LL('Ahora no', 'Not now') });
+    if (!ok || !(await reloadDocPdf(d))) return null;
+    return cachedPartText(d, part);
+}
+let docPartBusy = false; // una parte a la vez
+async function generateDocPart(hostId, partId, overrideText) {
+    if (docPartBusy) return;
     const host = nodes.get(hostId), d = host && host.docParts; if (!d) return;
     const part = d.parts.find(x => x.id === partId); if (!part) return;
     if (part.sub && nodes.get(part.sub)) { enterSubscheme(part.sub); return; }
-    const text = await ensurePartText(d, part); if (!text) return;
+    docPartBusy = true;
+    try {
+    const text = (overrideText && overrideText.trim().length > 200) ? overrideText.trim().slice(0, 20000) : await ensurePartText(d, part);
+    if (!text) return;
     track('pdf_part_generate', { part: d.parts.indexOf(part) + 1, of: d.parts.length, chars: text.length });
     await generateSubschemeFromNode(hostId, {
         text, title: `${d.parts.indexOf(part) + 1}. ${part.title}`,
@@ -4618,6 +4638,7 @@ async function generateDocPart(hostId, partId) {
             try { nodes.update({ id: hostId, docParts: { ...h.docParts, parts: h.docParts.parts.map(x => x.id === partId ? { ...x, sub: ptr } : x) } }); } finally { isApplyingUndo = false; }
         }
     });
+    } finally { docPartBusy = false; }
 }
 
 btnPdfRangeLoad?.addEventListener('click', async () => {
@@ -8888,6 +8909,83 @@ const vizUI = (() => {
     } catch (_e) { /* sin observadores: se ajusta con resize */ }
     setTimeout(() => refresh(), 1500);
     return { refresh, repaint: paint, openParts: () => { tab = 'parts'; lastGeo = ''; setOpen(true); } };
+})();
+
+
+// ==========================================
+// «MI TEXTO» CON LAS PARTES DE UN PDF: lista vertical (tipo radio) arriba y, debajo, el texto de la parte elegida.
+// «Crear esquema» genera esa parte como subesquema del documento. Solo está activo mientras en el lienzo esté el documento.
+// ==========================================
+const readerParts = (() => {
+    const box = document.getElementById('readerParts'), list = document.getElementById('rpList');
+    if (!box || !list || !readerPanel || !readerTextMode) return { refresh() {} };
+    const need = document.getElementById('rpNeed'), needBtn = document.getElementById('rpNeedBtn');
+    const bGen = readerPanel.querySelector('[data-role="btnGenerate"]'), hint = readerPanel.querySelector('[data-role="genHint"]');
+    const genLabel = bGen && bGen.querySelector('span'); const origLabel = genLabel ? genLabel.textContent : '', origHint = hint ? hint.textContent : '';
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    let selId = null, shownHost = null, seenHost = null, active = false;
+    const docHost = () => nodes.get().find(n => n.docParts) || null;
+    const isDone = (p) => !!(p.sub && nodes.get(p.sub));
+    const cur = () => { const h = docHost(); if (!h) return null; const d = h.docParts; const part = d.parts.find(x => x.id === selId); return part ? { h, d, part } : null; };
+
+    function labels() {
+        if (!bGen || !active) { if (genLabel) genLabel.textContent = origLabel; if (hint) hint.textContent = origHint; return; }
+        const c = cur(); const done = c && isDone(c.part);
+        if (genLabel) genLabel.textContent = done ? LL('📦 Abrir el esquema de esta parte', '📦 Open this part’s map') : LL('🌱 Crear esquema de esta parte', '🌱 Make a map of this part');
+        if (hint) hint.textContent = LL('Elige una parte de la lista: su texto aparece abajo.', 'Pick a part from the list: its text appears below.');
+    }
+    function showText() {
+        const c = cur(); if (!c) return;
+        const t = cachedPartText(c.d, c.part);
+        need.classList.toggle('hidden', !!t);
+        if (t) readerTextMode.innerHTML = textToParagraphHtml(t); else readerTextMode.innerHTML = '';
+        updateReaderEmptyHint();
+        const sc = document.getElementById('readerContentContainer'); if (sc) sc.scrollTop = 0;
+        labels();
+    }
+    function select(id) { selId = id; render(false); showText(); }
+    function render(resetSel) {
+        const h = docHost();
+        active = !!h && isDesktopFolding();
+        readerPanel.classList.toggle('gk-parts', active); box.classList.toggle('hidden', !active);
+        if (!active) { shownHost = null; labels(); return; }
+        const d = h.docParts, done = d.parts.filter(isDone).length, n = d.parts.length;
+        if (resetSel || !d.parts.some(x => x.id === selId)) { const nx = d.parts.find(x => !isDone(x)) || d.parts[0]; selId = nx.id; }
+        document.getElementById('rpDoc').textContent = d.file;
+        document.getElementById('rpCount').textContent = LL(`${done} de ${n} con esquema`, `${done} of ${n} mapped`);
+        document.getElementById('rpBar').style.width = Math.round(done / n * 100) + '%';
+        const how = d.by === 'outline' ? LL('según el índice del PDF', 'from the PDF index') : d.by === 'headings' ? LL('según los títulos del documento', 'from the document headings') : LL('en partes iguales', 'in equal parts');
+        document.getElementById('rpHow').textContent = LL(`Dividido ${how}`, `Split ${how}`);
+        list.innerHTML = d.parts.map((p, i) => `<div class="rp-row${p.id === selId ? ' sel' : ''}${isDone(p) ? ' done' : ''}" role="radio" aria-checked="${p.id === selId}" tabindex="0" data-id="${esc(p.id)}"><span class="rp-radio"></span><span class="rp-t"><b>${esc(p.title)}</b><small>${esc(LL('págs.', 'pp.'))} ${p.from}–${p.to}</small></span>${isDone(p) ? '<span class="rp-ok" title="' + esc(LL('Ya tiene esquema', 'Already mapped')) + '">✓</span>' : ''}</div>`).join('');
+        labels();
+    }
+    const pickRow = (id) => {
+        select(id); track('pdf_part_pick');
+        const c = cur(); if (c && isDone(c.part)) enterSubscheme(c.part.sub); // una parte que ya tiene esquema se abre de una vez
+    };
+    list.addEventListener('click', (e) => { const r = e.target.closest('.rp-row'); if (r) pickRow(r.dataset.id); });
+    list.addEventListener('keydown', (e) => {
+        const r = e.target.closest('.rp-row'); if (!r) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pickRow(r.dataset.id); }
+        else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const rows = [...list.querySelectorAll('.rp-row')]; const nx = rows[rows.indexOf(r) + (e.key === 'ArrowDown' ? 1 : -1)]; if (nx) { select(nx.dataset.id); const again = list.querySelector(`.rp-row[data-id="${nx.dataset.id}"]`); if (again) again.focus(); } }
+    });
+    needBtn.addEventListener('click', async () => { const h = docHost(); if (!h) return; if (await reloadDocPdf(h.docParts)) showText(); });
+    // «Crear esquema» en modo partes: genera la parte elegida (con el texto tal como está en el editor) o abre la que ya existe.
+    if (bGen) bGen.addEventListener('click', (e) => {
+        const c = active ? cur() : null; if (!c) return;
+        e.stopImmediatePropagation(); e.preventDefault();
+        generateDocPart(c.h.id, c.part.id, isDone(c.part) ? '' : readerTextMode.innerText);
+    }, true);
+    function refresh(openIt) {
+        const h = docHost(); const first = h && String(h.id) !== String(shownHost);
+        render(!!first || openIt === true);
+        if (h) { if (first || openIt === true) { shownHost = h.id; showText(); if (isDesktopFolding() && readerPanel.classList.contains('hidden')) openReaderPanel(); } }
+    }
+    let t = null; const soon = () => { clearTimeout(t); t = setTimeout(() => refresh(false), 350); };
+    nodes.on('add', soon); nodes.on('remove', soon);
+    nodes.on('update', (_e, p) => { if (p && p.data && p.data.some((d, i) => d && d.docParts && (!p.oldData || !p.oldData[i] || p.oldData[i].docParts !== d.docParts))) { clearTimeout(t); t = setTimeout(() => { render(false); labels(); }, 150); } });
+    setTimeout(soon, 1500);
+    return { refresh };
 })();
 
 // ==========================================

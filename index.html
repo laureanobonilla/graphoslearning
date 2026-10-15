@@ -118,6 +118,32 @@
             #readerPanel .rz:hover::after, body.gk-resizing #readerPanel .rz::after { background: var(--p-acc, #0e857c); height: 72px; margin-top: -36px; }
         }
         @media (max-width: 780px) { #readerPanel .rz { display: none; } }
+        /* --- partes de un PDF dentro de «Mi texto» --- */
+        #readerParts { flex: 0 0 auto; background: var(--p-head, #fbfaf6); border-bottom: 1px solid var(--p-rule, #dcd9ce); padding: 10px 14px 8px; color: #1d2330; font-family: 'Inter', sans-serif; }
+        #readerParts .rp-head { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: #5f6879; }
+        #readerParts .rp-head b { font: 700 13.5px 'Sora', sans-serif; color: #1d2330; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        #readerParts .rp-head span { white-space: nowrap; margin-left: auto; font-weight: 600; }
+        #readerParts .rp-bar { flex: 0 0 70px; height: 6px; border-radius: 6px; background: #efede5; overflow: hidden; }
+        #readerParts .rp-bar i { display: block; height: 100%; background: #0e857c; width: 0; }
+        #readerParts .rp-how { font-size: 11.5px; color: #8a93a6; margin: 2px 0 6px; }
+        #readerParts .rp-list { max-height: 36vh; overflow-y: auto; display: grid; gap: 4px; scrollbar-width: thin; scrollbar-color: #c9c5b7 transparent; }
+        #readerParts .rp-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 1px solid transparent; border-radius: 10px; cursor: pointer; background: transparent; }
+        #readerParts .rp-row:hover { background: #efede5; }
+        #readerParts .rp-row:focus-visible { outline: 2px solid #0e857c; }
+        #readerParts .rp-row.sel { background: #fff; border-color: #0e857c; }
+        #readerParts .rp-radio { flex: 0 0 16px; height: 16px; border-radius: 50%; border: 2px solid #b9bfcc; position: relative; }
+        #readerParts .rp-row.sel .rp-radio { border-color: #0e857c; }
+        #readerParts .rp-row.sel .rp-radio::after { content: ''; position: absolute; inset: 2px; border-radius: 50%; background: #0e857c; }
+        #readerParts .rp-t { flex: 1; min-width: 0; }
+        #readerParts .rp-t b { display: block; font: 600 13px/1.35 'Inter', sans-serif; overflow-wrap: anywhere; }
+        #readerParts .rp-t small { font-size: 11.5px; color: #5f6879; }
+        #readerParts .rp-ok { color: #0e857c; font-weight: 700; }
+        #readerParts .rp-row.done .rp-t b { color: #5f6879; }
+        #readerParts .rp-need { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 12px; color: #5f6879; }
+        #readerParts .rp-need.hidden { display: none; }
+        #readerParts .rp-need button { border: 0; background: #0e857c; color: #fff; border-radius: 8px; padding: 6px 10px; font: 700 12px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
+        #readerPanel.gk-parts [data-role="btnAnalyzeText"] { display: none !important; }
+        #readerPanel.gk-parts [data-role="btnGenerate"] { flex: 1; }
         /* ===== «MI TEXTO» CON EL MISMO LIENZO DE LECTURA QUE EL TEXTO DEL TEMA ===== */
         /* Mismas variables, tipografía (serif ~17.5px/1.75) y medida (~34em) que #topicPanel, para que pegar un texto
            propio se sienta como la otra forma de llegar al mismo lugar, no como otra herramienta. Se quitan PDF, «Solo un tema»
@@ -998,6 +1024,13 @@
                 </div>
             </div>
 
+            <!-- Partes de un PDF largo (solo se muestra cuando el lienzo tiene un documento dividido): ver readerParts en app.js -->
+            <div id="readerParts" class="hidden">
+                <div class="rp-head"><b id="rpDoc"></b><span id="rpCount"></span><div class="rp-bar"><i id="rpBar"></i></div></div>
+                <div id="rpHow" class="rp-how"></div>
+                <div id="rpList" class="rp-list" role="radiogroup" aria-label="Partes del documento"></div>
+                <div id="rpNeed" class="rp-need hidden"><span>El texto de esta parte necesita el PDF otra vez (no se guarda en el proyecto).</span><button type="button" id="rpNeedBtn">Elegir el PDF</button></div>
+            </div>
             <!-- Área de Lectura (Fondo Blanco Limpio) -->
             <div id="readerContentContainer" data-role="contentContainer" class="flex-1 overflow-auto p-6 bg-white relative select-text">
                 <div id="readerTextMode" data-role="textMode" class="w-full h-full text-slate-800 text-sm leading-relaxed font-sans outline-none select-text" contenteditable="true" data-placeholder="Escribe o pega aquí un texto o un enlace"></div>
