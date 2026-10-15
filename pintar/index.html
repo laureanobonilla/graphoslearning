@@ -124,10 +124,10 @@
         <p class="hint" id="hintLevel"></p>
 
         <label class="f" for="k">Cantidad de colores</label>
-        <div class="row"><input id="k" type="range" min="4" max="24" value="10"><output id="kOut">10</output></div>
+        <div class="row"><input id="k" type="range" min="4" max="24" value="24"><output id="kOut">24</output></div>
 
         <label class="f" for="cols">Cuadros a lo ancho</label>
-        <div class="row"><input id="cols" type="range" min="8" max="120" value="32"><output id="colsOut">32</output></div>
+        <div class="row"><input id="cols" type="range" min="8" max="120" value="120"><output id="colsOut">120</output></div>
         <p class="hint" id="detailHint"></p>
         <label class="chk"><input id="clean" type="checkbox" checked> Limpiar cuadros sueltos<span class="hint">Une los cuadros aislados a su alrededor para que las capas sean más fáciles de pintar.</span></label>
 
@@ -159,7 +159,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var FREE_LAYERS = 2;               // capas visibles sin pagar
+  var FREE_LAYERS = 5;               // capas visibles sin pagar
   var MAX_W = 2400;                  // ancho máximo en píxeles de cada cuadrícula dibujada
   var unlocked = false;
   try { unlocked = /[?&]probar=1/.test(location.search) || localStorage.getItem('pintar_unlocked') === '1'; } catch (e) { /* ok */ }
