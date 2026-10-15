@@ -8814,7 +8814,7 @@ const vizUI = (() => {
     const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const KINDS = [
-        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'rhizome', i: '🌿', es: 'Rizoma', en: 'Rhizome' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
+        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'rhizome', i: '🌿', es: 'Rizoma', en: 'Rhizome' }, { k: 'relief', i: '⛰️', es: 'Relieve', en: 'Relief' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
         { k: 'cause_effect', i: '🔗', es: 'Causa → efecto', en: 'Cause → effect' }, { k: 'process', i: '🧭', es: 'Proceso', en: 'Process' },
         { k: 'compare', i: '⚖️', es: 'Comparar', en: 'Compare' }, { k: 'actors', i: '👥', es: 'Actores', en: 'Actors' },
         { k: 'figures', i: '📊', es: 'Cifras', en: 'Figures' }, { k: 'places', i: '📍', es: 'Lugares', en: 'Places' },
@@ -8853,7 +8853,7 @@ const vizUI = (() => {
     const cardNodes = () => nodes.get().filter(n => !n.isSubscheme && (String(n.definition || '').trim() || String(n.simple || '').trim()));
     function availability() {
         const v = currentViews() || {}; const out = [{ k: 'notes', n: getNotes().length }];
-        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) out.push({ k: 'rhizome', n: '' });
+        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) { out.push({ k: 'rhizome', n: '' }); out.push({ k: 'relief', n: '' }); }
         const dh = docHost(); if (dh) { const dp = dh.docParts.parts; out.unshift({ k: 'parts', n: dp.filter(x => x.sub && nodes.get(x.sub)).length + '/' + dp.length }); }
         ['timeline', 'cause_effect', 'process', 'compare', 'actors', 'figures', 'places'].forEach(k => {
             if (!v[k]) return;
@@ -8879,11 +8879,11 @@ const vizUI = (() => {
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
         container.style.height = h ? 'calc(100% - ' + h + 'px)' : ''; container.style.alignSelf = h ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
-        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); }, 60);
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); if (tab === 'relief') reliefResize(); }, 60);
     }
     let layoutT = null; const layoutSoon = () => { clearTimeout(layoutT); layoutT = setTimeout(layout, 40); };
     function setOpen(v) { open = v; try { localStorage.setItem('gk_viz_open', v ? '1' : '0'); } catch (_e) { /* ok */ } lastGeo = ''; paint(); if (v) track('viz_open', { tab }); }
-    function pickTab(k) { tab = k; if (k === 'rhizome') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
+    function pickTab(k) { tab = k; if (k === 'rhizome' || k === 'relief') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
 
     function paint() {
         const av = availability(); if (!av.some(a => a.k === tab)) tab = av[0].k;
@@ -9159,11 +9159,114 @@ const vizUI = (() => {
         el.style.height = Math.max(240, bodyEl.clientHeight - 92) + 'px';
         try { rnet.setSize('100%', el.style.height); rnet.redraw(); } catch (_e) { /* ok */ }
     }
+    // ---------- relieve ----------
+    // El mismo mapa como un terreno: la altura de cada concepto es su importancia (cuánto cuelga de él y cuántas conexiones tiene),
+    // las ramas forman cordilleras que unen padre e hijo, y la posición en el plano es la del lienzo.
+    let rl = null;   // { cv, ctx, grid, pins, az, tilt, zoom, ... }
+    function reliefStop() { if (!rl) return; try { rl.cv.removeEventListener('pointerdown', rl.onDown); window.removeEventListener('pointermove', rl.onMove); window.removeEventListener('pointerup', rl.onUp); rl.cv.removeEventListener('wheel', rl.onWheel); cancelAnimationFrame(rl.raf); } catch (_e) { /* ok */ } rl = null; }
+    function reliefData(m) {
+        const pos = network.getPositions(m.nodes.map(n => n.id));
+        const pts = m.nodes.map(n => ({ n, x: (pos[n.id] || { x: 0 }).x, y: (pos[n.id] || { y: 0 }).y }));
+        let l = Infinity, r = -Infinity, t = Infinity, b = -Infinity; pts.forEach(p => { l = Math.min(l, p.x); r = Math.max(r, p.x); t = Math.min(t, p.y); b = Math.max(b, p.y); });
+        const span = Math.max(r - l, b - t, 1), cx = (l + r) / 2, cy = (t + b) / 2;
+        pts.forEach(p => { p.u = (p.x - cx) / span * 1.7; p.v = (p.y - cy) / span * 1.7; });
+        const kids = new Map(); m.tree.forEach(e => { if (!kids.has(e.a)) kids.set(e.a, []); kids.get(e.a).push(e.b); });
+        const size = new Map(); const sz = (id, g) => { if (size.has(id)) return size.get(id); if (g > 40) return 1; let t2 = 1; (kids.get(id) || []).forEach(c => { t2 += sz(c, g + 1); }); size.set(id, t2); return t2; };
+        m.nodes.forEach(n => sz(n.id, 0));
+        const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
+        const cross = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links : [];
+        const deg = new Map(); cross.forEach(k => { deg.set(k.a, (deg.get(k.a) || 0) + 1); deg.set(k.b, (deg.get(k.b) || 0) + 1); });
+        let mx = 1; pts.forEach(p => { p.score = size.get(p.n.id) + 1.5 * (deg.get(p.n.id) || 0); mx = Math.max(mx, p.score); });
+        pts.forEach(p => { p.z = 0.1 + 0.9 * Math.sqrt(p.score / mx); });
+        const byId = new Map(pts.map(p => [p.n.id, p]));
+        // distancia típica al vecino más cercano → ancho de los picos
+        const nn = pts.map(p => { let d = Infinity; pts.forEach(q => { if (q !== p) d = Math.min(d, Math.hypot(p.u - q.u, p.v - q.v)); }); return isFinite(d) ? d : 0.3; }).sort((a, b2) => a - b2);
+        const dn = Math.max(0.08, nn[Math.floor(nn.length / 2)] || 0.2);
+        const src = []; // fuentes gaussianas: picos + puntos a lo largo de cada rama (cordilleras)
+        pts.forEach(p => src.push({ u: p.u, v: p.v, z: p.z, s: dn * (0.5 + 0.7 * p.z) }));
+        m.tree.forEach(e => { const a = byId.get(e.a), c = byId.get(e.b); if (!a || !c) return; for (let k = 1; k < 6; k++) { const f = k / 6; src.push({ u: a.u + (c.u - a.u) * f, v: a.v + (c.v - a.v) * f, z: (a.z + (c.z - a.z) * f) * 0.62, s: dn * 0.42 }); } });
+        const N = 72, lim = 1.0, Z = new Float32Array((N + 1) * (N + 1)); let zmax = 0;
+        for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) {
+            const u = -lim + 2 * lim * i / N, v = -lim + 2 * lim * j / N; let z = 0;
+            for (let k = 0; k < src.length; k++) { const q = src[k], d2 = (u - q.u) * (u - q.u) + (v - q.v) * (v - q.v); if (d2 > 9 * q.s * q.s) continue; const h = q.z * Math.exp(-d2 / (2 * q.s * q.s)); if (h > z) z = h; }
+            Z[i * (N + 1) + j] = z; if (z > zmax) zmax = z;
+        }
+        return { N, lim, Z, zmax: zmax || 1, pts };
+    }
+    const RAMP = [[0, [203, 223, 196]], [0.18, [160, 198, 143]], [0.4, [201, 184, 122]], [0.62, [166, 140, 106]], [0.82, [138, 143, 152]], [1, [247, 249, 251]]];
+    const rampAt = (e) => { for (let i = 1; i < RAMP.length; i++) if (e <= RAMP[i][0]) { const a = RAMP[i - 1], b = RAMP[i], f = (e - a[0]) / (b[0] - a[0]); return [a[1][0] + (b[1][0] - a[1][0]) * f, a[1][1] + (b[1][1] - a[1][1]) * f, a[1][2] + (b[1][2] - a[1][2]) * f]; } return RAMP[RAMP.length - 1][1]; };
+    function reliefDraw() {
+        if (!rl) return; const { cv, ctx, g } = rl; const W = cv.clientWidth, Hh = cv.clientHeight, dpr = rl.dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, Hh);
+        const grd = ctx.createLinearGradient(0, 0, 0, Hh); grd.addColorStop(0, '#eef3f4'); grd.addColorStop(1, '#fbfaf6'); ctx.fillStyle = grd; ctx.fillRect(0, 0, W, Hh);
+        const { N, lim, Z, zmax } = g, ca = Math.cos(rl.az), sa = Math.sin(rl.az), sp = Math.sin(rl.tilt), cp = Math.cos(rl.tilt);
+        const sc = Math.min(Hh * 0.36, W * 0.38) * rl.zoom, hz = 0.95, cx = W / 2 + rl.panX, cy = Hh * 0.56 + rl.panY;
+        const proj = (u, v, z) => { const xr = u * ca - v * sa, yr = u * sa + v * ca; return [cx + xr * sc, cy + (yr * sp - z * hz * cp) * sc, yr]; };
+        const V = (N + 1) * (N + 1), X = new Float32Array(V), Y = new Float32Array(V), D = new Float32Array(V);
+        for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) { const k = i * (N + 1) + j; const p = proj(-lim + 2 * lim * i / N, -lim + 2 * lim * j / N, Z[k]); X[k] = p[0]; Y[k] = p[1]; D[k] = p[2]; }
+        const cells = []; for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { const a = i * (N + 1) + j; cells.push(a); }
+        const key = (a) => D[a] + D[a + 1] + D[a + N + 1] + D[a + N + 2];
+        cells.sort((p, q) => key(p) - key(q));
+        const step = 2 * lim / N;
+        for (let c = 0; c < cells.length; c++) {
+            const a = cells[c], b = a + 1, d = a + N + 1, e2 = a + N + 2;
+            const z = (Z[a] + Z[b] + Z[d] + Z[e2]) / 4;
+            const dzu = (Z[d] + Z[e2] - Z[a] - Z[b]) / (2 * step), dzv = (Z[b] + Z[e2] - Z[a] - Z[d]) / (2 * step);
+            const nl = Math.hypot(dzu, dzv, 1), lam = Math.max(0, (-dzu * -0.5 + -dzv * -0.6 + 1 * 0.62) / nl);
+            const base = rampAt(z / zmax), sh = 0.62 + 0.55 * lam;
+            const col = `rgb(${Math.min(255, base[0] * sh) | 0},${Math.min(255, base[1] * sh) | 0},${Math.min(255, base[2] * sh) | 0})`;
+            ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 0.6;
+            ctx.beginPath(); ctx.moveTo(X[a], Y[a]); ctx.lineTo(X[b], Y[b]); ctx.lineTo(X[e2], Y[e2]); ctx.lineTo(X[d], Y[d]); ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        // pines con la etiqueta de cada concepto (en los mapas grandes, solo los más altos y el que se señala)
+        const pins = []; const order = g.pts.slice().sort((a, b) => b.z - a.z); const maxLabels = rl.zoom > 1.4 ? 70 : 34;
+        order.forEach((p, idx) => {
+            const top = proj(p.u, p.v, p.z + 0.05), base = proj(p.u, p.v, p.z);
+            pins.push({ p, x: top[0], y: top[1] });
+            const show = idx < maxLabels || rl.hover === p.n.id;
+            ctx.strokeStyle = 'rgba(29,35,48,.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(top[0], top[1] - 8); ctx.stroke();
+            ctx.fillStyle = p.n.id === rl.sel ? '#0e857c' : '#1d2330'; ctx.beginPath(); ctx.arc(top[0], top[1] - 9, p.n.id === rl.sel ? 5 : 3.5, 0, 6.283); ctx.fill();
+            if (show) { const fs = idx === 0 ? 14 : (idx < 8 ? 12.5 : 11.5); ctx.font = `600 ${fs}px Inter, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom'; ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(251,250,246,.92)'; ctx.strokeText(p.n.label.length > 26 ? p.n.label.slice(0, 25) + '…' : p.n.label, top[0], top[1] - 14); ctx.fillStyle = '#1d2330'; ctx.fillText(p.n.label.length > 26 ? p.n.label.slice(0, 25) + '…' : p.n.label, top[0], top[1] - 14); }
+        });
+        rl.pins = pins;
+    }
+    function reliefResize() { if (!rl) return; const wrap = rl.cv.parentElement; const w = wrap.clientWidth, h = Math.max(240, bodyEl.clientHeight - 92); rl.dpr = Math.min(2, window.devicePixelRatio || 1); rl.cv.style.height = h + 'px'; rl.cv.width = Math.round(w * rl.dpr); rl.cv.height = Math.round(h * rl.dpr); reliefDraw(); }
+    function renderRelief() {
+        const m = rhizomeModel();
+        if (m.nodes.length < 5) { reliefStop(); bodyEl.innerHTML = `<div class="vz-empty">${esc(L('Necesitas al menos 5 conceptos para ver el relieve.', 'You need at least 5 concepts to see the relief.'))}</div>`; return; }
+        const pp = network.getPositions(m.nodes.map(n => n.id)); const sig = m.hash + '|' + hashOf(m.nodes.map(n => { const q = pp[n.id] || { x: 0, y: 0 }; return Math.round(q.x / 20) + ',' + Math.round(q.y / 20); }).join(';'));
+        if (rl && rl.sig === sig) return;
+        const keep = rl ? { az: rl.az, tilt: rl.tilt, zoom: rl.zoom } : null; reliefStop();
+        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('La altura de cada concepto es su importancia: cuánto cuelga de él y cuántas conexiones tiene. Las ramas forman cordilleras. Arrastra para girar, usa la rueda para acercar y toca un pico para ver el concepto.', 'Each concept’s height is its importance: how much hangs from it and how many connections it has. Branches form ranges. Drag to rotate, use the wheel to zoom and tap a peak to see the concept.'))}</div><div class="vz-rh-ctl"><button type="button" class="vz-ghost" id="vzRlTop">${esc(L('Vista desde arriba', 'Top view'))}</button><button type="button" class="vz-ghost" id="vzRlReset">${esc(L('Restablecer vista', 'Reset view'))}</button></div></div><div class="vz-rl-wrap"><canvas class="vz-rl" id="vzRl"></canvas></div>`;
+        const cv = document.getElementById('vzRl');
+        rl = { cv, ctx: cv.getContext('2d'), g: reliefData(m), sig, az: keep ? keep.az : 0.6, tilt: keep ? keep.tilt : 0.95, zoom: keep ? keep.zoom : 1, panX: 0, panY: 0, pins: [], hover: null, sel: null, drag: null, raf: 0 };
+        const R = rl;
+        const redraw = () => { if (R.raf) return; R.raf = requestAnimationFrame(() => { R.raf = 0; if (rl === R) reliefDraw(); }); };
+        const pinAt = (x, y) => { let best = null, bd = 16; R.pins.forEach(pn => { const d = Math.hypot(pn.x - x, pn.y - 9 - y); if (d < bd) { bd = d; best = pn; } }); return best; };
+        R.onDown = (ev) => { R.drag = { x: ev.clientX, y: ev.clientY, az: R.az, tilt: R.tilt, moved: false, pan: ev.shiftKey || ev.button === 2, px: R.panX, py: R.panY }; try { cv.setPointerCapture(ev.pointerId); } catch (_e) { /* ok */ } };
+        R.onMove = (ev) => {
+            if (R.drag) { const dx = ev.clientX - R.drag.x, dy = ev.clientY - R.drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) R.drag.moved = true; if (R.drag.pan) { R.panX = R.drag.px + dx; R.panY = R.drag.py + dy; } else { R.az = R.drag.az + dx * 0.008; R.tilt = Math.max(0.35, Math.min(1.45, R.drag.tilt + dy * 0.006)); } redraw(); return; }
+            const rc = cv.getBoundingClientRect(); const pn = pinAt(ev.clientX - rc.left, ev.clientY - rc.top); const hv = pn ? pn.p.n.id : null; if (hv !== R.hover) { R.hover = hv; cv.style.cursor = hv ? 'pointer' : 'grab'; redraw(); }
+        };
+        R.onUp = (ev) => {
+            const d = R.drag; R.drag = null; if (!d || d.moved) return;
+            const rc = cv.getBoundingClientRect(); const pn = pinAt(ev.clientX - rc.left, ev.clientY - rc.top);
+            if (pn) { R.sel = pn.p.n.id; const n = pn.p.n; showQuote(n.def || n.simple || n.path.concat(n.label).join(' › '), { noFind: true }); try { network.selectNodes([n.id]); network.focus(n.id, { scale: 1, animation: { duration: 400 } }); } catch (_e) { /* ok */ } } else { R.sel = null; showQuote(null); }
+            redraw();
+        };
+        R.onWheel = (ev) => { ev.preventDefault(); R.zoom = Math.max(0.5, Math.min(3.2, R.zoom * (ev.deltaY < 0 ? 1.1 : 0.9))); redraw(); };
+        cv.addEventListener('pointerdown', R.onDown); window.addEventListener('pointermove', R.onMove); window.addEventListener('pointerup', R.onUp); cv.addEventListener('wheel', R.onWheel, { passive: false }); cv.addEventListener('contextmenu', (ev) => ev.preventDefault());
+        document.getElementById('vzRlTop').addEventListener('click', () => { R.tilt = 1.45; R.az = 0; redraw(); });
+        document.getElementById('vzRlReset').addEventListener('click', () => { R.az = 0.6; R.tilt = 0.95; R.zoom = 1; R.panX = 0; R.panY = 0; redraw(); });
+        cv.style.cursor = 'grab'; reliefResize(); track('relief_view', { nodes: m.nodes.length });
+    }
     function renderBody() {
         showQuote(null);
         const v = currentViews() || {};
         if (tab !== 'rhizome' && rnet) { try { rnet.destroy(); } catch (_e) { /* ok */ } rnet = null; rSig = ''; }
+        if (tab !== 'relief') reliefStop();
         if (tab === 'rhizome') return renderRhizome();
+        if (tab === 'relief') return renderRelief();
         if (tab === 'parts') return renderParts();
         if (tab === 'notes') return renderNotes();
         if (tab === 'timeline' && v.timeline) return renderTimeline(v.timeline);
