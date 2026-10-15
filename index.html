@@ -602,6 +602,7 @@
             #vizPanel .vz-opt.bad { background: #fbeaea; border-color: #c25151; }
         }
         ::highlight(gk-quote) { background-color: #fde68a; color: #1d2330; }
+        #defsView .dv-rel { color: #8c95a8; font-size: .86em; font-style: italic; }
         /* --- PANEL DEL TEMA (escritorio): texto de solo lectura de un esquema, a la izquierda --- */
         #topicPanel, #topicTab, #topicLoading { display: none; }
         @media (min-width: 781px) {
@@ -746,6 +747,10 @@
                  nada que deshacer. Ver captureUndoSnapshotIfNeeded/performUndo en app.js. -->
             <button id="btnUndo" title="Deshacer la última acción (Ctrl/Cmd+Z)" disabled class="text-[#8a92b2] hover:text-[#4fd1c5] disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:text-[#8a92b2] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5" data-i18n-title="ui.deshacer_la_ultima_accion_ctrl">
                 <span>↩️</span> <span class="hidden md:inline" data-i18n="ui.deshacer">Deshacer</span>
+            </button>
+
+            <button id="btnReorganize" title="Reorganizar el esquema (lo deja ordenado otra vez)" class="text-[#8a92b2] hover:text-[#4fd1c5] text-xs font-semibold py-1.5 px-2.5 rounded-md hover:bg-[#1d2442] transition-colors flex items-center gap-1.5">
+                <span>🧭</span> <span class="hidden md:inline rg-l">Reorganizar</span>
             </button>
 
             <!-- Controles de exploración del esquema: buscar, repetir la aparición,
@@ -1016,8 +1021,6 @@
         <div class="rz" id="tpResize" title="Arrastra para ajustar el ancho"></div>
         <div class="tp-head">
             <div id="topicTitle" class="tp-title"></div>
-            <button id="topicWide" type="button" class="tp-btn" title="Ampliar hacia la derecha">⇥</button>
-            <button id="topicPin" type="button" class="tp-btn" title="Fijar a la izquierda (el mapa se ajusta)">📌</button>
             <button id="topicClose" type="button" class="tp-btn" title="Contraer">✕</button>
         </div>
         <div id="topicHint" class="tp-hint">Toca un concepto subrayado para verlo en el mapa.</div>
@@ -1693,8 +1696,6 @@
             <span id="dvTitle" class="dv-title"></span>
             <span id="dvSub" class="dv-sub"></span>
             <div class="dv-tools">
-                <button id="dvWide" type="button" class="dv-tool" title="Ampliar hacia la izquierda">⇤</button>
-                <button id="dvPin" type="button" class="dv-tool" title="Fijar a la derecha (el mapa se ajusta)">📌</button>
             </div>
         </div>
         <div class="dv-scroll"><div id="dvGrid" class="dv-grid"></div></div>

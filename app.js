@@ -1260,10 +1260,10 @@ async function renderThreeLevelTree(data, opts = {}) {
         }
     } else {
         // Si el lienzo tenía 0 o 1 nodo, SIEMPRE inicia como un proyecto nuevo independiente
+        // (salvo dentro de un subesquema, que sigue siendo parte del proyecto que se está viendo).
         isClearingCanvas = true;
         clearTimeout(window._binSaveTimer);
-        currentProjectId = null;
-        localStorage.removeItem('gk_current_project_id');
+        if (schemeStack.length === 0) { currentProjectId = null; localStorage.removeItem('gk_current_project_id'); }
         nodes.clear();
         edges.clear();
         isClearingCanvas = false;
@@ -1479,14 +1479,13 @@ function makeEdgeResizable(handle, panel, side, { key, cssVar, min = 300, maxFra
 const topicUI = (() => {
     const panel = document.getElementById('topicPanel'), tab = document.getElementById('topicTab');
     const body = document.getElementById('topicBody'), title = document.getElementById('topicTitle');
-    const pinBtn = document.getElementById('topicPin'), closeBtn = document.getElementById('topicClose'), wideBtn = document.getElementById('topicWide');
+    const closeBtn = document.getElementById('topicClose');
     if (!panel || !tab || !body) return null;
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
-    if (en) { document.getElementById('topicTabLbl').textContent = 'View text'; document.getElementById('topicHint').textContent = 'Tap an underlined concept to see it on the map.'; pinBtn.title = 'Pin to the left (the map adjusts)'; closeBtn.title = 'Collapse'; wideBtn.title = 'Expand to the right'; }
-    let open = false, pinned = false, wide = false, ownerId = null;
+    if (en) { document.getElementById('topicTabLbl').textContent = 'View text'; document.getElementById('topicHint').textContent = 'Tap an underlined concept to see it on the map.'; closeBtn.title = 'Collapse'; }
+    let open = false, ownerId = null; const pinned = true; // abierto, el mapa se ajusta (no tapa)
     const reserve = () => { container.style.marginLeft = (open && pinned) ? (panel.getBoundingClientRect().width || 440) + 'px' : ''; };
     makeEdgeResizable(document.getElementById('tpResize'), panel, 'right', { key: 'gk_topic_w', cssVar: '--tp-w', onResize: reserve });
-    try { pinned = localStorage.getItem('gk_topic_pin') === '1'; } catch (_e) { /* ok */ }
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -1509,9 +1508,8 @@ const topicUI = (() => {
         return out.filter(Boolean);
     }
     function paint() {
-        panel.classList.toggle('on', open); panel.classList.toggle('pinned', open && pinned); wideBtn.classList.toggle('on', wide);
+        panel.classList.toggle('on', open); panel.classList.toggle('pinned', open && pinned);
         tab.classList.toggle('on', !open && !!ownerId);
-        pinBtn.classList.toggle('on', pinned);
         reserve();
         setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
     }
@@ -1560,9 +1558,7 @@ const topicUI = (() => {
         try { if (v) localStorage.removeItem('gk_topic_closed'); else if (byUser) localStorage.setItem('gk_topic_closed', '1'); } catch (_e) { /* ok */ }
     }
     tab.addEventListener('click', () => setOpen(true));
-    wideBtn.addEventListener('click', () => { wide = !wide; panel.style.setProperty('--tp-w', (wide ? Math.round(Math.min(window.innerWidth * 0.58, 860)) : 440) + 'px'); try { localStorage.removeItem('gk_topic_w'); } catch (_e) { /* ok */ } if (en) wideBtn.title = wide ? 'Narrow' : 'Expand to the right'; paint(); });
     closeBtn.addEventListener('click', () => { setOpen(false, true); });
-    pinBtn.addEventListener('click', () => { pinned = !pinned; try { localStorage.setItem('gk_topic_pin', pinned ? '1' : '0'); } catch (_e) { /* ok */ } paint(); track('topic_text_pin', { pinned }); });
     body.addEventListener('click', (e) => {
         const m = e.target.closest('mark.tp-mark'); if (!m) return;
         const id = m.dataset.node; const nd = nodes.get(id) || nodes.get(Number(id)); if (!nd) return;
@@ -4925,13 +4921,17 @@ document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
 function findPointerFor(nodeId) {
     return nodes.get({ filter: n => n.isPointer && String(n.pointerFor) === String(nodeId) })[0] || null;
 }
-async function generateSubschemeFromNode(nodeId) {
+// opts.text: en vez del nombre del nodo se usa ese texto (p. ej. una nota); el subesquema cuelga del nodo como un puntero propio
+// (puede haber varios por nodo). opts.title: nombre del puntero. opts.onPointer(id): se llama al crear el puntero, antes de entrar.
+async function generateSubschemeFromNode(nodeId, opts = {}) {
     const node = nodes.get(nodeId);
-    if (!node) return;
-    const existing = findPointerFor(nodeId);
-    if (existing) { track('subscheme_pointer_opened', { source: 'menu' }); enterSubscheme(existing.id); return; }
-    const topic = node.baseTitle || String(node.label || '').replace(/\*/g, '').trim();
-    if (!topic || !checkBalance(1)) return;
+    if (!node) return null;
+    const fromText = typeof opts.text === 'string' && opts.text.trim();
+    const existing = fromText ? null : findPointerFor(nodeId);
+    if (existing) { track('subscheme_pointer_opened', { source: 'menu' }); enterSubscheme(existing.id); return existing.id; }
+    const topic = fromText ? opts.text.trim().slice(0, 12000) : (node.baseTitle || String(node.label || '').replace(/\*/g, '').trim());
+    const title = String(opts.title || topic).replace(/\s+/g, ' ').trim().slice(0, 60);
+    if (!topic || !checkBalance(1)) return null;
     track('schema_generate_attempt', { mode: 'from_node', length: topic.length, layoutMode: schemaLayoutMode, topicPreview: topic.slice(0, 60) });
     showLoader(tr("js.estructurando_esquema"));
     try {
@@ -4939,7 +4939,7 @@ async function generateSubschemeFromNode(nodeId) {
         if (!ok) {
             if (!handleBillingError(status, data)) appAlert(data?.error || tr("js.intenta_de_nuevo_en_unos"));
             track('schema_generate_error', { mode: 'from_node', message: String(data?.error || status).slice(0, 120), topicPreview: topic.slice(0, 60) });
-            return;
+            return null;
         }
         // Posición del puntero: hacia afuera del esquema, a un lado del nodo de origen.
         const allIds = nodes.getIds();
@@ -4952,9 +4952,9 @@ async function generateSubschemeFromNode(nodeId) {
         const ptrId = `subscheme_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         nodes.add({
             id: ptrId,
-            label: `📦 ${topic}`,
-            baseTitle: topic,
-            isSubscheme: true, isPointer: true, pointerFor: nodeId,
+            label: `📦 ${title}`,
+            baseTitle: title,
+            isSubscheme: true, isPointer: true, pointerFor: fromText ? null : nodeId,
             subSchemeData: { nodes: [], edges: [] },
             x: me.x + dx * 130, y: me.y + dy * 130,
             shape: 'image', image: generateSubschemeThumbnail([], [], {}), size: 34,
@@ -4963,15 +4963,23 @@ async function generateSubschemeFromNode(nodeId) {
             font: { color: '#b8bfdc', size: 12, bold: { color: '#eef1fb', size: 12 }, vadjust: 8 }
         });
         edges.add({ from: nodeId, to: ptrId, label: '', dashes: [5, 5], width: 1.5, color: { color: '#8b7cf6', highlight: '#4fd1c5', hover: '#4fd1c5' }, arrows: { to: { enabled: false } }, smooth: { type: 'continuous' } });
+        if (typeof opts.onPointer === 'function') { try { opts.onPointer(ptrId); } catch (_e) { /* ok */ } }
         enterSubscheme(ptrId);
         const totalNodes = 1 + (data.branches?.length || 0) + (data.subBranches?.length || 0);
         await renderThreeLevelTree(data, { originPanelId: node.originPanelId || null });
         applyServerBalance(data); consumeNodes(totalNodes);
+        // Escritorio: el esquema nuevo lleva su texto a la izquierda (el de la nota, o uno breve sobre el tema).
+        if (isDesktopFolding() && data.root) {
+            if (fromText && topic.split(/\s+/).length >= 25) setSourceTextAsSchemaText(data.root.id, topic);
+            else attachTopicText(data.root.id, title, data);
+        }
         track('schema_generate_success', { mode: 'from_node', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview: topic.slice(0, 60) });
+        return ptrId;
     } catch (err) {
         console.error(err);
         track('schema_generate_error', { mode: 'from_node', message: String(err?.message || '').slice(0, 120), topicPreview: topic.slice(0, 60) });
         appAlert(tr("js.intenta_de_nuevo_en_unos"));
+        return null;
     } finally {
         hideLoader();
     }
@@ -6119,6 +6127,17 @@ function relayoutExistingMap(mode) {
     };
     requestAnimationFrame(step);
 }
+
+// Botón «Reorganizar»: devuelve el esquema visible a su acomodo ordenado (útil tras mover nodos, sobre todo el central).
+(function () {
+    const b = document.getElementById('btnReorganize'); if (!b) return;
+    if (typeof I18N !== 'undefined' && I18N.lang === 'en') { b.title = 'Tidy up the map'; const l = b.querySelector('.rg-l'); if (l) l.textContent = 'Tidy up'; }
+    b.addEventListener('click', () => {
+        if (nodes.length < 2) return;
+        track('reorganize', { nodes: nodes.length, mode: schemaLayoutMode });
+        relayoutExistingMap(schemaLayoutMode);
+    });
+})();
 
 // --- Sonido al crear nodos (togglable) ---
 const btnSoundToggle = document.getElementById('btnSoundToggle');
@@ -8082,8 +8101,8 @@ async function exportReportRtf() {
         ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', term1: 'term', loading: 'loading', more: 'See more', below: 'Continues below:', hide: 'Hide' }
         : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', term1: 'término', loading: 'cargando', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
     document.getElementById('dvBackLbl').textContent = T.back;
-    const dvBackBtn = document.getElementById('dvBack'), dvWideBtn = document.getElementById('dvWide'), dvPinBtn = document.getElementById('dvPin');
-    dvBackBtn.title = en ? 'Collapse' : 'Contraer'; dvWideBtn.title = en ? 'Expand to the left' : 'Ampliar hacia la izquierda'; dvPinBtn.title = en ? 'Pin to the right (the map adjusts)' : 'Fijar a la derecha (el mapa se ajusta)';
+    const dvBackBtn = document.getElementById('dvBack');
+    dvBackBtn.title = en ? 'Collapse' : 'Contraer';
     if (en) btn.firstElementChild.textContent = 'View definitions';
     const isOpen = () => !view.classList.contains('hidden');
 
@@ -8092,18 +8111,19 @@ async function exportReportRtf() {
     setTimeout(refreshBtn, 900); setTimeout(refreshBtn, 3000);
 
     const cleanLabel = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '').replace(/^📦\s*/, '').split('\n')[0] || '').trim();
-    let byId = new Map(), kids = new Map(), allById = new Map(), hiddenKids = new Map();
+    let byId = new Map(), kids = new Map(), allById = new Map(), hiddenKids = new Map(), relOf = new Map();
     function buildTree() {
         const every = nodes.get().filter(n => !n.isSubscheme);
         allById = new Map(every.map(n => [String(n.id), n]));
         // Solo entran las definiciones de lo que está desplegado en el mapa; lo plegado queda preparado tras "Ver más".
         const all = every.filter(n => !n.hidden);
-        byId = new Map(all.map(n => [String(n.id), n])); kids = new Map(); hiddenKids = new Map();
+        byId = new Map(all.map(n => [String(n.id), n])); kids = new Map(); hiddenKids = new Map(); relOf = new Map();
         const hasIn = new Set();
         plainEdges().forEach(e => {
             if (isRelatedEdgeLabel && isRelatedEdgeLabel(e.label)) return;
             const a = String(e.from), b = String(e.to);
             if (!allById.has(a) || !allById.has(b) || a === b) return;
+            { const lb = String(e.label || '').replace(/[*\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40); if (lb && !relOf.has(b)) relOf.set(b, lb); }
             if (!byId.has(b)) { if (!hiddenKids.has(a)) hiddenKids.set(a, []); hiddenKids.get(a).push(b); return; }
             if (!byId.has(a)) return;
             if (!kids.has(a)) kids.set(a, []);
@@ -8119,9 +8139,16 @@ async function exportReportRtf() {
         (kids.get(id) || []).forEach(c => collect(c, depth + 1, maxDepth, seen, out));
     }
 
+    // La primera celda (definición) lleva antes, discreta y entre paréntesis, la relación con su padre.
+    function putCell(row, i, text) {
+        const t = String(text || '').trim(); if (!t) return false;
+        const c = row._cells[i]; c.textContent = '';
+        if (i === 0 && row._rel) { const sp = document.createElement('span'); sp.className = 'dv-rel'; sp.textContent = '(' + row._rel + ') '; c.appendChild(sp); }
+        c.appendChild(document.createTextNode(t)); return true;
+    }
     function fillRow(row, n) {
-        const cells = row._cells; const vals = [n.definition, n.simple, n.example];
-        cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; });
+        const vals = [n.definition, n.simple, n.example];
+        vals.forEach((v, i) => putCell(row, i, v));
     }
     let rowOf = new Map();
     const openMore = new Set(); // filas con «Ver más» abierto: se conservan aunque la lista se reconstruya
@@ -8140,8 +8167,8 @@ async function exportReportRtf() {
         if (depth > 0) { row.style.marginLeft = Math.min(depth, 5) * 26 + 'px'; row.classList.add('dv-child'); term.style.fontSize = Math.max(13.5, 16 - depth * 1) + 'px'; }
         row.appendChild(term);
         row._cells = [T.def, T.simple, T.ex].map((lbl) => { const c = document.createElement('div'); c.className = 'dv-cell'; c.dataset.l = lbl; row.appendChild(c); return c; });
-        const vals = [n.definition, n.simple, n.example];
-        row._cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; else c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
+        const vals = [n.definition, n.simple, n.example]; row._rel = relOf.get(String(n.id)) || '';
+        row._cells.forEach((c, i) => { if (!putCell(row, i, vals[i])) c.innerHTML = '<div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
         // Nodos de más abajo: citados junto al término, con "Ver más".
         const childIds = [...(depth >= MAX_LEVELS - 1 ? (kids.get(String(n.id)) || []) : []), ...(hiddenKids.get(String(n.id)) || [])];
         if (childIds.length) {
@@ -8295,15 +8322,13 @@ async function exportReportRtf() {
         track('defs_selection_schema', { length: info.text.length });
         generateFullSchemaFromTopic(info.text, { attachToNodeId: nd.id });
     });
-    let pinned = false;
-    try { pinned = localStorage.getItem('gk_defs_pin') === '1'; } catch (_e) { /* ok */ }
+    const pinned = true; // abierto, el mapa se ajusta (no tapa)
     const WIDE_AT = 780; // con este ancho o más, las tres explicaciones van en columnas
     function layout() {
         const hd = document.getElementById('mainHeader');
         view.style.setProperty('--dv-top', (hd ? Math.round(hd.getBoundingClientRect().bottom) : 64) + 'px');
         const wNow = view.getBoundingClientRect().width;
         view.classList.toggle('dv-wide', wNow >= WIDE_AT); view.classList.toggle('dv-pinned', pinned);
-        dvWideBtn.classList.toggle('on', wNow >= WIDE_AT); dvPinBtn.classList.toggle('on', pinned);
         const w = isOpen() && pinned ? wNow : 0;
         container.style.marginRight = w ? w + 'px' : '';
         setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
@@ -8326,13 +8351,6 @@ async function exportReportRtf() {
     btn.addEventListener('click', () => open());
     dvBackBtn.addEventListener('click', () => close(true));
     makeEdgeResizable(document.getElementById('dvResize'), view, 'left', { key: 'gk_defs_w', cssVar: '--dv-w', onResize: () => layout() });
-    dvWideBtn.addEventListener('click', () => {
-        const isWide = view.getBoundingClientRect().width >= WIDE_AT;
-        view.style.setProperty('--dv-w', (isWide ? 460 : Math.round(Math.min(window.innerWidth * 0.68, 1000))) + 'px');
-        try { localStorage.removeItem('gk_defs_w'); } catch (_e) { /* ok */ }
-        layout();
-    });
-    dvPinBtn.addEventListener('click', () => { pinned = !pinned; try { localStorage.setItem('gk_defs_pin', pinned ? '1' : '0'); } catch (_e) { /* ok */ } layout(); track('defs_view_pin', { pinned }); });
     window.addEventListener('resize', () => { if (isOpen()) view.style.setProperty('--dv-top', (document.getElementById('mainHeader')?.getBoundingClientRect().bottom || 64) + 'px'); });
     // Por defecto aparece junto al esquema (escritorio). Si lo cierras tú, se queda cerrado hasta que lo abras.
     // Cuando el mapa cambia (se genera, se despliega una rama…) se vuelve a armar con lo que está a la vista.
@@ -8459,12 +8477,13 @@ const vizUI = (() => {
     const pick = (el, q, opts) => { bodyEl.querySelectorAll('.vz-sel').forEach(x => x.classList.remove('vz-sel')); if (el) el.classList.add('vz-sel'); showQuote(q, opts); };
 
     // ---------- notas ----------
+    const noteTitle = (t) => { const w = String(t).replace(/\s+/g, ' ').trim().split(' '); return w.slice(0, 6).join(' ') + (w.length > 6 ? '…' : ''); };
     function renderNotes() {
         const notes = getNotes();
         const sel = (network.getSelectedNodes() || [])[0];
         bodyEl.innerHTML = `<div class="vz-note-form"><textarea id="vzNoteIn" placeholder="${esc(L('Escribe una nota sobre lo que estás estudiando…', 'Write a note about what you are studying…'))}"></textarea><button type="button" class="vz-primary" id="vzNoteAdd">${esc(L('Guardar nota', 'Save note'))}</button></div>`
             + (notes.length ? `<div class="vz-row" style="max-width:760px"><span class="vz-empty" style="padding:0;flex:1">${esc(L(notes.length + (notes.length === 1 ? ' nota. Cada una puede convertirse en su propio esquema, ligado al nodo del que salió.' : ' notas. Cada una puede convertirse en su propio esquema, ligado al nodo del que salió.'), notes.length + ' note(s). Each one can become its own map, linked to the node it came from.'))}</span>${notes.length > 1 ? `<button type="button" class="vz-ghost" id="vzNotesAll">${esc(L('🌱 Esquema con todas', '🌱 Map from all'))}</button>` : ''}</div>` : `<div class="vz-empty">${esc(L('Aquí van tus ideas, dudas y resúmenes. Si tienes un nodo elegido, la nota queda ligada a él.', 'Your ideas, questions and summaries go here. If a node is selected, the note is linked to it.'))}</div>`)
-            + `<div class="vz-notes">${notes.map(n => { const nd = n.node != null ? nodes.get(n.node) : null; return `<div class="vz-note" data-id="${esc(n.id)}"><div class="t" contenteditable="true" spellcheck="false">${esc(n.text)}</div><div class="m">${nd ? `<button type="button" class="vz-chip" data-go="${esc(n.node)}" title="${esc(L('Ir al nodo', 'Go to node'))}">↳ ${esc(clean(nd))}</button>` : ''}<span class="sp"></span><button type="button" class="vz-ghost" data-gen="1">${esc(L('🌱 Crear esquema', '🌱 Make a map'))}</button><button type="button" class="vz-ghost" data-del="1" title="${esc(L('Borrar', 'Delete'))}">✕</button></div></div>`; }).join('')}</div>`;
+            + `<div class="vz-notes">${notes.map(n => { const nd = n.node != null ? nodes.get(n.node) : null; return `<div class="vz-note" data-id="${esc(n.id)}"><div class="t" contenteditable="true" spellcheck="false">${esc(n.text)}</div><div class="m">${nd ? `<button type="button" class="vz-chip" data-go="${esc(n.node)}" title="${esc(L('Ir al nodo', 'Go to node'))}">↳ ${esc(clean(nd))}</button>` : ''}<span class="sp"></span><button type="button" class="vz-ghost" data-gen="1">${esc(n.sub && nodes.get(n.sub) ? L('📦 Abrir esquema', '📦 Open map') : L('🌱 Crear esquema', '🌱 Make a map'))}</button><button type="button" class="vz-ghost" data-del="1" title="${esc(L('Borrar', 'Delete'))}">✕</button></div></div>`; }).join('')}</div>`;
         const inp = bodyEl.querySelector('#vzNoteIn');
         const add = () => {
             const t = inp.value.trim(); if (!t) return;
@@ -8475,13 +8494,19 @@ const vizUI = (() => {
         bodyEl.querySelector('#vzNoteAdd').addEventListener('click', add);
         inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); add(); } });
         const all = bodyEl.querySelector('#vzNotesAll');
-        if (all) all.addEventListener('click', () => { track('viz_notes_schema', { all: true }); generateFullSchemaFromTopic(getNotes().map(n => n.text).reverse().join('\n\n'), { attachToNodeId: notesHostId() }); });
+        if (all) all.addEventListener('click', () => { track('viz_notes_schema', { all: true }); const t = getNotes().map(n => n.text).reverse().join('\n\n'); generateSubschemeFromNode(notesHostId(), { text: t, title: L('Mis notas', 'My notes') }); });
         bodyEl.querySelectorAll('.vz-note').forEach(card => {
             const id = card.dataset.id;
             const note = () => getNotes().find(n => n.id === id);
             card.querySelector('.t').addEventListener('blur', (e) => { const t = e.target.innerText.trim(); const n = note(); if (!n || t === n.text) return; if (!t) { setNotes(getNotes().filter(x => x.id !== id)); paint(); return; } setNotes(getNotes().map(x => x.id === id ? { ...x, text: t.slice(0, 4000) } : x)); });
             card.querySelector('[data-del]').addEventListener('click', () => { setNotes(getNotes().filter(x => x.id !== id)); paint(); });
-            card.querySelector('[data-gen]').addEventListener('click', () => { const n = note(); if (!n) return; const t = card.querySelector('.t').innerText.trim() || n.text; track('viz_notes_schema', { all: false }); generateFullSchemaFromTopic(t, { attachToNodeId: (n.node != null && nodes.get(n.node)) ? n.node : notesHostId() }); });
+            card.querySelector('[data-gen]').addEventListener('click', () => {
+                const n = note(); if (!n) return;
+                if (n.sub && nodes.get(n.sub)) { track('viz_notes_open'); enterSubscheme(n.sub); return; }
+                const t = card.querySelector('.t').innerText.trim() || n.text;
+                track('viz_notes_schema', { all: false });
+                generateSubschemeFromNode((n.node != null && nodes.get(n.node)) ? n.node : notesHostId(), { text: t, title: noteTitle(t), onPointer: (ptr) => setNotes(getNotes().map(x => x.id === id ? { ...x, sub: ptr } : x)) });
+            });
             const go = card.querySelector('[data-go]');
             if (go) go.addEventListener('click', () => { const nd = nodes.get(go.dataset.go) || nodes.get(Number(go.dataset.go)); if (!nd) return; revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); flashNewNode(nd.id); });
         });
