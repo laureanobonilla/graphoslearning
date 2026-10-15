@@ -3,3 +3,11 @@
 /en      /index.html   200
 /en/     /index.html   200
 /en/*    /index.html   200
+
+# Vestirte RETIRADA DE CIRCULACIÓN (2026-10-14): la carpeta /vestirte/ sigue en el repo, pero quien la abra ve una página en blanco.
+# El panel de administración sigue accesible. Para reactivarla: borrar las 4 líneas de abajo.
+/vestirte/admin     /vestirte/admin/index.html   200!
+/vestirte/admin/*   /vestirte/admin/:splat      200!
+/vestirte           /retirada.html               404!
+/vestirte/*         /retirada.html               404!
+
