@@ -1095,7 +1095,25 @@ network.on('click', (params) => {
     setFolded(b.id, !hiddenNow);
     track(hiddenNow ? 'branch_unfold' : 'branch_fold', {});
     network.redraw();
+    if (hiddenNow) setTimeout(fitMapAfterExpand, 80);
 });
+// Al desplegar una rama, solo se aleja lo justo para que todo el mapa visible quepa (nunca se acerca ni se centra de más).
+function fitMapAfterExpand() {
+    try {
+        const vis_ = nodes.get().filter(n => !n.hidden && !n.isSubscheme);
+        if (vis_.length < 2) return;
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        vis_.forEach(n => { const bb = network.getBoundingBox(n.id); if (!bb) return; l = Math.min(l, bb.left); r = Math.max(r, bb.right); t = Math.min(t, bb.top); b = Math.max(b, bb.bottom + 30); });   // +30: la burbuja bajo cada nodo
+        if (!isFinite(l)) return;
+        const W = container.clientWidth, H = container.clientHeight, pad = 36;
+        const cur = network.getScale(), vp = network.getViewPosition();
+        const needed = Math.min(W / ((r - l) + pad * 2), H / ((b - t) + pad * 2));
+        const target = Math.max(0.12, Math.min(cur, needed));
+        const inView = (l >= vp.x - W / 2 / cur + pad / cur) && (r <= vp.x + W / 2 / cur - pad / cur) && (t >= vp.y - H / 2 / cur + pad / cur) && (b <= vp.y + H / 2 / cur - pad / cur);
+        if (inView && target >= cur - 0.001) return;   // ya cabe: no se toca la vista
+        network.moveTo({ position: { x: (l + r) / 2, y: (t + b) / 2 }, scale: target, animation: { duration: 450, easingFunction: 'easeInOutQuad' } });
+    } catch (_e) { /* sin ajuste de vista */ }
+}
 (function () {
     const c = container;
     if (!c) return;
