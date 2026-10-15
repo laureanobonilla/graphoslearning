@@ -80,6 +80,14 @@ function intro() {
   const inp = h('input', 'field'); inp.type = 'text'; inp.maxLength = 120; inp.placeholder = 'Elige un tema'; inp.autocomplete = 'off'; inp.enterKeyHint = 'go'; inp.setAttribute('aria-label', 'Elige un tema');
   const btn = h('button', 'btn', 'Empezar'); btn.type = 'submit'; btn.disabled = true;
   form.appendChild(inp); form.appendChild(btn); s.appendChild(form);
+  // Temas de ejemplo: un clic y empieza (quien no sabe qué escribir no se queda sin poder probar).
+  const chips = h('div', 'chips'); chips.setAttribute('aria-label', 'Temas de ejemplo');
+  ['La Revolución Francesa', 'Fotosíntesis', 'Ecuaciones', 'Inteligencia artificial', 'La célula'].forEach((t) => {
+    const c = h('button', 'chip', t); c.type = 'button';
+    c.addEventListener('click', () => { if (going) return; inp.value = t; inp.dispatchEvent(new Event('input')); track('topic_chip', { topic: t }); form.requestSubmit ? form.requestSubmit() : btn.click(); });
+    chips.appendChild(c);
+  });
+  s.appendChild(chips);
   inp.addEventListener('input', () => {
     A.tema = inp.value.trim(); btn.disabled = A.tema.length < 2; setLabel(A.tema); setP(A.tema.length >= 2 ? 0.55 : 0);
     if (!typedTracked && A.tema.length >= 2) { typedTracked = true; track('topic_typed', {}); }

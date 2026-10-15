@@ -84,3 +84,8 @@ h2{ font:700 clamp(1.5rem,2.6vw,2.1rem)/1.2 Sora,sans-serif; letter-spacing:-.01
 .start{ display:flex; flex-direction:column; gap:14px; max-width:460px; }
 .start .field{ font-size:1.2rem; }
 .start .btn{ align-self:flex-start; }
+
+.chips{ display:flex; flex-wrap:wrap; gap:8px; max-width:460px; margin-top:14px; }
+.chip{ appearance:none; background:transparent; border:1px solid var(--line); color:#aeb6d6; font:500 .9rem Inter,sans-serif; padding:8px 14px; border-radius:999px; cursor:pointer; transition:border-color .2s, color .2s, background .2s; }
+.chip:hover{ border-color:var(--cyan); color:var(--hi); background:rgba(79,209,197,.08); }
+.chip:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }

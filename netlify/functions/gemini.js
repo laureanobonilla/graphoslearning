@@ -906,9 +906,14 @@ REGLAS:
 4. No menciones que es un texto generado ni el mapa.`,
                 config: { responseMimeType: 'application/json', responseSchema: schema, maxOutputTokens: 2500, ...(thinking ? { thinkingConfig: thinking } : {}) }
             });
-            // Sin "pensar" mucho el texto sale en pocos segundos; si el modelo rechaza esa configuración, se pide sin ella.
-            let response; try { response = await generateWithFallback(ttPayload({ thinkingLevel: 'minimal' })); } catch (e) { if (/thinking|level|budget/i.test(e.message || '')) response = await generateWithFallback(ttPayload(null)); else throw e; }
-            let d; try { d = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) }; }
+            // Mismo método que el texto de /aprender/ (que ya funciona): tope de tiempo por intento, cambio de modelo si uno se cuelga o
+            // responde roto, y razonamiento mínimo. Netlify corta a los ~26 s, así que se rinde antes y se devuelve un error claro.
+            const ttT0 = Date.now(); let d;
+            try {
+                d = await require('./_lib/qer-gemini').generateWithRetries(ttPayload(null).contents, schema,
+                    (x) => x && typeof x.text === 'string' && x.text.split(/\s+/).length >= 60,
+                    { tag: 'topic_text', maxOutputTokens: 3200, deadline: ttT0 + 23500, attemptMs: 11000 });
+            } catch (e) { console.error('[topic_text] falló:', e.message); return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) }; }
             const out = String(d.text || '').replace(/[*#`]/g, '').replace(/\r/g, '').trim().slice(0, 5000);
             if (out.split(/\s+/).length < 60) return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) };
             return { statusCode: 200, body: JSON.stringify({ text: out }) };

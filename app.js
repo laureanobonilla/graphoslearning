@@ -1705,7 +1705,7 @@ function setSourceTextAsSchemaText(ownerId, text) {
 async function attachTopicText(ownerId, topic, data) {
     if (!topicUI) return;
     topicUI.setLoading(true, topic);
-    let okDone = false;
+    let okDone = false, lastWhy = '';
     try {
         const labels = [data.root, ...(data.branches || []), ...(data.subBranches || [])].map(n => String(n && n.label || '').trim()).filter(Boolean);
         // Hasta 2 intentos de 30 s: el servidor puede tardar o devolver una respuesta inválida, y sin esto el texto quedaba sin escribirse.
@@ -1715,18 +1715,19 @@ async function attachTopicText(ownerId, topic, data) {
                 const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 30000);
                 let res; try { res = await fetch('/.netlify/functions/gemini', { method: 'POST', signal: ac.signal, body: JSON.stringify({ action: 'topic_text', topic, text: labels.join('\n') }) }); } finally { clearTimeout(to); }
                 const d = await res.json().catch(() => ({}));
-                if (!res.ok || !d.text) { await new Promise(r => setTimeout(r, 1200)); continue; }
+                if (!res.ok || !d.text) { lastWhy = res.status + ':' + String(d.error || '').slice(0, 40); await new Promise(r => setTimeout(r, 1200)); continue; }
                 if (!nodes.get(ownerId)) return;
                 isApplyingUndo = true;
                 try { nodes.update({ id: ownerId, schemaText: d.text }); } finally { isApplyingUndo = false; }
                 topicUI.show(ownerId, true);
                 track('topic_text_ready', { words: d.text.split(/\s+/).length, attempt });
                 okDone = true;
-            } catch (_e) { await new Promise(r => setTimeout(r, 1200)); }
+            } catch (e) { lastWhy = (e && e.name === 'AbortError') ? 'timeout' : 'red'; await new Promise(r => setTimeout(r, 1200)); }
         }
     } catch (_e) { /* el texto es un extra: si falla, el esquema sigue igual */ }
     finally {
         topicUI.setLoading(false);
+        if (!okDone) track('topic_text_error', { why: lastWhy || null });
         if (!okDone && nodes.get(ownerId)) topicUI.setFailed(() => attachTopicText(ownerId, topic, data));
     }
 }
@@ -8722,9 +8723,17 @@ async function exportReportRtf() {
                 const chunk = chunks[next++];
                 if (token !== loadMissing.token || !isOpen()) return;
                 try {
-                    const res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) }) });
-                    const data = await res.json();
-                    if (!res.ok || !Array.isArray(data.items)) throw new Error('glossary_failed');
+                    // Hasta 3 intentos por bloque (con pausa): un fallo suelto del servidor ya no deja la lista en error.
+                    let res = null, data = null;
+                    for (let at = 0; at < 3; at++) {
+                        try { res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) }) }); data = await res.json(); }
+                        catch (_e) { res = null; data = null; }
+                        if (res && res.ok && data && Array.isArray(data.items)) break;
+                        loadMissing.lastErr = res ? (res.status + ':' + String((data && data.error) || '').slice(0, 40)) : 'red';
+                        if (res && res.status === 429) break;   // límite por hora: reintentar al momento no sirve
+                        await new Promise(r => setTimeout(r, 900 * (at + 1)));
+                    }
+                    if (!res || !res.ok || !data || !Array.isArray(data.items)) throw new Error('glossary_failed');
                     isApplyingUndo = true;
                     try {
                         data.items.forEach(it => {
@@ -8745,7 +8754,7 @@ async function exportReportRtf() {
         if (token !== loadMissing.token || !isOpen()) return;
         pendingRows = Math.max(0, grid.querySelectorAll('.dv-skel').length ? pendingRows : 0); updateProgress();
         if (failed) {
-            track('defs_view_error');
+            track('defs_view_error', { why: loadMissing.lastErr || null });
             const box = document.createElement('div'); box.className = 'dv-err'; box.textContent = T.err;
             const b = document.createElement('button'); b.type = 'button'; b.textContent = T.retry;
             b.onclick = () => { box.remove(); pendingRows = 0; loadMissing(list, loadMissing.token); };
