@@ -4523,18 +4523,38 @@ async function pdfOutlineEntries(doc, from, to) {
     let ol = null; try { ol = await doc.getOutline(); } catch (_e) { return []; }
     if (!ol || !ol.length) return [];
     let list = ol; if (list.length === 1 && list[0].items && list[0].items.length >= 2) list = list[0].items;
-    const out = [];
-    for (const it of list) {
-        let idx = null;
+    const pageOf = async (it) => {
         try {
             let d = it.dest; if (typeof d === 'string') d = await doc.getDestination(d);
-            if (Array.isArray(d)) { const ref = d[0]; idx = (typeof ref === 'number') ? ref : await doc.getPageIndex(ref); }
+            if (Array.isArray(d)) { const ref = d[0]; const idx = (typeof ref === 'number') ? ref : await doc.getPageIndex(ref); return idx + 1; }
         } catch (_e) { /* destino ilegible: se salta */ }
-        if (idx == null) continue; const page = idx + 1; if (page < from || page > to) continue;
-        out.push({ title: String(it.title || '').replace(/\s+/g, ' ').trim(), page });
-    }
-    out.sort((a, b) => a.page - b.page);
-    const seen = new Set(); return out.filter(e => { if (!e.title || seen.has(e.page)) return false; seen.add(e.page); return true; });
+        return null;
+    };
+    const clean = (t) => { const x = String(t || '').replace(/\s+/g, ' ').trim(); return /\p{L}/u.test(x) ? prettyHeading(x.replace(/^(uno|dos|tres|cuatro|cinco|seis)$/i, (m) => LL('Parte ', 'Part ') + m.toUpperCase())) : ''; };
+    // El OCR a veces estropea el número romano («CAPÍTULO TU»): si no es un número válido se toma el siguiente al anterior.
+    const ROM = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX']; let lastCh = 0;
+    const fixCh = (t) => t.replace(/^(cap[ií]tulo|chapter)\s+(\S+)/i, (m, w, n) => {
+        const u = n.replace(/[:.]$/, '').toUpperCase(), i = ROM.indexOf(u);
+        if (i >= 0) { lastCh = i + 1; return m; }
+        if (/^\d+$/.test(u) || ORD_WORDS[normTxt(u)]) return m;
+        lastCh++; return w + ' ' + (ROM[lastCh - 1] || lastCh) + (/[:.]$/.test(n) ? n.slice(-1) : '');
+    });
+    const out = [];
+    // Recorre TODO el árbol del índice: lo que tiene hijos es un grupo (Parte / Capítulo) y las hojas son las partes a elegir.
+    const walk = async (items, path, depth) => {
+        for (const it of items) {
+            const title = fixCh(clean(it.title)), page = await pageOf(it);
+            const kids = (it.items || []).filter(k => k && k.title != null);
+            if (kids.length && depth < 4) {
+                const kp = await pageOf(kids[0]);
+                if (title && page != null && (kp == null || kp > page)) out.push({ title, page, group: path.join(' · ') });   // texto propio antes del primer hijo
+                await walk(kids, title ? path.concat(title) : path, depth + 1);
+            } else if (title && page != null) out.push({ title, page, group: path.join(' · '), sec: true });
+        }
+    };
+    await walk(list, [], 0);
+    const ins = out.filter(e => e.page >= from && e.page <= to).sort((a, b) => a.page - b.page);
+    const seen = new Set(); return ins.filter(e => { if (seen.has(e.page)) return false; seen.add(e.page); return true; });
 }
 const ORD_WORDS = { primero: 1, primer: 1, primera: 1, segundo: 2, segunda: 2, tercero: 3, tercer: 3, tercera: 3, cuarto: 4, cuarta: 4, quinto: 5, quinta: 5, sexto: 6, sexta: 6, septimo: 7, septima: 7, octavo: 8, octava: 8, noveno: 9, novena: 9, decimo: 10, decima: 10, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
 const normTxt = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/([a-z])-\s+([a-z])/g, '$1$2').replace(/[^a-z0-9ñ]+/g, ' ').trim();
@@ -4652,7 +4672,7 @@ function buildPdfParts(pages, entries, from, to) {
     let segs = [];
     if (entries.length >= 2) {
         const es = entries.slice(); if (es[0].page > from) es.unshift({ title: LL('Inicio', 'Start'), page: from });
-        es.forEach((e, i) => segs.push({ title: e.sec ? e.title : (e.chapter || e.title), group: [e.part, e.sec ? e.chapter : ''].filter(Boolean).join(' · '), from: e.page, to: (i + 1 < es.length ? es[i + 1].page - 1 : to) }));
+        es.forEach((e, i) => segs.push({ title: (e.group != null || e.sec) ? e.title : (e.chapter || e.title), group: e.group != null ? e.group : [e.part, e.sec ? e.chapter : ''].filter(Boolean).join(' · '), from: e.page, to: (i + 1 < es.length ? es[i + 1].page - 1 : to) }));
     } else segs = [{ title: '', from, to }];
     const out = [];
     segs.forEach(sg => {   // lo demasiado grande se parte en trozos iguales de páginas
