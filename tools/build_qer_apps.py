@@ -14,8 +14,8 @@ OPEN_SAMPLES = {
 }
 # Frase única de la versión «sellada» (la principal desde 2026-10-15): ningún resultado a la vista, una frase y el pago.
 SEALED = {
-    ('es', 'self'): {'phrase': 'Hay algo que respondiste sin darte cuenta, y dice más de ti que todo lo demás.', 'lead': 'Ver mi lectura completa'},
-    ('es', 'partner'): {'phrase': 'Hay algo que respondiste sobre tu pareja sin darte cuenta, y dice más de ustedes que todo lo demás.', 'lead': 'Ver la lectura completa'},
+    ('es', 'self'): {'phrase': 'Tus respuestas dicen mucho de ti y tenemos mucho que decirte al respecto.', 'lead': 'Ver mi lectura completa'},
+    ('es', 'partner'): {'phrase': 'Tus respuestas dicen mucho de tu pareja y tenemos mucho que decirte al respecto.', 'lead': 'Ver la lectura completa'},
 }
 tpl = open('qer-shared/template.html', encoding='utf8').read()
 for a in APPS:
