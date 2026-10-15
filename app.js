@@ -1455,6 +1455,27 @@ async function resumePendingGen(source) {
 // (también los que salen de otro) guarda su PROPIO texto en el nodo que lo origina (`schemaText`). Se ve a la
 // izquierda, contraído por defecto; los conceptos subrayados llevan al nodo y, al elegir un nodo, el texto sigue.
 // ==========================================
+// Arrastre del borde de un panel lateral para cambiar su ancho (se recuerda en localStorage).
+function makeEdgeResizable(handle, panel, side, { key, cssVar, min = 300, maxFrac = 0.7, onResize }) {
+    if (!handle || !panel) return;
+    const clampW = (w) => Math.max(min, Math.min(window.innerWidth * maxFrac, w));
+    const apply = (w) => { w = Math.round(clampW(w)); panel.style.setProperty(cssVar, w + 'px'); if (onResize) onResize(w); return w; };
+    try { const saved = Number(localStorage.getItem(key)); if (saved) panel.style.setProperty(cssVar, clampW(saved) + 'px'); } catch (_e) { /* ok */ }
+    handle.addEventListener('pointerdown', (e) => {
+        e.preventDefault(); handle.setPointerCapture(e.pointerId);
+        const startX = e.clientX, startW = panel.getBoundingClientRect().width;
+        document.body.classList.add('gk-resizing');
+        const move = (ev) => { apply(side === 'right' ? startW + (ev.clientX - startX) : startW - (ev.clientX - startX)); };
+        const up = () => {
+            document.body.classList.remove('gk-resizing');
+            handle.removeEventListener('pointermove', move); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up);
+            try { localStorage.setItem(key, String(Math.round(panel.getBoundingClientRect().width))); } catch (_e) { /* ok */ }
+            try { window.dispatchEvent(new Event('resize')); network.redraw(); } catch (_e) { /* ok */ }
+        };
+        handle.addEventListener('pointermove', move); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
+    });
+}
+
 const topicUI = (() => {
     const panel = document.getElementById('topicPanel'), tab = document.getElementById('topicTab');
     const body = document.getElementById('topicBody'), title = document.getElementById('topicTitle');
@@ -1463,6 +1484,8 @@ const topicUI = (() => {
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
     if (en) { document.getElementById('topicTabLbl').textContent = 'View text'; document.getElementById('topicHint').textContent = 'Tap an underlined concept to see it on the map.'; pinBtn.title = 'Pin to the left (the map adjusts)'; closeBtn.title = 'Collapse'; wideBtn.title = 'Expand to the right'; }
     let open = false, pinned = false, wide = false, ownerId = null;
+    const reserve = () => { container.style.marginLeft = (open && pinned) ? (panel.getBoundingClientRect().width || 440) + 'px' : ''; };
+    makeEdgeResizable(document.getElementById('tpResize'), panel, 'right', { key: 'gk_topic_w', cssVar: '--tp-w', onResize: reserve });
     try { pinned = localStorage.getItem('gk_topic_pin') === '1'; } catch (_e) { /* ok */ }
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1486,11 +1509,10 @@ const topicUI = (() => {
         return out.filter(Boolean);
     }
     function paint() {
-        panel.classList.toggle('on', open); panel.classList.toggle('pinned', open && pinned); panel.classList.toggle('wide', wide); wideBtn.classList.toggle('on', wide);
+        panel.classList.toggle('on', open); panel.classList.toggle('pinned', open && pinned); wideBtn.classList.toggle('on', wide);
         tab.classList.toggle('on', !open && !!ownerId);
         pinBtn.classList.toggle('on', pinned);
-        const w = open && pinned ? panel.getBoundingClientRect().width || 380 : 0;
-        container.style.marginLeft = w ? w + 'px' : '';
+        reserve();
         setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
     }
     function render(owner) {
@@ -1538,7 +1560,7 @@ const topicUI = (() => {
         try { if (v) localStorage.removeItem('gk_topic_closed'); else if (byUser) localStorage.setItem('gk_topic_closed', '1'); } catch (_e) { /* ok */ }
     }
     tab.addEventListener('click', () => setOpen(true));
-    wideBtn.addEventListener('click', () => { wide = !wide; if (en) wideBtn.title = wide ? 'Narrow' : 'Expand to the right'; paint(); });
+    wideBtn.addEventListener('click', () => { wide = !wide; panel.style.setProperty('--tp-w', (wide ? Math.round(Math.min(window.innerWidth * 0.58, 860)) : 440) + 'px'); try { localStorage.removeItem('gk_topic_w'); } catch (_e) { /* ok */ } if (en) wideBtn.title = wide ? 'Narrow' : 'Expand to the right'; paint(); });
     closeBtn.addEventListener('click', () => { setOpen(false, true); });
     pinBtn.addEventListener('click', () => { pinned = !pinned; try { localStorage.setItem('gk_topic_pin', pinned ? '1' : '0'); } catch (_e) { /* ok */ } paint(); track('topic_text_pin', { pinned }); });
     body.addEventListener('click', (e) => {
@@ -8037,11 +8059,11 @@ async function exportReportRtf() {
     const view = document.getElementById('defsView');
     const grid = document.getElementById('dvGrid');
     if (!btn || !view || !grid) return;
-    const MAX_LEVELS = 3;
+    const MAX_LEVELS = 1; // al inicio solo el primer nivel; lo demás (ya calculado en segundo plano) sale con «Ver más»
     const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
     const T = en
-        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', loading: 'loading', more: 'See more', below: 'Continues below:', hide: 'Hide' }
-        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', loading: 'cargando', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
+        ? { title: 'Definitions', back: 'Back to the diagram', term: 'Term', def: 'Definition', simple: 'In simple words', ex: 'Examples', err: 'Could not load the definitions.', retry: 'Retry', terms: 'terms', term1: 'term', loading: 'loading', more: 'See more', below: 'Continues below:', hide: 'Hide' }
+        : { title: 'Definiciones', back: 'Volver al esquema', term: 'Término', def: 'Definición', simple: 'Explicación sencilla', ex: 'Ejemplos', err: 'No se pudieron cargar las definiciones.', retry: 'Reintentar', terms: 'términos', term1: 'término', loading: 'cargando', more: 'Ver más', below: 'Continúa más abajo:', hide: 'Ocultar' };
     document.getElementById('dvBackLbl').textContent = T.back;
     const dvBackBtn = document.getElementById('dvBack'), dvWideBtn = document.getElementById('dvWide'), dvPinBtn = document.getElementById('dvPin');
     dvBackBtn.title = en ? 'Collapse' : 'Contraer'; dvWideBtn.title = en ? 'Expand to the left' : 'Ampliar hacia la izquierda'; dvPinBtn.title = en ? 'Pin to the right (the map adjusts)' : 'Fijar a la derecha (el mapa se ajusta)';
@@ -8126,11 +8148,11 @@ async function exportReportRtf() {
         const list = []; const seen = new Set();
         roots.forEach(r => collect(String(r.id), 0, MAX_LEVELS - 1, seen, list));
         document.getElementById('dvTitle').textContent = T.title;
-        document.getElementById('dvSub').textContent = list.length + ' ' + T.terms;
         const h = document.createElement('div'); h.className = 'dv-row dv-h';
         [T.term, T.def, T.simple, T.ex].forEach(t => { const d = document.createElement('div'); d.textContent = t; h.appendChild(d); });
         grid.appendChild(h);
         list.forEach(({ n, depth }) => grid.appendChild(makeRow(n, depth)));
+        updateProgress();
         return list;
     }
     // Se piden en bloques pequeños (5) y 3 a la vez: cada bloque que llega rellena sus filas
@@ -8139,7 +8161,8 @@ async function exportReportRtf() {
     function updateProgress() {
         const sub = document.getElementById('dvSub'); if (!sub) return;
         const total = grid.querySelectorAll('.dv-row[data-id]').length;
-        sub.textContent = total + ' ' + T.terms + (pendingRows > 0 ? ' · ' + T.loading + ' ' + pendingRows + '…' : '');
+        const skel = grid.querySelectorAll('.dv-row[data-id] .dv-skel').length;
+        sub.textContent = total + ' ' + (total === 1 ? T.term1 : T.terms) + (skel > 0 ? ' · ' + T.loading + '…' : '');
     }
     async function loadMissing(list, token) {
         const missing = list.filter(({ n }) => !(String(n.definition || '').trim() && String(n.simple || '').trim() && String(n.example || '').trim()));
@@ -8187,12 +8210,31 @@ async function exportReportRtf() {
         } else track('defs_view_ok', { ms: Date.now() - started, terms: list.length });
     }
     loadMissing.token = 0;
+    // Se calculan las definiciones de TODOS los nodos en segundo plano (lo mostrado primero), pero solo se presenta el primer nivel.
+    function loadAll(list) {
+        const shown = new Set(list.map(x => String(x.n.id)));
+        const rest = [...allById.values()].filter(n => !shown.has(String(n.id))).map(n => ({ n, depth: 0 }));
+        return loadMissing(list.concat(rest), ++loadMissing.token);
+    }
+    // Lleva a la fila de un nodo; si está más abajo de lo mostrado, despliega los «Ver más» de sus ancestros.
+    function ensureRow(id) {
+        id = String(id); if (rowOf.get(id)) return rowOf.get(id);
+        const par = new Map();
+        plainEdges().forEach(e => { if (!(isRelatedEdgeLabel && isRelatedEdgeLabel(e.label))) par.set(String(e.to), String(e.from)); });
+        const chain = [id]; let cur = id, g = 0;
+        while (par.has(cur) && !rowOf.get(cur) && g++ < 20) { cur = par.get(cur); chain.push(cur); }
+        for (let i = chain.length - 1; i >= 1; i--) {
+            const r = rowOf.get(chain[i]); const b = r && r.querySelector(':scope > .dv-foot .dv-more');
+            if (b && !b._open) b.click();
+        }
+        return rowOf.get(id) || null;
+    }
     // Mapa ↔ definiciones: elegir un nodo lleva a su definición, y tocar una definición lleva a su nodo.
     function flashRow(row) { if (!row) return; row.classList.add('dv-flash'); setTimeout(() => row.classList.remove('dv-flash'), 1400); }
     network.on('selectNode', (params) => {
         if (!isOpen()) return;
         const id = params.nodes && params.nodes[0]; if (id == null) return;
-        const row = rowOf.get(String(id)); if (!row) return;
+        const row = ensureRow(id); if (!row) return;
         row.scrollIntoView({ block: 'center', behavior: 'smooth' }); flashRow(row);
     });
     grid.addEventListener('click', (e) => {
@@ -8227,14 +8269,16 @@ async function exportReportRtf() {
         track('defs_selection_schema', { length: info.text.length });
         generateFullSchemaFromTopic(info.text, { attachToNodeId: nd.id });
     });
-    let wide = false, pinned = false;
+    let pinned = false;
     try { pinned = localStorage.getItem('gk_defs_pin') === '1'; } catch (_e) { /* ok */ }
+    const WIDE_AT = 780; // con este ancho o más, las tres explicaciones van en columnas
     function layout() {
         const hd = document.getElementById('mainHeader');
         view.style.setProperty('--dv-top', (hd ? Math.round(hd.getBoundingClientRect().bottom) : 64) + 'px');
-        view.classList.toggle('dv-wide', wide); view.classList.toggle('dv-pinned', pinned);
-        dvWideBtn.classList.toggle('on', wide); dvPinBtn.classList.toggle('on', pinned);
-        const w = isOpen() && pinned ? view.getBoundingClientRect().width : 0;
+        const wNow = view.getBoundingClientRect().width;
+        view.classList.toggle('dv-wide', wNow >= WIDE_AT); view.classList.toggle('dv-pinned', pinned);
+        dvWideBtn.classList.toggle('on', wNow >= WIDE_AT); dvPinBtn.classList.toggle('on', pinned);
+        const w = isOpen() && pinned ? wNow : 0;
         container.style.marginRight = w ? w + 'px' : '';
         setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
     }
@@ -8247,7 +8291,7 @@ async function exportReportRtf() {
         const list = render();
         refreshBtn();
         view.querySelector('.dv-scroll').scrollTop = 0;
-        loadMissing(list, ++loadMissing.token);
+        loadAll(list);
     }
     function close(byUser) {
         view.classList.add('hidden'); loadMissing.token++; refreshBtn(); layout();
@@ -8255,7 +8299,13 @@ async function exportReportRtf() {
     }
     btn.addEventListener('click', () => open());
     dvBackBtn.addEventListener('click', () => close(true));
-    dvWideBtn.addEventListener('click', () => { wide = !wide; layout(); if (isOpen()) { const l = render(); loadMissing(l, ++loadMissing.token); } });
+    makeEdgeResizable(document.getElementById('dvResize'), view, 'left', { key: 'gk_defs_w', cssVar: '--dv-w', onResize: () => layout() });
+    dvWideBtn.addEventListener('click', () => {
+        const isWide = view.getBoundingClientRect().width >= WIDE_AT;
+        view.style.setProperty('--dv-w', (isWide ? 460 : Math.round(Math.min(window.innerWidth * 0.68, 1000))) + 'px');
+        try { localStorage.removeItem('gk_defs_w'); } catch (_e) { /* ok */ }
+        layout();
+    });
     dvPinBtn.addEventListener('click', () => { pinned = !pinned; try { localStorage.setItem('gk_defs_pin', pinned ? '1' : '0'); } catch (_e) { /* ok */ } layout(); track('defs_view_pin', { pinned }); });
     window.addEventListener('resize', () => { if (isOpen()) view.style.setProperty('--dv-top', (document.getElementById('mainHeader')?.getBoundingClientRect().bottom || 64) + 'px'); });
     // Por defecto aparece junto al esquema (escritorio). Si lo cierras tú, se queda cerrado hasta que lo abras.
@@ -8265,7 +8315,7 @@ async function exportReportRtf() {
         if (window.innerWidth <= 780) return;
         clearTimeout(syncTimer);
         syncTimer = setTimeout(() => {
-            if (isOpen()) { const l = render(); if (toTop) { view.querySelector('.dv-scroll').scrollTop = 0; toTop = false; } loadMissing(l, ++loadMissing.token); return; }
+            if (isOpen()) { const l = render(); if (toTop) { view.querySelector('.dv-scroll').scrollTop = 0; toTop = false; } loadAll(l); return; }
             let closed = false; try { closed = localStorage.getItem('gk_defs_closed') === '1'; } catch (_e) { /* ok */ }
             if (!closed && nodes.length > 1) open(true);
         }, 700);

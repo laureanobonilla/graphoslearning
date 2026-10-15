@@ -402,48 +402,75 @@
         #btnDefsView:hover { border-color: #4fd1c5; color: #4fd1c5; }
         #btnDefsView svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s; }
         #btnDefsView:hover svg { transform: translateX(3px); }
-        #defsView { position: fixed; top: var(--dv-top, 64px); right: 0; bottom: 0; width: 400px; max-width: 60vw; z-index: 60; background: #0a0e1a; border-left: 1px solid #2c3458; box-shadow: -8px 0 24px rgba(0,0,0,.35); display: flex; flex-direction: column; font-family: 'Inter', sans-serif; color: #eef1fb; }
-        #defsView.dv-wide { width: min(68vw, 1000px); max-width: 80vw; }
-        #defsView.dv-pinned { box-shadow: none; }
-        #defsView .dv-row[data-id] { cursor: pointer; transition: background .3s; }
-        #defsView .dv-row.dv-flash { background: rgba(79,209,197,.2) !important; }
         #dvSelBtn { position: fixed; z-index: 200; display: none; padding: 7px 12px; border-radius: 999px; border: 1px solid #4fd1c5; background: #0f2e2c; color: #4fd1c5; font: 600 12.5px 'Sora', sans-serif; cursor: pointer; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
         #dvSelBtn:hover { background: #164443; }
-        #defsView .dv-tools { display: flex; gap: 6px; }
-        #defsView .dv-tool { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2c3458; background: #161c35; color: #aab2d3; cursor: pointer; font-size: 14px; }
-        #defsView .dv-tool:hover { color: #4fd1c5; border-color: #4fd1c5; }
-        #defsView .dv-tool.on { color: #06222a; background: #4fd1c5; border-color: #4fd1c5; }
         #defsView:not(.dv-wide) .dv-row { display: block; padding: 14px 0; }
         #defsView:not(.dv-wide) .dv-row.dv-h { display: none; }
         #defsView:not(.dv-wide) .dv-cell { margin: 8px 0 0 16px; font-size: 14px; line-height: 1.55; }
         #defsView:not(.dv-wide) .dv-cell::before { content: attr(data-l); display: block; font: 600 11px 'Sora', sans-serif; color: #7f88ab; margin-bottom: 1px; }
-        #defsView.dv-wide .dv-row { grid-template-columns: minmax(130px, .8fr) 2fr 2fr 2fr; gap: 0 18px; }
-        #defsView.dv-wide .dv-cell { font-size: 14.5px; }
-        #defsView.hidden { display: none; }
-        #defsView .dv-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #262c47; background: #11162b; }
-        #defsView .dv-back { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #2c3458; background: #161c35; color: #eef1fb; font: 600 13px 'Sora', sans-serif; cursor: pointer; }
-        #defsView .dv-back:hover { border-color: #4fd1c5; color: #4fd1c5; }
-        #defsView .dv-back svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-        #defsView .dv-title { font: 700 16px 'Sora', sans-serif; }
-        #defsView .dv-sub { color: #8a92b2; font-size: 12px; margin-left: auto; white-space: nowrap; }
-        #defsView .dv-scroll { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 0 16px 48px; }
-        #defsView .dv-grid { max-width: 1280px; margin: 0 auto; }
-        #defsView .dv-row { display: grid; grid-template-columns: minmax(150px, .9fr) 2fr 2fr 2fr; gap: 0 28px; padding: 18px 0; border-bottom: 1px solid #1d2442; align-items: start; }
-        #defsView .dv-row.dv-h { position: sticky; top: 0; z-index: 2; background: #0a0e1a; padding: 14px 0; border-bottom: 1px solid #2c3458; font: 700 12px 'Sora', sans-serif; letter-spacing: .04em; color: #8a92b2; text-transform: uppercase; }
-        #defsView .dv-term { font: 700 16px/1.3 'Sora', sans-serif; overflow-wrap: anywhere; border-left: 4px solid var(--c, #4fd1c5); padding-left: 12px; }
-        #defsView .dv-cell { font-size: 15.5px; line-height: 1.6; color: #d4d9ee; }
-        #defsView .dv-below { margin-top: 8px; font: 400 12.5px/1.4 'Inter', sans-serif; color: #8a92b2; }
-        #defsView .dv-row.dv-child { background: rgba(79,209,197,.035); border-left: 2px solid rgba(79,209,197,.35); padding-left: 14px; }
-        #defsView .dv-foot { grid-column: 1 / -1; margin: 10px 0 0 16px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
-        #defsView .dv-foot .dv-below, #defsView .dv-foot .dv-more { margin-top: 0; }
-        #defsView .dv-row.dv-child .dv-term { opacity: .95; }
-        #defsView .dv-more { margin-top: 8px; padding: 5px 12px; border-radius: 999px; border: 1px solid #2c3458; background: #161c35; color: #4fd1c5; font: 600 12px 'Sora', sans-serif; cursor: pointer; }
-        #defsView .dv-more:hover { border-color: #4fd1c5; }
-        #defsView .dv-skel { height: 12px; border-radius: 6px; margin: 5px 0 9px; background: linear-gradient(90deg,#161c35,#212850,#161c35); background-size: 200% 100%; animation: dvShim 1.2s linear infinite; }
         @keyframes dvShim { to { background-position: -200% 0; } }
-        #defsView .dv-err { max-width: 1280px; margin: 24px auto; text-align: center; color: #ff8a9b; }
-        #defsView .dv-err button { margin-left: 10px; padding: 6px 14px; border-radius: 999px; border: 1px solid #2c3458; background: #161c35; color: #eef1fb; cursor: pointer; }
         @media (max-width: 780px) { #btnDefsView, #defsView { display: none !important; } }
+        /* --- LIENZO DE LECTURA (texto del tema y definiciones) ---
+           Composición para estudiar: papel claro y cálido (menos fatiga que el fondo oscuro de los mapas), línea de ~62 caracteres,
+           interlineado 1.65–1.75, jerarquía clara (término > definición > explicación > ejemplo), agrupación por proximidad
+           (más aire entre filas que dentro de una fila) y un tinte leve alterno para seguir cada fila con la vista. */
+        #defsView, #topicPanel { --p-bg: #f7f6f1; --p-bg2: #efede5; --p-head: #fbfaf6; --p-ink: #1d2330; --p-ink2: #3a4254; --p-mute: #5f6879; --p-rule: #dcd9ce; --p-acc: #0e857c; --p-acc-bg: rgba(14,133,124,.12); }
+        #defsView, #topicPanel { color: var(--p-ink); background: var(--p-bg); font-family: 'Inter', sans-serif; }
+        #defsView .rz, #topicPanel .rz { position: absolute; top: 0; bottom: 0; width: 12px; cursor: col-resize; z-index: 6; touch-action: none; }
+        #defsView .rz { left: -6px; } #topicPanel .rz { right: -6px; }
+        #defsView .rz::after, #topicPanel .rz::after { content: ''; position: absolute; top: 50%; left: 4px; width: 4px; height: 44px; margin-top: -22px; border-radius: 4px; background: var(--p-rule); transition: background .15s, height .15s; }
+        #defsView .rz:hover::after, #topicPanel .rz:hover::after, body.gk-resizing #defsView .rz::after, body.gk-resizing #topicPanel .rz::after { background: var(--p-acc); height: 72px; margin-top: -36px; }
+        body.gk-resizing { cursor: col-resize !important; user-select: none !important; }
+        body.gk-resizing #network-container { pointer-events: none; }
+        #defsView { position: fixed; top: var(--dv-top, 64px); right: 0; bottom: 0; width: var(--dv-w, 460px); min-width: 300px; max-width: 78vw; z-index: 60; border-left: 1px solid var(--p-rule); box-shadow: -10px 0 30px rgba(0,0,0,.28); display: flex; flex-direction: column; }
+        #defsView.dv-pinned { box-shadow: none; }
+        #defsView.hidden { display: none; }
+        #defsView .dv-head { flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--p-rule); background: var(--p-head); min-width: 0; }
+        #defsView .dv-title { font: 700 15px 'Sora', sans-serif; white-space: nowrap; }
+        #defsView .dv-sub { color: var(--p-mute); font-size: 12px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        #defsView .dv-tools { display: flex; gap: 6px; flex: 0 0 auto; }
+        #defsView .dv-tool, #topicPanel .tp-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--p-rule); background: #fff; color: var(--p-mute); cursor: pointer; font-size: 14px; flex: 0 0 auto; }
+        #defsView .dv-tool:hover, #topicPanel .tp-btn:hover { color: var(--p-acc); border-color: var(--p-acc); }
+        #defsView .dv-tool.on, #topicPanel .tp-btn.on { color: #fff; background: var(--p-acc); border-color: var(--p-acc); }
+        #defsView .dv-scroll { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; padding: 6px 0 64px; scrollbar-width: thin; scrollbar-color: #c9c5b7 transparent; }
+        #defsView .dv-grid { margin: 0; }
+        #defsView .dv-row { position: relative; padding: 20px 22px 20px 26px; border-bottom: 1px solid var(--p-rule); background: transparent; transition: background .3s; cursor: pointer; }
+        #defsView .dv-row:nth-of-type(even) { background: var(--p-bg2); }
+        #defsView .dv-row.dv-flash { background: var(--p-acc-bg) !important; }
+        #defsView .dv-row.dv-h { display: none; }
+        #defsView .dv-term { font: 700 17px/1.3 'Sora', sans-serif; color: var(--p-ink); overflow-wrap: anywhere; border: 0; padding: 0 0 0 14px; position: relative; margin-bottom: 10px; }
+        #defsView .dv-term::before { content: ''; position: absolute; left: 0; top: .12em; bottom: .12em; width: 4px; border-radius: 4px; background: var(--c, var(--p-acc)); }
+        #defsView .dv-cell { margin: 0 0 12px 14px; color: var(--p-ink2); font-size: 14.5px; line-height: 1.65; max-width: 64ch; }
+        #defsView .dv-cell:nth-child(2) { color: var(--p-ink); font-size: 16px; line-height: 1.7; }
+        #defsView .dv-cell::before { content: attr(data-l); display: block; font: 600 11.5px 'Sora', sans-serif; color: var(--p-mute); margin-bottom: 2px; }
+        #defsView .dv-row.dv-child { border-left: 3px solid var(--p-rule); padding-left: 20px; background-image: none; }
+        #defsView .dv-row.dv-child .dv-term { font-size: 15.5px; }
+        #defsView .dv-below { font: 400 12.5px/1.45 'Inter', sans-serif; color: var(--p-mute); }
+        #defsView .dv-foot { grid-column: 1 / -1; margin: 6px 0 0 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+        #defsView .dv-more { padding: 5px 13px; border-radius: 999px; border: 1px solid var(--p-acc); background: #fff; color: var(--p-acc); font: 600 12px 'Sora', sans-serif; cursor: pointer; }
+        #defsView .dv-more:hover { background: var(--p-acc); color: #fff; }
+        #defsView .dv-skel { height: 12px; border-radius: 6px; margin: 6px 0 9px; background: linear-gradient(90deg,#e8e5da,#f3f1ea,#e8e5da); background-size: 200% 100%; animation: dvShim 1.2s linear infinite; }
+        #defsView .dv-err { margin: 24px 16px; text-align: center; color: #b3261e; }
+        #defsView .dv-err button { margin-left: 10px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--p-rule); background: #fff; color: var(--p-ink); cursor: pointer; }
+        /* Ancho suficiente: las tres explicaciones en columnas, con el término a la izquierda. */
+        #defsView.dv-wide .dv-row { display: grid; grid-template-columns: minmax(130px, .8fr) 1.6fr 1.3fr 1.3fr; gap: 0 22px; }
+        #defsView.dv-wide .dv-row.dv-h { display: grid; position: sticky; top: 0; z-index: 2; cursor: default; background: var(--p-head) !important; padding: 11px 22px 11px 40px; border-bottom: 1px solid var(--p-rule); font: 600 12px 'Sora', sans-serif; color: var(--p-mute); }
+        #defsView.dv-wide .dv-cell::before { display: none; }
+        #defsView.dv-wide .dv-term { margin-bottom: 0; }
+        #defsView.dv-wide .dv-cell { margin: 0; max-width: none; font-size: 14px; }
+        #defsView.dv-wide .dv-cell:nth-child(2) { font-size: 15px; }
+        #defsView.dv-wide .dv-foot { margin-left: 14px; }
+        @media (min-width: 781px) {
+            #topicPanel.on { display: flex; position: absolute; left: 0; top: 0; bottom: 0; z-index: 27; flex-direction: column; width: var(--tp-w, 440px); min-width: 300px; max-width: 70vw; border-right: 1px solid var(--p-rule); box-shadow: 10px 0 30px rgba(0,0,0,.28); }
+            #topicPanel.pinned { box-shadow: none; }
+            #topicPanel .tp-head { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 20px; border-bottom: 1px solid var(--p-rule); background: var(--p-head); }
+            #topicPanel .tp-title { flex: 1; font: 700 15px/1.3 'Sora', sans-serif; overflow-wrap: anywhere; }
+            #topicPanel .tp-hint { padding: 10px 28px 0; font: 400 12.5px/1.4 'Inter', sans-serif; color: var(--p-mute); }
+            #topicPanel .tp-body { flex: 1 1 auto; overflow-y: auto; padding: 18px 28px 90px; font: 400 17.5px/1.75 Charter, 'Iowan Old Style', 'Source Serif 4', Georgia, serif; color: var(--p-ink); user-select: text; scrollbar-width: thin; scrollbar-color: #c9c5b7 transparent; }
+            #topicPanel .tp-body > p { max-width: 34em; margin: 0 auto 1.15em; }
+            #topicPanel mark.tp-mark { background: color-mix(in srgb, var(--mc, #0e857c) 12%, transparent); color: inherit; border-bottom: 2px solid var(--mc, #0e857c); text-decoration: none; cursor: pointer; border-radius: 2px; padding: 0 1px; }
+            #topicPanel mark.tp-mark:hover, #topicPanel mark.tp-mark.flash { background: color-mix(in srgb, var(--mc, #0e857c) 30%, transparent); }
+        }
         /* --- PANEL DEL TEMA (escritorio): texto de solo lectura de un esquema, a la izquierda --- */
         #topicPanel, #topicTab, #topicLoading { display: none; }
         @media (min-width: 781px) {
@@ -454,19 +481,6 @@
             @keyframes tpSpin { to { transform: rotate(360deg); } }
             #topicTab.fresh { animation: tpPulse 1.6s ease-in-out 3; }
             @keyframes tpPulse { 50% { box-shadow: 0 0 0 6px rgba(79,209,197,.25); } }
-            #topicPanel.on { display: flex; position: absolute; left: 0; top: 0; bottom: 0; width: 380px; max-width: 46vw; z-index: 27; flex-direction: column; background: #0d1226; border-right: 1px solid #2c3458; box-shadow: 8px 0 24px rgba(0,0,0,.35); color: #e3e7f7; }
-            #topicPanel.pinned { box-shadow: none; }
-            #topicPanel.wide { width: min(58vw, 860px); max-width: 70vw; }
-            #topicPanel .tp-head { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 16px; border-bottom: 1px solid #262c47; }
-            #topicPanel .tp-title { flex: 1; font: 700 14px/1.3 'Sora', sans-serif; overflow-wrap: anywhere; }
-            #topicPanel .tp-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #2c3458; background: #161c35; color: #aab2d3; cursor: pointer; font-size: 14px; }
-            #topicPanel .tp-btn:hover { color: #4fd1c5; border-color: #4fd1c5; }
-            #topicPanel .tp-btn.on { color: #06222a; background: #4fd1c5; border-color: #4fd1c5; }
-            #topicPanel .tp-hint { padding: 8px 16px 0; font: 400 12px/1.4 'Inter', sans-serif; color: #8a92b2; }
-            #topicPanel .tp-body { flex: 1 1 auto; overflow-y: auto; padding: 14px 18px 40px; font: 400 15.5px/1.75 'Inter', sans-serif; user-select: text; }
-            #topicPanel .tp-body p { margin: 0 0 14px; }
-            #topicPanel mark.tp-mark { background: transparent; color: inherit; text-decoration: underline; text-decoration-color: var(--mc, #4fd1c5); text-decoration-thickness: 2px; text-underline-offset: 3px; cursor: pointer; border-radius: 3px; }
-            #topicPanel mark.tp-mark:hover, #topicPanel mark.tp-mark.flash { background: rgba(79,209,197,.22); }
         }
     </style>
 </head>
@@ -868,6 +882,7 @@
     <div id="topicLoading" role="status"><span class="tp-spin"></span><span id="topicLoadingLbl">Escribiendo el texto…</span></div>
     <button id="topicTab" type="button" title="Ver el texto de este esquema">📖 <span id="topicTabLbl">Ver texto</span></button>
     <aside id="topicPanel" aria-label="Texto del tema">
+        <div class="rz" id="tpResize" title="Arrastra para ajustar el ancho"></div>
         <div class="tp-head">
             <div id="topicTitle" class="tp-title"></div>
             <button id="topicWide" type="button" class="tp-btn" title="Ampliar hacia la derecha">⇥</button>
@@ -1528,7 +1543,8 @@
         })();
     </script>
     <!-- Pantalla "Ver definiciones" (escritorio): ver el bloque VER DEFINICIONES al final de app.js -->
-    <div id="defsView" class="hidden" role="dialog" aria-modal="true" aria-labelledby="dvTitle">
+    <div id="defsView" class="hidden" role="complementary" aria-labelledby="dvTitle">
+        <div class="rz" id="dvResize" title="Arrastra para ajustar el ancho"></div>
         <div class="dv-head">
             <button id="dvBack" type="button" class="dv-tool" title="Contraer"><span id="dvBackLbl" style="display:none">Contraer</span>›</button>
             <span id="dvTitle" class="dv-title"></span>
