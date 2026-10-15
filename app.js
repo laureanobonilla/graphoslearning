@@ -1058,12 +1058,16 @@ function revealNode(nodeId) {
         cur = nodes.get(pe.from);
     }
 }
-const foldBubbles = []; // {id, x, y, r} de la última pasada de dibujo
+const foldBubbles = []; // {id, x, y, r, hw, hidden} de la última pasada de dibujo
+let foldLearned = false; try { foldLearned = localStorage.getItem('gk_fold_learned') === '1'; } catch (_e) { /* ok */ }
+let foldPulseTimer = 0;
 network.on('afterDrawing', (ctx) => {
     foldBubbles.length = 0;
     if (!isDesktopFolding()) return;
     const scale = network.getScale();
     const r = Math.min(24, Math.max(11, 13 / scale));
+    const phase = (Date.now() % 1600) / 1600;   // 0..1: latido suave de las burbujas plegadas
+    let anyHidden = false;
     nodes.get().forEach(n => {
         if (!n.foldable || n.hidden) return;
         const kids = childEdgesOf(n.id).map(e => nodes.get(e.to)).filter(Boolean);
@@ -1072,26 +1076,39 @@ network.on('afterDrawing', (ctx) => {
         let bb; try { bb = network.getBoundingBox(n.id); } catch (_e) { return; }
         if (!bb) return;
         const x = (bb.left + bb.right) / 2, y = bb.bottom + r + 3;
-        foldBubbles.push({ id: n.id, x, y, r });
         ctx.save();
-        ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.font = `700 ${Math.round(r * 1.0)}px Sora, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const label = hiddenCount ? '+' + hiddenCount + ' ▾' : '−';
+        const hw = hiddenCount ? Math.max(r, ctx.measureText(label).width / 2 + r * 0.55) : r;
+        foldBubbles.push({ id: n.id, x, y, r, hw, hidden: hiddenCount });
+        if (hiddenCount) {
+            anyHidden = true;
+            if (!foldLearned) {   // halo que late hasta que la persona descubre que se puede abrir
+                const k = Math.sin(phase * Math.PI);
+                ctx.beginPath(); ctx.roundRect(x - hw - k * r * 0.55, y - r - k * r * 0.55, (hw + k * r * 0.55) * 2, (r + k * r * 0.55) * 2, r + k * r * 0.55);
+                ctx.fillStyle = `rgba(79,209,197,${(0.30 * (1 - k)).toFixed(3)})`; ctx.fill();
+            }
+        }
+        ctx.beginPath(); ctx.roundRect(x - hw, y - r, hw * 2, r * 2, r);
         ctx.fillStyle = hiddenCount ? '#4fd1c5' : '#1e2747';
         ctx.fill();
         ctx.lineWidth = Math.max(1.5, r / 8); ctx.strokeStyle = '#4fd1c5'; ctx.stroke();
         ctx.fillStyle = hiddenCount ? '#06222a' : '#4fd1c5';
-        ctx.font = `700 ${Math.round(r * 1.0)}px Sora, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(hiddenCount ? '+' + hiddenCount : '−', x, y + 1);
+        ctx.fillText(label, x, y + 1);
         ctx.restore();
     });
+    // El latido pide redibujar mientras haya ramas plegadas y la persona aún no haya abierto ninguna.
+    if (anyHidden && !foldLearned && !foldPulseTimer) foldPulseTimer = setTimeout(() => { foldPulseTimer = 0; if (!foldLearned && !document.hidden) network.redraw(); }, 70);
 });
 function foldBubbleAt(canvasPt) {
-    return foldBubbles.find(b => Math.hypot(canvasPt.x - b.x, canvasPt.y - b.y) <= b.r + 3) || null;
+    return foldBubbles.find(b => Math.abs(canvasPt.x - b.x) <= b.hw + 3 && Math.abs(canvasPt.y - b.y) <= b.r + 3) || null;
 }
 network.on('click', (params) => {
     const b = params.pointer && params.pointer.canvas ? foldBubbleAt(params.pointer.canvas) : null;
     if (!b) return;
     const n = nodes.get(b.id); if (!n) return;
     const hiddenNow = childEdgesOf(b.id).some(e => (nodes.get(e.to) || {}).hidden);
+    if (hiddenNow && !foldLearned) { foldLearned = true; try { localStorage.setItem('gk_fold_learned', '1'); } catch (_e) { /* ok */ } }
     setFolded(b.id, !hiddenNow);
     track(hiddenNow ? 'branch_unfold' : 'branch_fold', {});
     network.redraw();
@@ -1121,7 +1138,10 @@ function fitMapAfterExpand() {
         if (!foldBubbles.length) return;
         const r = c.getBoundingClientRect();
         const pt = network.DOMtoCanvas({ x: e.clientX - r.left, y: e.clientY - r.top });
-        c.style.cursor = foldBubbleAt(pt) ? 'pointer' : '';
+        const fb = foldBubbleAt(pt);
+        c.style.cursor = fb ? 'pointer' : '';
+        const tip = fb ? (fb.hidden ? 'Clic para ver ' + fb.hidden + (fb.hidden === 1 ? ' idea más' : ' ideas más') : 'Clic para plegar') : '';
+        if (c.title !== tip) c.title = tip;
     });
 })();
 
