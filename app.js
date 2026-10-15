@@ -1576,7 +1576,7 @@ async function renderThreeLevelTree(data, opts = {}) {
             network.focus(attachToNodeId, { scale: 0.85, animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
         } else {
             window.__gkLastAutoFit = Date.now();
-            network.fit({ animation: { duration: 600, easingFunction: 'easeInOutQuad' } });
+            fitVisible(600);
             freshSchemaUntil = Date.now() + 25000;   // los paneles que abren enseguida vuelven a encuadrar
         }
     }, 60);
@@ -1655,11 +1655,26 @@ function makeEdgeResizable(handle, panel, side, { key, cssVar, min = 300, maxFra
 // Reencuadre del esquema recién creado: los paneles (texto a la izquierda, definiciones a la derecha) abren DESPUÉS del
 // primer encuadre y achican el lienzo; sin esto, parte del mapa queda debajo de ellos. Solo vale los primeros segundos
 // y se cancela si la persona mueve o acerca el mapa por su cuenta.
+// Encuadre del mapa: centrado en lo VISIBLE (los nodos ocultos por ramas plegadas no cuentan), con zoom suficiente para ver
+// el esquema pero sin alejarlo demasiado (mínimo 0.4) ni agrandarlo de más (máximo 1).
+function fitVisible(duration) {
+    try {
+        const vis_ = nodes.get().filter(n => !n.hidden && !n.isSubscheme);
+        if (!vis_.length) return;
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        vis_.forEach(n => { const bb = network.getBoundingBox(n.id); if (!bb) return; l = Math.min(l, bb.left); r = Math.max(r, bb.right); t = Math.min(t, bb.top); b = Math.max(b, bb.bottom + 30); });
+        if (!isFinite(l)) { network.fit({ animation: duration ? { duration } : false }); return; }
+        const W = container.clientWidth, H = container.clientHeight, pad = 40;
+        const need = Math.min(W / ((r - l) + pad * 2), H / ((b - t) + pad * 2));
+        const scale = Math.max(0.4, Math.min(1, need));
+        network.moveTo({ position: { x: (l + r) / 2, y: (t + b) / 2 }, scale, animation: duration ? { duration, easingFunction: 'easeInOutQuad' } : false });
+    } catch (_e) { try { network.fit(); } catch (_e2) { /* ok */ } }
+}
 let freshSchemaUntil = 0, refitTimer = 0;
 function refitIfFresh() {
     if (Date.now() > freshSchemaUntil) return;
     clearTimeout(refitTimer);
-    refitTimer = setTimeout(() => { if (Date.now() > freshSchemaUntil) return; window.__gkLastAutoFit = Date.now(); try { network.fit({ animation: { duration: 450, easingFunction: 'easeInOutQuad' } }); } catch (_e) { /* ok */ } }, 220);
+    refitTimer = setTimeout(() => { if (Date.now() > freshSchemaUntil) return; window.__gkLastAutoFit = Date.now(); fitVisible(450); }, 220);
 }
 network.on('dragStart', () => { freshSchemaUntil = 0; });
 network.on('zoom', (p) => { if (p && p.direction && Date.now() - (window.__gkLastAutoFit || 0) > 1500) freshSchemaUntil = 0; });
@@ -8088,7 +8103,8 @@ function applyLoadedProject(projectId, record) {
     currentProjectId = projectId;
     localStorage.setItem('gk_current_project_id', currentProjectId);
     isClearingCanvas = false;
-    network.fit({ animation: { duration: 600 } });
+    window.__gkLastAutoFit = Date.now(); freshSchemaUntil = Date.now() + 8000;   // los paneles que se abren al cargar vuelven a centrar
+    fitVisible(600);
     if (typeof topicUI !== 'undefined' && topicUI) topicUI.onLoaded(true);   // solo trae el texto ya guardado; nunca lo reescribe
 }
 
