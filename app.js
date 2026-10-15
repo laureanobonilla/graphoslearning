@@ -8107,6 +8107,14 @@ async function exportReportRtf() {
         cells.forEach((c, i) => { const t = String(vals[i] || '').trim(); if (t) c.textContent = t; });
     }
     let rowOf = new Map();
+    const openMore = new Set(); // filas con «Ver más» abierto: se conservan aunque la lista se reconstruya
+    function reopenMore() {
+        for (let pass = 0; pass < 8; pass++) {
+            let did = false;
+            [...openMore].forEach(id => { const r = rowOf.get(id); if (!r) return; const b = r.querySelector(':scope > .dv-foot .dv-more'); if (b && !b._open) { b.click(); did = true; } });
+            if (!did) break;
+        }
+    }
     function makeRow(n, depth, afterEl) {
         const row = document.createElement('div'); row.className = 'dv-row'; row.dataset.id = String(n.id);
         const term = document.createElement('div'); term.className = 'dv-term';
@@ -8128,8 +8136,9 @@ async function exportReportRtf() {
             const more = document.createElement('button'); more.type = 'button'; more.className = 'dv-more'; more.textContent = moreLbl;
             more.addEventListener('click', () => {
                 if (more._open) { // ocultar lo desplegado
-                    let nx = row.nextElementSibling; while (nx && nx._depth > depth) { const t = nx.nextElementSibling; nx.remove(); nx = t; } more._rows = []; more._open = false; more.textContent = moreLbl; return;
+                    let nx = row.nextElementSibling; while (nx && nx._depth > depth) { const t = nx.nextElementSibling; openMore.delete(nx.dataset.id); nx.remove(); nx = t; } more._rows = []; more._open = false; more.textContent = moreLbl; openMore.delete(String(n.id)); return;
                 }
+                openMore.add(String(n.id));
                 const newRows = []; let anchor = row;
                 const list = childIds.map(c => ({ n: allById.get(c), depth: depth + 1 })).filter(x => x.n);
                 list.forEach(({ n: cn, depth: d }) => { const r = makeRow(cn, d, anchor); anchor.after(r); anchor = r; newRows.push(r); });
@@ -8286,7 +8295,7 @@ async function exportReportRtf() {
         if (nodes.length === 0) return;
         track('defs_view_opened', { nodes: nodes.length, in_subscheme: schemeStack.length > 0, auto: auto === true });
         try { localStorage.removeItem('gk_defs_closed'); } catch (_e) { /* ok */ }
-        pendingRows = 0;
+        pendingRows = 0; openMore.clear();
         view.classList.remove('hidden'); layout();
         const list = render();
         refreshBtn();
@@ -8315,7 +8324,12 @@ async function exportReportRtf() {
         if (window.innerWidth <= 780) return;
         clearTimeout(syncTimer);
         syncTimer = setTimeout(() => {
-            if (isOpen()) { const l = render(); if (toTop) { view.querySelector('.dv-scroll').scrollTop = 0; toTop = false; } loadAll(l); return; }
+            if (isOpen()) {
+                const sc = view.querySelector('.dv-scroll'); const keep = sc.scrollTop;
+                const l = render(); reopenMore();
+                if (toTop) { sc.scrollTop = 0; toTop = false; } else sc.scrollTop = keep;
+                loadAll(l); return;
+            }
             let closed = false; try { closed = localStorage.getItem('gk_defs_closed') === '1'; } catch (_e) { /* ok */ }
             if (!closed && nodes.length > 1) open(true);
         }, 700);
