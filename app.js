@@ -8763,7 +8763,7 @@ const vizUI = (() => {
     const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
     const KINDS = [
-        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
+        { k: 'parts', i: '📚', es: 'Partes', en: 'Parts' }, { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'rhizome', i: '🌿', es: 'Rizoma', en: 'Rhizome' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
         { k: 'cause_effect', i: '🔗', es: 'Causa → efecto', en: 'Cause → effect' }, { k: 'process', i: '🧭', es: 'Proceso', en: 'Process' },
         { k: 'compare', i: '⚖️', es: 'Comparar', en: 'Compare' }, { k: 'actors', i: '👥', es: 'Actores', en: 'Actors' },
         { k: 'figures', i: '📊', es: 'Cifras', en: 'Figures' }, { k: 'places', i: '📍', es: 'Lugares', en: 'Places' },
@@ -8802,6 +8802,7 @@ const vizUI = (() => {
     const cardNodes = () => nodes.get().filter(n => !n.isSubscheme && (String(n.definition || '').trim() || String(n.simple || '').trim()));
     function availability() {
         const v = currentViews() || {}; const out = [{ k: 'notes', n: getNotes().length }];
+        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) out.push({ k: 'rhizome', n: '' });
         const dh = docHost(); if (dh) { const dp = dh.docParts.parts; out.unshift({ k: 'parts', n: dp.filter(x => x.sub && nodes.get(x.sub)).length + '/' + dp.length }); }
         ['timeline', 'cause_effect', 'process', 'compare', 'actors', 'figures', 'places'].forEach(k => {
             if (!v[k]) return;
@@ -8827,11 +8828,11 @@ const vizUI = (() => {
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
         container.style.height = h ? 'calc(100% - ' + h + 'px)' : ''; container.style.alignSelf = h ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
-        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); }, 60);
     }
     let layoutT = null; const layoutSoon = () => { clearTimeout(layoutT); layoutT = setTimeout(layout, 40); };
     function setOpen(v) { open = v; try { localStorage.setItem('gk_viz_open', v ? '1' : '0'); } catch (_e) { /* ok */ } lastGeo = ''; paint(); if (v) track('viz_open', { tab }); }
-    function pickTab(k) { tab = k; if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
+    function pickTab(k) { tab = k; if (k === 'rhizome') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
 
     function paint() {
         const av = availability(); if (!av.some(a => a.k === tab)) tab = av[0].k;
@@ -9007,9 +9008,111 @@ const vizUI = (() => {
             const info = bodyEl.querySelector('.vz-row:last-child'); void info;
         }));
     }
+    // ---------- rizoma ----------
+    // El mismo mapa, sin jerarquía: cada concepto se acerca a los que comparten significado con él (venga de la rama que venga).
+    // Las uniones transversales las propone la IA (se guardan en la raíz); mientras llegan se usa el vocabulario compartido.
+    let rnet = null, rSig = '', rBusy = false, rShowTree = true, rNote = '';
+    const BRANCH_COLORS = ['#0e857c', '#d9822b', '#6b5bd2', '#c2410c', '#2b7de9', '#b83280', '#4d7c0f', '#0891b2'];
+    const RSTOP = new Set('de la el los las un una unos unas y o u en del al que se por con para como su sus es son lo le les mas pero sin sobre entre desde hasta este esta estos estas ese esa eso muy the of and to in is are for on with as by that this from or an be it its'.split(' '));
+    function rhizomeModel() {
+        const all = nodes.get().filter(n => !n.isSubscheme && !n.isPointer && clean(n));
+        const ids = new Set(all.map(n => String(n.id)));
+        const es = edges.get().filter(e => ids.has(String(e.from)) && ids.has(String(e.to)));
+        const parent = new Map(); es.forEach(e => { if (!parent.has(String(e.to))) parent.set(String(e.to), String(e.from)); });
+        const byId = new Map(all.map(n => [String(n.id), n]));
+        const pathOf = (id) => { const p = []; let c = id, g = 0; while (parent.has(c) && g++ < 12) { c = parent.get(c); if (byId.get(c)) p.unshift(clean(byId.get(c))); } return p; };
+        const branchOf = (id) => { let c = id, prev = id, g = 0; while (parent.has(c) && g++ < 12) { prev = c; c = parent.get(c); } return prev; };
+        const list = all.map(n => { const id = String(n.id); return { id, label: clean(n), path: pathOf(id), branch: branchOf(id), def: String(n.definition || '').trim(), simple: String(n.simple || n.simpleExplanation || '').trim(), example: String(n.example || '').trim() }; });
+        const root = list.find(x => !parent.has(x.id));
+        const tree = es.map(e => ({ a: String(e.from), b: String(e.to) }));
+        return { nodes: list, tree, parent, rootId: root ? root.id : null, rootLabel: root ? root.label : '', hash: hashOf(list.map(x => x.id + ':' + x.label).join('|')) };
+    }
+    function localRhizomeLinks(m) {
+        const docs = m.nodes.map(n => { const words = new Map(); const add = (t, w) => normTxt(t).split(' ').forEach(x => { if (x.length >= 4 && !RSTOP.has(x)) { const k = x.slice(0, 6); const o = words.get(k) || { w: 0, orig: x }; o.w += w; words.set(k, o); } }); add(n.label, 3); add(n.def, 1); add(n.simple, 1); add(n.example, 1); return words; });
+        const df = new Map(); docs.forEach(d => d.forEach((_v, k) => df.set(k, (df.get(k) || 0) + 1)));
+        const N = docs.length, idf = (k) => Math.log(1 + N / (df.get(k) || 1));
+        const vec = docs.map(d => { let sq = 0; const v = new Map(); d.forEach((o, k) => { const x = o.w * idf(k); v.set(k, x); sq += x * x; }); return { v, n: Math.sqrt(sq) || 1 }; });
+        const direct = new Set(m.tree.map(e => e.a < e.b ? e.a + '|' + e.b : e.b + '|' + e.a));
+        const cand = [];
+        for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+            const a = m.nodes[i], b = m.nodes[j]; const key = a.id < b.id ? a.id + '|' + b.id : b.id + '|' + a.id; if (direct.has(key)) continue;
+            let dot = 0; const shared = []; vec[i].v.forEach((x, k) => { const y = vec[j].v.get(k); if (y) { dot += x * y; shared.push(k); } });
+            if (!shared.length) continue;
+            let sim = dot / (vec[i].n * vec[j].n); if (a.branch !== b.branch) sim *= 1.4; else sim *= 0.5;
+            if (sim >= 0.12) cand.push({ i, j, sim, why: shared.slice(0, 3).map(k => docs[i].get(k).orig).join(', ') });
+        }
+        cand.sort((x, y) => y.sim - x.sim);
+        const cnt = new Array(N).fill(0), out = [];
+        cand.forEach(c => { if (cnt[c.i] >= 2 || cnt[c.j] >= 2) return; cnt[c.i]++; cnt[c.j]++; out.push({ a: m.nodes[c.i].id, b: m.nodes[c.j].id, why: c.why }); });
+        return out;
+    }
+    const rSetNote = (t) => { const el = document.getElementById('vzRhNote'); if (el) el.textContent = t; };
+    async function askRhizomeAi(m) {
+        if (rBusy) return; rBusy = true;
+        rSetNote(L('Buscando las conexiones de significado…', 'Looking for meaning connections…'));
+        let data = null;
+        try {
+            const items = m.nodes.slice(0, 120).map(n => ({ id: n.id, label: n.label, path: n.path.slice(-3).join(' › '), def: n.def || n.simple }));
+            const r = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'rhizome', topic: m.rootLabel, items }) });
+            data = r.ok ? await r.json() : null;
+        } catch (_e) { data = null; } finally { rBusy = false; }
+        const nowM = rhizomeModel();
+        if (data && Array.isArray(data.links) && data.links.length && nowM.hash === m.hash && m.rootId != null && nodes.get(m.rootId)) {
+            isApplyingUndo = true; try { nodes.update({ id: nodes.get(m.rootId).id, rhizome: { hash: m.hash, links: data.links } }); } finally { isApplyingUndo = false; }
+            track('rhizome_ai', { nodes: m.nodes.length, links: data.links.length });
+            if (tab === 'rhizome' && open) renderRhizome();
+        } else rSetNote(L('Conexiones por vocabulario compartido (no se pudieron pedir las de significado).', 'Connections by shared vocabulary (meaning connections could not be fetched).'));
+    }
+    function renderRhizome() {
+        const m = rhizomeModel();
+        if (m.nodes.length < 5) { bodyEl.innerHTML = `<div class="vz-empty">${esc(L('Necesitas al menos 5 conceptos para ver el rizoma.', 'You need at least 5 concepts to see the rhizome.'))}</div>`; return; }
+        const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
+        const saved = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links : null;
+        const links = saved || localRhizomeLinks(m);
+        const sig = m.hash + '|' + (saved ? 'ai' : 'local') + '|' + rShowTree + '|' + links.length;
+        if (rnet && sig === rSig) return;
+        rSig = sig; if (rnet) { try { rnet.destroy(); } catch (_e) { /* ok */ } rnet = null; }
+        const brs = []; m.nodes.forEach(n => { if (!brs.includes(n.branch)) brs.push(n.branch); });
+        const colorOf = (n) => BRANCH_COLORS[brs.indexOf(n.branch) % BRANCH_COLORS.length];
+        const byId = new Map(m.nodes.map(n => [n.id, n]));
+        const legend = brs.map(b => { const bn = byId.get(b); return `<span class="vz-lg"><i style="background:${BRANCH_COLORS[brs.indexOf(b) % BRANCH_COLORS.length]}"></i>${esc(bn ? bn.label : '')}</span>`; }).join('');
+        const h = Math.max(240, bodyEl.clientHeight - 92);
+        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('Cada concepto se acerca a los que comparten significado con él, sin importar de qué rama vengan. El tamaño indica cuántas conexiones tiene y el color, su rama de origen.', 'Each concept moves toward the ones it shares meaning with, whatever branch they come from. Size shows how many connections it has; color, the branch it comes from.'))}</div><div class="vz-rh-ctl"><label><input type="checkbox" id="vzRhTree"${rShowTree ? ' checked' : ''}> ${esc(L('Mostrar el árbol original', 'Show the original tree'))}</label><button type="button" class="vz-ghost" id="vzRhShake">${esc(L('Reacomodar', 'Re-arrange'))}</button><button type="button" class="vz-ghost" id="vzRhAi">${esc(L('Recalcular conexiones', 'Recompute connections'))}</button><span class="vz-rh-note" id="vzRhNote">${esc(saved ? L('Conexiones de significado propuestas por la IA. Toca una línea para ver qué las une.', 'Meaning connections proposed by the AI. Tap a line to see what links them.') : L('Mostrando conexiones por vocabulario compartido…', 'Showing connections by shared vocabulary…'))}</span></div><div class="vz-rh-lg">${legend}</div></div><div class="vz-rhz" id="vzRhz" style="height:${h}px"></div>`;
+        const deg = new Map(m.nodes.map(n => [n.id, 0])); links.forEach(l => { if (deg.has(l.a) && deg.has(l.b)) { deg.set(l.a, deg.get(l.a) + 1); deg.set(l.b, deg.get(l.b) + 1); } });
+        const wrap = (t) => { const w = String(t).split(' '); const out = []; let line = ''; w.forEach(x => { if ((line + ' ' + x).trim().length > 16 && line) { out.push(line); line = x; } else line = (line + ' ' + x).trim(); }); if (line) out.push(line); return out.join('\n'); };
+        const vn = new vis.DataSet(m.nodes.map(n => ({ id: n.id, label: wrap(n.label), shape: 'dot', size: (n.id === m.rootId ? 20 : 8) + Math.min(18, (deg.get(n.id) || 0) * 3.5), color: { background: colorOf(n), border: '#ffffff', highlight: { background: colorOf(n), border: '#1d2330' } }, borderWidth: 2, font: { size: 13, face: 'Inter, sans-serif', color: '#1d2330', strokeWidth: 4, strokeColor: '#f7f6f1' } })));
+        const ve = new vis.DataSet();
+        if (rShowTree) m.tree.forEach((e, i) => ve.add({ id: 't' + i, from: e.a, to: e.b, width: 1, dashes: [2, 5], color: { color: '#cfcbbd', highlight: '#9aa3b2' }, length: 210, smooth: false, selectionWidth: 0, hoverWidth: 0 }));
+        links.forEach((l, i) => { if (!byId.has(l.a) || !byId.has(l.b)) return; ve.add({ id: 'c' + i, from: l.a, to: l.b, why: l.why, width: 2.2, color: { color: 'rgba(14,133,124,.55)', highlight: '#0e857c' }, length: 95, smooth: { enabled: true, type: 'curvedCW', roundness: 0.18 }, title: l.why }); });
+        rnet = new vis.Network(document.getElementById('vzRhz'), { nodes: vn, edges: ve }, {
+            layout: { randomSeed: 11 }, interaction: { hover: true, tooltipDelay: 120, zoomView: true, dragView: true },
+            physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -55, centralGravity: 0.01, springLength: 100, springConstant: 0.06, damping: 0.5, avoidOverlap: 0.7 }, stabilization: { iterations: 320, updateInterval: 40 } },
+            nodes: { scaling: { label: false } }, edges: { arrows: { to: false } }
+        });
+        const rn = rnet;
+        rn.once('stabilizationIterationsDone', () => { try { rn.setOptions({ physics: false }); rn.fit({ animation: { duration: 350 } }); } catch (_e) { /* ok */ } });
+        rn.on('click', (ev) => {
+            const nid = ev.nodes && ev.nodes[0], eid = ev.edges && ev.edges[0];
+            if (nid != null) { const n = byId.get(String(nid)); showQuote(n ? (n.def || n.simple || n.path.concat(n.label).join(' › ')) : null, { noFind: true }); try { network.selectNodes([nid]); network.focus(nid, { scale: 1, animation: { duration: 400 } }); } catch (_e) { /* ok */ } }
+            else if (eid != null && String(eid).startsWith('c')) { const l = links[Number(String(eid).slice(1))]; if (l) showQuote(`${(byId.get(l.a) || {}).label} ↔ ${(byId.get(l.b) || {}).label}: ${l.why}`, { noFind: true }); }
+            else showQuote(null);
+        });
+        document.getElementById('vzRhTree').addEventListener('change', (e) => { rShowTree = e.target.checked; renderRhizome(); });
+        document.getElementById('vzRhShake').addEventListener('click', () => { rSig = ''; renderRhizome(); });
+        document.getElementById('vzRhAi').addEventListener('click', () => { const r = rhizomeModel(); askRhizomeAi(r); });
+        if (!saved) askRhizomeAi(m);
+        track('rhizome_view', { nodes: m.nodes.length, links: links.length, ai: !!saved });
+    }
+    function fitRhizome() {
+        const el = document.getElementById('vzRhz'); if (!el || !rnet) return;
+        el.style.height = Math.max(240, bodyEl.clientHeight - 92) + 'px';
+        try { rnet.setSize('100%', el.style.height); rnet.redraw(); } catch (_e) { /* ok */ }
+    }
     function renderBody() {
         showQuote(null);
         const v = currentViews() || {};
+        if (tab !== 'rhizome' && rnet) { try { rnet.destroy(); } catch (_e) { /* ok */ } rnet = null; rSig = ''; }
+        if (tab === 'rhizome') return renderRhizome();
         if (tab === 'parts') return renderParts();
         if (tab === 'notes') return renderNotes();
         if (tab === 'timeline' && v.timeline) return renderTimeline(v.timeline);
