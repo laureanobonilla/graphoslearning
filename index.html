@@ -680,6 +680,11 @@
         ::highlight(gk-quote) { background-color: #fde68a; color: #1d2330; }
         #defsView .dv-rel { color: #8c95a8; font-size: .86em; font-style: italic; }
         /* --- PANEL DEL TEMA (escritorio): texto de solo lectura de un esquema, a la izquierda --- */
+        #saveBanner { display: none; position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 70; max-width: min(560px, calc(100vw - 32px)); align-items: center; gap: 12px; padding: 11px 14px 11px 16px; border-radius: 14px; background: #161c35; border: 1px solid #2c3458; color: #dfe5fb; font: 500 13.5px/1.4 'Inter', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+        #saveBanner.on { display: flex; }
+        #saveBanner b { color: #fff; font-weight: 600; }
+        #saveBanner .sb-go { flex: 0 0 auto; padding: 8px 14px; border-radius: 10px; border: 0; background: #4fd1c5; color: #06222a; font: 700 13px 'Sora', sans-serif; cursor: pointer; }
+        #saveBanner .sb-x { flex: 0 0 auto; background: none; border: 0; color: #8b95b8; cursor: pointer; font-size: 16px; padding: 2px 4px; }
         #topicPanel, #topicTab, #topicLoading { display: none; }
         @media (min-width: 781px) {
             #topicTab.on { display: flex; position: absolute; left: 0; top: 96px; z-index: 26; align-items: center; gap: 6px; padding: 10px 12px 10px 10px; border-radius: 0 12px 12px 0; border: 1px solid #2c3458; border-left: 0; background: #161c35; color: #4fd1c5; font: 700 12px 'Sora', sans-serif; cursor: pointer; writing-mode: horizontal-tb; }
@@ -1105,6 +1110,7 @@
     </div>
 
     <div id="network-container" class="canvas-blueprint flex-1 h-full cursor-grab active:cursor-grabbing"></div>
+    <div id="saveBanner" role="status"><span><b>Tu mapa solo está en este navegador.</b> Crea tu cuenta gratis y queda guardado en la nube.</span><button id="saveBannerGo" type="button" class="sb-go">Crear cuenta</button><button id="saveBannerX" type="button" class="sb-x" aria-label="Cerrar">✕</button></div>
     <div id="topicLoading" role="status"><span class="tp-spin"></span><span id="topicLoadingLbl">Escribiendo el texto…</span></div>
     <button id="topicTab" type="button" title="Ver el texto de este esquema">📖 <span id="topicTabLbl">Ver texto</span></button>
     <aside id="topicPanel" aria-label="Texto del tema">

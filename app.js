@@ -782,6 +782,7 @@ if (window.netlifyIdentity) {
         track('login_success');
         resumePendingGen('login');
     });
+    netlifyIdentity.on('login', () => { document.getElementById('saveBanner')?.classList.remove('on'); });
     netlifyIdentity.on('logout', () => { currentUser = null; refreshBalanceFromServer(); updateAuthUI(); });
 }
 
@@ -890,8 +891,25 @@ document.getElementById('closeAuthWall')?.addEventListener('click', () => {
     authWallModal?.classList.add('hidden');
 });
 
+// Franja discreta para invitados: el mapa solo vive en este navegador; con cuenta queda guardado en la nube.
+let saveBannerTimer = 0;
+function scheduleSaveBanner() {
+    try { if (localStorage.getItem('gk_save_banner_closed') === '1') return; } catch (_e) { /* ok */ }
+    if (saveBannerTimer || currentUser || isAdmin || !isDesktopFolding()) return;
+    saveBannerTimer = setTimeout(() => {   // tras la guía inicial, para no apilar avisos
+        const el = document.getElementById('saveBanner'); if (!el || currentUser || isAdmin) return;
+        const wall = document.getElementById('authWallModal'); if (wall && !wall.classList.contains('hidden')) return;
+        el.classList.add('on'); track('save_banner_shown', {});
+    }, 45000);
+}
+(function () {
+    const el = document.getElementById('saveBanner'); if (!el) return;
+    document.getElementById('saveBannerGo')?.addEventListener('click', () => { track('save_banner_click', {}); el.classList.remove('on'); netlifyIdentity.open('signup'); });
+    document.getElementById('saveBannerX')?.addEventListener('click', () => { el.classList.remove('on'); track('save_banner_close', {}); try { localStorage.setItem('gk_save_banner_closed', '1'); } catch (_e) { /* ok */ } });
+})();
 function requireAuth(actionDescription) {
     if (currentUser || isAdmin) return true;
+    { const rs = document.getElementById('authWallReason'); if (rs && actionDescription && actionDescription !== 'guest_limit_reached') rs.textContent = actionDescription; }
     if (authWallModal) { authWallModal.classList.remove('hidden'); authWallModal.classList.add('flex'); }
     if (actionMenu) actionMenu.classList.add('hidden');
     track('login_wall_shown', { reason: actionDescription || null });
@@ -1759,6 +1777,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         await renderThreeLevelTree(data, { originPanelId, attachToNodeId });
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview });
+        scheduleSaveBanner();
         // Escritorio: el esquema nace con su propio texto de solo lectura (panel izquierdo), sin bloquear al usuario.
         if (isDesktopFolding() && (!welcome || opts.topicText)) {
             if (!isLong && (!originPanelId || opts.topicText)) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
@@ -7550,6 +7569,7 @@ function buildPptxModel() {
     return { title: root.label, lang: (typeof I18N !== 'undefined' && I18N.lang === 'en') ? 'en' : 'es', date: new Date().toISOString().slice(0, 10), root };
 }
 document.getElementById('btnExportPptx')?.addEventListener('click', async () => {
+    if (!requireAuth(LL('exportar tu esquema a PowerPoint', 'export your map to PowerPoint'))) return;
     if (nodes.length === 0) { appAlert(tr("js.el_lienzo_esta_vacio")); return; }
     const model = buildPptxModel(); if (!model || typeof GKPptx === 'undefined') { appAlert(LL('No se pudo preparar la presentación.', 'Could not prepare the presentation.')); return; }
     showLoader(LL('Preparando la presentación…', 'Preparing the presentation…'));
