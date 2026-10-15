@@ -1,5 +1,5 @@
 const { getUser } = require('./_lib/auth');
-const { getOrCreateGuestId, buildSetCookie } = require('./_lib/guest');
+const { getOrCreateGuestId, getExistingGuestId, buildSetCookie } = require('./_lib/guest');
 const store = require('./_lib/store');
 const { pdfMaxPages } = require('./_lib/packages');
 
@@ -15,7 +15,13 @@ exports.handler = async function (event, context) {
     if (user) {
         if (user.isAdmin) return json(200, { kind: 'admin', balance: null, pdfMaxPages: pdfMaxPages(0, true) });
         try {
-            const balance = await store.ensureProfile(user.id, user.email);
+            let balance = await store.ensureProfile(user.id, user.email);
+            // Primer contacto de la cuenta: lo que le quedaba como invitado en este navegador pasa a su saldo (una vez).
+            try {
+                const gid = getExistingGuestId(event);
+                const moved = gid ? Number(await store.claimGuestBalance(user.id, gid)) || 0 : 0;
+                if (moved > 0) { balance = (Number(balance) || 0) + moved; try { await store.logEvent(user.id, 'user', null, 'guest_balance_claimed', { nodes: moved }, user.email || null, 'graphikosmos'); } catch (_e) { /* ok */ } }
+            } catch (e) { console.error('[balance] claim guest:', e.message); }
             let maxUsd = 0; try { maxUsd = await store.maxPaymentUsd(user.id); } catch (_e) { /* sin dato: límite base */ }
             return json(200, { kind: 'user', balance, pdfMaxPages: pdfMaxPages(maxUsd, false) });
         } catch (err) {

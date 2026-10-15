@@ -35,4 +35,11 @@ function buildSetCookie(guestId) {
     return `${COOKIE_NAME}=${guestId}; Path=/; Max-Age=${oneYear}; HttpOnly; Secure; SameSite=Lax`;
 }
 
-module.exports = { getOrCreateGuestId, buildSetCookie, COOKIE_NAME };
+// Id de invitado de este navegador SOLO si ya trae la cookie (no crea una nueva). Sirve para pasar su saldo a la cuenta al registrarse.
+function getExistingGuestId(event) {
+    const cookies = parseCookies((event.headers && (event.headers.cookie || event.headers.Cookie)) || '');
+    const v = cookies[COOKIE_NAME];
+    return v && /^[a-f0-9-]{36}$/i.test(v) ? v : null;
+}
+
+module.exports = { getOrCreateGuestId, getExistingGuestId, buildSetCookie, COOKIE_NAME };

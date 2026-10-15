@@ -41,6 +41,8 @@ module.exports = {
     spendNodes: (id, cost, action) => rpc('spend_nodes', { p_user: id, p_cost: cost, p_action: action }),
     creditNodes: (id, nodes, order, amount) =>
         rpc('credit_nodes', { p_user: id, p_nodes: nodes, p_order: order, p_amount: amount }),
+    // Suma a la cuenta lo que le quede al invitado de este navegador (una vez por cuenta). Devuelve los nodos pasados.
+    claimGuestBalance: (userId, guestId) => rpc('claim_guest_balance', { p_user: userId, p_guest: guestId }),
     usageLastHour: id => rpc('usage_last_hour', { p_user: id }),
 
     ensureGuest: (guestId, ip) => rpc('ensure_guest', {

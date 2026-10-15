@@ -110,11 +110,28 @@ async function resolveIdentity(event, context, deps) {
     };
 }
 
+// Primer contacto de una cuenta: lo que le quedaba de invitado en este navegador pasa a su saldo (una vez por cuenta).
+// Nunca rompe nada: si la función de Supabase aún no existe o falla, se sigue con el saldo normal.
+async function claimGuestIfAny(event, user, balance, store, getExistingGuestId) {
+    try {
+        if (!store.claimGuestBalance || !getExistingGuestId) return balance;
+        const gid = getExistingGuestId(event);
+        if (!gid) return balance;
+        const moved = Number(await store.claimGuestBalance(user.id, gid)) || 0;
+        if (moved > 0) {
+            try { await store.logEvent(user.id, 'user', null, 'guest_balance_claimed', { nodes: moved }, user.email || null, 'graphikosmos'); } catch (_e) { /* ok */ }
+            return (Number(balance) || 0) + moved;
+        }
+    } catch (err) { console.error('[billing] claim guest:', err.message); }
+    return balance;
+}
+
 function withBilling(raw, overrides = {}) {
     const deps = {
         getUser: require('./auth').getUser,
         getOrCreateGuestId: require('./guest').getOrCreateGuestId,
         buildSetCookie: require('./guest').buildSetCookie,
+        getExistingGuestId: require('./guest').getExistingGuestId,
         store: require('./store'),
         rateLimitUser: Number(process.env.RATE_LIMIT_PER_HOUR || 60),
         rateLimitGuest: Number(process.env.GUEST_RATE_LIMIT_PER_HOUR || 40),
@@ -144,6 +161,7 @@ function withBilling(raw, overrides = {}) {
                 balance = identity.kind === 'user'
                     ? await deps.store.ensureProfile(identity.id, identity.email)
                     : await deps.store.ensureGuest(identity.guestId, identity.ip);
+                if (identity.kind === 'user') balance = await claimGuestIfAny(event, identity, balance, deps.store, deps.getExistingGuestId);
 
                 const limit = identity.kind === 'user' ? deps.rateLimitUser : deps.rateLimitGuest;
                 const used = await deps.store.usageLastHour(identity.id);
