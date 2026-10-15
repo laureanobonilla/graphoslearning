@@ -7828,23 +7828,9 @@ function getActiveUserKey() {
     return currentUser ? currentUser.id : 'guest_local';
 }
 
-function showSaveFeedback(state) {
-    const icon = document.getElementById('saveStatusIcon');
-    const text = document.getElementById('saveStatusText');
-    if (!icon || !text) return;
-
-    if (state === 'saving') {
-        icon.innerText = '⏳';
-        text.innerText = tr("js.guardando");
-    } else if (state === 'saved') {
-        icon.innerText = '✅';
-        text.innerText = tr("js.guardado");
-        setTimeout(() => {
-            icon.innerText = '📁';
-            text.innerText = tr("js.mis_proyectos");
-        }, 1800);
-    }
-}
+// El guardado automático es silencioso: antes el botón pasaba de «Mis proyectos» a «Guardando…» y «Guardado» a cada rato,
+// y distraía. El botón se queda siempre como «Mis proyectos».
+function showSaveFeedback(_state) { /* sin cambio visible */ }
 
 // Copia local del proyecto. Si el navegador se queda sin espacio, antes se abortaba el guardado y al reabrir volvía una copia
 // vieja (sin el texto del tema, por ejemplo): ahora se liberan copias de otros proyectos y se reintenta.
