@@ -6339,6 +6339,7 @@ async function runAprendeHandoff() {
         if (!globalDocumentContext) { globalDocumentContext = title || topic; if (docContextInput) docContextInput.value = globalDocumentContext; updateDocContextChip(); }
     } else { currentDocumentText = topic; }
     track('aprende_schema_start', { sid, withText: text.length >= 200 });
+    try { localStorage.removeItem('gk_topic_closed'); } catch (_e) { /* ok */ }   // quien llega aquí debe ver el texto abierto aunque lo haya cerrado en otra visita
     await generateFullSchemaFromTopic(textForSchema, { originPanelId: 'main', welcome: true, topicText: text.length < 200 });
     if (text.length >= 200) openReaderPanel();
     showOnbExampleNote();
