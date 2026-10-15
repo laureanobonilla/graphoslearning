@@ -12,6 +12,11 @@ OPEN_SAMPLES = {
     ('en', 'self'): ['That everything is fine and I can handle all of it.', 'I said yes to helping when all I wanted was to sleep.', 'That my family asks too much and I never learned to say no.', 'The tiredness I carry; people see me smiling and ready.', 'I wish someone would ask me twice how I really am.'],
     ('en', 'partner'): ['That they are warm with everyone except me when they are tired.', 'They hid it so I would not worry, but I already knew.', 'That they sometimes stay quiet about important things and expect me to guess.', 'When they get upset they go distant and I wait.', 'I wish they would tell me how they feel without me having to ask.'],
 }
+# Frase única de la versión «sellada» (la principal desde 2026-10-15): ningún resultado a la vista, una frase y el pago.
+SEALED = {
+    ('es', 'self'): {'phrase': 'Hay algo que respondiste sin darte cuenta, y dice más de ti que todo lo demás.', 'lead': 'Ver mi lectura completa'},
+    ('es', 'partner'): {'phrase': 'Hay algo que respondiste sobre tu pareja sin darte cuenta, y dice más de ustedes que todo lo demás.', 'lead': 'Ver la lectura completa'},
+}
 tpl = open('qer-shared/template.html', encoding='utf8').read()
 for a in APPS:
     if not os.path.exists(f'{a}/config.js'):
@@ -22,7 +27,13 @@ for a in APPS:
         return (t.replace('{{title}}', html.escape(cfg['t']['doc_title']))
                  .replace('{{desc}}', html.escape(cfg['t']['doc_desc'], quote=True))
                  .replace('{{lang}}', cfg['lang']).replace('{{testscript}}', test))
-    open(f'{a}/index.html', 'w', encoding='utf8').write(fill(tpl))
+    sc = SEALED.get((cfg['lang'], cfg.get('kind', 'self')))
+    sealed = ('<script>window.QER_SEALED = ' + json.dumps(sc, ensure_ascii=False) + ';</script>') if sc else ''
+    # La página principal es la SELLADA (si la app tiene frase); la versión con adelantos queda de respaldo en /<app>/abierto/.
+    open(f'{a}/index.html', 'w', encoding='utf8').write(fill(tpl, sealed))
+    if sc:
+        os.makedirs(f'{a}/abierto', exist_ok=True)
+        open(f'{a}/abierto/index.html', 'w', encoding='utf8').write(fill(tpl).replace('<script src="config.js"></script>', f'<script src="/{a}/config.js"></script>').replace('<title>', '<meta name="robots" content="noindex, nofollow">\n<title>', 1))
     # --- prueba ---
     opens = OPEN_SAMPLES.get((cfg['lang'], cfg.get('kind', 'self')), OPEN_SAMPLES[('es', 'self')])
     answers, k = [], 0
@@ -42,13 +53,11 @@ for a in APPS:
         p = f'{a}/prueba/{stale}'
         if os.path.exists(p): os.remove(p)
     open(f'{a}/prueba/index.html', 'w', encoding='utf8').write(out)
-    if a == 'quien-eres':
-        # --- variante «sellada»: sin ningún resultado a la vista, una frase y el pago directo (ver SEALED en qer-shared/qer-app.js) ---
-        sealed = '<script>window.QER_SEALED = ' + json.dumps({'phrase': 'Hay algo que respondiste sin darte cuenta, y dice más de ti que todo lo demás.', 'lead': 'Ver mi lectura completa'}, ensure_ascii=False) + ';</script>'
-        cfgabs = lambda s: s.replace('<script src="config.js"></script>', f'<script src="/{a}/config.js"></script>')
+    if sc:
+        # prueba sellada (respuestas cargadas, sin eventos): lleva directo a la pantalla de pago
         os.makedirs(f'{a}/sellado/prueba', exist_ok=True)
-        s1 = cfgabs(fill(tpl, sealed)).replace('<title>', '<meta name="robots" content="noindex, nofollow">\n<title>', 1)
-        open(f'{a}/sellado/index.html', 'w', encoding='utf8').write(s1)
-        s2 = cfgabs(fill(tpl, test + sealed)).replace('<title>', '<meta name="robots" content="noindex, nofollow">\n<title>Prueba sellada · ', 1)
+        idx = f'{a}/sellado/index.html'
+        if os.path.exists(idx): os.remove(idx)
+        s2 = out.replace('<script src="/' + a + '/config.js"></script>', sealed + '\n<script src="/' + a + '/config.js"></script>', 1).replace('<title>Prueba · ', '<title>Prueba sellada · ', 1)
         open(f'{a}/sellado/prueba/index.html', 'w', encoding='utf8').write(s2)
     print('ok', a)

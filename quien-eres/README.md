@@ -218,3 +218,6 @@ Prueba del dueño: /quien-eres/prueba/?k=QER_TEST_KEY. Se reconstruye con `pytho
 
 ## Variante «sellada» (2026-10-15)
 `/quien-eres/sellado/` (noindex): al terminar el cuestionario no se muestra ningún resultado; solo una frase (`QER_SEALED.phrase`, en `tools/build_qer_apps.py`) y los botones de PayPal con el precio del servidor. Al pagar se abre la lectura completa como siempre. Eventos con `variant:'sealed'`, `paywallVersion:'sealed1'`, más `sealed_shown`. Versión de prueba (respuestas cargadas, sin eventos): `/quien-eres/sellado/prueba/`.
+
+## 2026-10-15 (tarde): la versión sellada pasó a ser la principal
+`/quien-eres/` y `/quien-es-tu-pareja/` ahora son la versión sellada (una frase + pago, sin resultado a la vista). La versión con adelantos queda de respaldo en `/<app>/abierto/` (noindex). Prueba sellada: `/<app>/sellado/prueba/`; prueba con envío al correo del dueño: `/<app>/prueba/`. Las frases están en `SEALED` de `tools/build_qer_apps.py`.
