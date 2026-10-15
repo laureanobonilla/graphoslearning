@@ -347,8 +347,8 @@ async function rawHandler(event, context) {
             const schema = {
                 type: 'OBJECT',
                 properties: {
-                    definition: { type: 'STRING', description: 'Explicación en 1-2 oraciones MUY simples, sin jerga técnica ni palabras especializadas. Como si se la explicaras a alguien inteligente pero que nunca ha oído el tema.' },
-                    analogy: { type: 'STRING', description: 'Una analogía o comparación concreta y cotidiana (de la vida diaria, no de otro campo técnico) que ayude a entender la idea de un vistazo.' },
+                    definition: { type: 'STRING', description: 'Qué es, dicho directamente y en 1-2 oraciones MUY simples, sin jerga técnica. Sin comparaciones ni metáforas: di lo que ES, no a qué se parece.' },
+                    analogy: { type: 'STRING', description: 'Cómo funciona o para qué sirve, explicado paso a paso en palabras de todos los días (2-3 oraciones cortas, relación causa-efecto clara). PROHIBIDO usar analogías, metáforas o comparaciones con otras cosas (nada de "es como…", "imagina que…", "funciona igual que…").' },
                     example: { type: 'STRING', description: 'Un ejemplo breve y concreto de esto en la vida real o en un caso reconocible — nunca un ejemplo abstracto o genérico.' }
                 },
                 required: ["definition", "analogy", "example"]
@@ -364,9 +364,9 @@ async function rawHandler(event, context) {
 
                 REGLAS:
                 1. Cero jerga técnica, cero palabras que a su vez necesiten explicación. Si usas un término especializado, no lo puedes evitar explicándolo en palabras de todos los días.
-                2. La analogía debe ser de algo cotidiano y reconocible (cocinar, el tráfico, una fiesta, el cuerpo humano, deportes, etc.), NUNCA de otro concepto técnico.
+                2. NO uses analogías, metáforas ni comparaciones con otras cosas (nada de "es como…", "imagina…", "piensa en…"). Explica el concepto DIRECTAMENTE: qué es, de qué partes o pasos se compone y para qué sirve, con frases cortas, un solo dato por frase y las palabras más comunes posibles. La claridad viene de ordenar bien las ideas, no de compararlas con otra cosa.
                 3. El ejemplo debe ser concreto y específico, nunca "por ejemplo, en muchos casos...".
-                4. Tono cercano y claro, como explicándole a un amigo curioso, no como un libro de texto.`,
+                4. Tono cercano y claro, como explicándole a un amigo curioso, no como un libro de texto. Si el concepto tiene un término clave, dilo una vez y defínelo en la misma frase.`,
                 config: {
                     responseMimeType: 'application/json',
                     responseSchema: schema
