@@ -13,7 +13,7 @@ const KNOWN = new Set([
     // Móvil (/m/): mapa de 2 niveles ('m_welcome' = el primero, gratis una vez) y glosario de varios términos.
     'm_map', 'm_welcome', 'glossary', 'm_text',
     // Escritorio: texto breve de solo lectura que acompaña a un esquema generado desde un tema (gratis).
-    'topic_text',
+    'topic_text', 'views',
     // Documentos muy largos: resumen por fragmentos (gratis); el esquema final se cobra como parse_text.
     'long_outline',
     // Idiomas (/idiomas/): mapa de bloques con rol gramatical (se cobra por nodo) y palabra suelta en contexto (gratis).
@@ -23,7 +23,7 @@ const KNOWN = new Set([
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text']);
+const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.

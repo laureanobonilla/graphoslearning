@@ -1579,7 +1579,7 @@ const topicUI = (() => {
         if (m && open) { m.classList.add('flash'); m.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     });
     nodes.on('remove', () => { if (ownerId != null && !nodes.get(ownerId)) { ownerId = null; open = false; paint(); } });
-    nodes.on('update', (_ev, p) => { if (ownerId != null && p && p.items && p.items.some(i => String(i) === String(ownerId)) && nodes.get(ownerId)?.schemaText) render(ownerId); });
+    nodes.on('update', (_ev, p) => { if (ownerId != null && p && p.items && p.items.some((i, k) => String(i) === String(ownerId) && (!p.oldData || !p.oldData[k] || p.oldData[k].schemaText !== (p.data && p.data[k] ? p.data[k].schemaText : undefined))) && nodes.get(ownerId)?.schemaText) render(ownerId); });
     // Al abrir un proyecto guardado: mostrar el texto de su esquema (el que se guardó con él). Los proyectos viejos no lo
     // tienen: se genera una vez para la raíz (gratis) y queda guardado con el proyecto.
     function onLoaded(noGen) {
@@ -1606,7 +1606,24 @@ const topicUI = (() => {
         if (on) { open = false; paint(); }
         loadingEl.classList.toggle('on', !!on);
     }
-    return { show, ownerOf, setOpen, onLoaded, setLoading };
+    // Subraya en el texto una frase (de una vista) y lleva allí; usa el resaltado nativo (CSS Highlight) sin tocar el HTML.
+    function highlightQuote(q, owner) {
+        if (!q) return false;
+        if (owner != null && String(owner) !== String(ownerId)) render(owner);
+        if (!open) setOpen(true);
+        const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT); const map = []; let full = '', n;
+        while ((n = walker.nextNode())) { map.push({ n, start: full.length }); full += n.nodeValue; }
+        const words = String(q).match(/[\p{L}\p{N}]+/gu); if (!words || !words.length) return false;
+        const m = new RegExp(words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^\\p{L}\\p{N}]+'), 'iu').exec(full); if (!m) return false;
+        const locate = (pos) => { for (let i = map.length - 1; i >= 0; i--) if (map[i].start <= pos) return { node: map[i].n, off: pos - map[i].start }; return null; };
+        const a = locate(m.index), z = locate(m.index + m[0].length - 1); if (!a || !z) return false;
+        const range = document.createRange(); range.setStart(a.node, a.off); range.setEnd(z.node, z.off + 1);
+        if (window.CSS && CSS.highlights && window.Highlight) { CSS.highlights.set('gk-quote', new Highlight(range)); setTimeout(() => { try { CSS.highlights.delete('gk-quote'); } catch (_e) { /* ok */ } }, 5000); }
+        else { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); }
+        const el = a.node.parentElement; if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        return true;
+    }
+    return { show, ownerOf, setOpen, onLoaded, setLoading, highlightQuote };
 })();
 
 // Esquema hecho a partir de un texto pegado: ese mismo texto queda como el texto del esquema (solo lectura, a la izquierda).
@@ -8340,6 +8357,307 @@ async function exportReportRtf() {
     setTimeout(syncSoon, 1500);
 })();
 if (typeof I18N !== 'undefined' && I18N.lang === 'en') { const sp = document.querySelector('#btnExitSubscheme span'); if (sp) sp.textContent = 'Back'; }
+
+// ==========================================
+// PANEL INFERIOR (escritorio): notas del usuario + vistas del texto (línea de tiempo, causa→efecto, proceso, comparar,
+// actores, cifras, lugares) + tarjetas y quiz. Las vistas salen de gemini `views` y cada elemento trae la frase literal del
+// texto de donde viene (el servidor la verifica). Se guardan con el proyecto en el nodo que tiene el texto (`viewsData`);
+// las notas, en la raíz del esquema visible (`userNotes`).
+// ==========================================
+const vizUI = (() => {
+    const panel = document.getElementById('vizPanel'); if (!panel) return null;
+    const tabsEl = document.getElementById('vzTabs'), bodyEl = document.getElementById('vzBody'), quoteEl = document.getElementById('vzQuote');
+    const statusEl = document.getElementById('vzStatus'), redoBtn = document.getElementById('vzRedo'), toggleBtn = document.getElementById('vzToggle');
+    const en = (typeof I18N !== 'undefined' && I18N.lang === 'en'); const L = (es, e) => (en ? e : es);
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const clean = (n) => String(n.baseTitle || String(n.label || '').replace(/\*/g, '')).trim();
+    const KINDS = [
+        { k: 'notes', i: '✍️', es: 'Mis notas', en: 'My notes' }, { k: 'timeline', i: '⏳', es: 'Línea de tiempo', en: 'Timeline' },
+        { k: 'cause_effect', i: '🔗', es: 'Causa → efecto', en: 'Cause → effect' }, { k: 'process', i: '🧭', es: 'Proceso', en: 'Process' },
+        { k: 'compare', i: '⚖️', es: 'Comparar', en: 'Compare' }, { k: 'actors', i: '👥', es: 'Actores', en: 'Actors' },
+        { k: 'figures', i: '📊', es: 'Cifras', en: 'Figures' }, { k: 'places', i: '📍', es: 'Lugares', en: 'Places' },
+        { k: 'cards', i: '🃏', es: 'Tarjetas y quiz', en: 'Cards & quiz' }
+    ];
+    const STRIP = 44;
+    let hostId = null, open = false, tab = 'notes', H = 300, detectToken = 0, partial = false, lastGeo = '';
+    const mem = {}; // vistas sin guardar (cuando una de las dos búsquedas falló)
+    try { open = localStorage.getItem('gk_viz_open') === '1'; const h = Number(localStorage.getItem('gk_viz_h')); if (h) H = h; } catch (_e) { /* ok */ }
+
+    const hashOf = (t) => { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return t.length + ':' + (h >>> 0); };
+    function rootNode() {
+        const hasIn = new Set(edges.get().map(e => String(e.to)));
+        return nodes.get().filter(n => !hasIn.has(String(n.id)) && !n.isSubscheme).sort((a, b) => (a.depthLevel ?? 0) - (b.depthLevel ?? 0))[0] || null;
+    }
+    const notesHostId = () => { const r = rootNode(); return r ? r.id : null; };
+    function pickHost(preferId) {
+        if (preferId != null && topicUI) { const o = topicUI.ownerOf(preferId); if (o != null) return o; }
+        if (hostId != null && nodes.get(hostId) && nodes.get(hostId).schemaText) return hostId;
+        const withT = nodes.get().filter(n => n.schemaText);
+        if (withT.length) { const hasIn = new Set(edges.get().map(e => String(e.to))); return (withT.find(n => !hasIn.has(String(n.id))) || withT[0]).id; }
+        return null;
+    }
+    function currentViews() {
+        const n = hostId != null ? nodes.get(hostId) : null; if (!n || !n.schemaText) return null;
+        const h = hashOf(n.schemaText);
+        if (n.viewsData && n.viewsData.hash === h) return n.viewsData.v || {};
+        if (mem[hostId] && mem[hostId].hash === h) return mem[hostId].v;
+        return null;
+    }
+    const getNotes = () => { const h = nodes.get(notesHostId()); return (h && Array.isArray(h.userNotes)) ? h.userNotes : []; };
+    function setNotes(list) {
+        const id = notesHostId(); if (id == null) return;
+        isApplyingUndo = true; try { nodes.update({ id, userNotes: list }); } finally { isApplyingUndo = false; }
+    }
+    const cardNodes = () => nodes.get().filter(n => !n.isSubscheme && (String(n.definition || '').trim() || String(n.simple || '').trim()));
+    function availability() {
+        const v = currentViews() || {}; const out = [{ k: 'notes', n: getNotes().length }];
+        ['timeline', 'cause_effect', 'process', 'compare', 'actors', 'figures', 'places'].forEach(k => {
+            if (!v[k]) return;
+            const n = k === 'compare' ? v.compare.items.length : k === 'actors' ? v.actors.actors.length : v[k].length; out.push({ k, n });
+        });
+        if (cardNodes().length >= 3) out.push({ k: 'cards', n: cardNodes().length });
+        return out;
+    }
+
+    // ---------- diseño del panel ----------
+    const visible = () => isDesktopFolding() && nodes.length > 1 && notesHostId() != null;
+    function layout() {
+        const on = visible(); open = open && on;
+        panel.classList.toggle('on', on); panel.classList.toggle('open', open);
+        const maxH = Math.round(window.innerHeight * 0.7);
+        const h = !on ? 0 : (open ? Math.max(170, Math.min(H, maxH)) : STRIP);
+        const tp = document.getElementById('topicPanel'), dv = document.getElementById('defsView');
+        const l = tp && tp.classList.contains('on') ? Math.round(tp.getBoundingClientRect().width) : 0;
+        const r = dv && !dv.classList.contains('hidden') ? Math.round(dv.getBoundingClientRect().width) : 0;
+        const geo = h + '|' + l + '|' + r; if (geo === lastGeo) return; lastGeo = geo;
+        panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
+        container.style.height = h ? 'calc(100% - ' + h + 'px)' : ''; container.style.alignSelf = h ? 'flex-start' : '';
+        toggleBtn.textContent = open ? '▾' : '▴';
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } }, 60);
+    }
+    let layoutT = null; const layoutSoon = () => { clearTimeout(layoutT); layoutT = setTimeout(layout, 40); };
+    function setOpen(v) { open = v; try { localStorage.setItem('gk_viz_open', v ? '1' : '0'); } catch (_e) { /* ok */ } lastGeo = ''; paint(); if (v) track('viz_open', { tab }); }
+    function pickTab(k) { tab = k; if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
+
+    function paint() {
+        const av = availability(); if (!av.some(a => a.k === tab)) tab = 'notes';
+        layout();
+        tabsEl.innerHTML = av.map(a => { const k = KINDS.find(x => x.k === a.k); return `<button type="button" class="vz-tab${a.k === tab ? ' on' : ''}" role="tab" data-k="${a.k}">${k.i} ${esc(L(k.es, k.en))}${a.k !== 'notes' || a.n ? `<span class="n">${a.n}</span>` : ''}</button>`; }).join('');
+        statusEl.textContent = detectToken && detecting ? L('🔎 Buscando más vistas…', '🔎 Looking for more views…') : (partial ? L('Algunas vistas no se pudieron buscar', 'Some views could not be searched') : '');
+        redoBtn.style.display = (hostId != null && nodes.get(hostId) && nodes.get(hostId).schemaText) ? '' : 'none';
+        if (open) renderBody();
+    }
+    let detecting = 0;
+
+    // ---------- citas ----------
+    function showQuote(q, opts) {
+        if (!q) { quoteEl.classList.remove('on'); return; }
+        quoteEl.innerHTML = `<q>${esc(q)}</q>` + (opts && opts.noFind ? '' : `<button type="button" data-find="1">${esc(L('Ver en el texto', 'Show in text'))}</button>`);
+        quoteEl.dataset.q = q; quoteEl.classList.add('on');
+    }
+    quoteEl.addEventListener('click', (e) => { if (e.target.closest('[data-find]') && topicUI) topicUI.highlightQuote(quoteEl.dataset.q, hostId); });
+    const pick = (el, q, opts) => { bodyEl.querySelectorAll('.vz-sel').forEach(x => x.classList.remove('vz-sel')); if (el) el.classList.add('vz-sel'); showQuote(q, opts); };
+
+    // ---------- notas ----------
+    function renderNotes() {
+        const notes = getNotes();
+        const sel = (network.getSelectedNodes() || [])[0];
+        bodyEl.innerHTML = `<div class="vz-note-form"><textarea id="vzNoteIn" placeholder="${esc(L('Escribe una nota sobre lo que estás estudiando…', 'Write a note about what you are studying…'))}"></textarea><button type="button" class="vz-primary" id="vzNoteAdd">${esc(L('Guardar nota', 'Save note'))}</button></div>`
+            + (notes.length ? `<div class="vz-row" style="max-width:760px"><span class="vz-empty" style="padding:0;flex:1">${esc(L(notes.length + (notes.length === 1 ? ' nota. Cada una puede convertirse en su propio esquema, ligado al nodo del que salió.' : ' notas. Cada una puede convertirse en su propio esquema, ligado al nodo del que salió.'), notes.length + ' note(s). Each one can become its own map, linked to the node it came from.'))}</span>${notes.length > 1 ? `<button type="button" class="vz-ghost" id="vzNotesAll">${esc(L('🌱 Esquema con todas', '🌱 Map from all'))}</button>` : ''}</div>` : `<div class="vz-empty">${esc(L('Aquí van tus ideas, dudas y resúmenes. Si tienes un nodo elegido, la nota queda ligada a él.', 'Your ideas, questions and summaries go here. If a node is selected, the note is linked to it.'))}</div>`)
+            + `<div class="vz-notes">${notes.map(n => { const nd = n.node != null ? nodes.get(n.node) : null; return `<div class="vz-note" data-id="${esc(n.id)}"><div class="t" contenteditable="true" spellcheck="false">${esc(n.text)}</div><div class="m">${nd ? `<button type="button" class="vz-chip" data-go="${esc(n.node)}" title="${esc(L('Ir al nodo', 'Go to node'))}">↳ ${esc(clean(nd))}</button>` : ''}<span class="sp"></span><button type="button" class="vz-ghost" data-gen="1">${esc(L('🌱 Crear esquema', '🌱 Make a map'))}</button><button type="button" class="vz-ghost" data-del="1" title="${esc(L('Borrar', 'Delete'))}">✕</button></div></div>`; }).join('')}</div>`;
+        const inp = bodyEl.querySelector('#vzNoteIn');
+        const add = () => {
+            const t = inp.value.trim(); if (!t) return;
+            const s = (network.getSelectedNodes() || [])[0];
+            setNotes([{ id: 'n' + Date.now().toString(36), text: t.slice(0, 4000), node: s != null && nodes.get(s) ? s : null, ts: Date.now() }, ...getNotes()]);
+            track('viz_note_add', { linked: s != null }); paint();
+        };
+        bodyEl.querySelector('#vzNoteAdd').addEventListener('click', add);
+        inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); add(); } });
+        const all = bodyEl.querySelector('#vzNotesAll');
+        if (all) all.addEventListener('click', () => { track('viz_notes_schema', { all: true }); generateFullSchemaFromTopic(getNotes().map(n => n.text).reverse().join('\n\n'), { attachToNodeId: notesHostId() }); });
+        bodyEl.querySelectorAll('.vz-note').forEach(card => {
+            const id = card.dataset.id;
+            const note = () => getNotes().find(n => n.id === id);
+            card.querySelector('.t').addEventListener('blur', (e) => { const t = e.target.innerText.trim(); const n = note(); if (!n || t === n.text) return; if (!t) { setNotes(getNotes().filter(x => x.id !== id)); paint(); return; } setNotes(getNotes().map(x => x.id === id ? { ...x, text: t.slice(0, 4000) } : x)); });
+            card.querySelector('[data-del]').addEventListener('click', () => { setNotes(getNotes().filter(x => x.id !== id)); paint(); });
+            card.querySelector('[data-gen]').addEventListener('click', () => { const n = note(); if (!n) return; const t = card.querySelector('.t').innerText.trim() || n.text; track('viz_notes_schema', { all: false }); generateFullSchemaFromTopic(t, { attachToNodeId: (n.node != null && nodes.get(n.node)) ? n.node : notesHostId() }); });
+            const go = card.querySelector('[data-go]');
+            if (go) go.addEventListener('click', () => { const nd = nodes.get(go.dataset.go) || nodes.get(Number(go.dataset.go)); if (!nd) return; revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); flashNewNode(nd.id); });
+        });
+    }
+
+    // ---------- vistas ----------
+    function yearOf(d) {
+        const s = String(d).toLowerCase(); const neg = /a\.?\s?c\b|antes de c|\bbc\b/.test(s) ? -1 : 1;
+        let m = s.match(/siglo\s+([ivxlcdm]+)/);
+        if (m) { const R = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 }; let t = 0; const a = m[1].split('').map(c => R[c]); a.forEach((v, i) => { t += (a[i + 1] && a[i + 1] > v) ? -v : v; }); return t ? neg * (t * 100 - 50) : null; }
+        m = s.match(/\d{3,4}/); if (m) return neg * Number(m[0]);
+        m = s.match(/\b\d{1,2}\b/); return m && /(año|year)/.test(s) ? neg * Number(m[0]) : null;
+    }
+    function renderTimeline(ev) {
+        const ys = ev.map(e => yearOf(e.date)); const ok = ys.every(y => y != null);
+        const list = ev.map((e, i) => ({ ...e, y: ys[i], i })); if (ok) list.sort((a, b) => a.y - b.y || a.i - b.i);
+        bodyEl.innerHTML = `<div class="vz-tl">${list.map(e => `<div class="vz-ev"><div class="d">${esc(e.date)}</div><div class="dot"></div><div class="l vz-click" data-q="${esc(e.quote)}">${esc(e.label)}</div></div>`).join('')}</div>`
+            + (ok ? '' : `<div class="vz-empty">${esc(L('Algunas fechas no tienen un año claro: se muestran en el orden del texto.', 'Some dates have no clear year: shown in text order.'))}</div>`);
+        bodyEl.querySelectorAll('.vz-click').forEach(el => el.addEventListener('click', () => pick(el, el.dataset.q)));
+    }
+    function drawGraph(boxes, links, size, labelled) {
+        // boxes: [{x,y,w,h,t}], links: [{a,b,q,label}] con índices; las flechas salen del borde derecho al izquierdo (o del centro, en círculo).
+        const W = size.w, Hh = size.h;
+        const boxHtml = boxes.map((b, i) => `<div class="vz-box${b.role ? ' vz-click' : ''}" data-i="${i}" style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px" ${b.role ? `data-role="${esc(b.role)}"` : ''}>${esc(b.t)}</div>`).join('');
+        const paths = links.map((l, i) => {
+            const A = boxes[l.a], B = boxes[l.b]; let d, mx, my;
+            if (labelled) { // círculo: línea recta entre centros, recortada al borde de las cajas
+                const ax = A.x + A.w / 2, ay = A.y + A.h / 2, bx = B.x + B.w / 2, by = B.y + B.h / 2; const dx = bx - ax, dy = by - ay;
+                const cut = (bw, bh) => { const sx = dx === 0 ? Infinity : (bw / 2) / Math.abs(dx), sy = dy === 0 ? Infinity : (bh / 2) / Math.abs(dy); return Math.min(sx, sy) + 0.01; };
+                const ta = cut(A.w, A.h), tb = 1 - cut(B.w, B.h);
+                const x1 = ax + dx * ta, y1 = ay + dy * ta, x2 = ax + dx * tb, y2 = ay + dy * tb; d = `M${x1},${y1} L${x2},${y2}`; mx = (x1 + x2) / 2; my = (y1 + y2) / 2;
+            } else {
+                const x1 = A.x + A.w, y1 = A.y + A.h / 2, x2 = B.x, y2 = B.y + B.h / 2, c = Math.max(24, Math.abs(x2 - x1) / 2);
+                d = `M${x1},${y1} C${x1 + c},${y1} ${x2 - c},${y2} ${x2},${y2}`; mx = (x1 + x2) / 2; my = (y1 + y2) / 2;
+            }
+            return `<g class="lk" data-l="${i}"><path d="${d}" fill="none" stroke="#9aa3b2" stroke-width="1.6" marker-end="url(#vzArr)"/><path d="${d}" fill="none" stroke="transparent" stroke-width="14"/>`
+                + (labelled && l.label ? `<text x="${mx}" y="${my - 4}" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0e857c" style="paint-order:stroke;stroke:#f7f6f1;stroke-width:4px;stroke-linejoin:round">${esc(l.label)}</text>` : '') + `</g>`;
+        }).join('');
+        bodyEl.innerHTML = `<div class="vz-graph" style="width:${W}px;height:${Hh}px"><svg width="${W}" height="${Hh}"><defs><marker id="vzArr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9aa3b2"/></marker></defs>${paths}</svg>${boxHtml}</div>`;
+        bodyEl.querySelectorAll('.lk').forEach(g => g.addEventListener('click', () => { const l = links[Number(g.dataset.l)]; bodyEl.querySelectorAll('.vz-sel').forEach(x => x.classList.remove('vz-sel')); showQuote(l.q); }));
+        bodyEl.querySelectorAll('.vz-box[data-role]').forEach(el => el.addEventListener('click', () => pick(el, el.dataset.role, { noFind: true })));
+    }
+    function renderCauseEffect(list) {
+        const ids = new Map(), N = []; const key = (t) => t.toLowerCase().replace(/\s+/g, ' ').trim();
+        const get = (t) => { const k = key(t); if (!ids.has(k)) { ids.set(k, N.length); N.push({ t }); } return ids.get(k); };
+        const links = list.map(l => ({ a: get(l.cause), b: get(l.effect), q: l.quote })).filter(l => l.a !== l.b);
+        const depth = new Array(N.length).fill(0);
+        for (let it = 0; it < N.length; it++) { let ch = false; links.forEach(l => { if (depth[l.b] < depth[l.a] + 1 && depth[l.a] + 1 < N.length) { depth[l.b] = depth[l.a] + 1; ch = true; } }); if (!ch) break; }
+        const bw = 190, bh = 54, gx = 70, gy = 14; const cols = {}; const boxes = N.map((n, i) => { const c = depth[i]; cols[c] = (cols[c] || 0); const y = cols[c]++ * (bh + gy); return { x: c * (bw + gx), y, w: bw, h: bh, t: n.t }; });
+        const W = (Math.max(...depth) + 1) * (bw + gx) - gx, Hh = Math.max(...Object.values(cols)) * (bh + gy) - gy;
+        drawGraph(boxes, links, { w: W + 4, h: Hh + 4 }, false);
+        bodyEl.insertAdjacentHTML('beforeend', `<div class="vz-empty">${esc(L('Toca una flecha para ver la frase del texto que la respalda.', 'Tap an arrow to see the sentence in the text that supports it.'))}</div>`);
+    }
+    function renderActors(d) {
+        const A = d.actors, n = A.length, bw = 150, bh = 44, Rx = Math.max(210, n * 62), Ry = Math.max(86, Math.min(130, n * 18)); const cx = Rx + bw / 2 + 10, cy = Ry + bh / 2 + 10;
+        const idx = new Map(A.map((a, i) => [a.name, i]));
+        const boxes = A.map((a, i) => { const t = (i / n) * 2 * Math.PI - Math.PI / 2; return { x: Math.round(cx + Rx * Math.cos(t) - bw / 2), y: Math.round(cy + Ry * Math.sin(t) - bh / 2), w: bw, h: bh, t: a.name, role: a.role || '' }; });
+        const links = d.relations.map(r => ({ a: idx.get(r.from), b: idx.get(r.to), q: r.quote, label: r.label })).filter(l => l.a != null && l.b != null);
+        drawGraph(boxes, links, { w: 2 * Rx + bw + 20, h: 2 * Ry + bh + 20 }, true);
+        bodyEl.insertAdjacentHTML('beforeend', `<div class="vz-empty">${esc(L('Toca un nombre para ver quién es, o una relación para ver la frase del texto.', 'Tap a name to see who it is, or a relation to see the sentence.'))}</div>`);
+    }
+    function renderProcess(list) {
+        bodyEl.innerHTML = `<div class="vz-steps">${list.map(s => `<div class="vz-step vz-click" data-q="${esc(s.quote)}"><b>${esc(s.title)}</b><span>${esc(s.detail)}</span></div>`).join('')}</div>`;
+        bodyEl.querySelectorAll('.vz-click').forEach(el => el.addEventListener('click', () => pick(el, el.dataset.q)));
+    }
+    function renderCompare(c) {
+        bodyEl.innerHTML = `<table class="vz-cmp"><thead><tr><th></th>${c.items.map(i => `<th>${esc(i)}</th>`).join('')}</tr></thead><tbody>`
+            + c.criteria.map(k => `<tr><th>${esc(k.name)}</th>${c.items.map(i => { const cell = k.cells.find(x => x.item === i); return cell ? `<td class="has" data-q="${esc(cell.quote)}">${esc(cell.value)}</td>` : '<td>—</td>'; }).join('')}</tr>`).join('') + '</tbody></table>';
+        bodyEl.querySelectorAll('td.has').forEach(el => el.addEventListener('click', () => pick(el, el.dataset.q)));
+    }
+    let figUnit = null;
+    function renderFigures(list) {
+        const byUnit = {}; list.forEach(f => { const u = f.unit || ''; (byUnit[u] = byUnit[u] || []).push(f); });
+        const units = Object.keys(byUnit).sort((a, b) => byUnit[b].length - byUnit[a].length);
+        if (figUnit == null || !byUnit[figUnit]) figUnit = units[0];
+        const items = byUnit[figUnit], max = Math.max(...items.map(f => Math.abs(f.value))) || 1;
+        bodyEl.innerHTML = (units.length > 1 ? `<div class="vz-units">${units.map(u => `<button type="button" class="vz-ghost${u === figUnit ? ' vz-sel' : ''}" data-u="${esc(u)}">${esc(u || L('sin unidad', 'no unit'))} (${byUnit[u].length})</button>`).join('')}</div>` : '')
+            + `<div class="vz-bars">${items.map(f => `<div class="lb">${esc(f.label)}</div><div class="tr" data-q="${esc(f.quote)}"><i style="width:${Math.max(1, Math.round(Math.abs(f.value) / max * 100))}%"></i><b>${esc(f.value.toLocaleString(en ? 'en' : 'es'))} ${esc(f.unit)}</b></div>`).join('')}</div>`;
+        bodyEl.querySelectorAll('[data-u]').forEach(b => b.addEventListener('click', () => { figUnit = b.dataset.u; renderFigures(list); }));
+        bodyEl.querySelectorAll('.tr').forEach(el => el.addEventListener('click', () => pick(null, el.dataset.q)));
+    }
+    function renderPlaces(list) {
+        bodyEl.innerHTML = `<div class="vz-places">${list.map(p => `<div class="vz-place"><b>${esc(p.name)}</b><span>${esc(p.note)}</span><a href="https://www.openstreetmap.org/search?query=${encodeURIComponent(p.name)}" target="_blank" rel="noopener">${esc(L('Ver en el mapa ↗', 'View on map ↗'))}</a></div>`).join('')}</div>`;
+    }
+    // Tarjetas y quiz hechas con las definiciones del esquema (sin llamadas extra).
+    const cs = { mode: 'cards', deck: [], i: 0, flip: false, score: 0, done: 0, answered: false, opts: [] };
+    function newDeck() { cs.deck = cardNodes().map(n => ({ id: n.id, term: clean(n), def: String(n.definition || n.simple || '').trim(), simple: String(n.simple || '').trim(), ex: String(n.example || '').trim() })).filter(c => c.term && c.def); for (let i = cs.deck.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cs.deck[i], cs.deck[j]] = [cs.deck[j], cs.deck[i]]; } cs.i = 0; cs.flip = false; cs.score = 0; cs.done = 0; cs.answered = false; makeOpts(); }
+    function makeOpts() { const c = cs.deck[cs.i]; if (!c) { cs.opts = []; return; } const others = cs.deck.filter(x => x.id !== c.id).sort(() => Math.random() - 0.5).slice(0, 3); cs.opts = [c, ...others].sort(() => Math.random() - 0.5).map(x => ({ id: x.id, term: x.term })); }
+    function renderCards() {
+        if (!cs.deck.length || cs.deck.length !== cardNodes().filter(n => String(n.definition || n.simple || '').trim()).length) newDeck();
+        const c = cs.deck[cs.i];
+        const head = `<div class="vz-row" style="margin:0 0 12px"><button type="button" class="vz-ghost${cs.mode === 'cards' ? ' vz-sel' : ''}" data-m="cards">${esc(L('Tarjetas', 'Cards'))}</button><button type="button" class="vz-ghost${cs.mode === 'quiz' ? ' vz-sel' : ''}" data-m="quiz">Quiz</button><span class="vz-empty" style="padding:0">${cs.i + 1} / ${cs.deck.length}${cs.mode === 'quiz' ? ' · ' + esc(L('aciertos', 'correct')) + ' ' + cs.score + '/' + cs.done : ''}</span></div>`;
+        let main = '';
+        if (cs.mode === 'cards') {
+            main = `<div class="vz-flash" id="vzFlash">${cs.flip ? `<div class="a">${esc(c.def)}${c.simple && c.simple !== c.def ? `<small>${esc(c.simple)}</small>` : ''}${c.ex ? `<small>${esc(L('Ejemplo: ', 'Example: '))}${esc(c.ex)}</small>` : ''}</div>` : `<div class="q">${esc(c.term)}</div><div class="vz-empty">${esc(L('Toca para ver la definición', 'Tap to see the definition'))}</div>`}</div>`
+                + `<div class="vz-row"><button type="button" class="vz-ghost" data-n="-1">←</button><button type="button" class="vz-primary" data-n="1">${esc(L('Siguiente', 'Next'))}</button><button type="button" class="vz-ghost" data-shuffle="1">${esc(L('Barajar', 'Shuffle'))}</button></div>`;
+        } else {
+            main = `<div class="vz-flash" style="cursor:default"><div class="a">${esc(c.def)}</div></div><div class="vz-empty" style="padding:10px 0 0">${esc(L('¿A qué concepto corresponde?', 'Which concept is this?'))}</div><div class="vz-opts">${cs.opts.map(o => `<button type="button" class="vz-opt" data-o="${esc(o.id)}"${cs.answered ? ' disabled' : ''}>${esc(o.term)}</button>`).join('')}</div>`
+                + `<div class="vz-row"><button type="button" class="vz-primary" data-n="1"${cs.answered ? '' : ' style="visibility:hidden"'}>${esc(L('Siguiente', 'Next'))}</button></div>`;
+        }
+        bodyEl.innerHTML = `<div class="vz-cardwrap">${head}${main}</div>`;
+        bodyEl.querySelectorAll('[data-m]').forEach(b => b.addEventListener('click', () => { cs.mode = b.dataset.m; cs.flip = false; cs.answered = false; if (cs.mode === 'quiz') { cs.score = 0; cs.done = 0; } makeOpts(); renderCards(); }));
+        const f = bodyEl.querySelector('#vzFlash'); if (f && cs.mode === 'cards') f.addEventListener('click', () => { cs.flip = !cs.flip; renderCards(); });
+        bodyEl.querySelectorAll('[data-n]').forEach(b => b.addEventListener('click', () => { cs.i = (cs.i + Number(b.dataset.n) + cs.deck.length) % cs.deck.length; cs.flip = false; cs.answered = false; makeOpts(); renderCards(); }));
+        const sh = bodyEl.querySelector('[data-shuffle]'); if (sh) sh.addEventListener('click', () => { newDeck(); renderCards(); });
+        bodyEl.querySelectorAll('[data-o]').forEach(b => b.addEventListener('click', () => {
+            if (cs.answered) return; cs.answered = true; cs.done++; const right = String(b.dataset.o) === String(c.id); if (right) cs.score++;
+            bodyEl.querySelectorAll('[data-o]').forEach(x => { x.disabled = true; if (String(x.dataset.o) === String(c.id)) x.classList.add('ok'); else if (x === b) x.classList.add('bad'); });
+            const nx = bodyEl.querySelector('[data-n]'); if (nx) nx.style.visibility = 'visible';
+            const info = bodyEl.querySelector('.vz-row:last-child'); void info;
+        }));
+    }
+    function renderBody() {
+        showQuote(null);
+        const v = currentViews() || {};
+        if (tab === 'notes') return renderNotes();
+        if (tab === 'timeline' && v.timeline) return renderTimeline(v.timeline);
+        if (tab === 'cause_effect' && v.cause_effect) return renderCauseEffect(v.cause_effect);
+        if (tab === 'process' && v.process) return renderProcess(v.process);
+        if (tab === 'compare' && v.compare) return renderCompare(v.compare);
+        if (tab === 'actors' && v.actors) return renderActors(v.actors);
+        if (tab === 'figures' && v.figures) return renderFigures(v.figures);
+        if (tab === 'places' && v.places) return renderPlaces(v.places);
+        if (tab === 'cards') return renderCards();
+        bodyEl.innerHTML = '';
+    }
+
+    // ---------- búsqueda de vistas ----------
+    async function detect(force) {
+        const n = hostId != null ? nodes.get(hostId) : null; if (!n || !n.schemaText) return;
+        const text = n.schemaText, h = hashOf(text);
+        if (!force && ((n.viewsData && n.viewsData.hash === h) || (mem[hostId] && mem[hostId].hash === h))) return;
+        if (text.split(/\s+/).filter(Boolean).length < 40) return;
+        const token = ++detectToken, owner = hostId; detecting++; partial = false; paint();
+        const call = (g) => fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'views', group: g, text }) }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+        let a = null, b = null;
+        try { [a, b] = await Promise.all([call('a'), call('b')]); } finally { detecting = Math.max(0, detecting - 1); }
+        const cur = nodes.get(owner); if (!cur || cur.schemaText !== text) { paint(); return; }
+        if (token !== detectToken) { paint(); return; }
+        const v = Object.assign({}, a && a.views, b && b.views);
+        if (a && b) {
+            isApplyingUndo = true; try { nodes.update({ id: owner, viewsData: { hash: h, v } }); } finally { isApplyingUndo = false; }
+        } else { mem[owner] = { hash: h, v }; partial = true; }
+        track('viz_detected', { kinds: Object.keys(v).join(','), ok: !!(a && b) });
+        paint();
+    }
+    function refresh(preferId) {
+        const next = pickHost(preferId);
+        const changed = next !== hostId; hostId = next;
+        if (changed) showQuote(null);
+        const typing = bodyEl.contains(document.activeElement) && /TEXTAREA|INPUT/.test(document.activeElement.tagName) || (document.activeElement && document.activeElement.isContentEditable && bodyEl.contains(document.activeElement));
+        if (typing) { layout(); } else paint();
+        detect(false);
+    }
+    let rT = null; const refreshSoon = (id) => { clearTimeout(rT); rT = setTimeout(() => refresh(id), 500); };
+
+    tabsEl.addEventListener('click', (e) => { const b = e.target.closest('.vz-tab'); if (b) pickTab(b.dataset.k); });
+    toggleBtn.addEventListener('click', () => setOpen(!open));
+    redoBtn.addEventListener('click', () => { delete mem[hostId]; track('viz_redo'); detect(true); });
+    document.getElementById('vzResize').addEventListener('pointerdown', (e) => {
+        const h = document.getElementById('vzResize'); e.preventDefault(); h.setPointerCapture(e.pointerId);
+        const y0 = e.clientY, h0 = panel.getBoundingClientRect().height; document.body.classList.add('gk-resizing');
+        const move = (ev) => { H = Math.round(Math.max(170, Math.min(window.innerHeight * 0.7, h0 - (ev.clientY - y0)))); lastGeo = ''; layout(); };
+        const up = () => { document.body.classList.remove('gk-resizing'); h.removeEventListener('pointermove', move); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); try { localStorage.setItem('gk_viz_h', String(H)); } catch (_e) { /* ok */ } };
+        h.addEventListener('pointermove', move); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+    });
+    nodes.on('add', () => refreshSoon()); nodes.on('remove', () => refreshSoon());
+    nodes.on('update', (_ev, p) => { if (p && p.data && p.data.some((d, i) => d && (d.schemaText !== undefined) && (!p.oldData || !p.oldData[i] || p.oldData[i].schemaText !== d.schemaText))) refreshSoon(); });
+    network.on('selectNode', (params) => { const id = params.nodes && params.nodes[0]; if (id != null) { const o = topicUI ? topicUI.ownerOf(id) : null; if (o != null && o !== hostId) refreshSoon(id); } });
+    window.addEventListener('resize', layoutSoon);
+    try {
+        const ro = new ResizeObserver(layoutSoon); ['topicPanel', 'defsView'].forEach(id => { const el = document.getElementById(id); if (el) { ro.observe(el); new MutationObserver(layoutSoon).observe(el, { attributes: true, attributeFilter: ['class'] }); } });
+    } catch (_e) { /* sin observadores: se ajusta con resize */ }
+    setTimeout(() => refresh(), 1500);
+    return { refresh };
+})();
 
 // ==========================================
 // MODO LECTOR: pestañas "Tengo un texto" / "Solo un tema", y botones de generar abajo

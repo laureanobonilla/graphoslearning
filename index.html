@@ -500,6 +500,108 @@
             #topicPanel mark.tp-mark { background: color-mix(in srgb, var(--mc, #0e857c) 12%, transparent); color: inherit; border-bottom: 2px solid var(--mc, #0e857c); text-decoration: none; cursor: pointer; border-radius: 2px; padding: 0 1px; }
             #topicPanel mark.tp-mark:hover, #topicPanel mark.tp-mark.flash { background: color-mix(in srgb, var(--mc, #0e857c) 30%, transparent); }
         }
+
+        /* --- PANEL INFERIOR (escritorio): notas + vistas del texto --- */
+        #vizPanel { display: none; }
+        @media (min-width: 781px) {
+            #vizPanel { --p-bg: #f7f6f1; --p-bg2: #efede5; --p-head: #fbfaf6; --p-ink: #1d2330; --p-ink2: #3a4254; --p-mute: #5f6879; --p-rule: #dcd9ce; --p-acc: #0e857c; --p-acc-bg: rgba(14,133,124,.12);
+                position: fixed; bottom: 0; left: var(--vz-l, 0px); right: var(--vz-r, 0px); height: var(--vz-h, 44px); z-index: 24; flex-direction: column; background: var(--p-bg); color: var(--p-ink); font-family: 'Inter', sans-serif; border-top: 1px solid var(--p-rule); box-shadow: 0 -8px 24px rgba(0,0,0,.22); }
+            #vizPanel.on { display: flex; }
+            #vizPanel .vz-rz { position: absolute; left: 0; right: 0; top: -6px; height: 12px; cursor: row-resize; z-index: 5; touch-action: none; }
+            #vizPanel .vz-rz::after { content: ''; position: absolute; left: 50%; top: 4px; width: 56px; height: 4px; margin-left: -28px; border-radius: 4px; background: var(--p-rule); transition: background .15s; }
+            #vizPanel .vz-rz:hover::after, body.gk-resizing #vizPanel .vz-rz::after { background: var(--p-acc); }
+            #vizPanel:not(.open) .vz-rz { display: none; }
+            #vizPanel .vz-strip { flex: 0 0 44px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 8px; background: var(--p-head); border-bottom: 1px solid transparent; }
+            #vizPanel.open .vz-strip { border-bottom-color: var(--p-rule); }
+            #vizPanel .vz-tabs { flex: 1; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+            #vizPanel .vz-tabs::-webkit-scrollbar { display: none; }
+            #vizPanel .vz-tab { flex: 0 0 auto; border: 0; background: transparent; color: var(--p-mute); font: 600 13px/1 'Inter', sans-serif; padding: 11px 12px; border-radius: 9px; cursor: pointer; white-space: nowrap; }
+            #vizPanel .vz-tab:hover { color: var(--p-ink); background: var(--p-bg2); }
+            #vizPanel.open .vz-tab.on { color: var(--p-acc); background: var(--p-acc-bg); }
+            #vizPanel .vz-tab .n { margin-left: 5px; font-weight: 700; color: var(--p-acc); }
+            #vizPanel .vz-status { font: 500 12px 'Inter', sans-serif; color: var(--p-mute); white-space: nowrap; }
+            #vizPanel .vz-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--p-rule); background: #fff; color: var(--p-mute); cursor: pointer; font-size: 14px; flex: 0 0 auto; }
+            #vizPanel .vz-btn:hover { color: var(--p-acc); border-color: var(--p-acc); }
+            #vizPanel .vz-body { flex: 1 1 auto; overflow: auto; padding: 16px 22px 18px; scrollbar-width: thin; scrollbar-color: #c9c5b7 transparent; }
+            #vizPanel:not(.open) .vz-body, #vizPanel:not(.open) .vz-quote { display: none; }
+            #vizPanel .vz-quote { flex: 0 0 auto; display: none; align-items: center; gap: 12px; padding: 8px 22px; border-top: 1px solid var(--p-rule); background: var(--p-head); font: 400 14px/1.5 Charter, Georgia, serif; color: var(--p-ink2); }
+            #vizPanel.open .vz-quote.on { display: flex; }
+            #vizPanel .vz-quote q { flex: 1; font-style: italic; quotes: '«' '»'; }
+            #vizPanel .vz-quote button { border: 1px solid var(--p-acc); color: var(--p-acc); background: #fff; border-radius: 8px; padding: 5px 10px; font: 600 12px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
+            #vizPanel .vz-quote button:hover { background: var(--p-acc-bg); }
+            #vizPanel .vz-empty { color: var(--p-mute); font: 400 14px/1.6 'Inter', sans-serif; padding: 8px 0; }
+            #vizPanel .vz-note-form { display: flex; gap: 10px; align-items: flex-start; max-width: 760px; }
+            #vizPanel .vz-note-form textarea { flex: 1; min-height: 54px; resize: vertical; border: 1px solid var(--p-rule); border-radius: 10px; padding: 10px 12px; background: #fff; color: var(--p-ink); font: 400 16px/1.55 Charter, Georgia, serif; }
+            #vizPanel .vz-note-form textarea:focus { outline: 2px solid var(--p-acc-bg); border-color: var(--p-acc); }
+            #vizPanel .vz-primary { border: 0; background: var(--p-acc); color: #fff; border-radius: 10px; padding: 9px 14px; font: 700 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
+            #vizPanel .vz-primary:hover { filter: brightness(1.08); }
+            #vizPanel .vz-ghost { border: 1px solid var(--p-rule); background: #fff; color: var(--p-mute); border-radius: 8px; padding: 5px 9px; font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+            #vizPanel .vz-ghost:hover { color: var(--p-acc); border-color: var(--p-acc); }
+            #vizPanel .vz-notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 14px; }
+            #vizPanel .vz-note { background: #fff; border: 1px solid var(--p-rule); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+            #vizPanel .vz-note .t { font: 400 15.5px/1.55 Charter, Georgia, serif; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; }
+            #vizPanel .vz-note .m { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font: 500 11.5px 'Inter', sans-serif; color: var(--p-mute); }
+            #vizPanel .vz-note .m .sp { flex: 1; }
+            #vizPanel .vz-chip { border: 0; background: var(--p-acc-bg); color: var(--p-acc); border-radius: 999px; padding: 3px 9px; font: 600 11.5px 'Inter', sans-serif; cursor: pointer; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            #vizPanel .vz-click { cursor: pointer; }
+            #vizPanel .vz-click:hover { box-shadow: 0 0 0 2px var(--p-acc-bg); border-color: var(--p-acc) !important; }
+            #vizPanel .vz-sel { box-shadow: 0 0 0 2px var(--p-acc) !important; }
+            /* línea de tiempo */
+            #vizPanel .vz-tl { position: relative; display: flex; gap: 0; min-width: max-content; padding-top: 6px; }
+            #vizPanel .vz-tl::before { content: ''; position: absolute; left: 0; right: 0; top: 34px; height: 2px; background: var(--p-rule); }
+            #vizPanel .vz-ev { position: relative; width: 190px; padding: 0 10px; }
+            #vizPanel .vz-ev .d { font: 700 14px 'Sora', sans-serif; color: var(--p-acc); height: 22px; }
+            #vizPanel .vz-ev .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--p-acc); border: 3px solid var(--p-bg); box-shadow: 0 0 0 1.5px var(--p-acc); margin: 6px 0 10px; position: relative; }
+            #vizPanel .vz-ev .l { background: #fff; border: 1px solid var(--p-rule); border-radius: 10px; padding: 9px 11px; font: 400 14px/1.45 'Inter', sans-serif; }
+            /* causa → efecto y actores */
+            #vizPanel .vz-graph { position: relative; }
+            #vizPanel .vz-graph svg { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+            #vizPanel .vz-graph svg path, #vizPanel .vz-graph svg line { pointer-events: stroke; cursor: pointer; }
+            #vizPanel .vz-box { position: absolute; background: #fff; border: 1px solid var(--p-rule); border-radius: 10px; padding: 8px 10px; font: 500 13.5px/1.35 'Inter', sans-serif; display: flex; align-items: center; justify-content: center; text-align: center; box-sizing: border-box; }
+            /* proceso */
+            #vizPanel .vz-steps { display: flex; flex-wrap: wrap; gap: 12px 26px; counter-reset: st; }
+            #vizPanel .vz-step { position: relative; width: 230px; background: #fff; border: 1px solid var(--p-rule); border-radius: 12px; padding: 12px 14px 12px 46px; }
+            #vizPanel .vz-step::before { counter-increment: st; content: counter(st); position: absolute; left: 12px; top: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--p-acc); color: #fff; font: 700 12px/24px 'Inter', sans-serif; text-align: center; }
+            #vizPanel .vz-step:not(:last-child)::after { content: '→'; position: absolute; right: -22px; top: 50%; margin-top: -12px; color: var(--p-mute); font-size: 18px; }
+            #vizPanel .vz-step b { display: block; font: 700 14px 'Sora', sans-serif; margin-bottom: 3px; }
+            #vizPanel .vz-step span { font: 400 13.5px/1.45 'Inter', sans-serif; color: var(--p-ink2); }
+            /* comparar */
+            #vizPanel table.vz-cmp { border-collapse: separate; border-spacing: 0; min-width: 560px; background: #fff; border: 1px solid var(--p-rule); border-radius: 12px; overflow: hidden; }
+            #vizPanel .vz-cmp th, #vizPanel .vz-cmp td { padding: 10px 14px; text-align: left; vertical-align: top; font: 400 14px/1.5 'Inter', sans-serif; border-bottom: 1px solid var(--p-rule); }
+            #vizPanel .vz-cmp tr:last-child th, #vizPanel .vz-cmp tr:last-child td { border-bottom: 0; }
+            #vizPanel .vz-cmp thead th { background: var(--p-head); font: 700 14px 'Sora', sans-serif; }
+            #vizPanel .vz-cmp tbody th { background: var(--p-head); font-weight: 600; color: var(--p-mute); width: 150px; }
+            #vizPanel .vz-cmp tbody tr:nth-child(even) td { background: #fbfaf7; }
+            #vizPanel .vz-cmp td.has { cursor: pointer; }
+            #vizPanel .vz-cmp td.has:hover { background: var(--p-acc-bg); }
+            /* cifras */
+            #vizPanel .vz-bars { display: grid; grid-template-columns: minmax(140px, 260px) 1fr; gap: 8px 14px; align-items: center; max-width: 900px; }
+            #vizPanel .vz-bars .lb { font: 500 13.5px/1.35 'Inter', sans-serif; text-align: right; }
+            #vizPanel .vz-bars .tr { height: 26px; background: var(--p-bg2); border-radius: 6px; position: relative; cursor: pointer; }
+            #vizPanel .vz-bars .tr i { display: block; height: 100%; border-radius: 6px; background: var(--p-acc); opacity: .85; min-width: 3px; }
+            #vizPanel .vz-bars .tr b { position: absolute; left: 8px; top: 0; line-height: 26px; font: 700 12.5px 'Inter', sans-serif; color: var(--p-ink); text-shadow: 0 0 4px var(--p-bg); }
+            #vizPanel .vz-units { display: flex; gap: 6px; margin-bottom: 10px; }
+            /* lugares */
+            #vizPanel .vz-places { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+            #vizPanel .vz-place { background: #fff; border: 1px solid var(--p-rule); border-radius: 12px; padding: 11px 14px; }
+            #vizPanel .vz-place b { font: 700 14.5px 'Sora', sans-serif; display: block; }
+            #vizPanel .vz-place span { font: 400 13.5px/1.45 'Inter', sans-serif; color: var(--p-ink2); display: block; margin: 3px 0 6px; }
+            #vizPanel .vz-place a { font: 600 12px 'Inter', sans-serif; color: var(--p-acc); text-decoration: none; }
+            #vizPanel .vz-place a:hover { text-decoration: underline; }
+            /* tarjetas y quiz */
+            #vizPanel .vz-cardwrap { max-width: 640px; }
+            #vizPanel .vz-flash { background: #fff; border: 1px solid var(--p-rule); border-radius: 16px; min-height: 84px; padding: 14px 22px; cursor: pointer; display: flex; flex-direction: column; justify-content: center; }
+            #vizPanel .vz-flash .q { font: 700 19px/1.3 'Sora', sans-serif; }
+            #vizPanel .vz-flash .a { font: 400 17px/1.6 Charter, Georgia, serif; color: var(--p-ink2); }
+            #vizPanel .vz-flash .a small { display: block; margin-top: 10px; font: 400 14px/1.5 'Inter', sans-serif; color: var(--p-mute); }
+            #vizPanel .vz-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+            #vizPanel .vz-opts { display: grid; gap: 8px; margin-top: 12px; }
+            #vizPanel .vz-opt { text-align: left; background: #fff; border: 1px solid var(--p-rule); border-radius: 10px; padding: 10px 14px; font: 500 14.5px/1.4 'Inter', sans-serif; cursor: pointer; color: var(--p-ink); }
+            #vizPanel .vz-opt:hover:not([disabled]) { border-color: var(--p-acc); }
+            #vizPanel .vz-opt.ok { background: #e3f4ef; border-color: #0e857c; }
+            #vizPanel .vz-opt.bad { background: #fbeaea; border-color: #c25151; }
+        }
+        ::highlight(gk-quote) { background-color: #fde68a; color: #1d2330; }
         /* --- PANEL DEL TEMA (escritorio): texto de solo lectura de un esquema, a la izquierda --- */
         #topicPanel, #topicTab, #topicLoading { display: none; }
         @media (min-width: 781px) {
@@ -921,6 +1023,18 @@
         <div id="topicHint" class="tp-hint">Toca un concepto subrayado para verlo en el mapa.</div>
         <div id="topicBody" class="tp-body"></div>
     </aside>
+    <!-- Panel inferior (escritorio): notas del usuario y vistas sacadas del texto (línea de tiempo, causa→efecto, etc.). Ver vizUI en app.js -->
+    <section id="vizPanel" aria-label="Vistas del texto">
+        <div class="vz-rz" id="vzResize" title="Arrastra para ajustar la altura"></div>
+        <div class="vz-strip">
+            <div id="vzTabs" class="vz-tabs" role="tablist"></div>
+            <span id="vzStatus" class="vz-status"></span>
+            <button id="vzRedo" type="button" class="vz-btn" title="Buscar vistas de nuevo">↻</button>
+            <button id="vzToggle" type="button" class="vz-btn" title="Abrir o cerrar el panel">▴</button>
+        </div>
+        <div id="vzBody" class="vz-body"></div>
+        <div id="vzQuote" class="vz-quote"></div>
+    </section>
     <div id="schemeBreadcrumb" class="hidden">
         <button id="btnExitSubscheme" type="button" class="gk-canvas-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Volver</span></button>
         <span id="schemeBreadcrumbLabel"></span>
