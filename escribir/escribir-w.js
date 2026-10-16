@@ -6,7 +6,7 @@
   const E = window.ESC; if (!E) return;
   const $ = (s) => document.querySelector(s);
   const KEY = 'esc_projects';
-  const CATS = { ortografia: 'Ortografía', precision: 'Precisión', sintesis: 'Dilo más corto', repeticion: 'Repeticiones', observacion: 'Observaciones', comprobar: 'A comprobar', lecturas: 'Autores y textos', idea: 'Ideas tuyas' };
+  const CATS = { ortografia: 'Ortografía', precision: 'Precisión', sintesis: 'Dilo más corto', repeticion: 'Repeticiones', observacion: 'Observaciones', comprobar: 'A comprobar', lecturas: 'Autores y textos', idea: 'Ideas novedosas en tu texto' };
   const ORDER = ['idea', 'ortografia', 'precision', 'sintesis', 'repeticion', 'observacion', 'comprobar', 'lecturas'];
   const GN = { cientifico: 'Científico', ensayo: 'Ensayo', periodistico: 'Periodístico', cuento: 'Cuento', novela: 'Novela' };
   const HINT = { orto: 'Solo corrige ortografía, tildes y puntuación.', estilo: 'Además, señala palabras vagas, frases largas y repeticiones.', ideas: 'Además: detecta ideas nuevas tuyas, datos a comprobar y autores o textos relacionados.' };
