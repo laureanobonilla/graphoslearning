@@ -5593,6 +5593,19 @@ document.getElementById('btnMenuFullSchema')?.addEventListener('click', async ()
     await generateSubschemeFromNode(selectedNodeId);
 });
 
+document.getElementById('btnMenuPractice')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    const nd = nodes.get(selectedNodeId); if (!nd) return;
+    const clean = (t) => String(t || '').replace(/[*_`#]/g, '').replace(/^[^\p{L}\p{N}]+/u, '').replace(/\s+/g, ' ').trim();
+    const t = clean(nd.label).slice(0, 100); if (!t) return;
+    const ctx = clean(globalDocumentContext || '').slice(0, 60);
+    const topic = (ctx && !t.toLowerCase().includes(ctx.toLowerCase()) ? ctx + ': ' : '') + t;
+    track('node_to_practice', {});
+    window.open('/escribir/?practicar=' + encodeURIComponent(topic.slice(0, 160)), '_blank', 'noopener');
+});
+
 document.getElementById('btnMenuLocateText')?.addEventListener('click', () => {
     actionMenu.style.visibility = 'hidden';
     actionMenu.classList.add('hidden');

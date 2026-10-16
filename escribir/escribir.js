@@ -68,6 +68,7 @@
     return ({ login: 'Para seguir, crea tu cuenta gratis o inicia sesión.', nobalance: 'Se acabaron tus gemas. Consigue más para seguir.', rate: 'Hay mucha actividad en tu cuenta. Espera unos minutos e intenta de nuevo.', network: 'Sin conexión. Revisa tu internet e intenta de nuevo.' })[k] || 'No pudimos hacerlo. Intenta de nuevo.';
   }
   function afterFail(k) {
+    if (k === 'login' || k === 'nobalance') track('paywall_shown', { kind: k });
     if (k === 'login') { try { window.netlifyIdentity && netlifyIdentity.open('signup'); } catch { /* nada */ } }
     if (k === 'nobalance' && window.GK_GEMS) window.GK_GEMS.openShop({ from: 'escribir' });
   }
@@ -294,6 +295,11 @@
     track('esc_levelup', { level: lvl });
     begin(S.topic, lvl, r.data.questions, false);
   });
+
+  try {   // llegada desde Graphikosmos ("Practicar este tema"): el tema ya viene escrito
+    const qp = new URLSearchParams(location.search), pt = clip(qp.get('practicar') || '', 160);
+    if (pt.length >= 2) { history.replaceState(null, '', location.pathname); track('esc_from_map', {}); setTimeout(() => { show('Setup'); topicIn.value = pt; topicIn.dispatchEvent(new Event('input')); }, 0); }
+  } catch { /* nada */ }
 
   window.ESC = { show, renderHome, callRetry, failText, afterFail, track, toast, esc, clip, ls, lsSet };
   renderHome();

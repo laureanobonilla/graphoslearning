@@ -142,6 +142,7 @@
   "ui.prompt_personalizado": "Custom prompt",
   "ui.explorar": "Explore",
   "ui.generar_esquema_completo_a_partir": "Generate a full map from here",
+  "ui.practicar_este_tema": "Practice this topic",
   "ui.editar_2": "Edit",
   "ui.expandir_subesquema": "Expand sub-map",
   "ui.enlazar": "Connect",

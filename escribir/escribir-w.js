@@ -68,6 +68,14 @@
   $('#wTitle').addEventListener('input', saveSoon);
   $('#wLevel').addEventListener('change', () => { level = $('#wLevel').value; done = {}; items = []; render(); schedule(300); saveSoon(); E.track('esc_level', { level }); });
   $('#btnCopy').addEventListener('click', async () => { try { await navigator.clipboard.writeText(doc.value); E.toast('Texto copiado'); } catch { doc.select(); E.toast('Selecciona y copia con Ctrl+C'); } });
+  $('#btnMapW').addEventListener('click', () => {
+    const t = doc.value.trim();
+    if (t.length < 200) { E.toast('Escribe al menos un párrafo para armar el mapa.'); return; }
+    const sid = crypto.randomUUID();
+    try { localStorage.setItem('gk_ap_pending', JSON.stringify({ sid, title: ($('#wTitle').value || '').trim().slice(0, 80), text: t.slice(0, 12000) })); } catch { E.toast('No se pudo preparar el mapa.'); return; }
+    E.track('esc_to_map', { len: t.length });
+    window.open('/?aprende=' + sid, '_blank', 'noopener');
+  });
   $('#btnCheck').addEventListener('click', () => { clearTimeout(timer); analyze(true); });
   $('#btnDisc').addEventListener('click', () => { showDisc = !showDisc; render(); });
 

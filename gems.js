@@ -135,7 +135,7 @@
     }
     // En el escritorio (app principal) solo se ofrece el paquete grande de $19.99 (2026-10-16).
     // El paquete sigue existiendo en el servidor por si alguien tiene un pago pendiente.
-    (from === 'graphikosmos' && !/^\/m(\/|$)/.test(location.pathname) ? PACKS.filter((p) => p.id === 'g100') : PACKS).forEach((p) => {
+    ((from === 'graphikosmos' || from === 'escribir') && !/^\/m(\/|$)/.test(location.pathname) ? PACKS.filter((p) => p.id === 'g100') : PACKS).forEach((p) => {
       const left = h('div', {}, [h('div', { class: 'gkg-g' }, [document.createTextNode(fmt(p.gems)), h('small', { text: T.gems })])]);
       if (p.tag) left.appendChild(h('span', { class: 'gkg-tag', text: p.tag === 'best' ? T.best : T.rec }));
       const b = h('button', { class: 'gkg-pk' + (p.tag === 'rec' ? ' hot' : ''), type: 'button', 'data-pack': p.id }, [left, h('div', { class: 'gkg-pr', text: '$' + p.usd })]);

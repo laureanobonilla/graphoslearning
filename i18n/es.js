@@ -142,6 +142,7 @@
   "ui.prompt_personalizado": "Prompt personalizado",
   "ui.explorar": "Explorar",
   "ui.generar_esquema_completo_a_partir": "Generar esquema completo a partir de aquí",
+  "ui.practicar_este_tema": "Practicar este tema",
   "ui.editar_2": "Editar",
   "ui.expandir_subesquema": "Expandir subesquema",
   "ui.enlazar": "Enlazar",
