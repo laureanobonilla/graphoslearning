@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/escribir/escribir.css?v=2">
+<link rel="stylesheet" href="/escribir/escribir.css?v=3">
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
@@ -34,6 +34,15 @@
         <span>Escribe tu propio texto y recibe sugerencias discretas mientras avanzas. Tú decides qué adoptar.</span>
       </button>
     </div>
+  </section>
+
+  <!-- PROYECTOS -->
+  <section id="vProj" class="view" hidden>
+    <button class="back" data-go="home" type="button">‹ Volver</button>
+    <h1>Tus escritos</h1>
+    <div id="projList"></div>
+    <button class="primary" id="btnNew" type="button" style="width:100%;margin-top:14px">Nuevo escrito</button>
+    <p class="msg">Se guardan en este navegador, con las sugerencias que tenían.</p>
   </section>
 
   <!-- GÉNERO -->
@@ -63,9 +72,10 @@
     <div class="wbar">
       <button class="back" id="btnWBack" type="button">‹ Salir</button>
       <span class="sp"></span>
-      <span class="small" id="wInfo"></span>
+      <input id="wTitle" class="wtitle" type="text" maxlength="80" placeholder="Título del escrito" aria-label="Título"><span class="small" id="wInfo"></span><span class="small" id="wSaved"></span>
       <select id="wLevel" aria-label="Nivel de intervención"><option value="orto">Solo ortografía</option><option value="estilo">Ortografía y estilo</option><option value="ideas">Estilo e ideas</option></select>
       <button class="ghost" id="btnCheck" type="button">Revisar ahora</button>
+      <button class="ghost" id="btnDisc" type="button" hidden>Descartadas (<span id="discN">0</span>)</button>
       <button class="ghost" id="btnCopy" type="button">Copiar texto</button>
     </div>
     <div class="wgrid" id="wGrid">
@@ -142,7 +152,7 @@
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=2"></script>
-<script src="/escribir/escribir.js?v=2"></script>
-<script src="/escribir/escribir-w.js?v=1"></script>
+<script src="/escribir/escribir.js?v=3"></script>
+<script src="/escribir/escribir-w.js?v=2"></script>
 </body>
 </html>
