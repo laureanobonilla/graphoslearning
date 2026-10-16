@@ -9,12 +9,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/escribir/escribir.css?v=3">
+<link rel="stylesheet" href="/escribir/escribir.css?v=4">
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
 <header id="bar">
-  <a class="brand" href="/escribir/">Escribir</a>
+  <a class="brand" href="/" title="Graphikosmos"><span class="logo">Γ</span><span class="bname">Graphikosmos</span></a>
+  <nav id="nav" aria-label="Secciones">
+    <a href="/" class="navl">Mapas</a>
+    <button type="button" class="navl" data-nav="practice">Practicar</button>
+    <button type="button" class="navl" data-nav="write">Escribir</button>
+  </nav>
   <span class="sp"></span>
   <button class="chip" id="btnGems" type="button" hidden>◆ <span id="gemsVal">0</span></button>
   <button class="chip" id="btnLogin" type="button"><span id="loginLabel">Entrar</span></button>
@@ -112,7 +117,7 @@
         <button type="button" data-n="8" role="radio" aria-checked="false">8 preguntas</button>
       </div>
       <button class="primary" id="btnStart" type="submit" disabled>Crear preguntas</button>
-      <p class="msg" id="setupMsg" role="status">Las preguntas son gratis. Corregir cada respuesta cuesta 1 gema de nodo.</p>
+      <p class="msg" id="setupMsg" role="status"></p>
     </form>
   </section>
 
@@ -169,7 +174,7 @@
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=7"></script>
-<script src="/escribir/escribir.js?v=8"></script>
+<script src="/escribir/escribir.js?v=9"></script>
 <script src="/escribir/escribir-w.js?v=7"></script>
 </body>
 </html>

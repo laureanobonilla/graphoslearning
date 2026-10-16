@@ -107,3 +107,10 @@ main:has(.view.wide:not([hidden])){max-width:none;padding:14px 16px 24px}
 
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.chips .chip{cursor:default}
 .backOrig{margin:0 0 10px}
+
+.brand{display:flex;align-items:center;gap:9px}
+.logo{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#4fd1c5,#8b7cf6);color:#0a0e1a;display:flex;align-items:center;justify-content:center;font:700 16px var(--disp);box-shadow:0 0 16px rgba(79,209,197,.3)}
+#nav{display:flex;gap:2px;margin-left:14px}
+.navl{background:none;border:0;color:var(--mid);font:600 14px var(--font);padding:7px 12px;border-radius:10px;text-decoration:none}
+.navl:hover{color:var(--hi);background:var(--s1)}.navl.on{color:var(--cy)}
+@media(max-width:560px){.bname{display:none}#nav{margin-left:4px}.navl{padding:7px 8px}}

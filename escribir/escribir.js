@@ -306,6 +306,14 @@
     if (pt.length >= 2) { history.replaceState(null, '', location.pathname); track('esc_from_map', {}); setTimeout(() => { show('Setup'); topicIn.value = pt; topicIn.dispatchEvent(new Event('input')); }, 0); }
   } catch { /* nada */ }
 
+  /* navegación común: Mapas (Graphikosmos) · Practicar · Escribir */
+  document.querySelectorAll('[data-nav]').forEach((b) => b.addEventListener('click', () => {
+    const inPractice = !$('#vAsk').hidden || !$('#vFb').hidden;
+    if (inPractice && !confirm('¿Salir de la práctica en curso?')) return;
+    S = null;
+    $(b.dataset.nav === 'practice' ? '#modePractice' : '#modeWrite').click();
+  }));
+
   window.ESC = { show, renderHome, callRetry, failText, afterFail, track, toast, esc, clip, ls, lsSet };
   renderHome();
 })();
