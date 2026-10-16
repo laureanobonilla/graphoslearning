@@ -225,6 +225,7 @@
   "js.conectando_nodos_y_relaciones": "Connecting nodes and relationships...",
   "js.organizando_niveles_en_el_lienzo": "Arranging levels on the canvas...",
   "js.invitado": "Guest",
+  "js.seguir_sin_esperar_limite_hora": "keep going without waiting (you've done a lot this hour)",
   "js.estas_generando_muy_rapido_espera": "You're generating too fast. Wait a minute and try again.",
   "js.procesar_este_esquema": "process this map",
   "js.mi_cuenta": "My Account",

@@ -225,6 +225,7 @@
   "js.conectando_nodos_y_relaciones": "Conectando nodos y relaciones...",
   "js.organizando_niveles_en_el_lienzo": "Organizando niveles en el lienzo...",
   "js.invitado": "Invitado",
+  "js.seguir_sin_esperar_limite_hora": "seguir sin esperar (llevas muchas acciones esta hora)",
   "js.estas_generando_muy_rapido_espera": "Estás generando muy rápido. Espera un minuto y vuelve a intentar.",
   "js.procesar_este_esquema": "procesar este esquema",
   "js.mi_cuenta": "Mi Cuenta",

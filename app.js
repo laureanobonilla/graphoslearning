@@ -827,6 +827,9 @@ function handleBillingError(status, data) {
         return true;
     }
     if (status === 429) {
+        track('rate_limited', { guest: !currentUser && !isAdmin, used: data?.used ?? null, limit: data?.limit ?? null });
+        // Un invitado que topa con el límite por hora debe poder seguir ya: se le ofrece crear su cuenta.
+        if (!currentUser && !isAdmin) { markPendingGenWall(); requireAuth(tr("js.seguir_sin_esperar_limite_hora")); return true; }
         appAlert(tr("js.estas_generando_muy_rapido_espera"));
         return true;
     }
