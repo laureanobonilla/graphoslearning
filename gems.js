@@ -133,7 +133,9 @@
       card.appendChild(h('p', { class: 'gkg-foot' }, [helpLink()]));
       openOverlay(card); return;
     }
-    PACKS.forEach((p) => {
+    // En el escritorio (app principal) no se ofrece el paquete intermedio: la compra grande rinde más (2026-10-16).
+    // El paquete sigue existiendo en el servidor por si alguien tiene un pago pendiente.
+    (from === 'graphikosmos' ? PACKS.filter((p) => p.id !== 'g40') : PACKS).forEach((p) => {
       const left = h('div', {}, [h('div', { class: 'gkg-g' }, [document.createTextNode(fmt(p.gems)), h('small', { text: T.gems })])]);
       if (p.tag) left.appendChild(h('span', { class: 'gkg-tag', text: p.tag === 'best' ? T.best : T.rec }));
       const b = h('button', { class: 'gkg-pk' + (p.tag === 'rec' ? ' hot' : ''), type: 'button', 'data-pack': p.id }, [left, h('div', { class: 'gkg-pr', text: '$' + p.usd })]);
