@@ -5,13 +5,13 @@
   const $ = (s) => document.querySelector(s);
   const FN = '/.netlify/functions/';
   const LS = { fail: 'esc_failed', errs: 'esc_errs', anon: 'gk_anon_id' };
-  const LV = { 1: 'Básico', 2: 'Medio', 3: 'Alto' };
+  const LV = { 1: 'Principiante', 2: 'Intermedio', 3: 'Avanzado' };
   const CRIT = { precision: 'Precisión', completitud: 'Completitud', claridad: 'Claridad' };
   const LVTXT = { logrado: 'Logrado', parcial: 'Parcial', falta: 'Falta trabajo' };
   const CONF = { 3: 'Lo sabías bien', 2: 'Más o menos', 1: 'Adivinabas' };
 
   let S = null; // { topic, level, qs:[{q,level,focus}], i, results:[], asked:[], review }
-  let count = 5, conf = 0, busyNow = false;
+  let count = 5, pickLv = 1, conf = 0, busyNow = false;
 
   /* ---------- utilidades ---------- */
   const clip = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
@@ -99,6 +99,11 @@
     count = Number(b.dataset.n);
     document.querySelectorAll('#countSeg button').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
   });
+  $('#levelPick').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-lv]'); if (!b) return;
+    pickLv = Number(b.dataset.lv);
+    document.querySelectorAll('#levelPick button').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+  });
   async function fetchQuestions(topic, level, n, avoid) {
     return callRetry({ action: 'esc_questions', topic, count: n, level, avoid });
   }
@@ -108,12 +113,12 @@
     const msg = $('#setupMsg'); msg.className = 'msg'; msg.textContent = 'Armando tus preguntas…';
     busyNow = true; btnStart.disabled = true;
     const topic = clip(topicIn.value, 160);
-    const r = await fetchQuestions(topic, 1, count, []);
+    const r = await fetchQuestions(topic, pickLv, count, []);
     busyNow = false; btnStart.disabled = false;
     if (!r.ok) { msg.className = 'msg err'; msg.textContent = failText(r.kind); afterFail(r.kind); return; }
     msg.textContent = '';
-    track('esc_start', { count, level: 1, topicLen: topic.length });
-    begin(r.data.topic || topic, 1, r.data.questions, false);
+    track('esc_start', { count, level: pickLv, topicLen: topic.length });
+    begin(r.data.topic || topic, pickLv, r.data.questions, false);
   });
 
   /* ---------- sesión ---------- */
@@ -134,7 +139,7 @@
     const q = S.qs[S.i];
     show('Ask'); setProg();
     $('#qNum').textContent = 'Pregunta ' + (S.i + 1) + ' de ' + S.qs.length;
-    $('#qLevel').textContent = 'Nivel ' + (LV[q.level] || 'Básico').toLowerCase();
+    $('#qLevel').textContent = 'Nivel ' + (LV[q.level] || 'Principiante').toLowerCase();
     $('#qText').textContent = q.q;
     conf = 0;
     document.querySelectorAll('#confSeg button').forEach((b) => b.classList.remove('on'));
@@ -165,7 +170,7 @@
     const q = S.qs[S.i], ans = $('#ansIn').value.trim();
     const msg = $('#askMsg'); msg.className = 'msg'; msg.textContent = 'Revisando tu respuesta…';
     busyNow = true; $('#btnSend').disabled = true;
-    const r = await callRetry({ action: 'esc_feedback', topic: q.topic || S.topic, question: q.q, focus: q.focus, userAnswer: ans });
+    const r = await callRetry({ action: 'esc_feedback', topic: q.topic || S.topic, question: q.q, focus: q.focus, level: q.level, userAnswer: ans });
     busyNow = false;
     if (!r.ok) { msg.className = 'msg err'; msg.textContent = failText(r.kind); updateSend(); afterFail(r.kind); return; }
     const fb = r.data;

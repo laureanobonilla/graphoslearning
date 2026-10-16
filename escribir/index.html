@@ -98,6 +98,12 @@
     <form id="setupForm" autocomplete="off">
       <label for="topicIn">Tema</label>
       <input id="topicIn" type="text" maxlength="160" placeholder="Ej.: la fotosíntesis, el Renacimiento, la inflación" enterkeyhint="go">
+      <label>Tu nivel</label>
+      <div class="seg" id="levelPick" role="radiogroup">
+        <button type="button" class="on" data-lv="1" role="radio" aria-checked="true">Principiante</button>
+        <button type="button" data-lv="2" role="radio" aria-checked="false">Intermedio</button>
+        <button type="button" data-lv="3" role="radio" aria-checked="false">Avanzado</button>
+      </div>
       <label>Cantidad de preguntas</label>
       <div class="seg" id="countSeg" role="radiogroup">
         <button type="button" class="on" data-n="5" role="radio" aria-checked="true">5 preguntas</button>
@@ -158,7 +164,7 @@
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=2"></script>
-<script src="/escribir/escribir.js?v=3"></script>
-<script src="/escribir/escribir-w.js?v=5"></script>
+<script src="/escribir/escribir.js?v=4"></script>
+<script src="/escribir/escribir-w.js?v=6"></script>
 </body>
 </html>

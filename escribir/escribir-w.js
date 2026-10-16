@@ -6,8 +6,8 @@
   const E = window.ESC; if (!E) return;
   const $ = (s) => document.querySelector(s);
   const KEY = 'esc_projects';
-  const CATS = { ortografia: 'Ortografía', precision: 'Precisión', sintesis: 'Dilo más corto', repeticion: 'Repeticiones', observacion: 'Observaciones', comprobar: 'A comprobar', lecturas: 'Autores y textos', idea: 'Ideas novedosas en tu texto' };
-  const ORDER = ['idea', 'ortografia', 'precision', 'sintesis', 'repeticion', 'observacion', 'comprobar', 'lecturas'];
+  const CATS = { ortografia: 'Ortografía', precision: 'Precisión', sintesis: 'Dilo más corto', repeticion: 'Repeticiones', observacion: 'Observaciones', comprobar: 'A comprobar', lecturas: 'Autores y textos', idea: 'Ideas novedosas en tu texto', lugarcomun: 'Lugares comunes', critica: 'Crítica literaria' };
+  const ORDER = ['idea', 'critica', 'lugarcomun', 'ortografia', 'precision', 'sintesis', 'repeticion', 'observacion', 'comprobar', 'lecturas'];
   const GN = { cientifico: 'Científico', ensayo: 'Ensayo', periodistico: 'Periodístico', discurso: 'Discurso', resena: 'Reseña', carta: 'Carta', cuento: 'Cuento', novela: 'Novela', poesia: 'Poesía', guion: 'Guion', memorias: 'Memorias' };
   const CREATIVE = ['cuento', 'novela', 'poesia', 'guion', 'memorias'];
   const HINT = { orto: 'Solo corrige ortografía, tildes y puntuación.', estilo: 'Además, señala palabras vagas, frases largas y repeticiones.', ideas: 'Además: detecta ideas nuevas tuyas, datos a comprobar y autores o textos relacionados.' };
@@ -46,7 +46,7 @@
 
   /* ---- género / nivel ---- */
   function sel(seg, attr, val) { document.querySelectorAll(seg + ' button').forEach((b) => b.classList.toggle('on', b.dataset[attr] === val)); }
-  function gHint() { $('#genreHint').textContent = HINT[level] + (CREATIVE.includes(genre) ? ' En géneros creativos nunca se reescribe tu texto: solo ortografía clara y preguntas.' : ''); }
+  function gHint() { $('#genreHint').textContent = HINT[level] + (CREATIVE.includes(genre) ? ' En géneros creativos nunca se reescribe tu texto: solo ortografía clara, lugares comunes y crítica literaria en forma de pregunta.' : ''); }
   $('#genreSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-g]'); if (!b) return; genre = b.dataset.g; sel('#genreSeg', 'g', genre); gHint(); });
   $('#levelSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-l]'); if (!b) return; level = b.dataset.l; sel('#levelSeg', 'l', level); gHint(); });
   $('#btnWrite').addEventListener('click', () => {
