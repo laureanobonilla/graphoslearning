@@ -1280,7 +1280,7 @@ const depthView = (() => {
         kick();
     }
     sel?.addEventListener('change', (e) => set(e.target.value, true));
-    let saved = 'flat'; try { saved = localStorage.getItem('gk_view_mode') === 'depth' ? 'depth' : 'flat'; } catch (_e) { /* ok */ }
+    let saved = 'depth'; try { saved = localStorage.getItem('gk_view_mode') === 'flat' ? 'flat' : 'depth'; } catch (_e) { /* ok */ }   // por defecto Profundidad; solo queda Plana si la persona la eligió
     if (saved === 'depth') set('depth', false);
     return { set };
   } catch (_e) { return { set() {} }; }
