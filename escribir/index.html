@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/escribir/escribir.css?v=1">
+<link rel="stylesheet" href="/escribir/escribir.css?v=2">
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
@@ -29,11 +29,50 @@
         <strong>Practicar</strong>
         <span>Elige un tema, responde preguntas de desarrollo y recibe retroalimentación por criterios.</span>
       </button>
-      <div class="mode off" aria-disabled="true">
+      <button class="mode" id="modeWrite" type="button">
         <strong>Escribir</strong>
-        <span>Un asistente que te acompaña mientras escribes tu propio texto. Próximamente.</span>
-      </div>
+        <span>Escribe tu propio texto y recibe sugerencias discretas mientras avanzas. Tú decides qué adoptar.</span>
+      </button>
     </div>
+  </section>
+
+  <!-- GÉNERO -->
+  <section id="vGenre" class="view" hidden>
+    <button class="back" data-go="home" type="button">‹ Volver</button>
+    <h1>Escribir</h1>
+    <label>¿Qué vas a escribir?</label>
+    <div class="genres" id="genreSeg">
+      <button type="button" data-g="cientifico"><strong>Científico</strong><span>Precisión y claridad</span></button>
+      <button type="button" data-g="ensayo" class="on"><strong>Ensayo</strong><span>Argumento y estilo</span></button>
+      <button type="button" data-g="periodistico"><strong>Periodístico</strong><span>Datos y síntesis</span></button>
+      <button type="button" data-g="cuento"><strong>Cuento</strong><span>Tu prosa no se toca</span></button>
+      <button type="button" data-g="novela"><strong>Novela</strong><span>Tu prosa no se toca</span></button>
+    </div>
+    <label>¿Cuánto quieres que intervenga el asistente?</label>
+    <div class="seg" id="levelSeg">
+      <button type="button" data-l="orto">Solo ortografía</button>
+      <button type="button" data-l="estilo" class="on">Ortografía y estilo</button>
+      <button type="button" data-l="ideas">Estilo e ideas</button>
+    </div>
+    <p class="msg" id="genreHint"></p>
+    <button class="primary" id="btnWrite" type="button" style="margin-top:18px;width:100%">Empezar a escribir</button>
+  </section>
+
+  <!-- ESCRIBIR -->
+  <section id="vWrite" class="view wide" hidden>
+    <div class="wbar">
+      <button class="back" id="btnWBack" type="button">‹ Salir</button>
+      <span class="sp"></span>
+      <span class="small" id="wInfo"></span>
+      <select id="wLevel" aria-label="Nivel de intervención"><option value="orto">Solo ortografía</option><option value="estilo">Ortografía y estilo</option><option value="ideas">Estilo e ideas</option></select>
+      <button class="ghost" id="btnCheck" type="button">Revisar ahora</button>
+      <button class="ghost" id="btnCopy" type="button">Copiar texto</button>
+    </div>
+    <div class="wgrid" id="wGrid">
+      <textarea id="doc" spellcheck="false" placeholder="Empieza a escribir. Las sugerencias aparecen a un lado, cuando haces una pausa."></textarea>
+      <aside id="boxes" aria-label="Sugerencias"></aside>
+    </div>
+    <p class="msg" id="wMsg" role="status"></p>
   </section>
 
   <!-- PREPARAR -->
@@ -103,6 +142,7 @@
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=2"></script>
-<script src="/escribir/escribir.js?v=1"></script>
+<script src="/escribir/escribir.js?v=2"></script>
+<script src="/escribir/escribir-w.js?v=1"></script>
 </body>
 </html>

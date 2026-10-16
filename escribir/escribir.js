@@ -73,7 +73,7 @@
   }
 
   /* ---------- navegación ---------- */
-  function show(v) { ['Home', 'Setup', 'Ask', 'Fb', 'End'].forEach((n) => { $('#v' + n).hidden = n !== v; }); window.scrollTo(0, 0); }
+  function show(v) { ['Home', 'Setup', 'Ask', 'Fb', 'End', 'Genre', 'Write'].forEach((n) => { $('#v' + n).hidden = n !== v; }); window.scrollTo(0, 0); }
   document.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { if (b.dataset.go === 'home') renderHome(); } });
 
   function dueReviews() { const now = Date.now(); return ls(LS.fail, []).filter((f) => f.due <= now); }
@@ -260,5 +260,6 @@
     begin(S.topic, lvl, r.data.questions, false);
   });
 
+  window.ESC = { show, renderHome, callRetry, failText, afterFail, track, toast, esc, clip, ls, lsSet };
   renderHome();
 })();

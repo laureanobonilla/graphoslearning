@@ -21,11 +21,11 @@ const KNOWN = new Set([
     // Oráculo del Caos (/oraculo/): 5 señales gratis al día con tono al azar; elegir el tono o pasar de 5 cuesta 1 nodo.
     'oracle',
     // Escribir (/escribir/): preguntas de desarrollo (gratis) y retroalimentación de una respuesta (1 nodo).
-    'esc_questions', 'esc_feedback'
+    'esc_questions', 'esc_feedback', 'esc_analyze'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome', 'esc_questions']);
+const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome', 'esc_questions', 'esc_analyze']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.
