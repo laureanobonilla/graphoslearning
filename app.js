@@ -744,6 +744,8 @@ function isRelatedEdgeLabel(l) { return RELATED_EDGE_LABELS.has(l); }
             || target.includes('/.netlify/functions/db')
             || target.includes('/.netlify/functions/balance');
         if (!isOurFn) return nativeFetch(url, options);
+        // Tras un 429 se pausan unos segundos las llamadas automáticas (definiciones, vistas…): no tiene sentido lanzarlas en ráfaga.
+        if (target.includes('/.netlify/functions/gemini') && Date.now() < (window.__gkRateBlockUntil || 0)) throw new Error('billing_blocked');
 
         const finalOptions = { ...options, credentials: 'same-origin', headers: await authHeaders(options.headers) };
         // El servidor responde (prompts de Gemini) en el idioma de la página.
@@ -827,6 +829,9 @@ function handleBillingError(status, data) {
         return true;
     }
     if (status === 429) {
+        const nowT = Date.now(), first = nowT > (window.__gkRateBlockUntil || 0);
+        window.__gkRateBlockUntil = nowT + 8000;
+        if (!first) return true;   // ráfaga: ya se avisó, no se repite aviso ni evento
         track('rate_limited', { guest: !currentUser && !isAdmin, used: data?.used ?? null, limit: data?.limit ?? null });
         // Un invitado que topa con el límite por hora debe poder seguir ya: se le ofrece crear su cuenta.
         if (!currentUser && !isAdmin) { markPendingGenWall(); requireAuth(tr("js.seguir_sin_esperar_limite_hora")); return true; }

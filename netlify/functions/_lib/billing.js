@@ -137,7 +137,8 @@ function withBilling(raw, overrides = {}) {
         getExistingGuestId: require('./guest').getExistingGuestId,
         store: require('./store'),
         rateLimitUser: Number(process.env.RATE_LIMIT_PER_HOUR || 60),
-        rateLimitGuest: Number(process.env.GUEST_RATE_LIMIT_PER_HOUR || 40),
+        // Fijo a propósito (2026-10-15): con 20 un invitado nuevo lo alcanzaba al minuto de llegar. Ya no depende de la variable de Netlify.
+        rateLimitGuest: 80,
         ...overrides
     };
 
