@@ -202,6 +202,7 @@
     if (res.conf === 3 && ok) return 'Tu seguridad coincidió con el resultado.';
     return '';
   }
+  function practBtn(k) { return S.parent ? '' : '<button class="ghost" data-pract="' + k + '" type="button">Practicar estos conceptos</button>'; }
   function renderFb(res) {
     const fb = res.fb;
     show('Fb'); setProg();
@@ -213,29 +214,33 @@
     h += '</div>';
     if (fb.summary) h += '<p>' + esc(fb.summary) + '</p>';
     const cal = calibration(res); if (cal) h += '<p class="calib">' + esc(cal) + '</p>';
-    if (fb.terms.length) { h += '<div class="card"><h3>Palabras más exactas</h3>'; fb.terms.forEach((t) => { h += '<div class="sug"><s>' + esc(t.said) + '</s> → <b>' + esc(t.better) + '</b><em>' + esc(t.why) + '</em></div>'; }); h += '</div>'; }
-    if (fb.synthesis.length) { h += '<div class="card"><h3>Dilo más preciso</h3>'; fb.synthesis.forEach((t) => { h += '<div class="sug"><s>' + esc(t.long) + '</s><br>→ <b>' + esc(t.short) + '</b></div>'; }); h += '</div>'; }
+    if (fb.terms.length) { h += '<div class="card"><h3>Palabras más exactas</h3>'; fb.terms.forEach((t) => { h += '<div class="sug"><s>' + esc(t.said) + '</s> → <b>' + esc(t.better) + '</b><em>' + esc(t.why) + '</em></div>'; }); h += practBtn('terms') + '</div>'; }
+    if (fb.synthesis.length) { h += '<div class="card"><h3>Dilo más preciso</h3>'; fb.synthesis.forEach((t) => { h += '<div class="sug"><s>' + esc(t.long) + '</s><br>→ <b>' + esc(t.short) + '</b></div>'; }); h += practBtn('synthesis') + '</div>'; }
     if (fb.missing.length) { h += '<div class="card"><h3>Lo que faltó</h3><ul>' + fb.missing.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></div>'; }
     if (fb.concepts && fb.concepts.length) {
       h += '<div class="card"><h3>Conceptos importantes que no mencionaste</h3><div class="chips">' + fb.concepts.map((c) => '<span class="chip">' + esc(c) + '</span>').join('') + '</div>' +
-        '<button class="ghost" id="btnConcepts" type="button">Practicar estos conceptos</button>' +
+        (S.parent ? '' : '<button class="ghost" data-pract="concepts" type="button">Practicar estos conceptos</button>') +
         (S.parent ? '' : '<p class="small">Después podrás volver aquí, a la pregunta ' + (S.i + 2 <= S.qs.length ? (S.i + 2) : 'final') + '.</p>') + '</div>';
     }
     h += '<div class="card"><h3>Respuesta modelo</h3><div class="model">' + esc(fb.modelAnswer) + '</div></div>';
     $('#fbBody').innerHTML = h;
-    const bc = $('#btnConcepts'); if (bc) bc.addEventListener('click', () => practiceConcepts(fb.concepts, bc));
+    document.querySelectorAll('#fbBody [data-pract]').forEach((bc) => bc.addEventListener('click', () => {
+      const k = bc.dataset.pract;
+      const list = k === 'terms' ? fb.terms.map((t) => t.better) : k === 'synthesis' ? fb.synthesis.map((t) => t.short) : fb.concepts;
+      practiceConcepts(list.slice(0, 4), bc, k);
+    }));
     syncBack();
     $('#btnNext').textContent = S.i + 1 >= S.qs.length ? 'Ver resumen' : 'Siguiente';
   }
   function syncBack() { document.querySelectorAll('[data-back]').forEach((b) => { b.hidden = !(S && S.parent); }); }
-  async function practiceConcepts(concepts, btn) {
+  async function practiceConcepts(concepts, btn, kind) {
     if (busyNow || S.parent) { if (S.parent) toast('Termina o vuelve a la práctica original primero.'); return; }
     busyNow = true; btn.disabled = true; const old = btn.textContent; btn.textContent = 'Armando preguntas…';
     const sub = S.topic + ': ' + concepts.join(', ');
     const r = await fetchQuestions(sub.slice(0, 160), S.level, 3, []);
     busyNow = false; btn.disabled = false; btn.textContent = old;
     if (!r.ok) { toast(failText(r.kind)); afterFail(r.kind); return; }
-    track('esc_concepts_start', { n: concepts.length });
+    track('esc_concepts_start', { n: concepts.length, from: kind || 'concepts' });
     const parent = S; parent.i = S.i + 1;   // al volver se sigue con la pregunta que tocaba
     begin(S.topic + ' · conceptos', S.level, r.data.questions, false);
     S.parent = parent; syncBack();
