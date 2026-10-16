@@ -114,9 +114,17 @@
   function xBtn() { return h('button', { class: 'gkg-x', type: 'button', 'aria-label': T.close, text: '×', onclick: closeOverlay }); }
 
   /* ---------- Tienda ---------- */
+  // Registro (solo para medir el embudo): quién abrió la tienda y desde dónde. Nunca debe romper nada.
+  function trackShop(event, md) {
+    try {
+      let id = ''; try { id = localStorage.getItem('gk_anon_id') || ''; if (!id) { id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'a' + Math.random().toString(36).slice(2, 12); localStorage.setItem('gk_anon_id', id); } } catch (e) { /* nada */ }
+      fetch('/.netlify/functions/track-event', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event, anonId: id, metadata: md || {} }) }).catch(() => {});
+    } catch (e) { /* nada */ }
+  }
   function openShop(opts) {
     opts = opts || {};
     const from = opts.from || cfg.from;
+    trackShop('shop_opened', { from, loggedIn: !!user() });
     const card = h('div', { class: 'gkg-card' }, [xBtn(), h('h2', { text: T.shopTitle }), h('p', { class: 'gkg-sub', text: T.shopSub })]);
     const msg = h('p', { class: 'gkg-msg', role: 'status' });
     if (!user()) {
@@ -129,7 +137,7 @@
       const left = h('div', {}, [h('div', { class: 'gkg-g' }, [document.createTextNode(fmt(p.gems)), h('small', { text: T.gems })])]);
       if (p.tag) left.appendChild(h('span', { class: 'gkg-tag', text: p.tag === 'best' ? T.best : T.rec }));
       const b = h('button', { class: 'gkg-pk' + (p.tag === 'rec' ? ' hot' : ''), type: 'button', 'data-pack': p.id }, [left, h('div', { class: 'gkg-pr', text: '$' + p.usd })]);
-      b.addEventListener('click', () => buy(p, from, card, msg));
+      b.addEventListener('click', () => { trackShop('pack_clicked', { from, pack: p.id }); buy(p, from, card, msg); });
       card.appendChild(b);
     });
     card.appendChild(msg);

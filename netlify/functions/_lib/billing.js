@@ -136,9 +136,11 @@ function withBilling(raw, overrides = {}) {
         buildSetCookie: require('./guest').buildSetCookie,
         getExistingGuestId: require('./guest').getExistingGuestId,
         store: require('./store'),
-        rateLimitUser: Number(process.env.RATE_LIMIT_PER_HOUR || 60),
+        // Fijos a propósito (2026-10-16): quien explora mucho (definiciones, 'ver más') llegaba a 80 en 4 minutos.
+        // El gasto lo limita el saldo; esto solo frena abuso. Ya no dependen de variables de Netlify.
+        rateLimitUser: 300,
         // Fijo a propósito (2026-10-15): con 20 un invitado nuevo lo alcanzaba al minuto de llegar. Ya no depende de la variable de Netlify.
-        rateLimitGuest: 80,
+        rateLimitGuest: 300,
         ...overrides
     };
 
