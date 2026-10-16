@@ -19,11 +19,13 @@ const KNOWN = new Set([
     // Idiomas (/idiomas/): mapa de bloques con rol gramatical (se cobra por nodo) y palabra suelta en contexto (gratis).
     'lang_map', 'lang_word',
     // Oráculo del Caos (/oraculo/): 5 señales gratis al día con tono al azar; elegir el tono o pasar de 5 cuesta 1 nodo.
-    'oracle'
+    'oracle',
+    // Escribir (/escribir/): preguntas de desarrollo (gratis) y retroalimentación de una respuesta (1 nodo).
+    'esc_questions', 'esc_feedback'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome']);
+const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome', 'esc_questions']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.
@@ -62,6 +64,7 @@ function computeCost(action, d) {
         case 'm_map':             return d.root ? 1 + len(d.branches) : 0;
         case 'm_text':            return d.root ? 1 + len(d.branches) : 0;
         case 'lang_map':          return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
+        case 'esc_feedback':      return d.criteria ? 1 : 0;
         // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
         default:                  return 0;
     }

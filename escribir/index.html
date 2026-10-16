@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0e1a">
+<meta name="robots" content="noindex">
+<title>Graphikosmos · Escribir</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/escribir/escribir.css?v=1">
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<header id="bar">
+  <a class="brand" href="/escribir/">Escribir</a>
+  <span class="sp"></span>
+  <button class="chip" id="btnGems" type="button" hidden>◆ <span id="gemsVal">0</span></button>
+  <button class="chip" id="btnLogin" type="button"><span id="loginLabel">Entrar</span></button>
+</header>
+
+<main>
+  <!-- INICIO -->
+  <section id="vHome" class="view">
+    <h1>¿Qué quieres hacer hoy?</h1>
+    <div class="modes">
+      <button class="mode" id="modePractice" type="button">
+        <strong>Practicar</strong>
+        <span>Elige un tema, responde preguntas de desarrollo y recibe retroalimentación por criterios.</span>
+      </button>
+      <div class="mode off" aria-disabled="true">
+        <strong>Escribir</strong>
+        <span>Un asistente que te acompaña mientras escribes tu propio texto. Próximamente.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PREPARAR -->
+  <section id="vSetup" class="view" hidden>
+    <button class="back" data-go="home" type="button">‹ Volver</button>
+    <h1>Practicar</h1>
+    <form id="setupForm" autocomplete="off">
+      <label for="topicIn">Tema</label>
+      <input id="topicIn" type="text" maxlength="160" placeholder="Ej.: la fotosíntesis, el Renacimiento, la inflación" enterkeyhint="go">
+      <label>Cantidad de preguntas</label>
+      <div class="seg" id="countSeg" role="radiogroup">
+        <button type="button" class="on" data-n="5" role="radio" aria-checked="true">5 preguntas</button>
+        <button type="button" data-n="8" role="radio" aria-checked="false">8 preguntas</button>
+      </div>
+      <button class="primary" id="btnStart" type="submit" disabled>Crear preguntas</button>
+      <p class="msg" id="setupMsg" role="status">Las preguntas son gratis. Corregir cada respuesta cuesta 1 gema de nodo.</p>
+    </form>
+  </section>
+
+  <!-- PREGUNTA -->
+  <section id="vAsk" class="view" hidden>
+    <div class="prog"><div id="progBar"></div></div>
+    <p class="meta"><span id="qNum"></span><span id="qLevel"></span></p>
+    <h2 id="qText"></h2>
+    <div id="conf">
+      <p class="small">Antes de escribir, ¿qué tan seguro estás de saberla?</p>
+      <div class="seg" id="confSeg">
+        <button type="button" data-c="3">Lo sé bien</button>
+        <button type="button" data-c="2">Más o menos</button>
+        <button type="button" data-c="1">Adivinaría</button>
+      </div>
+    </div>
+    <textarea id="ansIn" rows="8" placeholder="Escribe tu respuesta con tus palabras. No busques: primero inténtalo." disabled></textarea>
+    <div class="row">
+      <button class="ghost" id="btnSkip" type="button">No lo sé</button>
+      <span class="sp"></span>
+      <button class="primary" id="btnSend" type="button" disabled>Enviar respuesta</button>
+    </div>
+    <p class="msg" id="askMsg" role="status"></p>
+  </section>
+
+  <!-- RETROALIMENTACIÓN -->
+  <section id="vFb" class="view" hidden>
+    <div class="prog"><div id="progBar2"></div></div>
+    <p class="meta"><span id="fNum"></span></p>
+    <h2 id="fQ"></h2>
+    <blockquote id="fAns"></blockquote>
+    <div id="fbBody"></div>
+    <div class="row">
+      <span class="sp"></span>
+      <button class="primary" id="btnNext" type="button">Siguiente</button>
+    </div>
+  </section>
+
+  <!-- RESUMEN -->
+  <section id="vEnd" class="view" hidden>
+    <h1>Resumen de la práctica</h1>
+    <p class="lead" id="endTopic"></p>
+    <div id="endBody"></div>
+    <div class="col">
+      <button class="primary" id="btnReview" type="button" hidden>Repasar las falladas</button>
+      <button class="primary alt" id="btnLevelUp" type="button">Nuevas preguntas, un nivel más alto</button>
+      <a class="ghost link" id="lnkMap" href="/" target="_blank" rel="noopener">Abrir Graphikosmos</a>
+      <button class="ghost" data-go="home" type="button">Terminar</button>
+    </div>
+  </section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="/gems.js?v=2"></script>
+<script src="/escribir/escribir.js?v=1"></script>
+</body>
+</html>
