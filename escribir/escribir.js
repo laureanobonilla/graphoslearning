@@ -143,23 +143,23 @@
     $('#qText').textContent = q.q;
     conf = 0;
     document.querySelectorAll('#confSeg button').forEach((b) => b.classList.remove('on'));
-    $('#ansIn').value = ''; $('#ansIn').disabled = true; $('#btnSend').disabled = true; $('#askMsg').textContent = ''; $('#askMsg').className = 'msg';
+    $('#ansIn').value = ''; $('#ansIn').disabled = false; $('#btnSend').disabled = true; $('#askMsg').textContent = ''; $('#askMsg').className = 'msg';
     $('#conf').hidden = false;
   }
   $('#confSeg').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-c]'); if (!b) return;
-    conf = Number(b.dataset.c);
-    document.querySelectorAll('#confSeg button').forEach((x) => x.classList.toggle('on', x === b));
-    $('#ansIn').disabled = false; $('#ansIn').focus(); updateSend();
+    const c = Number(b.dataset.c);
+    conf = conf === c ? 0 : c;   // volver a tocar la opción la quita
+    document.querySelectorAll('#confSeg button').forEach((x) => x.classList.toggle('on', conf && Number(x.dataset.c) === conf));
   });
   function wc(s) { return s.trim().split(/\s+/).filter(Boolean).length; }
-  function updateSend() { $('#btnSend').disabled = !conf || wc($('#ansIn').value) < 3; }
+  function updateSend() { $('#btnSend').disabled = wc($('#ansIn').value) < 3; }
   $('#ansIn').addEventListener('input', updateSend);
 
   $('#btnSkip').addEventListener('click', () => {
     if (busyNow) return;
     const q = S.qs[S.i];
-    S.results.push({ q, ans: '', conf: conf || 1, skipped: true, fb: null, failed: true });
+    S.results.push({ q, ans: '', conf: 0, skipped: true, fb: null, failed: true });
     registerFail(q);
     track('esc_skip', { level: q.level });
     next();
