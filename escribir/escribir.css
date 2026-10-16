@@ -104,3 +104,6 @@ main:has(.view.wide:not([hidden])){max-width:none;padding:14px 16px 24px}
 .it .q{cursor:pointer;text-decoration:underline dotted var(--lo)}
 .box.disc{border-style:dashed}
 @media (max-width:900px){.wgrid{flex-direction:column;height:auto}#doc{min-height:320px}#boxes{display:flex;flex-direction:column}.box{max-height:260px}}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.chips .chip{cursor:default}
+.backOrig{margin:0 0 10px}

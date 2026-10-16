@@ -145,6 +145,7 @@
     document.querySelectorAll('#confSeg button').forEach((b) => b.classList.remove('on'));
     $('#ansIn').value = ''; $('#ansIn').disabled = false; $('#btnSend').disabled = true; $('#askMsg').textContent = ''; $('#askMsg').className = 'msg';
     $('#conf').hidden = false;
+    syncBack();
   }
   $('#confSeg').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-c]'); if (!b) return;
@@ -214,10 +215,37 @@
     if (fb.terms.length) { h += '<div class="card"><h3>Palabras más exactas</h3>'; fb.terms.forEach((t) => { h += '<div class="sug"><s>' + esc(t.said) + '</s> → <b>' + esc(t.better) + '</b><em>' + esc(t.why) + '</em></div>'; }); h += '</div>'; }
     if (fb.synthesis.length) { h += '<div class="card"><h3>Dilo más preciso</h3>'; fb.synthesis.forEach((t) => { h += '<div class="sug"><s>' + esc(t.long) + '</s><br>→ <b>' + esc(t.short) + '</b></div>'; }); h += '</div>'; }
     if (fb.missing.length) { h += '<div class="card"><h3>Lo que faltó</h3><ul>' + fb.missing.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></div>'; }
+    if (fb.concepts && fb.concepts.length) {
+      h += '<div class="card"><h3>Conceptos importantes que no mencionaste</h3><div class="chips">' + fb.concepts.map((c) => '<span class="chip">' + esc(c) + '</span>').join('') + '</div>' +
+        '<button class="ghost" id="btnConcepts" type="button">Practicar estos conceptos</button>' +
+        (S.parent ? '' : '<p class="small">Después podrás volver aquí, a la pregunta ' + (S.i + 2 <= S.qs.length ? (S.i + 2) : 'final') + '.</p>') + '</div>';
+    }
     h += '<div class="card"><h3>Respuesta modelo</h3><div class="model">' + esc(fb.modelAnswer) + '</div></div>';
     $('#fbBody').innerHTML = h;
+    const bc = $('#btnConcepts'); if (bc) bc.addEventListener('click', () => practiceConcepts(fb.concepts, bc));
+    syncBack();
     $('#btnNext').textContent = S.i + 1 >= S.qs.length ? 'Ver resumen' : 'Siguiente';
   }
+  function syncBack() { document.querySelectorAll('[data-back]').forEach((b) => { b.hidden = !(S && S.parent); }); }
+  async function practiceConcepts(concepts, btn) {
+    if (busyNow || S.parent) { if (S.parent) toast('Termina o vuelve a la práctica original primero.'); return; }
+    busyNow = true; btn.disabled = true; const old = btn.textContent; btn.textContent = 'Armando preguntas…';
+    const sub = S.topic + ': ' + concepts.join(', ');
+    const r = await fetchQuestions(sub.slice(0, 160), S.level, 3, []);
+    busyNow = false; btn.disabled = false; btn.textContent = old;
+    if (!r.ok) { toast(failText(r.kind)); afterFail(r.kind); return; }
+    track('esc_concepts_start', { n: concepts.length });
+    const parent = S; parent.i = S.i + 1;   // al volver se sigue con la pregunta que tocaba
+    begin(S.topic + ' · conceptos', S.level, r.data.questions, false);
+    S.parent = parent; syncBack();
+  }
+  function backToOriginal() {
+    if (!S || !S.parent) return;
+    S = S.parent; track('esc_concepts_back', {});
+    if (S.i >= S.qs.length) return renderEnd();
+    askCurrent();
+  }
+  document.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', backToOriginal));
   $('#btnNext').addEventListener('click', next);
   function next() {
     S.i++;
@@ -242,11 +270,13 @@
     if (errs.length) h += '<div class="card"><h3>Errores que se repiten</h3><ul>' + errs.map((e) => '<li>' + esc(e[0]) + ' (' + e[1] + ' veces)</li>').join('') + '</ul></div>';
     $('#endBody').innerHTML = h;
     const failed = R.filter((r) => r.failed);
-    $('#btnReview').hidden = !failed.length;
+    $('#btnReview').hidden = !failed.length || !!S.parent;
     $('#btnReview').textContent = 'Repasar las falladas (' + failed.length + ')';
-    $('#btnLevelUp').hidden = S.review || S.level >= 3;
+    $('#btnLevelUp').hidden = S.review || S.level >= 3 || !!S.parent;
+    $('#btnBackEnd').hidden = !S.parent;
     $('#lnkMap').hidden = S.review;
-    $('#lnkMap').href = '/?t=' + encodeURIComponent(clip(S.topic, 120));
+    $('#lnkMap').href = '/?aprende=' + crypto.randomUUID() + '&t=' + encodeURIComponent(clip((S.parent ? S.parent.topic : S.topic), 120));
+    $('#lnkMap').onclick = () => track('esc_to_map', {});
     track('esc_end', { n: R.length, good, level: S.level, review: S.review });
   }
   $('#btnReview').addEventListener('click', () => {
@@ -258,7 +288,7 @@
     const b = $('#btnLevelUp'), old = b.textContent;
     b.textContent = 'Armando preguntas…'; busyNow = true; b.disabled = true;
     const lvl = Math.min(3, S.level + 1);
-    const r = await fetchQuestions(S.topic, lvl, S.qs.length >= 8 ? 8 : 5, S.qs.map((q) => q.q));
+    const r = await fetchQuestions(S.topic, lvl, [2, 3, 5, 8].includes(S.qs.length) ? S.qs.length : 5, S.qs.map((q) => q.q));
     busyNow = false; b.disabled = false; b.textContent = old;
     if (!r.ok) { toast(failText(r.kind)); afterFail(r.kind); return; }
     track('esc_levelup', { level: lvl });

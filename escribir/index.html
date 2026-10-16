@@ -106,6 +106,7 @@
       </div>
       <label>Cantidad de preguntas</label>
       <div class="seg" id="countSeg" role="radiogroup">
+        <button type="button" data-n="2" role="radio" aria-checked="false">2 preguntas</button>
         <button type="button" class="on" data-n="5" role="radio" aria-checked="true">5 preguntas</button>
         <button type="button" data-n="8" role="radio" aria-checked="false">8 preguntas</button>
       </div>
@@ -118,6 +119,7 @@
   <section id="vAsk" class="view" hidden>
     <div class="prog"><div id="progBar"></div></div>
     <p class="meta"><span id="qNum"></span><span id="qLevel"></span></p>
+    <button class="ghost small backOrig" type="button" data-back hidden>← Volver a la práctica original</button>
     <h2 id="qText"></h2>
     <div id="conf">
       <p class="small">Opcional: ¿qué tan seguro estás de saberla? Así te mostramos si tu seguridad coincidió con el resultado.</p>
@@ -140,6 +142,7 @@
   <section id="vFb" class="view" hidden>
     <div class="prog"><div id="progBar2"></div></div>
     <p class="meta"><span id="fNum"></span></p>
+    <button class="ghost small backOrig" type="button" data-back hidden>← Volver a la práctica original</button>
     <h2 id="fQ"></h2>
     <blockquote id="fAns"></blockquote>
     <div id="fbBody"></div>
@@ -155,16 +158,17 @@
     <p class="lead" id="endTopic"></p>
     <div id="endBody"></div>
     <div class="col">
+      <button class="primary" id="btnBackEnd" type="button" data-back hidden>Volver a la práctica original</button>
       <button class="primary" id="btnReview" type="button" hidden>Repasar las falladas</button>
       <button class="primary alt" id="btnLevelUp" type="button">Nuevas preguntas, un nivel más alto</button>
-      <a class="ghost link" id="lnkMap" href="/" target="_blank" rel="noopener">Abrir Graphikosmos</a>
+      <a class="ghost link" id="lnkMap" href="/" target="_blank" rel="noopener">Ver este tema como mapa en Graphikosmos</a>
       <button class="ghost" data-go="home" type="button">Terminar</button>
     </div>
   </section>
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=6"></script>
-<script src="/escribir/escribir.js?v=5"></script>
+<script src="/escribir/escribir.js?v=6"></script>
 <script src="/escribir/escribir-w.js?v=6"></script>
 </body>
 </html>
