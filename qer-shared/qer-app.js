@@ -160,7 +160,9 @@ function renderQuestion(index) {
     const otherWrap = document.createElement('div'); otherWrap.className = 'other-wrap is-hidden';
     const ta = document.createElement('textarea'); ta.className = 'short-input'; ta.rows = 2; ta.maxLength = 300; ta.placeholder = tt('other_placeholder');
     otherWrap.appendChild(ta);
-    const known = existing && q.options.includes(existing);
+    // Opción extra opcional (CFG.t.unknown_option, p. ej. «No lo sé / depende»): quien no está seguro no abandona.
+    const opts = CFG.t.unknown_option ? q.options.concat([CFG.t.unknown_option]) : q.options;
+    const known = existing && opts.includes(existing);
     const isOther = existing && !known;
     const mk = (label, other) => {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'option' + (other ? ' is-other' : '');
@@ -168,7 +170,7 @@ function renderQuestion(index) {
       const dot = document.createElement('span'); dot.className = 'dot'; const sp = document.createElement('span'); sp.textContent = label;
       b.append(dot, sp); return b;
     };
-    q.options.forEach(opt => {
+    opts.forEach(opt => {
       const b = mk(opt, false);
       if (existing === opt) { b.classList.add('is-selected'); btnNext.disabled = false; }
       b.addEventListener('click', () => {
