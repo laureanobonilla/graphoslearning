@@ -1910,13 +1910,22 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     if (!attachToNodeId) savePendingGen(topicText, opts);
 
     try {
-        const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', {
-            method: 'POST',
-            body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText })
-        });
+        // Gemini a veces responde 503 («alta demanda») por unos segundos: se reintenta solo, sin que la persona tenga que volver a escribir su tema.
+        // (Lo fallido no se cobra: el cobro es después de generar.)
+        let resp = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+            resp = await apiFetch('/.netlify/functions/gemini', {
+                method: 'POST',
+                body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText })
+            });
+            if (resp.ok || (resp.status !== 503 && resp.status !== 502 && resp.status !== 500) || attempt === 2) break;
+            track('schema_auto_retry', { status: resp.status, attempt: attempt + 1 });
+            await new Promise((r) => setTimeout(r, attempt === 0 ? 2500 : 5000));
+        }
+        const { ok, status, data } = resp;
         if (!ok) {
             const handled = handleBillingError(status, data);
-            if (!handled) { appAlert(data?.error || tr("js.intenta_de_nuevo_en_unos")); clearPendingGen(); }
+            if (!handled) { appAlert(tr("js.intenta_de_nuevo_en_unos")); clearPendingGen(); const st = document.getElementById('startTopic'); if (st && !isLong && !st.value) st.value = topicText.trim().slice(0, 160); }
             else if (!(status === 402 && data?.error === 'guest_limit_reached') && status !== 401) clearPendingGen(); // solo el muro de login conserva el pedido
             track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(data?.error || status).slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
             return;
