@@ -1215,7 +1215,7 @@ Cada pregunta debe ser clara por sí sola, sin pedir listas largas. Sin markdown
                 synthesis: { type: 'ARRAY', description: 'Hasta 3 frases largas o rodeadas que se pueden decir más corto y preciso sin perder sentido.', items: { type: 'OBJECT', properties: {
                     long: { type: 'STRING', description: 'Frase LITERAL de la respuesta (copia exacta).' },
                     short: { type: 'STRING', description: 'Versión sintética que conserva el sentido.' } }, required: ['long', 'short'] } },
-                missing: { type: 'ARRAY', description: 'Hasta 4 ideas esenciales que faltan, cada una en una oración corta. Vacío si no falta nada.', items: { type: 'STRING' } },
+                missing: { type: 'ARRAY', description: 'Hasta 4 ideas esenciales que faltan. Cada una es una oración AUTOSUFICIENTE que nombra explícitamente el sujeto de que habla (p. ej. «En microservicios, …» o «El monolito, en cambio, …»), de modo que se entienda sin releer la pregunta. En comparaciones, deja claro de cuál de los elementos habla y, si aplica, en contraste con el otro. Vacío si no falta nada.', items: { type: 'STRING' } },
                 errors: { type: 'ARRAY', description: 'Hasta 2 etiquetas cortas (2 a 5 palabras, en minúscula) del tipo de error recurrente, ej. «confunde causa y efecto», «definición circular», «no da ejemplo». Vacío si no hay.', items: { type: 'STRING' } },
                 modelAnswer: { type: 'STRING', description: 'Respuesta modelo de 60 a 120 palabras, un solo párrafo, sin markdown.' },
                 summary: { type: 'STRING', description: 'Dos oraciones: lo mejor de la respuesta y el paso concreto para mejorarla.' }
@@ -1234,6 +1234,7 @@ REGLAS:
 2. "said" y "long" deben ser copias EXACTAS de la respuesta; si no puedes citar literal, omite ese elemento.
 3. No inventes errores: si la respuesta es precisa, deja "terms" y "synthesis" vacíos.
 4. No reescribas toda la respuesta: señala, no sustituyas la voz de la persona.
+4b. Cada punto de "missing", "terms" y las notas de los criterios debe entenderse por sí solo: nombra siempre de qué concepto, opción o caso hablas (nunca «esto», «lo anterior» ni una idea sin sujeto). Si la pregunta compara dos cosas, indica a cuál se refiere cada punto.
 5. La respuesta modelo debe ser correcta y verificable. Español, sin markdown ni asteriscos.`,
                 config: { responseMimeType: 'application/json', responseSchema: schema }
             });
