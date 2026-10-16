@@ -1262,14 +1262,25 @@ REGLAS:
             const para = String(text == null ? '' : text).replace(/\r/g, '').trim().slice(0, 3000);
             if (para.split(/\s+/).filter(Boolean).length < 4) return { statusCode: 200, body: JSON.stringify({ items: [] }) };
             const before = String(documentContext == null ? '' : documentContext).replace(/\r/g, '').trim().slice(-2500);
-            const GENRES = { cientifico: 'texto científico', ensayo: 'ensayo', periodistico: 'texto periodístico', cuento: 'cuento', novela: 'novela' };
+            const GENRES = { cientifico: 'texto científico', ensayo: 'ensayo', periodistico: 'texto periodístico', discurso: 'discurso', resena: 'reseña o crítica', carta: 'carta o correo formal', cuento: 'cuento', novela: 'novela', poesia: 'poema', guion: 'guion (cine, teatro o series)', memorias: 'texto de memorias o autobiográfico' };
             const genre = Object.prototype.hasOwnProperty.call(GENRES, ab.purpose) ? ab.purpose : 'ensayo';
-            const fiction = genre === 'cuento' || genre === 'novela';
+            // Géneros creativos: la prosa o el verso de la persona no se reescribe nunca.
+            const fiction = ['cuento', 'novela', 'poesia', 'guion', 'memorias'].includes(genre);
             const lvl = ['orto', 'estilo', 'ideas'].includes(ab.level) ? ab.level : 'estilo';
             let cats = ['ortografia'];
             if (lvl !== 'orto') cats = cats.concat(fiction ? ['observacion'] : ['precision', 'sintesis', 'repeticion']);
             if (lvl === 'ideas') cats = cats.concat(fiction ? [] : ['idea', 'observacion', 'comprobar', 'lecturas']);
-            if (fiction && lvl === 'estilo') cats = cats.concat(['repeticion']);
+            if (fiction && lvl === 'estilo' && genre !== 'poesia') cats = cats.concat(['repeticion']);
+            const GNOTE = {
+                poesia: 'Es poesía: la repetición, los cortes de verso, la puntuación, las mayúsculas y las licencias poéticas suelen ser deliberados. Marca solo errores ortográficos inequívocos y, como mucho, una pregunta sobre el ritmo o la imagen.',
+                guion: 'Es un guion: respeta el formato de escenas, acotaciones y diálogos, y la forma de hablar de cada personaje (los diálogos pueden romper la norma a propósito).',
+                memorias: 'Son memorias: es la voz y el recuerdo de la persona; no corrijas su manera de contar ni cuestiones lo que recuerda.',
+                cuento: 'Es ficción: respeta la voz del narrador y de los personajes (los diálogos pueden romper la norma a propósito).',
+                novela: 'Es ficción: respeta la voz del narrador y de los personajes (los diálogos pueden romper la norma a propósito).',
+                carta: 'Es una carta o correo formal: prioriza claridad, cortesía y concisión.',
+                discurso: 'Es un discurso para decir en voz alta: la repetición retórica puede ser intencional; prioriza frases que se puedan pronunciar.',
+                resena: 'Es una reseña o crítica: la opinión de la persona es suya; no la suavices ni la cambies.'
+            };
             const DESC = {
                 ortografia: 'Error de ortografía, tildes, puntuación o concordancia. "replacement" = la forma correcta de ese fragmento.',
                 precision: 'Palabra o expresión vaga o inexacta («cosa», «algo», «cosas así») que tiene un término más exacto. "replacement" = ese término o frase.',
@@ -1298,7 +1309,7 @@ REGLAS:
 1. Equilibrio: señala SOLO lo que de verdad mejora el texto, máximo 4 sugerencias, las más valiosas. Si el párrafo está bien, devuelve la lista vacía. Respeta el estilo y la voz de la persona; no impongas preferencias.
 2. "quote" es una copia EXACTA del párrafo actual. Si no puedes citar literal, no incluyas esa sugerencia.
 3. Una sugerencia por fragmento; sin solapar fragmentos.
-${fiction ? '4. Es ficción: jamás reescribas ni "mejores" la prosa; solo ortografía y observaciones en forma de pregunta.\n' : '4. No inventes hechos ni cambies el significado.\n'}5. Sin markdown ni asteriscos.`,
+${GNOTE[genre] ? 'NOTA DE GÉNERO: ' + GNOTE[genre] + '\n' : ''}${fiction ? '4. Es un género creativo: jamás reescribas ni "mejores" la prosa o el verso; solo ortografía inequívoca y observaciones en forma de pregunta.\n' : '4. No inventes hechos ni cambies el significado.\n'}5. Sin markdown ni asteriscos.`,
                 config: { responseMimeType: 'application/json', responseSchema: schema }
             });
             let d; try { d = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'respuesta_invalida' }) }; }

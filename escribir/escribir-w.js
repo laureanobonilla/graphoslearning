@@ -8,7 +8,8 @@
   const KEY = 'esc_projects';
   const CATS = { ortografia: 'Ortografía', precision: 'Precisión', sintesis: 'Dilo más corto', repeticion: 'Repeticiones', observacion: 'Observaciones', comprobar: 'A comprobar', lecturas: 'Autores y textos', idea: 'Ideas novedosas en tu texto' };
   const ORDER = ['idea', 'ortografia', 'precision', 'sintesis', 'repeticion', 'observacion', 'comprobar', 'lecturas'];
-  const GN = { cientifico: 'Científico', ensayo: 'Ensayo', periodistico: 'Periodístico', cuento: 'Cuento', novela: 'Novela' };
+  const GN = { cientifico: 'Científico', ensayo: 'Ensayo', periodistico: 'Periodístico', discurso: 'Discurso', resena: 'Reseña', carta: 'Carta', cuento: 'Cuento', novela: 'Novela', poesia: 'Poesía', guion: 'Guion', memorias: 'Memorias' };
+  const CREATIVE = ['cuento', 'novela', 'poesia', 'guion', 'memorias'];
   const HINT = { orto: 'Solo corrige ortografía, tildes y puntuación.', estilo: 'Además, señala palabras vagas, frases largas y repeticiones.', ideas: 'Además: detecta ideas nuevas tuyas, datos a comprobar y autores o textos relacionados.' };
   let genre = 'ensayo', level = 'estilo';
   let P = null, items = [], disc = [], done = {}, uid = 0, timer = 0, saveT = 0, busy = false, showDisc = false;
@@ -45,7 +46,7 @@
 
   /* ---- género / nivel ---- */
   function sel(seg, attr, val) { document.querySelectorAll(seg + ' button').forEach((b) => b.classList.toggle('on', b.dataset[attr] === val)); }
-  function gHint() { $('#genreHint').textContent = HINT[level] + ((genre === 'cuento' || genre === 'novela') ? ' En ficción nunca se reescribe tu prosa: solo ortografía y preguntas.' : ''); }
+  function gHint() { $('#genreHint').textContent = HINT[level] + (CREATIVE.includes(genre) ? ' En géneros creativos nunca se reescribe tu texto: solo ortografía clara y preguntas.' : ''); }
   $('#genreSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-g]'); if (!b) return; genre = b.dataset.g; sel('#genreSeg', 'g', genre); gHint(); });
   $('#levelSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-l]'); if (!b) return; level = b.dataset.l; sel('#levelSeg', 'l', level); gHint(); });
   $('#btnWrite').addEventListener('click', () => {
@@ -71,7 +72,16 @@
   $('#btnDisc').addEventListener('click', () => { showDisc = !showDisc; render(); });
 
   /* ---- párrafos ---- */
-  function paragraphs() { const out = []; let pos = 0; doc.value.split('\n').forEach((t) => { out.push({ text: t, start: pos }); pos += t.length + 1; }); return out; }
+  function paragraphs() {
+    const lines = doc.value.split('\n'), out = []; let pos = 0, cur = null;
+    lines.forEach((t) => {
+      if (genre === 'poesia') {   // una estrofa = líneas seguidas sin línea en blanco
+        if (t.trim()) { if (cur) { cur.text += '\n' + t; } else { cur = { text: t, start: pos }; out.push(cur); } } else cur = null;
+      } else out.push({ text: t, start: pos });
+      pos += t.length + 1;
+    });
+    return out.length ? out : [{ text: '', start: 0 }];
+  }
   function current() { const c = doc.selectionStart, ps = paragraphs(); for (let i = ps.length - 1; i >= 0; i--) if (c >= ps[i].start) return { i, ps }; return { i: 0, ps }; }
   const key = (t) => genre + '|' + level + '|' + t.trim();
   const wcount = (t) => t.trim().split(/\s+/).filter(Boolean).length;
@@ -101,8 +111,12 @@
     if (!manual) schedule(600);
   }
 
-  function prune() { const t = doc.value, n = items.length; items = items.filter((it) => t.includes(it.quote)); if (items.length !== n) render(); }
-  const find = (it) => { const s = doc.value.indexOf(it.quote); return s < 0 ? null : [s, s + it.quote.length]; };
+  function prune() { const t = doc.value, n = items.length; items = items.filter((it) => find(it)); if (items.length !== n) render(); }
+  const find = (it) => {
+    let s = doc.value.indexOf(it.quote); if (s >= 0) return [s, s + it.quote.length];
+    const w = it.quote.trim().split(/\s+/).map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); if (!w.length) return null;
+    const m = new RegExp(w.join('\\s+')).exec(doc.value); return m ? [m.index, m.index + m[0].length] : null;
+  };
   function show(it) { const p = find(it); if (!p) return; doc.focus(); doc.setSelectionRange(p[0], p[1]); const lh = parseFloat(getComputedStyle(doc).lineHeight) || 30; const line = doc.value.slice(0, p[0]).split('\n').length; doc.scrollTop = Math.max(0, line * lh * 0.9 - doc.clientHeight / 2); }
   function adopt(it) {
     const p = find(it); if (!p) { prune(); return; }
@@ -110,7 +124,7 @@
     items = items.filter((x) => x.id !== it.id); delete done[it.para]; prune(); render(); saveSoon(); E.track('esc_adopt', { cat: it.cat }); schedule(3500);
   }
   function discard(it) { items = items.filter((x) => x.id !== it.id); disc.push(it); render(); saveSoon(); E.track('esc_dismiss', { cat: it.cat }); }
-  function restore(it) { disc = disc.filter((x) => x.id !== it.id); if (doc.value.includes(it.quote)) items.push(it); render(); saveSoon(); E.track('esc_restore', { cat: it.cat }); }
+  function restore(it) { disc = disc.filter((x) => x.id !== it.id); if (find(it)) items.push(it); render(); saveSoon(); E.track('esc_restore', { cat: it.cat }); }
 
   /* ---- matriz de cajas: solo las que tienen sugerencias ---- */
   function card(it, discarded) {
