@@ -1268,7 +1268,7 @@ REGLAS:
             const lvl = ['orto', 'estilo', 'ideas'].includes(ab.level) ? ab.level : 'estilo';
             let cats = ['ortografia'];
             if (lvl !== 'orto') cats = cats.concat(fiction ? ['observacion'] : ['precision', 'sintesis', 'repeticion']);
-            if (lvl === 'ideas') cats = cats.concat(fiction ? [] : ['observacion', 'comprobar', 'lecturas']);
+            if (lvl === 'ideas') cats = cats.concat(fiction ? [] : ['idea', 'observacion', 'comprobar', 'lecturas']);
             if (fiction && lvl === 'estilo') cats = cats.concat(['repeticion']);
             const DESC = {
                 ortografia: 'Error de ortografía, tildes, puntuación o concordancia. "replacement" = la forma correcta de ese fragmento.',
@@ -1276,6 +1276,7 @@ REGLAS:
                 sintesis: 'Frase larga o rodeada que se puede decir más corto sin perder sentido. "replacement" = la versión sintética.',
                 repeticion: 'Palabra o idea repetida de forma notoria (en este párrafo o respecto al texto previo). "replacement" vacío; en "note" propón una alternativa o di qué idea ya se dijo.',
                 observacion: fiction ? 'Observación o pregunta de editor sobre ritmo, claridad o coherencia. NUNCA reescribas: "replacement" vacío; la nota es una pregunta o una observación.' : 'Idea del propio texto que se podría desarrollar, conectar con lo dicho antes o cuestionar. "replacement" vacío. Solo a partir de lo que la persona ya escribió.',
+                idea: 'Una IDEA NUEVA DE LA PERSONA: una afirmación, distinción o giro propio que aparece por primera vez en este texto (no está en el TEXTO PREVIO, no es resumen de una fuente ni un lugar común). Sé exigente: solo si de verdad aporta algo suyo. "replacement" vacío; en "note" di en una frase cuál es la idea y por qué parece nueva en su texto (p. ej. «Aquí introduces X: podrías desarrollarla»). Máximo 1 por párrafo. No afirmes que sea original en el mundo, solo nueva en su texto.',
                 lecturas: 'Autor(es) u obras RECONOCIDOS que tratan el asunto del fragmento (para que la persona lea o cite). Solo si estás seguro de que existen y de lo que sostienen; si dudas, no lo incluyas. "replacement" vacío; en "note" escribe «Autor, Obra (año): cómo se relaciona con lo que escribe». Máximo 1 por párrafo.',
                 comprobar: 'Afirmación factual (dato, fecha, cifra, atribución) que conviene verificar. "replacement" vacío; en "note" di qué verificar y dónde mirar (sin afirmar que sea falsa).'
             };
@@ -1309,7 +1310,7 @@ ${fiction ? '4. Es ficción: jamás reescribas ni "mejores" la prosa; solo ortog
                 const quote = clipS(it.quote, 300); if (!quote || !nPara.includes(nr(quote))) return;
                 let rep = clipS(it.replacement, 400);
                 if (!['ortografia', 'precision', 'sintesis'].includes(cat)) rep = '';
-                if (cat === 'lecturas' && out.some((o) => o.cat === 'lecturas')) return;
+                if ((cat === 'lecturas' || cat === 'idea') && out.some((o) => o.cat === cat)) return;
                 if (['ortografia', 'precision', 'sintesis'].includes(cat) && (!rep || nr(rep) === nr(quote))) return;
                 if (out.some((o) => nr(o.quote).includes(nr(quote)) || nr(quote).includes(nr(o.quote)))) return;
                 out.push({ cat, quote, replacement: rep, note: clipS(it.note, 260).replace(/[*#`]/g, '') });
