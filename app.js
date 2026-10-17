@@ -603,11 +603,8 @@ function trackNodeUsage(topicName) {
     localStorage.setItem('gk_nodes_tracked', nodesTracked.toString());
     updateSurpriseButtonVisibility(); // Oculta el botón de prueba tras el primer uso
 
-    fetch('/.netlify/functions/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topicName, sessionId: sessionId })
-    }).catch(() => {});
+    // (2026-10-17) Ya no se llama a /track: escribía cada nodo en JSONBin (2+ llamadas por nodo). El tema de cada esquema queda en Supabase
+    // como evento schema_generate_success (topicPreview). Aquí solo se conserva el contador local.
 }
 
 // ==========================================
@@ -7938,7 +7935,7 @@ async function saveCurrentProjectToBin() {
     localStorage.setItem(`gk_projects_${userKey}`, JSON.stringify(catalog));
     putSnapshot(targetProjectId, projectData);
 
-    // 2. Sincronización en la nube (JSONBin) si está logueado
+    // 2. Sincronización en la nube (Supabase, vía /db) si está logueado
     if (currentUser) {
         try {
             const isCloudId = !targetProjectId.startsWith('local_');
