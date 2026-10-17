@@ -815,7 +815,7 @@ function handleBillingError(status, data) {
     if (status === 402 && data?.error === 'guest_limit_reached') {
         if (typeof data.balance === 'number') { availableNodes = data.balance; updateCounterDisplay(); }
         markPendingGenWall();
-        requireAuth('guest_limit_reached');
+        requireAuth(data?.registration_required ? tr('js.crear_tu_esquema') : 'guest_limit_reached');
         return true;
     }
     if (status === 402 && data?.error === 'insufficient_balance') {
@@ -1883,7 +1883,7 @@ async function attachTopicText(ownerId, topic, data) {
 
 async function generateFullSchemaFromTopic(topicText, opts = {}) {
     if (!topicText) return;
-    const { originPanelId = null, attachToNodeId = null, welcome = false } = opts;
+    const { originPanelId = null, attachToNodeId = null, welcome = false, ticket = '' } = opts;
     // Verificamos que tenga al menos saldo disponible para iniciar. El primer
     // esquema del asistente de bienvenida es gratis ("welcome_schema" en
     // billing.js): si por lo que sea el servidor no lo puede dejar gratis, lo
@@ -1913,7 +1913,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         for (let attempt = 0; attempt < 3; attempt++) {
             resp = await apiFetch('/.netlify/functions/gemini', {
                 method: 'POST',
-                body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText })
+                body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText, ticket: welcome ? ticket : undefined })
             });
             if (resp.ok || (resp.status !== 503 && resp.status !== 502 && resp.status !== 500) || attempt === 2) break;
             track('schema_auto_retry', { status: resp.status, attempt: attempt + 1 });
@@ -6278,7 +6278,7 @@ function setOnbStep(n) {
     });
     const dots = document.getElementById('onbProgressDots');
     const numeric = typeof n === 'number';
-    dots?.classList.toggle('hidden', !numeric);
+    dots?.classList.add('hidden');   // sin cuestionario: ya no hay pasos que contar
     if (numeric) {
         document.querySelectorAll('#onbProgressDots [data-dot]').forEach((dot) => {
             const active = parseInt(dot.dataset.dot, 10) <= n;
@@ -6307,8 +6307,17 @@ if (onbChipsContainer) {
 onbTopicInput?.addEventListener('input', () => {
     if (onbNext1) onbNext1.disabled = !onbTopicInput.value.trim();
 });
-onbTopicInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter' && onbTopicInput.value.trim()) setOnbStep(2); });
-onbNext1?.addEventListener('click', () => { if (onbTopicInput?.value.trim()) setOnbStep(2); });
+// Sin cuestionario (política de prueba, 2026-10-17): solo se pide el tema. Quien llegó directo (sin cuenta) topa con el
+// registro porque el servidor no le deja crear esquemas sin boleto de anuncio (ver _lib/trial.js); el pedido se conserva.
+function startFromOnbTopic() {
+    const topic = (onbTopicInput?.value || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+    if (!topic) return;
+    track('onboarding_topic_direct', { length: topic.length });
+    dismissWelcomeScreen();
+    generateFullSchemaFromTopic(topic, { originPanelId: 'main' });
+}
+onbTopicInput?.addEventListener('keydown', (e) => { if (e.key === 'Enter') startFromOnbTopic(); });
+onbNext1?.addEventListener('click', startFromOnbTopic);
 
 // Escape rápido: probar con un tema al azar sin contestar nada
 document.getElementById('onbSkipToRandom')?.addEventListener('click', () => {
@@ -6532,7 +6541,7 @@ async function runAprendeHandoff() {
     } else { currentDocumentText = topic; }
     track('aprende_schema_start', { sid, withText: text.length >= 200 });
     try { localStorage.removeItem('gk_topic_closed'); } catch (_e) { /* ok */ }   // quien llega aquí debe ver el texto abierto aunque lo haya cerrado en otra visita
-    await generateFullSchemaFromTopic(textForSchema, { originPanelId: 'main', welcome: true, topicText: text.length < 200 });
+    await generateFullSchemaFromTopic(textForSchema, { originPanelId: 'main', welcome: true, ticket: sid, topicText: text.length < 200 });
     if (text.length >= 200) openReaderPanel();
     showOnbExampleNote();
     if (typeof maybeStartCoachTour === 'function') maybeStartCoachTour('aprende');

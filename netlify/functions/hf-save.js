@@ -6,6 +6,7 @@ const { TOOLS, APP_OF, UUID_RE, json, scrubOne, countryOf, ipOf, hashIp, cleanAn
 const FALLBACK_TO_EMAIL = 'bonillapretiz@gmail.com';
 const MAX_NEW_SESSIONS_PER_HOUR_IP = 40;
 const MAX_EMAILS_PER_HOUR = 3;
+const MAX_NEW_SESSIONS_PER_DAY_IP_APRENDE = 12;   // cada sesión de Aprender puede dar un boleto de prueba; IP compartidas (datos móviles) necesitan margen
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -17,8 +18,16 @@ exports.handler = async (event) => {
     const anonId = typeof body.anonId === 'string' ? body.anonId.slice(0, 64) : sid;
 
     // Freno a quien intente crear sesiones sin parar (solo se revisa al abrir una sesión nueva).
+    if (tool === 'aprende' && !(body.utm && (scrubOne(body.utm.campaign, 40) || scrubOne(body.utm.ad, 40)))) {
+        // Aprender solo funciona viniendo del anuncio (el servidor es quien lo exige, no solo la página).
+        return json(403, { error: 'no_ad' });
+    }
     if (body.first === true) {
         try {
+            if (tool === 'aprende') {
+                const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+                if (await store.countEventsSince(ipKey, 'hf_session', since) >= MAX_NEW_SESSIONS_PER_DAY_IP_APRENDE) return json(429, { error: 'Demasiadas solicitudes' });
+            }
             if (await store.countEventsLastHour(ipKey, 'hf_session') >= MAX_NEW_SESSIONS_PER_HOUR_IP) return json(429, { error: 'Demasiadas solicitudes' });
             await store.logEvent(ipKey, 'anon', anonId, 'hf_session', { tool, source: 'server' }, null, app);
         } catch (e) { console.error('[hf-save] conteo', e.message); }

@@ -97,6 +97,8 @@
   "ui.un_tema_de_la_universidad": "A university subject, something from work, or pure curiosity — we'll build your first map from it.",
   "ui.ej_la_revolucion_francesa_computacion": "E.g.: The French Revolution, Quantum Computing...",
   "ui.siguiente": "Next →",
+  "ui.crear_mi_esquema": "Create my schema",
+  "js.crear_tu_esquema": "create your schema",
   "ui.ya_tengo_un_texto_un": "I already have a text, a link or a PDF",
   "ui.probar_con_un_tema_al": "Try a random topic, no questions",
   "ui.para_que_lo_estudias": "What are you studying it for?",

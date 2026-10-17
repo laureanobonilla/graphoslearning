@@ -47,6 +47,29 @@
   const ORIGIN = {};
   ['ref', 'utm_source', 'utm_medium', 'utm_campaign'].forEach((k) => { const v = qp.get(k); if (v) ORIGIN[k] = clip(v, 60); });
   try { if (Object.keys(ORIGIN).length) sessionStorage.setItem('gk_m_origin', JSON.stringify(ORIGIN)); else Object.assign(ORIGIN, JSON.parse(sessionStorage.getItem('gk_m_origin') || '{}')); } catch { /* nada */ }
+  /* Llegada desde /aprender/ (anuncio): el código es el «boleto» de UN esquema de prueba (se verifica en el servidor). */
+  let TICKET = '', APR_TOPIC = '', TICKET_P = Promise.resolve();
+  try {
+    const a = qp.get('aprende') || '';
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a)) {
+      TICKET = a; APR_TOPIC = clip(qp.get('t') || '', 120);
+      const q2 = new URLSearchParams(location.search); ['aprende', 'ref', 't'].forEach((k) => q2.delete(k));
+      const rest = q2.toString(); history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    }
+    else if (qp.get('ref') === 'aprende') {
+      /* En teléfono /aprender/ lleva directo aquí: se pide el boleto igual que lo haría la página de escritorio (hf-save). */
+      const src = (qp.get('utm_source') || '').toLowerCase();
+      let camp = clip(qp.get('utm_campaign') || qp.get('c') || '', 40), ad = clip(qp.get('utm_content') || qp.get('ad') || '', 40);
+      if (!camp && !ad && (qp.get('fbclid') || qp.get('src') === 'fb' || /^(facebook|fb|instagram|ig|meta|messenger)$/.test(src))) ad = 'fb';
+      if (camp || ad) {
+        const sid = crypto.randomUUID();
+        TICKET_P = fetch(FN + 'hf-save', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, tool: 'aprende', first: true, anonId: anonId(), step: 1, total: 1, answers: { origen: 'movil' }, utm: { campaign: camp, ad } }) })
+          .then((r) => { if (r.ok) TICKET = sid; }).catch(() => {});
+      }
+      const q2 = new URLSearchParams(location.search); ['ref', 'fbclid', 'src', 'c', 'ad'].forEach((k) => q2.delete(k));
+      const rest = q2.toString(); history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+    }
+  } catch { /* nada */ }
   const t0 = Date.now();
   let mapsCount = 0;
   function track(ev, meta) {
@@ -149,14 +172,15 @@
     track('m_generate_clicked', { topicPreview: topic.slice(0, 80) });
     msg.textContent = 'Armando tu mapa mental…'; busy(btn, true); input.blur();
     const started = Date.now();
-    const r = await callGemini({ action: 'm_welcome', topic });
+    await TICKET_P;
+    const r = await callGemini({ action: 'm_welcome', topic, ticket: TICKET || undefined });
     busy(btn, false);
     if (!r.ok) {
       track('m_map_error', { kind: r.kind, status: r.data && r.data.error, used: r.data && r.data.used, where: 'home' });
       if (handleBlocked(r.kind, 'home')) { msg.textContent = ''; return; }
       msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return;
     }
-    msg.textContent = '';
+    msg.textContent = ''; TICKET = '';
     G = emptyG();
     const root = newNode(clip(r.data.root && r.data.root.label, 80) || topic, '', null);
     G.rootId = root.id;
@@ -167,6 +191,8 @@
     scheduleSave();
     go('map', root.id, true);
   });
+
+  if (TICKET && APR_TOPIC.length >= 2) setTimeout(() => { try { if (G && G.rootId) return; $('#topicInput').value = APR_TOPIC; track('m_aprende_arrival', {}); $('#homeForm').requestSubmit(); } catch { /* nada */ } }, 300);
 
   function addChildren(parentId, branches) {
     (branches || []).slice(0, 8).forEach((b, i) => {

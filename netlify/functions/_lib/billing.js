@@ -89,6 +89,13 @@ function json(statusCode, obj, extraHeaders, cookies) {
     return res;
 }
 
+// Política de prueba para invitados (ver _lib/trial.js). TRIAL_POLICY=off en el entorno la apaga sin redeploy de código.
+const TRIAL_POLICY = process.env.TRIAL_POLICY !== 'off';
+// Fuera de la política: otras apps que comparten este backend.
+const TRIAL_EXEMPT = new Set(['oracle', 'lang_map', 'lang_word', 'esc_questions', 'esc_feedback', 'esc_analyze']);
+// Crear esquemas nuevos: exige cuenta aunque ya haya usado su prueba.
+const TRIAL_NEW_SCHEMA = new Set(['parse_text', 'analyze_text', 'long_outline', 'onboarding_text']);
+
 const WELCOME_COOKIE = 'gk_welcome';
 function hasWelcomeCookie(event) {
     const raw = (event.headers && (event.headers.cookie || event.headers.Cookie)) || '';
@@ -109,6 +116,7 @@ async function resolveIdentity(event, context, deps) {
         kind: 'guest',
         id: `guest:${guestId}`,
         guestId, ip, isAdmin: false,
+        isNew,
         setCookie: isNew ? deps.buildSetCookie(guestId) : null
     };
 }
@@ -136,6 +144,7 @@ function withBilling(raw, overrides = {}) {
         buildSetCookie: require('./guest').buildSetCookie,
         getExistingGuestId: require('./guest').getExistingGuestId,
         store: require('./store'),
+        trial: require('./trial'),
         // Fijos a propósito (2026-10-16): quien explora mucho (definiciones, 'ver más') llegaba a 80 en 4 minutos.
         // El gasto lo limita el saldo; esto solo frena abuso. Ya no dependen de variables de Netlify.
         rateLimitUser: 300,
@@ -157,9 +166,12 @@ function withBilling(raw, overrides = {}) {
         const cookieHeaders = identity.setCookie ? { 'Set-Cookie': identity.setCookie } : {};
 
         sanitize(body);
+        const ticket = typeof body.ticket === 'string' ? body.ticket.slice(0, 40) : '';
+        delete body.ticket;
 
         let balance = null;
         let welcomeFree = false;
+        let consumeTicket = null;
         let oracleFree = false, oracleFreeLeft = 0;
         if ((action === 'welcome_schema' || action === 'm_welcome') && identity.isAdmin) welcomeFree = true;
         if (!identity.isAdmin) {
@@ -180,11 +192,29 @@ function withBilling(raw, overrides = {}) {
                 return json(503, { error: 'billing_unavailable' }, cookieHeaders);
             }
 
+            // POLÍTICA DE PRUEBA (invitados): un solo esquema de prueba, solo con boleto de anuncio; el resto exige cuenta.
+            // Verificado en Supabase (ver _lib/trial.js), no con cookies. Si la verificación falla, se pide cuenta (nunca se regala).
+            if (identity.kind === 'guest' && TRIAL_POLICY && !TRIAL_EXEMPT.has(action)) {
+                const isWelcome = action === 'welcome_schema' || action === 'm_welcome';
+                let allowed = false, hasTrial = false;
+                try {
+                    hasTrial = await deps.trial.guestHasTrial(identity.guestId);
+                    if (!hasTrial && hasWelcomeCookie(event) && !identity.isNew) hasTrial = true;   // quien ya tenía su esquema antes de esta regla puede seguir con él
+                    if (isWelcome && !hasTrial && ticket && await deps.trial.ticketValid(ticket)) { allowed = true; consumeTicket = ticket; }
+                    else if (!isWelcome && hasTrial && !TRIAL_NEW_SCHEMA.has(action)) allowed = true;
+                } catch (err) { console.error('[billing] verificación de prueba:', err.message); }
+                if (!allowed) {
+                    const reason = isWelcome ? (hasTrial ? 'trial_used' : 'no_ticket') : (TRIAL_NEW_SCHEMA.has(action) ? 'new_schema' : 'no_trial');
+                    return json(402, { error: 'guest_limit_reached', reason, registration_required: true, balance }, cookieHeaders);
+                }
+                if (isWelcome) { welcomeFree = true; }
+            }
+
             // Esquema de bienvenida GRATIS, una sola vez por persona: solo si no
             // trae la marca de haberlo usado y aún no ha gastado nada de su saldo
             // inicial. Si no cumple, se cobra como un parse_text normal (nunca se
             // rechaza: es mejor cobrar que dejar a alguien sin esquema).
-            if (action === 'welcome_schema' || action === 'm_welcome') {
+            if ((action === 'welcome_schema' || action === 'm_welcome') && !(identity.kind === 'guest' && TRIAL_POLICY && consumeTicket)) {
                 const paidAction = action === 'm_welcome' ? 'm_map' : 'parse_text';
                 const initial = identity.kind === 'user'
                     ? require('./packages').freeUserNodes()
@@ -235,6 +265,11 @@ function withBilling(raw, overrides = {}) {
             } catch (err) {
                 console.error('[billing] no se pudo descontar:', err.message);
             }
+        }
+
+        if (consumeTicket && !identity.isAdmin) {
+            try { await deps.store.logEvent(consumeTicket, 'anon', null, 'trial_used', { guest: identity.guestId, action }, null, 'graphikosmos'); }
+            catch (err) { console.error('[billing] no se pudo registrar la prueba:', err.message); }
         }
 
         const outCookies = [identity.setCookie, (welcomeFree && !identity.isAdmin) ? buildWelcomeCookie() : null].filter(Boolean);

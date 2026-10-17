@@ -23,6 +23,8 @@ exports.handler = async (event) => {
     let body; try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
     const sid = String(body.sid || '');
     if (!UUID_RE.test(sid)) return json(400, { error: 'Solicitud inválida' });
+    try { if (!(await require('./_lib/trial').adRow(sid))) return json(403, { error: 'no_ad' }); }
+    catch (e) { console.error('[ap-generate] anuncio', e.message); return json(503, { error: 'unavailable' }); }
     // Las respuestas se leen de lo que ya quedó guardado (hf-save): así el cliente no puede mandar texto arbitrario aquí.
     let a = null; try { a = await getAnswers(sid); } catch (e) { console.error('[ap-generate] lectura', e.message); }
     if (!a || scrubOne(a.tema, 200).length < 2) a = body.answers && typeof body.answers === 'object' ? body.answers : {};

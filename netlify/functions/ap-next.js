@@ -26,6 +26,7 @@ exports.handler = async (event) => {
     const sid = String(body.sid || ''); const step = Math.min(3, Math.max(1, parseInt(body.step, 10) || 1));
     const tema = scrubOne(body.tema, 200);
     if (!UUID_RE.test(sid) || tema.length < 2) return json(400, { error: 'Solicitud inválida' });
+    try { if (!(await require('./_lib/trial').adRow(sid))) return json(403, { error: 'no_ad' }); } catch (e) { return json(503, { error: 'unavailable' }); }
     const history = (Array.isArray(body.history) ? body.history : []).slice(0, 3).map(h => ({ q: scrubOne(h && h.q, 140), a: scrubOne(h && h.a, 200) })).filter(h => h.q && h.a);
     const ipKey = hashIp(ipOf(event));
     try {

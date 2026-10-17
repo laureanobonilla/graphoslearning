@@ -97,6 +97,8 @@
   "ui.un_tema_de_la_universidad": "Un tema de la universidad, algo del trabajo, o pura curiosidad — con eso armamos tu primer esquema.",
   "ui.ej_la_revolucion_francesa_computacion": "Ej: La Revolución Francesa, Computación Cuántica...",
   "ui.siguiente": "Siguiente →",
+  "ui.crear_mi_esquema": "Crear mi esquema",
+  "js.crear_tu_esquema": "crear tu esquema",
   "ui.ya_tengo_un_texto_un": "Ya tengo un texto, un enlace o un PDF",
   "ui.probar_con_un_tema_al": "Probar con un tema al azar, sin preguntas",
   "ui.para_que_lo_estudias": "¿Para qué lo estudiás?",

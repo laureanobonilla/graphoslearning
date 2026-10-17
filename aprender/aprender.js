@@ -18,6 +18,14 @@ let anonId = lsGet('gk_anon_id'); if (!anonId) { anonId = uuid(); lsSet('gk_anon
 const qs = new URLSearchParams(location.search);
 ['campaign', 'ad'].forEach(k => { const v = qs.get(k === 'campaign' ? 'utm_campaign' : 'utm_content') || qs.get(k === 'campaign' ? 'c' : 'ad'); if (v) ssSet('ap_' + k, v.slice(0, 40)); });
 const UTM = { campaign: ssGet('ap_campaign') || '', ad: ssGet('ap_ad') || '' };
+// Solo se entra desde el anuncio: parámetros de campaña, clic de Facebook/Instagram, o venir de su navegador/enlace.
+if (!UTM.campaign && !UTM.ad) {
+  const src = (qs.get('utm_source') || '').toLowerCase();
+  const fb = qs.get('fbclid') || qs.get('src') === 'fb' || /^(facebook|fb|instagram|ig|meta|messenger)$/.test(src)
+    || /facebook|instagram|fb\.me|messenger|l\.fb/i.test(document.referrer || '') || /FBAN|FBAV|Instagram/.test(navigator.userAgent || '');
+  if (fb) { UTM.ad = 'fb'; ssSet('ap_ad', 'fb'); }
+}
+const HAS_AD = !!(UTM.campaign || UTM.ad);
 
 // ---------- Medición y guardado ----------
 function track(event, metadata) {
@@ -109,6 +117,13 @@ document.addEventListener('visibilitychange', () => {
   try { navigator.sendBeacon(TRACK, new Blob([JSON.stringify({ event: 'page_hidden', anonId, app: APP, metadata: { step: going ? 'final' : 'intro' } })], { type: 'application/json' })); if (firstSaved) navigator.sendBeacon(SAVE, new Blob([JSON.stringify(payload({ first: false }))], { type: 'application/json' })); } catch { /* ok */ }
 });
 
-track('landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 120) : '' });
-intro();
+track('landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 120) : '', noAd: !HAS_AD });
+if (HAS_AD) intro();
+else {
+  track('blocked_no_ad', {});
+  const col = $('col'); col.textContent = ''; const s = h('div', 'scr'); col.appendChild(s);
+  s.appendChild(h('h1', '', 'Esta página se abre desde nuestro anuncio'));
+  s.appendChild(h('p', '', 'Para crear tu primer esquema, regístrate gratis en Graphikosmos.'));
+  const b = h('button', 'btn', 'Ir a Graphikosmos'); b.type = 'button'; b.addEventListener('click', () => { location.href = '/'; }); s.appendChild(b);
+}
 })();

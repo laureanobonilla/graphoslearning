@@ -11,7 +11,8 @@
     if (/[?&]desktop=1/.test(q)) { sessionStorage.setItem('gk_force_desktop', '1'); }
     if (sessionStorage.getItem('gk_force_desktop') === '1') return;
     if (window.matchMedia('(max-width: 780px)').matches) {
-      var keep = q.replace(/^\?/, '').split('&').filter(function (p) { return /^utm_/.test(p); });
+      var keep = q.replace(/^\?/, '').split('&').filter(function (p) { return /^(utm_|fbclid=|c=|ad=)/.test(p); });
+      if (/facebook|instagram|fb\.me|messenger|l\.fb/i.test(document.referrer || '') || /FBAN|FBAV|Instagram/.test(navigator.userAgent || '')) keep.push('src=fb');
       location.replace('/m/?ref=aprende' + (keep.length ? '&' + keep.join('&') : ''));
     }
   } catch (e) {}
@@ -34,6 +35,6 @@
   <aside class="viz" aria-hidden="true"><svg id="viz" viewBox="0 0 520 520" preserveAspectRatio="xMidYMid meet"></svg></aside>
 </div>
 <noscript><p style="padding:24px;color:#eef1fb">Esta página necesita JavaScript.</p></noscript>
-<script src="aprender.js?v=5"></script>
+<script src="aprender.js?v=6"></script>
 </body>
 </html>
