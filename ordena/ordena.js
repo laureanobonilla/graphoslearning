@@ -58,7 +58,7 @@ const FRENTES = [
           ['¿Revisas el celular apenas despiertas o justo antes de dormir?', [['Casi nunca', 0.5], ['A veces', 1], ['Siempre', 1.5]]],
           ['¿Tienes encendidas las notificaciones de redes sociales?', [['Casi todas apagadas', 0.5], ['Algunas', 1], ['Todas', 1.4]]]] },
     { id: 'mensajes', fin: 'Interrupciones y cambio constante de tarea', t: 'Mensajes e interrupciones', f: 'Contestar todo al instante y no terminar nada', base: [1.5, 4], p: 1,
-      q: [['¿Contestas los mensajes apenas llegan?', [['No, los reviso a ciertas horas', 0.5], ['Depende', 1], ['Sí, casi siempre', 1.4]]],
+      q: [['¿Contestas los mensajes apenas llegan?', [['No, los reviso a ciertas horas', 0.5], ['Depende', 1], ['Sí, casi siempre', 1.4], ['Solo los de trabajo o familia', 0.7, 0.5]]],
           ['¿Cuántos grupos de WhatsApp activos tienes?', [['Menos de 5', 0.5], ['De 5 a 15', 1], ['Más de 15', 1.4]]],
           ['¿Logras concentrarte una hora seguida sin interrupciones?', [['Sí, a diario', 0.5], ['A veces', 1], ['Casi nunca', 1.5]]]] },
     { id: 'pendientes', fin: 'Olvidos, repeticiones y búsquedas', t: 'Pendientes y olvidos', f: 'Cosas que se olvidan, se hacen dos veces o se buscan', base: [1, 3], p: 2, dep: true,
@@ -66,7 +66,7 @@ const FRENTES = [
           ['¿Se te olvidan pagos, citas o encargos?', [['Casi nunca', 0.5], ['A veces', 1], ['Seguido', 1.6]]],
           ['¿Pierdes tiempo buscando cosas (llaves, papeles, archivos)?', [['Casi nunca', 0.5], ['A veces', 1], ['Todos los días', 1.4]]]] },
     { id: 'semana', fin: 'Planificación semanal y prioridades', t: 'Planificar tu semana', f: 'Improvisar cada día qué hacer', base: [1.5, 4], p: 3,
-      q: [['¿Planificas tu semana?', [['Sí, cada semana', 0.5], ['A veces', 1], ['Nunca', 1.5]]],
+      q: [['¿Planificas tu semana?', [['Sí, cada semana', 0.5], ['A veces', 1], ['Nunca', 1.5], ['Solo lo más importante', 0.7, 0.5]]],
           ['Al empezar el día, ¿sabes cuáles son tus 3 cosas más importantes?', [['Sí', 0.5], ['A veces', 1], ['No', 1.4]]],
           ['¿Terminas el día sintiendo que no avanzaste en lo importante?', [['Casi nunca', 0.5], ['A veces', 1], ['Casi siempre', 1.5]]]] },
     { id: 'compromisos', fin: 'Límites y compromisos que no aportan', t: 'Compromisos y decir que sí', f: 'Aceptar más de lo que cabe en tu semana', base: [1, 3], p: 4, dep: true,
@@ -74,19 +74,19 @@ const FRENTES = [
           ['¿Llegas tarde o con prisa a tus compromisos?', [['Casi nunca', 0.5], ['A veces', 1], ['Seguido', 1.4]]],
           ['¿Tienes reuniones o actividades que no te aportan?', [['Pocas', 0.5], ['Algunas', 1], ['Muchas', 1.4]]]] },
     { id: 'casa', fin: 'Compras, comidas y mandados', t: 'Casa y mandados', f: 'Salidas sueltas y decisiones de último minuto', base: [1, 3], p: 5, dep: true,
-      q: [['¿Haces una lista antes de ir al súper?', [['Siempre', 0.5], ['A veces', 1], ['Nunca', 1.4]]],
+      q: [['¿Haces una lista antes de ir al súper?', [['Siempre', 0.5], ['A veces', 1], ['Nunca', 1.4], ['Otra persona hace las compras', 0, 4]]],
           ['¿Cuántas veces a la semana sales por un mandado suelto?', [['0 o 1', 0.5], ['2 o 3', 1], ['4 o más', 1.5]]],
-          ['¿Decides qué comer el mismo día?', [['No, lo planeo', 0.5], ['A veces', 1], ['Casi siempre', 1.3]]]] },
+          ['¿Decides qué comer el mismo día?', [['No, lo planeo', 0.5], ['A veces', 1], ['Casi siempre', 1.3], ['Otra persona se encarga', 0, 4]]]] },
     { id: 'traslados', fin: 'Tiempo de viaje y tráfico', t: 'Traslados', f: 'Horas de viaje mal planeadas o sin aprovechar', base: [1, 3], p: 6,
-      q: [['¿Cuánto tardas en ir y volver de tu trabajo o estudio?', [['Menos de 30 minutos', 0.5], ['De 30 a 90 minutos', 1], ['Más de 90 minutos', 1.6]]],
-          ['¿Aprovechas el viaje (escuchar algo, planear, descansar)?', [['Sí', 0.5], ['A veces', 1], ['No', 1.3]]],
-          ['¿Sales en horas de mucho tráfico pudiendo evitarlas?', [['No', 0.5], ['A veces', 1], ['Casi siempre', 1.4]]]] },
+      q: [['¿Cuánto tardas en ir y volver de tu trabajo o estudio?', [['Menos de 30 minutos', 0.5], ['De 30 a 90 minutos', 1], ['Más de 90 minutos', 1.6], ['Casi no me traslado', 0, -1]]],
+          ['¿Aprovechas el viaje (escuchar algo, planear, descansar)?', [['Sí', 0.5], ['A veces', 1], ['No', 1.3], ['Casi no me traslado', 0, 4]]],
+          ['¿Sales en horas de mucho tráfico pudiendo evitarlas?', [['No', 0.5], ['A veces', 1], ['Casi siempre', 1.4], ['Mi horario no me deja elegir', 0.8, 1.5], ['Casi no me traslado', 0, 4]]]] },
     { id: 'energia', fin: 'Sueño, energía y foco', t: 'Sueño y energía', f: 'Cansancio que te hace rendir menos', base: [2, 5], p: 7,
       q: [['¿Cuántas horas duermes de lunes a viernes?', [['7 o más', 0.5], ['De 6 a 7', 1], ['Menos de 6', 1.6]]],
-          ['¿Usas tu mejor hora del día para lo más importante?', [['Sí', 0.5], ['No lo he pensado', 1], ['La uso en otras cosas', 1.3]]],
+          ['¿Usas tu mejor hora del día para lo más importante?', [['Sí', 0.5], ['No lo he pensado', 1], ['La uso en otras cosas', 1.3], ['Mi horario no me deja elegir', 0.8, 1.5]]],
           ['¿Haces pausas o algo de movimiento durante el día?', [['Sí', 0.5], ['A veces', 1], ['Casi nunca', 1.4]]]] },
     { id: 'tramites', fin: 'Pagos, recargos y papeles pendientes', t: 'Pagos y trámites', f: 'Pagar tarde, hacer filas y trámites que se arrastran', base: [0.5, 1.5], p: 8,
-      q: [['¿Tus pagos fijos están automatizados o con recordatorio?', [['Sí', 0.5], ['Algunos', 1], ['No', 1.4]]],
+      q: [['¿Tus pagos fijos están automatizados o con recordatorio?', [['Sí', 0.5], ['Algunos', 1], ['No', 1.4], ['No tengo pagos fijos', 0, 4]]],
           ['¿Has pagado recargos o multas este año por olvido?', [['No', 0.5], ['Una vez', 1], ['Varias', 1.5]]],
           ['¿Tienes trámites pendientes desde hace más de un mes?', [['No', 0.5], ['Uno', 1], ['Varios', 1.4]]]] }
 ];
@@ -106,6 +106,9 @@ function guardar(sync = true) {
     if (sync && USER) { clearTimeout(guardarT); guardarT = setTimeout(subir, 1200); }
 }
 const fr = (id) => { const st = (S.fr[id] = S.fr[id] || { r: {}, oculto: false, plan: null, extra: {} }); st.libre = st.libre || {}; return st; };
+// Opciones en el orden en que se muestran: el 3er dato de una opción es su posición en pantalla (si no hay, su índice).
+// Las opciones nuevas se agregan AL FINAL de la lista (las respuestas guardadas son índices) y se ubican con ese dato.
+const opsDe = (qq) => qq[1].map((o, k) => ({ o, k })).sort((a, b) => (a.o[2] != null ? a.o[2] : a.k) - (b.o[2] != null ? b.o[2] : b.k));
 const respTexto = (f, st, i) => (st.r[i] === 'x' ? '«' + ((st.libre[i] || {}).texto || '') + '»' : (f.q[i][1][st.r[i]] || [''])[0]);
 
 // ---------- Utilidades ----------
@@ -315,7 +318,7 @@ function vPanel() {
       <div class="r-prec"><p class="lbl">Semana revisada</p><div class="meter"><i style="width:${T.revisado}%"></i></div><p class="per">${T.resp} de ${T.posibles} preguntas · ${T.revisado === 0 ? 'empieza por la pregunta rápida' : T.revisado < 100 ? 'el total puede seguir subiendo' : 'revisión completa'}</p></div>
     </section>
     ${sig ? `<section class="pdia"><div><p class="lbl">Pregunta rápida · ${esc(FR[sig.id].t)}</p><p class="pq">${esc(FR[sig.id].q[sig.i][0])}</p></div>
-      <div class="opciones fila">${FR[sig.id].q[sig.i][1].map((o, k) => `<button class="opc chip" data-a="resp" data-f="${sig.id}" data-i="${sig.i}" data-k="${k}">${esc(o[0])}</button>`).join('')}<button class="opc chip otra" data-a="libre" data-f="${sig.id}" data-i="${sig.i}">Otra respuesta…</button></div></section>` : ''}
+      <div class="opciones fila">${opsDe(FR[sig.id].q[sig.i]).map(({ o, k }) => `<button class="opc chip ${o[1] === 0 ? 'na' : ''}" data-a="resp" data-f="${sig.id}" data-i="${sig.i}" data-k="${k}">${esc(o[0])}</button>`).join('')}<button class="opc chip otra" data-a="libre" data-f="${sig.id}" data-i="${sig.i}">Otra respuesta…</button></div></section>` : ''}
     <section class="tarjetas">${T.l.map((x, idx) => tarjeta(x, idx, max)).join('')}</section>
     ${ocultos.length ? `<p class="ocultos">Ocultos: ${ocultos.map(f => `<button class="lnk" data-a="mostrar" data-f="${f.id}">${esc(f.t)}</button>`).join(' · ')}</p>` : ''}
     <p class="disc">Cada frente empieza en cero y suma solo lo que muestran tus respuestas, con horas de referencia prudentes. Sirve para decidir por dónde empezar; tu semana real puede variar. <button class="lnk" data-a="perfil">Editar mis datos</button> · <button class="lnk" data-a="limpiar">Empezar de nuevo</button></p>`;
@@ -436,7 +439,7 @@ function refrescarAfinar(id) { const m = $('#modal'); if (!m.hidden && m.dataset
 function mAfinar(id, mantener) {
     const f = FR[id], st = fr(id);
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>Revisar este frente</h2><p class="sub">${esc(f.fin)}. Cada respuesta puede destapar horas que se te van; si lo tienes bajo control, no suma nada.</p>
-      ${f.q.map((qq, i) => `<div class="pregunta"><p>${esc(qq[0])}</p><div class="opciones fila">${qq[1].map((o, k) => `<button class="opc chip ${st.r[i] === k ? 'on' : ''}" data-a="resp" data-f="${id}" data-i="${i}" data-k="${k}" data-m="1">${esc(o[0])}</button>`).join('')}<button class="opc chip otra ${st.r[i] === 'x' ? 'on' : ''}" data-a="libre" data-f="${id}" data-i="${i}" data-m="1">Otra respuesta…</button></div>${st.r[i] === 'x' ? libreLinea(st.libre[i]) : ''}</div>`).join('')}
+      ${f.q.map((qq, i) => `<div class="pregunta"><p>${esc(qq[0])}</p><div class="opciones fila">${opsDe(qq).map(({ o, k }) => `<button class="opc chip ${o[1] === 0 ? 'na' : ''} ${st.r[i] === k ? 'on' : ''}" data-a="resp" data-f="${id}" data-i="${i}" data-k="${k}" data-m="1">${esc(o[0])}</button>`).join('')}<button class="opc chip otra ${st.r[i] === 'x' ? 'on' : ''}" data-a="libre" data-f="${id}" data-i="${i}" data-m="1">Otra respuesta…</button></div>${st.r[i] === 'x' ? libreLinea(st.libre[i]) : ''}</div>`).join('')}
       <div class="m-pie"><span class="vivo">${(() => { const x = calc(id); return `Encontrado: <b>${rangoF(x.min, x.max)}</b> por semana · ${x.calculando ? '<span class="calc-pill">Calculando…</span>' : x.conf}`; })()}</span><button class="btn" data-a="cerrar">Listo</button></div>`, '', mantener);
     $('#modal').dataset.afinar = id;
 }

@@ -341,3 +341,7 @@ p { margin: 0 0 .8em; }
 .emp-m-lbl { margin: 4px 10px 0; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); }
 .emp-m-act { margin: 0 10px 6px; font-weight: 700; }
 @media (max-width: 560px) { .emp-menu { position: fixed; left: 16px; right: 16px; top: 62px; width: auto; } }
+
+/* «No aplica»: opción válida que no suma nada, con un tono más discreto */
+.opc.chip.na { color: var(--suave); border-style: dashed; }
+.opc.chip.na.on { color: var(--tinta); }

@@ -73,32 +73,32 @@ const IC = {
 const FRENTES = [
     { id: 'cobros', fin: 'Cuentas por cobrar y días de cobro', t: 'Cobros', f: 'Dinero que ya es suyo y no ha entrado', base: [0.6, 2], p: 0,
       q: [['¿Les vende a crédito (le pagan después)?', [['Casi todo a crédito', 1.5], ['Una parte', 1], ['Casi todo de contado', 0.2]]],
-          ['¿Cuánto tardan sus clientes en pagarle?', [['Menos de 30 días', 0.5], ['De 30 a 60 días', 1], ['Más de 60 días', 1.6], ['No lo sé bien', 1.3]]],
-          ['¿Revisa cada semana quién le debe?', [['Sí, con una lista', 0.5], ['De vez en cuando', 1], ['No', 1.3]]]] },
+          ['¿Cuánto tardan sus clientes en pagarle?', [['Menos de 30 días', 0.5], ['De 30 a 60 días', 1], ['Más de 60 días', 1.6], ['No lo sé bien', 1.3], ['No aplica: me pagan de contado', 0, 4]]],
+          ['¿Revisa cada semana quién le debe?', [['Sí, con una lista', 0.5], ['De vez en cuando', 1], ['No', 1.3], ['No aplica: casi nadie me debe', 0, 4]]]] },
     { id: 'compras', fin: 'Costo de ventas y negociación con proveedores', t: 'Compras y proveedores', f: 'Pagar más de lo necesario por lo que compra', base: [1, 3], p: 1,
-      q: [['¿Pide cotizaciones a más de un proveedor?', [['Siempre', 0.5], ['A veces', 1], ['Casi nunca', 1.4]]],
-          ['¿Cuándo negoció precios con sus proveedores principales?', [['Este año', 0.5], ['Hace 1 o 2 años', 1.1], ['Nunca o no recuerdo', 1.4]]],
-          ['¿Quién decide las compras?', [['Yo reviso todo', 0.5], ['Una persona encargada', 1], ['Varias personas, sin control', 1.4]]]] },
+      q: [['¿Pide cotizaciones a más de un proveedor?', [['Siempre', 0.5], ['A veces', 1], ['Casi nunca', 1.4], ['Solo en las compras grandes', 0.7, 0.5]]],
+          ['¿Cuándo negoció precios con sus proveedores principales?', [['Este año', 0.5], ['Hace 1 o 2 años', 1.1], ['Nunca o no recuerdo', 1.4], ['Con algunos, este año', 0.8, 0.5]]],
+          ['¿Quién decide las compras?', [['Yo reviso todo', 0.5], ['Una persona encargada', 1], ['Varias personas, sin control', 1.4], ['Una persona encargada, y yo reviso', 0.6, 0.5]]]] },
     { id: 'inventario', fin: 'Merma y rotación de inventario', t: 'Inventario', f: 'Producto que se daña, se vence, se pierde o no se mueve', base: [1, 2.5], p: 2,
-      q: [['¿Cada cuánto cuenta su inventario?', [['Cada mes o más seguido', 0.5], ['Cada pocos meses', 1], ['Una vez al año o nunca', 1.5]]],
+      q: [['¿Cada cuánto cuenta su inventario?', [['Cada mes o más seguido', 0.5], ['Cada pocos meses', 1], ['Una vez al año o nunca', 1.5], ['Un sistema lo lleva al día', 0.5, -0.5]]],
           ['¿Se le dañan, vencen o desaparecen productos?', [['Casi nunca', 0.5], ['A veces', 1], ['Seguido', 1.6]]],
           ['¿Tiene productos guardados que casi no se venden?', [['No', 0.5], ['Algunos', 1], ['Bastantes', 1.4]]]] },
     { id: 'precios', fin: 'Margen bruto y política de precios', t: 'Precios y ganancia', f: 'Vender barato sin saberlo, o regalar descuentos', base: [1, 3], p: 3,
-      q: [['¿Cuándo subió sus precios por última vez?', [['Este año', 0.5], ['El año pasado', 1], ['Hace más de 2 años', 1.5]]],
+      q: [['¿Cuándo subió sus precios por última vez?', [['Este año', 0.5], ['El año pasado', 1], ['Hace más de 2 años', 1.5], ['Los revisé y decidí no subirlos', 0.7, 0.5]]],
           ['¿Sabe cuánto gana realmente en cada producto o servicio?', [['Sí, en todos', 0.5], ['En los principales', 1], ['No con exactitud', 1.4]]],
-          ['¿Cómo maneja los descuentos?', [['Casi no doy', 0.5], ['Con reglas claras', 0.9], ['Seguido, según el cliente', 1.4]]]] },
+          ['¿Cómo maneja los descuentos?', [['Casi no doy', 0.5], ['Con reglas claras', 0.5], ['Seguido, según el cliente', 1.4]]]] },
     { id: 'fijos', fin: 'Gastos operativos fijos', t: 'Gastos fijos', f: 'Pagos de cada mes que nadie ha revisado', base: [0.5, 1.5], p: 4,
       q: [['¿Revisó este año lo que paga cada mes (alquiler, seguros, teléfonos, programas)?', [['Sí', 0.5], ['Una parte', 1], ['No', 1.4]]],
           ['¿Paga servicios o programas que casi no usa?', [['No', 0.5], ['Tal vez alguno', 1], ['Seguro que sí', 1.5]]],
-          ['¿Cuántos cobros automáticos tiene en tarjetas o cuentas?', [['Pocos y los conozco', 0.5], ['Varios', 1], ['No sé exactamente', 1.4]]]] },
+          ['¿Cuántos cobros automáticos tiene en tarjetas o cuentas?', [['Pocos y los conozco', 0.5], ['Varios', 1], ['No sé exactamente', 1.4], ['Varios, y los reviso cada mes', 0.5, 0.5]]]] },
     { id: 'personal', fin: 'Costo laboral y productividad', t: 'Tiempo y personal', f: 'Horas extra, tareas repetidas y gente que se va', base: [1, 2.5], p: 5,
-      q: [['¿Se pagan horas extra con frecuencia?', [['Casi nunca', 0.5], ['A veces', 1], ['Todas las semanas', 1.4]]],
+      q: [['¿Se pagan horas extra con frecuencia?', [['Casi nunca', 0.5], ['A veces', 1], ['Todas las semanas', 1.4], ['No aplica: no tengo empleados', 0, 4]]],
           ['¿Hay tareas que se hacen dos veces o a mano y podrían simplificarse?', [['Pocas', 0.5], ['Algunas', 1], ['Muchas', 1.4]]],
-          ['¿Cuántas personas se fueron el último año?', [['Casi nadie', 0.5], ['Algunas', 1], ['Mucha gente', 1.5]]]] },
+          ['¿Cuántas personas se fueron el último año?', [['Casi nadie', 0.5], ['Algunas', 1], ['Mucha gente', 1.5], ['No aplica: no tengo empleados', 0, 4]]]] },
     { id: 'servicios', t: 'Electricidad, agua y combustible', f: 'Consumo que se escapa sin que nadie lo mire', base: [0.3, 1], p: 6,
       q: [['¿Compara su factura de electricidad o combustible con meses anteriores?', [['Sí, cada mes', 0.5], ['A veces', 1], ['Nunca', 1.3]]],
-          ['¿Quedan equipos encendidos fuera de horario, o vehículos con rutas sin planear?', [['No', 0.5], ['Algunos', 1], ['Sí, bastante', 1.5]]],
-          ['¿Los equipos (aires, refrigeración, vehículos) tienen mantenimiento al día?', [['Sí', 0.5], ['Más o menos', 1], ['No', 1.3]]]] },
+          ['¿Quedan equipos encendidos fuera de horario, o vehículos con rutas sin planear?', [['No', 0.5], ['Algunos', 1], ['Sí, bastante', 1.5], ['No aplica: no tengo equipos ni vehículos', 0, 4]]],
+          ['¿Los equipos (aires, refrigeración, vehículos) tienen mantenimiento al día?', [['Sí', 0.5], ['Más o menos', 1], ['No', 1.3], ['No aplica: no tengo equipos ni vehículos', 0, 4]]]] },
     { id: 'sedes', fin: 'Rentabilidad por sede o unidad de negocio', t: 'Diferencias entre sedes', f: 'Una sede que gasta más o vende menos que otra', base: [1, 2.5], p: -1,
       q: [['¿Compara los números de una sede con otra?', [['Sí, cada mes', 0.5], ['A veces', 1], ['Nunca', 1.4]]],
           ['¿Cada sede compra por su cuenta?', [['No, compramos juntos', 0.5], ['En parte', 1], ['Sí, cada una aparte', 1.4]]],
@@ -161,6 +161,9 @@ function empezarOnb() {
 }
 const fr = (id) => { const st = (S.fr[id] = S.fr[id] || { r: {}, oculto: false, plan: null, extra: {} }); st.libre = st.libre || {}; return st; };
 // Texto de una respuesta: la opción elegida, o lo que el dueño escribió («Otra respuesta…»).
+// Opciones en el orden en que se muestran: el 3er dato de una opción es su posición en pantalla (si no hay, su índice).
+// Las opciones nuevas se agregan AL FINAL de la lista (las respuestas guardadas son índices) y se ubican con ese dato.
+const opsDe = (qq) => qq[1].map((o, k) => ({ o, k })).sort((a, b) => (a.o[2] != null ? a.o[2] : a.k) - (b.o[2] != null ? b.o[2] : b.k));
 const respTexto = (f, st, i) => (st.r[i] === 'x' ? '«' + ((st.libre[i] || {}).texto || '') + '»' : (f.q[i][1][st.r[i]] || [''])[0]);
 
 // ---------- Utilidades ----------
@@ -378,7 +381,7 @@ function vPanel() {
       <div class="r-prec"><p class="lbl">Empresa revisada</p><div class="meter"><i style="width:${T.revisado}%"></i></div><p class="per">${T.resp} de ${T.posibles} preguntas · ${T.revisado === 0 ? 'empiece por la pregunta rápida' : T.revisado < 100 ? 'el total puede seguir subiendo' : 'revisión completa'}</p></div>
     </section>
     ${sig ? `<section class="pdia"><div><p class="lbl">Pregunta rápida · ${esc(FR[sig.id].t)}</p><p class="pq">${esc(FR[sig.id].q[sig.i][0])}</p></div>
-      <div class="opciones fila">${FR[sig.id].q[sig.i][1].map((o, k) => `<button class="opc chip" data-a="resp" data-f="${sig.id}" data-i="${sig.i}" data-k="${k}">${esc(o[0])}</button>`).join('')}<button class="opc chip otra" data-a="libre" data-f="${sig.id}" data-i="${sig.i}">Otra respuesta…</button></div></section>` : ''}
+      <div class="opciones fila">${opsDe(FR[sig.id].q[sig.i]).map(({ o, k }) => `<button class="opc chip ${o[1] === 0 ? 'na' : ''}" data-a="resp" data-f="${sig.id}" data-i="${sig.i}" data-k="${k}">${esc(o[0])}</button>`).join('')}<button class="opc chip otra" data-a="libre" data-f="${sig.id}" data-i="${sig.i}">Otra respuesta…</button></div></section>` : ''}
     <section class="tarjetas">
       ${T.l.map((x, idx) => tarjeta(x, idx, max)).join('')}
     </section>
@@ -507,7 +510,7 @@ function refrescarAfinar(id) { const m = $('#modal'); if (!m.hidden && m.dataset
 function mAfinar(id, mantener) {
     const f = FR[id], st = fr(id);
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>Revisar este frente</h2><p class="sub">${esc(f.fin)}. Cada respuesta puede destapar una parte de la fuga; si lo tiene bajo control, no suma nada.</p>
-      ${f.q.map((qq, i) => `<div class="pregunta"><p>${esc(qq[0])}</p><div class="opciones fila">${qq[1].map((o, k) => `<button class="opc chip ${st.r[i] === k ? 'on' : ''}" data-a="resp" data-f="${id}" data-i="${i}" data-k="${k}" data-m="1">${esc(o[0])}</button>`).join('')}<button class="opc chip otra ${st.r[i] === 'x' ? 'on' : ''}" data-a="libre" data-f="${id}" data-i="${i}" data-m="1">Otra respuesta…</button></div>${st.r[i] === 'x' ? libreLinea(st.libre[i]) : ''}</div>`).join('')}
+      ${f.q.map((qq, i) => `<div class="pregunta"><p>${esc(qq[0])}</p><div class="opciones fila">${opsDe(qq).map(({ o, k }) => `<button class="opc chip ${o[1] === 0 ? 'na' : ''} ${st.r[i] === k ? 'on' : ''}" data-a="resp" data-f="${id}" data-i="${i}" data-k="${k}" data-m="1">${esc(o[0])}</button>`).join('')}<button class="opc chip otra ${st.r[i] === 'x' ? 'on' : ''}" data-a="libre" data-f="${id}" data-i="${i}" data-m="1">Otra respuesta…</button></div>${st.r[i] === 'x' ? libreLinea(st.libre[i]) : ''}</div>`).join('')}
       <div class="m-pie"><span class="vivo">${(() => { const x = calc(id); return `Encontrado: <b>${rangoF(x.min, x.max)}</b> al mes · ${x.calculando ? '<span class="calc-pill">Calculando…</span>' : x.conf}`; })()}</span><button class="btn" data-a="cerrar">Listo</button></div>`, '', mantener);
     $('#modal').dataset.afinar = id;
 }
