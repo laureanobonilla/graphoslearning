@@ -1,0 +1,11 @@
+{
+  "name": "Ordena",
+  "short_name": "Ordena",
+  "description": "Encuentra las horas que se te escapan cada semana y recupéralas.",
+  "start_url": "/ordena/",
+  "scope": "/ordena/",
+  "display": "standalone",
+  "background_color": "#f6f3ee",
+  "theme_color": "#23395b",
+  "icons": [{ "src": "/ordena/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
