@@ -53,7 +53,7 @@ function fromAud(r) {   // trabajos de tu-audio: el pago y el estado son automá
         fulfil_status: r.paid ? 'pagado' : r.status === 'failed' ? 'cancelado' : 'nuevo', paid: !!r.paid, paid_amount: r.paid_amount_usd == null ? null : Number(r.paid_amount_usd), admin_note: r.admin_note || '', auto: true };
 }
 function fromDst(r) {   // lotes de Destila: el pago y el estado son automáticos; solo la nota es editable
-    return { app: 'destila', id: r.id, created_at: r.created_at, kind: 'pedido', name: r.payer_email || (r.free ? '(acceso libre)' : '(aún no paga)'), phone: '', email: r.payer_email || '', with_video: false,
+    return { app: 'destila', id: r.id, created_at: r.created_at, kind: 'pedido', name: r.payer_email || (r.free ? '(acceso libre)' : r.trial ? '(primer lote gratis)' : '(aún no paga)'), phone: '', email: r.payer_email || '', with_video: false,
         price_text: r.price_usd != null ? 'US$' + Number(r.price_usd).toFixed(2) : '', price_amount: Number(r.price_usd) || 0, currency: 'USD', title: `Lote de ${r.count} audio${r.count === 1 ? '' : 's'}`, rhythm: r.general ? 'con idea general' : '',
         notes: '', lyrics: '', has_files: false, country: r.country || '', fulfil_status: r.paid ? 'pagado' : 'nuevo', paid: !!r.paid, paid_amount: r.paid_amount_usd == null ? null : Number(r.paid_amount_usd), admin_note: r.admin_note || '', auto: true };
 }
@@ -81,7 +81,7 @@ exports.handler = async (event, context) => {
                 rest('tc_songs?status=in.(requested,whatsapp_intent)&order=created_at.desc&limit=500').catch(e => { console.error('[mnt] tc_songs', e.message); return null; }),
                 rest('cs_orders?order=created_at.desc&limit=500').catch(e => { console.error('[mnt] cs_orders', e.message); return null; }),
                 rest('aud_jobs?status=in.(ready,processing,failed)&order=created_at.desc&limit=500').catch(e => { console.error('[mnt] aud_jobs', e.message); return null; }),
-                rest('dst_jobs?select=id,created_at,count,price_usd,country,free,paid,paid_amount_usd,payer_email,general,admin_note&order=created_at.desc&limit=500').catch(e => { console.error('[mnt] dst_jobs', e.message); return null; })
+                rest('dst_jobs?select=id,created_at,count,price_usd,country,free,trial,paid,paid_amount_usd,payer_email,general,admin_note&order=created_at.desc&limit=500').catch(e => { console.error('[mnt] dst_jobs', e.message); return null; })
             ]);
             const needsSql = (tc && tc[0] && tc[0].fulfil_status === undefined) || (cs && cs[0] && cs[0].fulfil_status === undefined);
             const orders = [...(tc || []).map(fromTc), ...(cs || []).map(fromCs), ...(au || []).map(fromAud), ...(ds || []).map(fromDst)].map(o => ({ ...o, fulfil_status: o.fulfil_status || 'nuevo' })).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));

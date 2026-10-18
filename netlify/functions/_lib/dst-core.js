@@ -1,7 +1,8 @@
 // «Destila»: notas de voz de WhatsApp → transcripción + idea principal de cada una + idea general del conjunto.
 // Flujo: la persona elige audios (sueltos, el ZIP de «Exportar chat» o compartidos desde WhatsApp en Android).
 //   dst-start crea el lote (cuántos audios → precio) → dst-audio manda cada audio a Gemini (transcribe y resume en una
-//   sola llamada) → el PRIMER audio es gratis; los demás y la idea general (dst-general) piden el pago (PayPal).
+//   sola llamada) → el PRIMER LOTE de cada persona es gratis (hasta TRIAL_MAX audios); desde el segundo, el primer audio es
+//   de muestra y los demás y la idea general (dst-general) piden el pago (PayPal).
 // El audio NO se guarda: llega en base64 a dst-audio, se le pasa a Gemini y se descarta. Solo queda el texto resultante
 //   (para que la persona pueda volver a su enlace). Tablas: supabase/destila.sql. Variables: GEMINI_API_KEY + las de
 //   PayPal y Supabase que ya existen (+ opcionales DST_FREE_KEY y DST_PRICES).
@@ -17,6 +18,9 @@ const freeKeyOk = (k) => { const a = Buffer.from(String(k || '')), b = Buffer.fr
 let TIERS = [{ max: 10, usd: '1.99' }, { max: 30, usd: '3.99' }, { max: 80, usd: '6.99' }];
 try { const t = JSON.parse(process.env.DST_PRICES || 'null'); if (Array.isArray(t) && t.length && t.every(x => x && Number(x.max) > 0 && Number(x.usd) > 0)) TIERS = t.map(x => ({ max: Math.floor(Number(x.max)), usd: Number(x.usd).toFixed(2) })).sort((a, b) => a.max - b.max); } catch (_e) { /* se usan los de arriba */ }
 const MAX_AUDIOS = TIERS[TIERS.length - 1].max;
+// Primer lote gratis: una vez por navegador (anon_id) y por conexión (IP, últimos 30 días), hasta TRIAL_MAX audios.
+// A partir del segundo lote se cobra (con el primer audio de muestra). Cambia el tope con la variable DST_TRIAL_MAX (0 = sin lote gratis).
+const TRIAL_MAX = Math.max(0, Math.floor(Number(process.env.DST_TRIAL_MAX == null ? 10 : process.env.DST_TRIAL_MAX) || 0));
 const priceFor = (count) => { const t = TIERS.find(x => count <= x.max); return t ? t.usd : null; };
 
 // Límites por audio. El cuerpo de una función de Netlify llega hasta ~6 MB y el base64 pesa un 33 % más: 4 MB de audio
@@ -43,6 +47,13 @@ async function rest(path, opt = {}) {
 const upsert = (table, row, conflict) => rest(`${table}?on_conflict=${conflict}`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ ...row, updated_at: new Date().toISOString() }) });
 const saveJob = (row) => upsert('dst_jobs', row, 'id');
 async function getJob(id) { const r = await rest(`dst_jobs?id=eq.${encodeURIComponent(id)}&select=*`); return (r && r[0]) || null; }
+// ¿Ya usó su lote gratis? (este navegador, o esta IP en los últimos 30 días)
+async function trialUsed(anonId, ipKey) {
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    const or = [anonId ? `anon_id.eq.${encodeURIComponent(anonId)}` : null, `and(ip_hash.eq.${encodeURIComponent(ipKey)},created_at.gt.${encodeURIComponent(since)})`].filter(Boolean).join(',');
+    const r = await rest(`dst_jobs?trial=eq.true&or=(${or})&select=id&limit=1`);
+    return !!(r && r.length);
+}
 const saveItem = (row) => upsert('dst_items', row, 'job_id,idx');
 async function getItems(jobId) { return (await rest(`dst_items?job_id=eq.${encodeURIComponent(jobId)}&select=*&order=idx.asc`)) || []; }
 async function getItem(jobId, idx) { const r = await rest(`dst_items?job_id=eq.${encodeURIComponent(jobId)}&idx=eq.${Number(idx)}&select=*`); return (r && r[0]) || null; }
@@ -51,7 +62,7 @@ async function getItem(jobId, idx) { const r = await rest(`dst_items?job_id=eq.$
 const publicItem = (it) => ({ index: it.idx, sender: it.sender || '', date: it.sent_at || '', seconds: it.seconds || null, transcript: it.transcript || '', idea: it.idea || '', points: it.points || [], actions: it.actions || [], noSpeech: !!it.no_speech });
 function publicJob(job, items) {
     const paid = !!job.paid, visible = (items || []).filter(it => paid || it.idx === 0);
-    return { id: job.id, count: job.count, price: job.price_usd != null ? Number(job.price_usd).toFixed(2) : null, paid, done: (items || []).map(it => it.idx),
+    return { id: job.id, count: job.count, trial: !!job.trial, price: job.price_usd != null ? Number(job.price_usd).toFixed(2) : null, paid, done: (items || []).map(it => it.idx),
         items: visible.map(publicItem), general: paid && job.general ? job.general : null, generalCount: paid ? job.general_count || null : null };
 }
 
@@ -96,5 +107,5 @@ function generalPrompt(items) {
 }
 const cleanList = (a, n, max) => (Array.isArray(a) ? a : []).slice(0, n).map(x => scrubOne(x, max)).filter(Boolean);
 
-module.exports = { json, UUID_RE, scrub, scrubOne, ipOf, hashIp, countryOf, freeKeyOk, TIERS, MAX_AUDIOS, priceFor, MAX_BYTES, MAX_MIN, geminiMime,
+module.exports = { json, UUID_RE, scrub, scrubOne, ipOf, hashIp, countryOf, freeKeyOk, TIERS, MAX_AUDIOS, TRIAL_MAX, trialUsed, priceFor, MAX_BYTES, MAX_MIN, geminiMime,
     saveJob, getJob, saveItem, getItems, getItem, publicItem, publicJob, ITEM_SCHEMA, itemPrompt, GENERAL_SCHEMA, generalPrompt, cleanList };

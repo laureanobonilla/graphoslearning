@@ -1,4 +1,5 @@
 // Destila: crea (o actualiza mientras no esté pagado) el lote: cuántos audios trae → precio fijado por el servidor.
+// El primer lote de cada persona (hasta TRIAL_MAX audios) nace pagado con monto 0 (trial=true).
 const store = require('./_lib/store');
 const core = require('./_lib/dst-core');
 exports.handler = async (event) => {
@@ -18,8 +19,13 @@ exports.handler = async (event) => {
             try { if (!free && (await store.countEventsLastHour(ipKey, 'dst_started')) >= 12) return core.json(429, { error: 'Empezaste muchos lotes seguidos. Espera un rato e inténtalo de nuevo.' }); } catch (e) { console.error('[dst-start] límite', e.message); }
             try { await store.logEvent(ipKey, 'anon', anonId, 'dst_started', { count }, null, 'destila'); } catch (_e) { /* no crítico */ }
         }
-        const row = { id: jobId, count, price_usd: Number(core.priceFor(count)), ...(job ? {} : { anon_id: anonId, country: core.countryOf(event) || null }),
-            ...(free ? { paid: true, paid_at: new Date().toISOString(), paid_amount_usd: 0, free: true } : {}) };
+        // Primer lote gratis: solo al crear el lote, si trae hasta TRIAL_MAX audios y nunca usó el suyo.
+        let trial = false;
+        if (!job && !free && core.TRIAL_MAX > 0 && count <= core.TRIAL_MAX) { try { trial = !(await core.trialUsed(anonId, ipKey)); } catch (e) { console.error('[dst-start] prueba', e.message); } }
+        const now = new Date().toISOString();
+        const row = { id: jobId, count, price_usd: Number(core.priceFor(count)), ...(job ? {} : { anon_id: anonId, ip_hash: ipKey, country: core.countryOf(event) || null }),
+            ...(free ? { paid: true, paid_at: now, paid_amount_usd: 0, free: true } : {}), ...(trial ? { paid: true, paid_at: now, paid_amount_usd: 0, trial: true } : {}) };
+        if (trial) { try { await store.logEvent(ipKey, 'anon', anonId, 'dst_trial', { count }, null, 'destila'); } catch (_e) { /* no crítico */ } }
         await core.saveJob(row);
         return core.json(200, core.publicJob({ ...(job || {}), ...row }, job ? await core.getItems(jobId) : []));
     } catch (e) { console.error('[dst-start]', e.message); return core.json(502, { error: 'No pudimos empezar. Inténtalo de nuevo en un momento.' }); }

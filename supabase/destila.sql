@@ -23,7 +23,10 @@ create table if not exists public.dst_jobs (
   general_count     integer,
   admin_note        text                              -- nota tuya (pantalla /mantenimiento/)
 );
+alter table public.dst_jobs add column if not exists trial boolean not null default false;   -- su primer lote, gratis
+alter table public.dst_jobs add column if not exists ip_hash text;                           -- huella de la IP (no la IP) para el lote gratis
 alter table public.dst_jobs enable row level security;
+create index if not exists dst_jobs_trial on public.dst_jobs (anon_id) where trial;
 create index if not exists dst_jobs_created on public.dst_jobs (created_at desc);
 create index if not exists dst_jobs_order on public.dst_jobs (paypal_order);
 
@@ -48,7 +51,7 @@ alter table public.dst_items enable row level security;
 drop view if exists public.dst_jobs_friendly;
 create view public.dst_jobs_friendly with (security_invoker = true) as   -- con invoker: no queda expuesta por la API pública
   select j.id, (j.created_at at time zone 'America/Costa_Rica') as creado_cr, j.count as audios, (select count(*) from public.dst_items i where i.job_id = j.id) as hechos,
-         j.country, j.price_usd, j.paid, j.paid_amount_usd, j.payer_email, j.free, (j.general is not null) as con_idea_general
+         j.country, j.price_usd, j.paid, j.paid_amount_usd, j.payer_email, j.free, j.trial as gratis_primer_lote, (j.general is not null) as con_idea_general
   from public.dst_jobs j order by j.created_at desc;
 
 -- Limpieza opcional (privacidad): borra los textos de lotes de más de 30 días. Puedes correrla a mano cuando quieras:
