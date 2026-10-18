@@ -48,11 +48,15 @@
   ['ref', 'utm_source', 'utm_medium', 'utm_campaign'].forEach((k) => { const v = qp.get(k); if (v) ORIGIN[k] = clip(v, 60); });
   try { if (Object.keys(ORIGIN).length) sessionStorage.setItem('gk_m_origin', JSON.stringify(ORIGIN)); else Object.assign(ORIGIN, JSON.parse(sessionStorage.getItem('gk_m_origin') || '{}')); } catch { /* nada */ }
   /* Llegada desde /aprender/ (anuncio): el código es el «boleto» de UN esquema de prueba (se verifica en el servidor). */
-  let TICKET = '', APR_TOPIC = '', TICKET_P = Promise.resolve();
+  let TICKET = '', APR_TOPIC = '', TICKET_P = Promise.resolve(), PEND_TEXT = null;
   try {
     const a = qp.get('aprende') || '';
+    try {   /* "Ver como mapa" de Escribir deja el texto en este navegador con ese mismo código */
+      const pend = JSON.parse(localStorage.getItem('gk_ap_pending') || 'null');
+      if (pend && pend.sid === a && typeof pend.text === 'string' && pend.text.length >= 200) { PEND_TEXT = { title: clip(pend.title || '', 80), text: pend.text.slice(0, 12000) }; localStorage.removeItem('gk_ap_pending'); }
+    } catch { /* nada */ }
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a)) {
-      TICKET = a; APR_TOPIC = clip(qp.get('t') || '', 120);
+      TICKET = PEND_TEXT ? '' : a; APR_TOPIC = PEND_TEXT ? '' : clip(qp.get('t') || '', 120);
       const q2 = new URLSearchParams(location.search); ['aprende', 'ref', 't'].forEach((k) => q2.delete(k));
       const rest = q2.toString(); history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
     }
@@ -192,6 +196,20 @@
     go('map', root.id, true);
   });
 
+  /* Texto que viene de Escribir: se arma un mapa nuevo a partir de él (acción m_text, se cobra como cualquier mapa). */
+  if (PEND_TEXT) setTimeout(async () => {
+    try {
+      if (G && G.rootId) return;
+      const msg = $('#homeMsg'), btn = $('#btnGenerate'); msg.className = 'msg'; msg.textContent = 'Armando el mapa de tu texto…'; busy(btn, true);
+      track('m_from_escribir', { chars: PEND_TEXT.text.length });
+      const r = await callGemini({ action: 'm_text', text: PEND_TEXT.text, topic: PEND_TEXT.title });
+      busy(btn, false);
+      if (!r.ok) { if (handleBlocked(r.kind, 'escribir')) { msg.textContent = ''; return; } msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return; }
+      msg.textContent = ''; G = emptyG();
+      const root = newNode(clip(r.data.root && r.data.root.label, 80) || PEND_TEXT.title || 'Mi texto', '', null); G.rootId = root.id;
+      addChildren(root.id, r.data.branches); mapsCount++; scheduleSave(); go('map', root.id, true);
+    } catch { /* nada */ }
+  }, 300);
   if (TICKET && APR_TOPIC.length >= 2) setTimeout(() => { try { if (G && G.rootId) return; $('#topicInput').value = APR_TOPIC; track('m_aprende_arrival', {}); $('#homeForm').requestSubmit(); } catch { /* nada */ } }, 300);
 
   function addChildren(parentId, branches) {
@@ -422,6 +440,15 @@
   });
 
   /* ---------- Ver definiciones ---------- */
+  /* Puente con Escribir (Practicar): se guarda el mapa y se abre la práctica con el tema del nodo actual. */
+  $('#btnPractice').addEventListener('click', async () => {
+    const n = G.nodes[cur]; if (!n) return;
+    const root = G.rootId && G.nodes[G.rootId] ? G.nodes[G.rootId].label : '';
+    const topic = clip(n.id !== G.rootId && root ? n.label + ' (' + root + ')' : n.label, 120);
+    track('m_to_practice', { depth: depthOf(cur) });
+    clearTimeout(saveTimer); try { await saveProject(); } catch { /* nada */ }
+    location.href = '/escribir/?practicar=' + encodeURIComponent(topic);
+  });
   $('#btnDefs').addEventListener('click', () => { track('m_defs_opened', { depth: depthOf(cur) }); go('defs', cur); });
   $('#btnDefsBack').addEventListener('click', () => { track('m_defs_back'); go('map', cur, false); });
   let allOpen = false;

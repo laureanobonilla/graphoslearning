@@ -94,7 +94,7 @@ const TRIAL_POLICY = process.env.TRIAL_POLICY !== 'off';
 // Fuera de la política: otras apps que comparten este backend.
 const TRIAL_EXEMPT = new Set(['oracle', 'lang_map', 'lang_word', 'esc_questions', 'esc_feedback', 'esc_analyze']);
 // Crear esquemas nuevos: exige cuenta aunque ya haya usado su prueba.
-const TRIAL_NEW_SCHEMA = new Set(['parse_text', 'analyze_text', 'long_outline', 'onboarding_text']);
+const TRIAL_NEW_SCHEMA = new Set(['parse_text', 'analyze_text', 'long_outline', 'onboarding_text', 'm_text']);
 
 const WELCOME_COOKIE = 'gk_welcome';
 function hasWelcomeCookie(event) {
