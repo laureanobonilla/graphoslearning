@@ -327,3 +327,17 @@ p { margin: 0 0 .8em; }
 .btn.peligro { background: transparent; border: 1.5px solid var(--rojo); }
 .btn.peligro:hover { background: color-mix(in srgb, var(--rojo) 10%, transparent); }
 @media (max-width: 560px) { .top-d .mail { max-width: 84px; } .top-d { gap: 8px; } .marca span { display: none; } }
+.emp-wrap { position: relative; min-width: 0; }
+.emp-txt { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.15; }
+.emp-txt small { font-size: .66rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); }
+.emp-txt span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-btn[aria-expanded="true"] { border-color: var(--verde); }
+.emp-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: min(300px, calc(100vw - 32px)); background: var(--papel); border: 1px solid var(--linea);
+  border-radius: 14px; box-shadow: var(--sombra), 0 12px 32px rgba(0,0,0,.12); padding: 10px; display: grid; gap: 2px; }
+.emp-menu button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 10px; padding: 10px; cursor: pointer; color: var(--tinta); font-weight: 500; }
+.emp-menu button:hover, .emp-menu button:focus-visible { background: color-mix(in srgb, var(--verde) 8%, transparent); outline: none; }
+.emp-menu .emp-m-nueva { color: var(--verde-2); font-weight: 700; }
+.emp-menu hr { border: 0; border-top: 1px solid var(--linea); margin: 6px 0; }
+.emp-m-lbl { margin: 4px 10px 0; font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--suave); }
+.emp-m-act { margin: 0 10px 6px; font-weight: 700; }
+@media (max-width: 560px) { .emp-menu { position: fixed; left: 16px; right: 16px; top: 62px; width: auto; } }

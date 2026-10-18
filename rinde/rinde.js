@@ -274,7 +274,7 @@ function cabecera(enApp) {
       <a class="marca" href="#" data-a="${enApp ? 'tab' : 'nada'}" data-tab="panel">${logo()}<span>Rinde</span></a>
       <div class="top-d">
         ${enApp ? `<nav class="tabs-d">${tabsHTML()}</nav>` : ''}
-        ${enApp && S.perfil ? `<button class="emp-btn" data-a="empresas" title="Cambiar o agregar empresa">${icon('sedes', 'mini')}<span>${esc(nombreEmp(S))}</span><b aria-hidden="true">▾</b></button>` : ''}
+        ${enApp && S.perfil ? `<div class="emp-wrap"><button class="emp-btn" data-a="emp-menu" aria-haspopup="menu" aria-expanded="${UI.menu ? 'true' : 'false'}">${icon('sedes', 'mini')}<span class="emp-txt"><small>Empresa</small><span>${esc(nombreEmp(S))}</span></span><b aria-hidden="true">▾</b></button>${UI.menu ? menuEmp() : ''}</div>` : ''}
         ${USER ? `<button class="btn-q" data-a="cuenta">${ACCESO.active ? '<span class="pill ok">Plan activo</span>' : ''}<span class="mail">${esc(USER.email || 'Mi cuenta')}</span></button>`
                : `<button class="btn-q" data-a="login">Entrar</button>`}
       </div></header>`;
@@ -630,6 +630,17 @@ function mHecho(id) {
       <div class="m-pie"><button class="btn ghost" data-a="cerrar">Cancelar</button><button class="btn" data-a="hecho-ok" data-id="${id}">Guardar</button></div>`, 'chico');
 }
 
+// Menú de empresa (arriba, junto al nombre): cambiar de empresa, agregar otra, editar datos y limpiar el proyecto.
+function menuEmp() {
+    const otras = Object.entries(E.empresas).filter(([id, x]) => id !== E.activa && x.perfil);
+    return `<div class="emp-menu" role="menu">
+      <p class="emp-m-lbl">Empresa abierta</p><p class="emp-m-act">${esc(nombreEmp(S))}</p>
+      ${otras.length ? `<p class="emp-m-lbl">Cambiar a</p>${otras.map(([id, x]) => `<button role="menuitem" data-a="emp-abrir" data-id="${id}">${icon('sedes', 'mini')} ${esc(nombreEmp(x))}</button>`).join('')}` : ''}
+      <hr><button role="menuitem" class="emp-m-nueva" data-a="emp-nueva">＋ Agregar empresa</button>
+      <button role="menuitem" data-a="perfil">✎ Editar datos de la empresa</button>
+      <button role="menuitem" data-a="limpiar">↺ Limpiar proyecto</button>
+    </div>`;
+}
 function mEmpresas() {
     const lista = Object.entries(E.empresas).filter(([, x]) => x.perfil);
     abrir(`<h2>Sus empresas</h2><p class="sub">Cada empresa tiene su propio diagnóstico, planes y acciones.${ACCESO.active ? ' Su plan cubre todas.' : ''}</p>
@@ -720,12 +731,15 @@ function pedirLogin(modo) {
 //  Eventos
 // =====================================================================================
 document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-a]'); if (!b) return;
+    const b = e.target.closest('[data-a]');
+    if (UI.menu && (!b || b.dataset.a !== 'emp-menu')) { UI.menu = false; if (!b) { render(); return; } }
+    if (!b) return;
     const a = b.dataset.a, id = b.dataset.f;
     if (b.tagName === 'A') e.preventDefault();
     switch (a) {
         case 'empezar': case 'perfil': empezarOnb(); track(a === 'empezar' ? 'empezar' : 'editar_perfil'); break;
         case 'empresas': mEmpresas(); break;
+        case 'emp-menu': UI.menu = !UI.menu; render(); track('menu_empresa', { abierto: UI.menu }); break;
         case 'emp-abrir': cerrar(); abrirEmpresa(b.dataset.id); track('empresa_cambiada'); break;
         case 'emp-nueva': { guardar(false); const nid = nuevoId(); E.empresas[nid] = nuevo(); E.activa = nid; S = E.empresas[nid]; limpiarVacias(); UI.tab = 'panel'; empezarOnb(); track('empresa_nueva', { empresas: Object.keys(E.empresas).length }); break; }
         case 'limpiar': mLimpiar(); break;
@@ -842,7 +856,7 @@ document.addEventListener('change', (e) => {
 document.addEventListener('input', (e) => {
     if (e.target.id === 'exacta') { const n = Number(e.target.value.replace(/[^\d]/g, '')) || 0; const s = $('[data-a="onb-sig"]'); if (s) s.disabled = !(n > 0 || UI.borrador.ventas != null); }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#modal').hidden) cerrar(); });
+document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (!$('#modal').hidden) cerrar(); else if (UI.menu) { UI.menu = false; render(); } });
 
 function leerOnb() {
     const b = UI.borrador; if (!b) return;
