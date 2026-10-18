@@ -157,9 +157,9 @@ p { margin: 0 0 .8em; }
 .monto small { font: 500 .85rem var(--sans); color: var(--suave); }
 .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 14px; font-size: .9rem; }
 .conf { padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; }
-.c-estimado { background: var(--linea); color: var(--suave); }
-.c-probable { background: var(--ambar-f); color: var(--ambar); }
-.c-afinado { background: var(--ok-f); color: var(--ok); }
+.c-sin { background: var(--linea); color: var(--suave); }
+.c-en { background: var(--ambar-f); color: var(--ambar); }
+.c-rev { background: var(--ok-f); color: var(--ok); }
 .ok-t { color: var(--ok); font-weight: 600; }
 .avance { font-size: .85rem; color: var(--ok); margin: -6px 0 10px; }
 .card .btn { margin-top: auto; }
@@ -302,3 +302,13 @@ p { margin: 0 0 .8em; }
   .bar i { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .kpis { grid-template-columns: repeat(4, 1fr); }
 }
+
+/* ---------- Desde cero, lenguaje financiero y respuestas escritas ---------- */
+.card .fin, .tabla .fin { font-size: .74rem; text-transform: uppercase; letter-spacing: .05em; color: var(--ambar); font-weight: 700; margin: 1px 0 3px; }
+.card.cero .monto { color: var(--suave); }
+.calc-pill { display: inline-block; vertical-align: middle; font: 600 .72rem var(--sans); letter-spacing: 0; padding: 3px 10px; border-radius: 999px; background: var(--ambar-f); color: var(--ambar); animation: titila 1.2s ease-in-out infinite; }
+.r-enc .calc-pill { background: rgba(255,255,255,.16); color: #fff; }
+@keyframes titila { 50% { opacity: .45; } }
+.opc.chip.otra { border-style: dashed; color: var(--verde-2); }
+.libre-txt { margin: 8px 0 0; font-size: .88rem; color: var(--suave); font-style: italic; }
+.libre-txt .calc-pill, .libre-txt .error { font-style: normal; }

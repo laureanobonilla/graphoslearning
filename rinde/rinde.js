@@ -36,7 +36,7 @@ const VENTAS = [[0, 3000, 1800], [3000, 10000, 6000], [10000, 30000, 18000], [30
 const NEGOCIOS = [
     { id: 'comercio', t: 'Tienda o comercio', d: 'Vende productos al público o a otros negocios' },
     { id: 'restaurante', t: 'Restaurante, soda o cafetería', d: 'Comida y bebida' },
-    { id: 'servicios', t: 'Servicios profesionales', d: 'Consultoría, agencia, despacho, oficina técnica' },
+    { id: 'servicios', fin: 'Costos operativos variables', t: 'Servicios profesionales', d: 'Consultoría, agencia, despacho, oficina técnica' },
     { id: 'taller', t: 'Taller o fábrica', d: 'Produce, repara o transforma' },
     { id: 'construccion', t: 'Construcción', d: 'Obras, remodelación, mantenimiento' },
     { id: 'salud', t: 'Salud o belleza', d: 'Clínica, consultorio, farmacia, salón' },
@@ -71,27 +71,27 @@ const IC = {
 
 // Frentes: base = % de las ventas mensuales que suele perderse [mín, máx]; p = índice en PESOS
 const FRENTES = [
-    { id: 'cobros', t: 'Cobros', f: 'Dinero que ya es suyo y no ha entrado', base: [0.6, 2], p: 0,
+    { id: 'cobros', fin: 'Cuentas por cobrar y días de cobro', t: 'Cobros', f: 'Dinero que ya es suyo y no ha entrado', base: [0.6, 2], p: 0,
       q: [['¿Les vende a crédito (le pagan después)?', [['Casi todo a crédito', 1.5], ['Una parte', 1], ['Casi todo de contado', 0.2]]],
           ['¿Cuánto tardan sus clientes en pagarle?', [['Menos de 30 días', 0.6], ['De 30 a 60 días', 1], ['Más de 60 días', 1.6], ['No lo sé bien', 1.3]]],
           ['¿Revisa cada semana quién le debe?', [['Sí, con una lista', 0.6], ['De vez en cuando', 1], ['No', 1.3]]]] },
-    { id: 'compras', t: 'Compras y proveedores', f: 'Pagar más de lo necesario por lo que compra', base: [1, 3], p: 1,
+    { id: 'compras', fin: 'Costo de ventas y negociación con proveedores', t: 'Compras y proveedores', f: 'Pagar más de lo necesario por lo que compra', base: [1, 3], p: 1,
       q: [['¿Pide cotizaciones a más de un proveedor?', [['Siempre', 0.6], ['A veces', 1], ['Casi nunca', 1.4]]],
           ['¿Cuándo negoció precios con sus proveedores principales?', [['Este año', 0.7], ['Hace 1 o 2 años', 1.1], ['Nunca o no recuerdo', 1.4]]],
           ['¿Quién decide las compras?', [['Yo reviso todo', 0.8], ['Una persona encargada', 1], ['Varias personas, sin control', 1.4]]]] },
-    { id: 'inventario', t: 'Inventario', f: 'Producto que se daña, se vence, se pierde o no se mueve', base: [1, 2.5], p: 2,
+    { id: 'inventario', fin: 'Merma y rotación de inventario', t: 'Inventario', f: 'Producto que se daña, se vence, se pierde o no se mueve', base: [1, 2.5], p: 2,
       q: [['¿Cada cuánto cuenta su inventario?', [['Cada mes o más seguido', 0.6], ['Cada pocos meses', 1], ['Una vez al año o nunca', 1.5]]],
           ['¿Se le dañan, vencen o desaparecen productos?', [['Casi nunca', 0.5], ['A veces', 1], ['Seguido', 1.6]]],
           ['¿Tiene productos guardados que casi no se venden?', [['No', 0.6], ['Algunos', 1], ['Bastantes', 1.4]]]] },
-    { id: 'precios', t: 'Precios y ganancia', f: 'Vender barato sin saberlo, o regalar descuentos', base: [1, 3], p: 3,
+    { id: 'precios', fin: 'Margen bruto y política de precios', t: 'Precios y ganancia', f: 'Vender barato sin saberlo, o regalar descuentos', base: [1, 3], p: 3,
       q: [['¿Cuándo subió sus precios por última vez?', [['Este año', 0.7], ['El año pasado', 1], ['Hace más de 2 años', 1.5]]],
           ['¿Sabe cuánto gana realmente en cada producto o servicio?', [['Sí, en todos', 0.6], ['En los principales', 1], ['No con exactitud', 1.4]]],
           ['¿Cómo maneja los descuentos?', [['Casi no doy', 0.7], ['Con reglas claras', 0.9], ['Seguido, según el cliente', 1.4]]]] },
-    { id: 'fijos', t: 'Gastos fijos', f: 'Pagos de cada mes que nadie ha revisado', base: [0.5, 1.5], p: 4,
+    { id: 'fijos', fin: 'Gastos operativos fijos', t: 'Gastos fijos', f: 'Pagos de cada mes que nadie ha revisado', base: [0.5, 1.5], p: 4,
       q: [['¿Revisó este año lo que paga cada mes (alquiler, seguros, teléfonos, programas)?', [['Sí', 0.6], ['Una parte', 1], ['No', 1.4]]],
           ['¿Paga servicios o programas que casi no usa?', [['No', 0.5], ['Tal vez alguno', 1], ['Seguro que sí', 1.5]]],
           ['¿Cuántos cobros automáticos tiene en tarjetas o cuentas?', [['Pocos y los conozco', 0.7], ['Varios', 1], ['No sé exactamente', 1.4]]]] },
-    { id: 'personal', t: 'Tiempo y personal', f: 'Horas extra, tareas repetidas y gente que se va', base: [1, 2.5], p: 5,
+    { id: 'personal', fin: 'Costo laboral y productividad', t: 'Tiempo y personal', f: 'Horas extra, tareas repetidas y gente que se va', base: [1, 2.5], p: 5,
       q: [['¿Se pagan horas extra con frecuencia?', [['Casi nunca', 0.7], ['A veces', 1], ['Todas las semanas', 1.4]]],
           ['¿Hay tareas que se hacen dos veces o a mano y podrían simplificarse?', [['Pocas', 0.7], ['Algunas', 1], ['Muchas', 1.4]]],
           ['¿Cuántas personas se fueron el último año?', [['Casi nadie', 0.7], ['Algunas', 1], ['Mucha gente', 1.5]]]] },
@@ -99,7 +99,7 @@ const FRENTES = [
       q: [['¿Compara su factura de electricidad o combustible con meses anteriores?', [['Sí, cada mes', 0.6], ['A veces', 1], ['Nunca', 1.3]]],
           ['¿Quedan equipos encendidos fuera de horario, o vehículos con rutas sin planear?', [['No', 0.6], ['Algunos', 1], ['Sí, bastante', 1.5]]],
           ['¿Los equipos (aires, refrigeración, vehículos) tienen mantenimiento al día?', [['Sí', 0.7], ['Más o menos', 1], ['No', 1.3]]]] },
-    { id: 'sedes', t: 'Diferencias entre sedes', f: 'Una sede que gasta más o vende menos que otra', base: [1, 2.5], p: -1,
+    { id: 'sedes', fin: 'Rentabilidad por sede o unidad de negocio', t: 'Diferencias entre sedes', f: 'Una sede que gasta más o vende menos que otra', base: [1, 2.5], p: -1,
       q: [['¿Compara los números de una sede con otra?', [['Sí, cada mes', 0.6], ['A veces', 1], ['Nunca', 1.4]]],
           ['¿Cada sede compra por su cuenta?', [['No, compramos juntos', 0.7], ['En parte', 1], ['Sí, cada una aparte', 1.4]]],
           ['¿Sospecha que alguna sede rinde menos?', [['No', 0.7], ['Tal vez', 1], ['Sí', 1.5]]]] }
@@ -119,7 +119,9 @@ function guardar(sync = true) {
     try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_e) {}
     if (sync && USER) { clearTimeout(guardarT); guardarT = setTimeout(subir, 1200); }
 }
-const fr = (id) => (S.fr[id] = S.fr[id] || { r: {}, oculto: false, plan: null, extra: {} });
+const fr = (id) => { const st = (S.fr[id] = S.fr[id] || { r: {}, oculto: false, plan: null, extra: {} }); st.libre = st.libre || {}; return st; };
+// Texto de una respuesta: la opción elegida, o lo que el dueño escribió («Otra respuesta…»).
+const respTexto = (f, st, i) => (st.r[i] === 'x' ? '«' + ((st.libre[i] || {}).texto || '') + '»' : (f.q[i][1][st.r[i]] || [''])[0]);
 
 // ---------- Utilidades ----------
 const $ = (s, r = document) => r.querySelector(s);
@@ -142,6 +144,9 @@ function corto(n, m = mon()) {
 }
 function redondo(n) { const a = Math.abs(n); const st = a >= 1e5 ? 1000 : a >= 1e4 ? 500 : a >= 1000 ? 50 : 10; return Math.round(n / st) * st; }
 const rango = (a, b, m) => `${corto(a, m)} – ${corto(b, m)}`;
+const rangoF = (a, b, m) => (b < 1 ? dinero(0, m) : rango(a, b, m));   // fugas: «₡0» mientras no se haya encontrado nada
+const pts = (n) => (Math.round(n * 10) / 10).toLocaleString('es');
+const rangoPts = (a, b) => `${pts(a)} – ${pts(b)}`;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (el.hidden = true), 3200); }
 const isoLocal = (x) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
 const hoyISO = () => isoLocal(new Date());
@@ -160,19 +165,43 @@ function aplica(f, p = S.perfil) {
     if (f.id === 'sedes') return (SEDES.find(s => s.id === p.sedes) || SEDES[0]).k > 0;
     return (PESOS[p.negocio] || PESOS.otro)[f.p] > 0;
 }
-function calc(id) {
-    const f = FR[id], p = S.perfil, st = fr(id);
+// DESDE CERO HACIA ARRIBA: cada frente empieza en 0. Cada pregunta respondida «destapa» su parte de la fuga:
+// parte = (ventas × prudencia × peso × % de referencia) ÷ nº de preguntas, multiplicada por la gravedad de la respuesta.
+// Una buena práctica (factor ≤ 0,5) no suma nada; la respuesta «normal» (factor 1) suma su parte; una mala, hasta ~2,2 veces.
+// Con todas las preguntas en «normal» se llega exactamente al rango de referencia de ese frente.
+const gravedad = (factor) => Math.max(0, Math.min(2.2, (factor - 0.5) / 0.5));
+function pesoDe(f, p = S.perfil) {
     let peso = f.id === 'sedes' ? (SEDES.find(s => s.id === p.sedes) || SEDES[0]).k : (PESOS[p.negocio] || PESOS.otro)[f.p];
     if (f.id === 'personal') peso *= (PERSONAS.find(x => x.id === p.personas) || PERSONAS[1]).k;
-    let mult = 1, n = 0;
-    f.q.forEach((qq, i) => { const r = st.r[i]; if (r != null && qq[1][r]) { mult *= qq[1][r][1]; n++; } });
+    return peso;
+}
+function calc(id) {
+    const f = FR[id], p = S.perfil, st = fr(id), peso = pesoDe(f, p), nq = f.q.length;
     const v = ventasMes(p) * PRUDENCIA * peso / 100;
-    const lo = v * f.base[0], hi = v * f.base[1], mid = (lo + hi) / 2 * mult, half = (hi - lo) / 2 * mult * (1 - 0.22 * n);
-    return { id, min: Math.max(0, mid - half), max: mid + half, mid, n, total: f.q.length, conf: n === 0 ? 'Estimado' : n < f.q.length ? 'Probable' : 'Afinado', peso, mult };
+    let min = 0, max = 0, n = 0, calculando = false;
+    const partes = f.q.map((qq, i) => {
+        const r = st.r[i];
+        let factor = null;
+        if (r === 'x') {   // respuesta escrita: la IA la ubica en la misma escala (rinde-interpretar)
+            const L = st.libre[i] || {};
+            n++;
+            if (L.estado === 'ok' && Number.isFinite(L.factor)) factor = L.factor;
+            else { if (L.estado === 'calc') calculando = true; return null; }
+        } else {
+            if (r == null || !qq[1][r]) return null;
+            n++; factor = qq[1][r][1];
+        }
+        const g = gravedad(factor), a = v * f.base[0] / nq * g, b = v * f.base[1] / nq * g;
+        min += a; max += b;
+        return { min: a, max: b, g };
+    });
+    const potencial = v * (f.base[0] + f.base[1]) / 2;   // solo para ordenar las tarjetas; no se muestra
+    return { id, min, max, mid: (min + max) / 2, n, total: nq, partes, potencial, peso, v, calculando,
+        conf: n === 0 ? 'Sin revisar' : n < nq ? 'En revisión' : 'Revisado', cc: n === 0 ? 'sin' : n < nq ? 'en' : 'rev' };
 }
 function todos() {
     if (!S.perfil) return [];
-    return FRENTES.filter(f => aplica(f) && !fr(f.id).oculto).map(f => calc(f.id)).sort((a, b) => b.mid - a.mid);
+    return FRENTES.filter(f => aplica(f) && !fr(f.id).oculto).map(f => calc(f.id)).sort((a, b) => b.potencial - a.potencial);
 }
 function totales() {
     const l = todos();
@@ -180,7 +209,9 @@ function totales() {
     const resp = l.reduce((a, x) => a + x.n, 0), posibles = l.reduce((a, x) => a + x.total, 0);
     let unaVez = 0, mensual = 0;
     S.acciones.forEach(a => { if (a.hecho && a.monto > 0) { if (a.tipo === 'mes') mensual += a.monto; else unaVez += a.monto; } });
-    return { l, enc, precision: posibles ? Math.round(25 + 75 * resp / posibles) : 0, unaVez, mensual };
+    const vm = ventasMes() || 1;
+    return { l, enc, resp, posibles, calculando: l.some(x => x.calculando), revisado: posibles ? Math.round(100 * resp / posibles) : 0,
+        pts: { min: enc.min / vm * 100, max: enc.max / vm * 100 }, unaVez, mensual };
 }
 function siguientePregunta() {
     for (const x of todos()) { const st = fr(x.id); const i = FR[x.id].q.findIndex((_, k) => st.r[k] == null); if (i >= 0) return { id: x.id, i }; }
@@ -221,25 +252,25 @@ function vInicio() {
     return `${cabecera(false)}
     <main class="inicio">
       <section class="hero">
-        <p class="eyebrow">Diagnóstico para dueños de negocio</p>
+        <p class="eyebrow">Diagnóstico de rentabilidad para pymes</p>
         <h1>Encuentre fugas de dinero en su empresa.<br><em>Y recupérelo.</em></h1>
-        <p class="lead">En un minuto, con tres preguntas, Rinde le muestra en qué partes de su empresa es más probable que esté perdiendo dinero, cuánto podría ser y qué hacer primero.</p>
+        <p class="lead">Empezamos en cero. Con cada pregunta de un toque, Rinde destapa cuánto se le está yendo en cobros, compras, inventario, precios y gastos, cuánto le resta a su rentabilidad y qué hacer primero.</p>
         <div class="cta-row"><button class="btn xl" data-a="empezar">Empezar · 1 minuto</button><span class="nota">Sin tarjeta. Sin registrarse para ver el resultado.</span></div>
       </section>
       <section class="demo" aria-label="Ejemplo de resultado">
-        <div class="demo-top"><span>Ejemplo: tienda con 12 personas</span><strong>₡820 mil – ₡2 millones <small>al mes</small></strong></div>
+        <div class="demo-top"><span>Ejemplo: tienda con 12 personas, tras 9 respuestas</span><strong>₡820 mil – ₡2 millones <small>al mes · 2,3 a 5,6 puntos de rentabilidad</small></strong></div>
         ${ejemplo.map(([id, t, r, w]) => `<div class="demo-row">${icon(id)}<span class="dt">${t}</span><span class="bar"><i style="width:${w}%"></i></span><span class="dr">${r}</span></div>`).join('')}
       </section>
       <section class="tres">
         <div><b>1</b><h3>Responda 3 preguntas</h3><p>A qué se dedica, cuántas personas trabajan y cuánto vende más o menos. Nada de documentos.</p></div>
-        <div><b>2</b><h3>Vea sus posibles fugas</h3><p>Cada tarjeta muestra un frente, cuánto podría estar perdiendo y por qué. Usted decide cuánto afinarla.</p></div>
+        <div><b>2</b><h3>Destape sus fugas</h3><p>Cada frente empieza en cero. Cada respuesta de un toque suma lo que se está fugando ahí, y usted ve el total crecer.</p></div>
         <div><b>3</b><h3>Recupere paso a paso</h3><p>Un plan concreto, mensajes listos para enviar y un registro de lo que ya recuperó.</p></div>
       </section>
       <section class="porque">
         <h2>Por qué confiar en las cifras</h2>
         <ul>
           <li><b>Cada número se puede explicar.</b> Toque "¿De dónde sale?" y vea el cálculo. No es una adivinanza de la inteligencia artificial.</li>
-          <li><b>Preferimos quedarnos cortos.</b> Usamos rangos prudentes; con cada respuesta suya, el rango se vuelve más preciso.</li>
+          <li><b>Nada inflado.</b> Todo empieza en cero y solo sumamos una fuga cuando sus respuestas la muestran, con rangos de referencia prudentes.</li>
           <li><b>Sus datos son suyos.</b> No pedimos nombres de clientes, cuentas bancarias ni facturas. Se guardan en su dispositivo, y en su cuenta privada si decide crear una.</li>
         </ul>
       </section>
@@ -247,9 +278,9 @@ function vInicio() {
       <section class="faq">
         <h2>Preguntas frecuentes</h2>
         <details><summary>¿Cuánto cuesta?</summary><p>El diagnóstico es gratis, y también el plan completo de un frente. Para ver los planes de todos los frentes, con seguimiento, hay planes desde US$19 por un mes. Es un pago único: no se renueva solo.</p></details>
-        <details><summary>¿Necesito saber de finanzas?</summary><p>No. Todo está en lenguaje sencillo, y si sabe del tema, puede ver el detalle de cada cálculo.</p></details>
+        <details><summary>¿Necesito saber de finanzas?</summary><p>No. Todo está en lenguaje sencillo, y cada frente indica también su término financiero (margen bruto, días de cobro, rotación de inventario…) para quien lo maneja, o para pasárselo al contador.</p></details>
         <details><summary>¿Sirve para mi tipo de negocio?</summary><p>Rinde ajusta los frentes según el tipo de negocio, su tamaño y si tiene varias sedes. Lo que no aplica a su empresa, no aparece.</p></details>
-        <details><summary>¿Y si el número no se parece a mi realidad?</summary><p>Afínelo: cada tarjeta tiene preguntas de una línea que lo ajustan. También puede ocultar un frente que no le aplica.</p></details>
+        <details><summary>¿Y si el número no se parece a mi realidad?</summary><p>Cada cifra sale solo de sus respuestas: puede cambiarlas cuando quiera, ver el cálculo exacto o ocultar un frente que no le aplica.</p></details>
       </section>
       <section class="cierre"><h2>¿Cuántas fugas de dinero tiene su empresa?</h2><button class="btn xl" data-a="empezar">Averiguarlo ahora</button></section>
       <footer class="pie">Rinde · ${new Date().getFullYear()}${CFG.contacto ? ' · ' + esc(CFG.contacto) : ''}</footer>
@@ -299,32 +330,34 @@ function vPanel() {
     const ocultos = FRENTES.filter(f => aplica(f) && fr(f.id).oculto);
     return `
     <section class="resumen">
-      <div class="r-enc"><p class="lbl">Dinero que podría estar perdiendo</p><p class="big">${rango(T.enc.min, T.enc.max)}</p><p class="per">cada mes · ${esc(neg ? neg.t : '')}</p>
-        <p class="anual">Al año: ${rango(T.enc.min * 12, T.enc.max * 12)}</p></div>
+      <div class="r-enc"><p class="lbl">Fugas encontradas hasta ahora</p><p class="big">${rangoF(T.enc.min, T.enc.max)}${T.calculando ? ' <span class="calc-pill">Calculando…</span>' : ''}</p><p class="per">cada mes · ${esc(neg ? neg.t : '')}</p>
+        <p class="anual">${T.enc.max < 1 ? 'Responda las preguntas rápidas: cada una puede destapar una fuga.' : `Al año: ${rango(T.enc.min * 12, T.enc.max * 12)} · le resta ${rangoPts(T.pts.min, T.pts.max)} puntos de rentabilidad`}</p></div>
       <div class="r-rec"><p class="lbl">Recuperado</p><p class="big verde">${dinero(redondo(T.unaVez))}</p><p class="per">${T.mensual ? `+ ${corto(T.mensual)} al mes en ahorros nuevos` : 'Marque acciones como hechas para verlo crecer'}</p></div>
-      <div class="r-prec"><p class="lbl">Precisión del diagnóstico</p><div class="meter"><i style="width:${T.precision}%"></i></div><p class="per">${T.precision}% · ${T.precision < 50 ? 'Cada respuesta lo afina' : T.precision < 90 ? 'Va muy bien' : 'Muy afinado'}</p></div>
+      <div class="r-prec"><p class="lbl">Empresa revisada</p><div class="meter"><i style="width:${T.revisado}%"></i></div><p class="per">${T.resp} de ${T.posibles} preguntas · ${T.revisado === 0 ? 'empiece por la pregunta rápida' : T.revisado < 100 ? 'el total puede seguir subiendo' : 'revisión completa'}</p></div>
     </section>
     ${sig ? `<section class="pdia"><div><p class="lbl">Pregunta rápida · ${esc(FR[sig.id].t)}</p><p class="pq">${esc(FR[sig.id].q[sig.i][0])}</p></div>
-      <div class="opciones fila">${FR[sig.id].q[sig.i][1].map((o, k) => `<button class="opc chip" data-a="resp" data-f="${sig.id}" data-i="${sig.i}" data-k="${k}">${esc(o[0])}</button>`).join('')}</div></section>` : ''}
+      <div class="opciones fila">${FR[sig.id].q[sig.i][1].map((o, k) => `<button class="opc chip" data-a="resp" data-f="${sig.id}" data-i="${sig.i}" data-k="${k}">${esc(o[0])}</button>`).join('')}<button class="opc chip otra" data-a="libre" data-f="${sig.id}" data-i="${sig.i}">Otra respuesta…</button></div></section>` : ''}
     <section class="tarjetas">
       ${T.l.map((x, idx) => tarjeta(x, idx, max)).join('')}
     </section>
     ${ocultos.length ? `<p class="ocultos">Ocultos: ${ocultos.map(f => `<button class="lnk" data-a="mostrar" data-f="${f.id}">${esc(f.t)}</button>`).join(' · ')}</p>` : ''}
-    <p class="disc">Las cifras son estimaciones con rangos de referencia prudentes, ajustadas con sus respuestas. Sirven para decidir por dónde empezar, no como contabilidad. <button class="lnk" data-a="perfil">Editar datos de la empresa</button></p>`;
+    <p class="disc">Cada frente empieza en cero y suma solo lo que sus respuestas muestran, con rangos de referencia prudentes. «Puntos de rentabilidad» = la fuga como porcentaje de sus ventas. Sirve para decidir por dónde empezar, no sustituye la contabilidad. <button class="lnk" data-a="perfil">Editar datos de la empresa</button></p>`;
 }
 
 function tarjeta(x, idx, max) {
     const f = FR[x.id], st = fr(x.id), libre = ACCESO.active || !ACCESO.freeFrente || ACCESO.freeFrente === x.id, tienePlan = !!st.plan;
     const accs = S.acciones.filter(a => a.frente === x.id), hechas = accs.filter(a => a.hecho).length;
-    return `<article class="card ${idx === 0 ? 'top1' : ''}">
-      <header><span class="ci">${icon(x.id)}</span><div><h3>${esc(f.t)}</h3><p>${esc(f.f)}</p></div>
+    const cero = x.n === 0;
+    return `<article class="card ${idx === 0 ? 'top1' : ''} ${cero ? 'cero' : ''}">
+      <header><span class="ci">${icon(x.id)}</span><div><h3>${esc(f.t)}</h3><p class="fin">${esc(f.fin)}</p><p>${esc(f.f)}</p></div>
         <button class="mas" data-a="menu" data-f="${x.id}" aria-label="Opciones">⋯</button></header>
-      <p class="monto">${rango(x.min, x.max)}<small> /mes</small></p>
-      <div class="bar"><i style="left:${x.min / max * 100}%;width:${Math.max(2, (x.max - x.min) / max * 100)}%"></i></div>
-      <div class="meta"><span class="conf c-${x.conf.toLowerCase()}">${x.conf}</span>${x.n < x.total ? `<button class="lnk" data-a="afinar" data-f="${x.id}">Afinar (${x.total - x.n} pregunta${x.total - x.n > 1 ? 's' : ''})</button>` : '<span class="ok-t">Respondido</span>'}
-        <button class="lnk sut" data-a="porque" data-f="${x.id}">¿De dónde sale?</button></div>
+      <p class="monto">${rangoF(x.min, x.max)}<small> /mes</small>${x.calculando ? ' <span class="calc-pill">Calculando…</span>' : ''}</p>
+      <div class="bar"><i style="left:${x.min / max * 100}%;width:${x.max < 1 ? 0 : Math.max(2, (x.max - x.min) / max * 100)}%"></i></div>
+      <div class="meta"><span class="conf c-${x.cc}">${x.conf}</span>${x.n > 0 && x.n < x.total ? `<button class="lnk" data-a="afinar" data-f="${x.id}">Seguir revisando (${x.total - x.n})</button>` : ''}
+        ${x.n > 0 ? `<button class="lnk sut" data-a="porque" data-f="${x.id}">¿De dónde sale?</button>` : ''}</div>
       ${accs.length ? `<p class="avance">${hechas} de ${accs.length} acciones hechas</p>` : ''}
-      <button class="btn ${libre || tienePlan ? '' : 'lock'} full" data-a="plan" data-f="${x.id}">${tienePlan ? 'Ver mi plan' : libre ? (idx === 0 && !ACCESO.active ? 'Ver plan gratis' : 'Ver plan para recuperarlo') : '🔒 Ver plan para recuperarlo'}</button>
+      ${cero ? `<button class="btn ghost full" data-a="afinar" data-f="${x.id}">Revisar este frente · ${x.total} preguntas</button>`
+        : `<button class="btn ${libre || tienePlan ? '' : 'lock'} full" data-a="plan" data-f="${x.id}">${tienePlan ? 'Ver mi plan' : libre ? (!ACCESO.active && !ACCESO.freeFrente ? 'Ver plan gratis' : 'Ver plan para recuperarlo') : '🔒 Ver plan para recuperarlo'}</button>`}
     </article>`;
 }
 
@@ -369,14 +402,15 @@ function vInforme() {
     const T = totales(), neg = NEGOCIOS.find(n => n.id === S.perfil.negocio), max = Math.max(...T.l.map(x => x.max), 1);
     const pers = PERSONAS.find(x => x.id === S.perfil.personas), sed = SEDES.find(x => x.id === S.perfil.sedes);
     return `<section class="informe">
-      <div class="inf-h"><div><h2>Informe de fugas</h2><p class="sub">${esc(neg ? neg.t : '')}${S.perfil.detalle ? ' · ' + esc(S.perfil.detalle) : ''} · ${pers ? pers.t : ''} personas · ${sed ? sed.t.toLowerCase() : ''} sede(s) · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+      <div class="inf-h"><div><h2>Diagnóstico de rentabilidad</h2><p class="sub">${esc(neg ? neg.t : '')}${S.perfil.detalle ? ' · ' + esc(S.perfil.detalle) : ''} · ${pers ? pers.t : ''} personas · ${sed ? sed.t.toLowerCase() : ''} sede(s) · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
         <button class="btn ghost no-print" data-a="imprimir">Descargar PDF</button></div>
-      <div class="kpis"><div><p class="lbl">Posible fuga mensual</p><p class="big">${rango(T.enc.min, T.enc.max)}</p></div><div><p class="lbl">Al año</p><p class="big">${rango(T.enc.min * 12, T.enc.max * 12)}</p></div><div><p class="lbl">Recuperado</p><p class="big verde">${dinero(redondo(T.unaVez))}${T.mensual ? `<small> + ${corto(T.mensual)}/mes</small>` : ''}</p></div><div><p class="lbl">Precisión</p><p class="big">${T.precision}%</p></div></div>
-      <div class="tabla-w"><table class="tabla"><thead><tr><th>Frente</th><th>Posible fuga al mes</th><th class="h-bar"></th><th class="h-prec">Precisión</th><th>Acciones</th></tr></thead><tbody>
-      ${T.l.map(x => { const a = S.acciones.filter(z => z.frente === x.id); return `<tr><td>${icon(x.id, 'mini')} ${esc(FR[x.id].t)}</td><td class="num">${rango(x.min, x.max)}</td><td class="h-bar"><span class="bar"><i style="left:${x.min / max * 100}%;width:${Math.max(2, (x.max - x.min) / max * 100)}%"></i></span></td><td class="h-prec">${x.conf}</td><td>${a.filter(z => z.hecho).length}/${a.length}</td></tr>`; }).join('')}
+      <div class="kpis"><div><p class="lbl">Fugas encontradas al mes</p><p class="big">${rangoF(T.enc.min, T.enc.max)}</p></div><div><p class="lbl">Al año</p><p class="big">${rangoF(T.enc.min * 12, T.enc.max * 12)}</p></div><div><p class="lbl">Impacto en rentabilidad</p><p class="big">${T.enc.max < 1 ? '0' : rangoPts(T.pts.min, T.pts.max)}<small> puntos de margen</small></p></div><div><p class="lbl">Recuperado</p><p class="big verde">${dinero(redondo(T.unaVez))}${T.mensual ? `<small> + ${corto(T.mensual)}/mes</small>` : ''}</p></div></div>
+      <p class="sub">Empresa revisada: ${T.resp} de ${T.posibles} preguntas (${T.revisado}%). Los frentes sin revisar aparecen en cero.</p>
+      <div class="tabla-w"><table class="tabla"><thead><tr><th>Frente · indicador</th><th>Fuga al mes</th><th class="h-bar"></th><th class="h-prec">% de ventas</th><th>Acciones</th></tr></thead><tbody>
+      ${T.l.map(x => { const a = S.acciones.filter(z => z.frente === x.id), vm = ventasMes() || 1; return `<tr><td>${icon(x.id, 'mini')} ${esc(FR[x.id].t)}<br><small class="fin">${esc(FR[x.id].fin)}</small></td><td class="num">${x.n ? rangoF(x.min, x.max) : '<span class="sut">Sin revisar</span>'}</td><td class="h-bar"><span class="bar"><i style="left:${x.min / max * 100}%;width:${x.max < 1 ? 0 : Math.max(2, (x.max - x.min) / max * 100)}%"></i></span></td><td class="h-prec">${x.max < 1 ? '—' : rangoPts(x.min / vm * 100, x.max / vm * 100) + ' %'}</td><td>${a.filter(z => z.hecho).length}/${a.length}</td></tr>`; }).join('')}
       </tbody></table></div>
       ${T.l.filter(x => fr(x.id).plan).map(x => { const p = fr(x.id).plan; return `<div class="inf-plan"><h3>${icon(x.id, 'mini')} ${esc(FR[x.id].t)}</h3><p>${esc(p.resumen)}</p><p><b>Primer paso:</b> ${esc(p.victoria.titulo)}. ${esc(p.victoria.detalle)}</p><p><b>Cómo medirlo:</b> ${esc(p.medir)}</p></div>`; }).join('')}
-      <p class="disc">Estimaciones basadas en rangos de referencia prudentes y en las respuestas del dueño. No sustituyen la contabilidad de la empresa.</p>
+      <p class="disc">Cada frente parte de cero y suma solo lo que muestran las respuestas del dueño, sobre rangos de referencia prudentes por tipo de negocio. «Puntos de margen» = fuga mensual como porcentaje de las ventas mensuales. Es un diagnóstico de priorización; no sustituye los estados financieros de la empresa.</p>
     </section>`;
 }
 
@@ -386,32 +420,69 @@ function vInforme() {
 function abrir(html, cls = '', mantener = false) {
     const m = $('#modal');
     const antes = mantener && !m.hidden && $('.m-caja', m) ? $('.m-caja', m).scrollTop : 0;
-    m.className = 'modal ' + cls;
+    m.className = 'modal ' + cls; m.dataset.afinar = '';
     m.innerHTML = `<div class="m-fondo" data-a="cerrar"></div><div class="m-caja" role="dialog" aria-modal="true"><button class="m-x" data-a="cerrar" aria-label="Cerrar">×</button>${html}</div>`;
     m.hidden = false; document.body.classList.add('quieto');
     const c = $('.m-caja', m); if (c) c.scrollTop = antes;
 }
-function cerrar() { const m = $('#modal'); m.hidden = true; m.innerHTML = ''; document.body.classList.remove('quieto'); }
+function cerrar() { const m = $('#modal'); m.hidden = true; m.innerHTML = ''; m.dataset.afinar = ''; document.body.classList.remove('quieto'); }
 
+function libreLinea(L) {
+    L = L || {};
+    const est = L.estado === 'calc' ? '<span class="calc-pill">Calculando…</span>' : L.estado === 'error' ? '<span class="error">No se pudo interpretar. Tóquela para reintentar.</span>' : esc(L.nota || '');
+    return `<p class="libre-txt">«${esc(L.texto || '')}» ${est}</p>`;
+}
+function mLibre(id, i, desdeAfinar) {
+    const f = FR[id], st = fr(id), L = st.r[i] === 'x' ? (st.libre[i] || {}) : {};
+    abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>${esc(f.q[i][0])}</h2>
+      <p class="sub">Escríbalo con sus palabras, si ninguna opción describe su caso. Lo interpretamos y lo sumamos con la misma regla que las opciones.</p>
+      <label class="campo"><span>Su respuesta</span><textarea id="libreTxt" rows="3" maxlength="500" placeholder="Ej.: vendemos a crédito solo a 3 clientes grandes y pagan a 45 días">${esc(L.texto || '')}</textarea></label>
+      <div class="m-pie"><button class="btn ghost" data-a="${desdeAfinar ? 'afinar' : 'cerrar'}" data-f="${id}">Cancelar</button><button class="btn" data-a="libre-ok" data-f="${id}" data-i="${i}" ${desdeAfinar ? 'data-m="1"' : ''}>Calcular</button></div>`, 'chico');
+    setTimeout(() => { const t = $('#libreTxt'); if (t) t.focus(); }, 60);
+}
+async function interpretar(id, i) {
+    const f = FR[id], st = fr(id), L = st.libre[i];
+    if (!L || !L.texto) return;
+    const antes = calc(id);
+    L.estado = 'calc'; guardar(false); render(); refrescarAfinar(id);
+    let r;
+    try {
+        const res = await fetch('/.netlify/functions/rinde-interpretar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+            frente: f.t + ' (' + f.fin + ')', pregunta: f.q[i][0], opciones: f.q[i][1].map(o => ({ t: o[0], f: o[1] })), texto: L.texto,
+            negocio: ((NEGOCIOS.find(n => n.id === S.perfil.negocio) || {}).t || '') + (S.perfil.detalle ? ' · ' + S.perfil.detalle : '') }) });
+        r = await res.json().catch(() => ({}));
+        if (!res.ok || !Number.isFinite(Number(r.factor))) throw new Error(r.error || 'Error');
+    } catch (_e) { r = null; }
+    if (st.r[i] !== 'x' || st.libre[i] !== L) return;   // la cambió mientras tanto
+    if (!r) { L.estado = 'error'; guardar(); render(); refrescarAfinar(id); toast('No se pudo interpretar su respuesta. Puede reintentar.'); return; }
+    Object.assign(L, { estado: 'ok', factor: Number(r.factor), nota: r.nota || '', parecida: r.parecida || '' });
+    guardar(); track('respuesta_libre', { frente: id, i, factor: L.factor });
+    const ahora = calc(id), dMin = ahora.min - antes.min, dMax = ahora.max - antes.max;
+    render(); refrescarAfinar(id);
+    toast(dMax >= 1 ? `+${rango(dMin, dMax)} al mes en ${f.t}` : `Bien: según su respuesta, aquí no hay fuga en ${f.t.toLowerCase()}`);
+}
+function refrescarAfinar(id) { const m = $('#modal'); if (!m.hidden && m.dataset.afinar === id) mAfinar(id, true); }
 function mAfinar(id, mantener) {
     const f = FR[id], st = fr(id);
-    abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>Afinar este número</h2><p class="sub">Responda las que pueda. Cada respuesta cambia el cálculo al instante.</p>
-      ${f.q.map((qq, i) => `<div class="pregunta"><p>${esc(qq[0])}</p><div class="opciones fila">${qq[1].map((o, k) => `<button class="opc chip ${st.r[i] === k ? 'on' : ''}" data-a="resp" data-f="${id}" data-i="${i}" data-k="${k}" data-m="1">${esc(o[0])}</button>`).join('')}</div></div>`).join('')}
-      <div class="m-pie"><span class="vivo">${(() => { const x = calc(id); return `Ahora: <b>${rango(x.min, x.max)}</b> al mes · ${x.conf}`; })()}</span><button class="btn" data-a="cerrar">Listo</button></div>`, '', mantener);
+    abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>Revisar este frente</h2><p class="sub">${esc(f.fin)}. Cada respuesta puede destapar una parte de la fuga; si lo tiene bajo control, no suma nada.</p>
+      ${f.q.map((qq, i) => `<div class="pregunta"><p>${esc(qq[0])}</p><div class="opciones fila">${qq[1].map((o, k) => `<button class="opc chip ${st.r[i] === k ? 'on' : ''}" data-a="resp" data-f="${id}" data-i="${i}" data-k="${k}" data-m="1">${esc(o[0])}</button>`).join('')}<button class="opc chip otra ${st.r[i] === 'x' ? 'on' : ''}" data-a="libre" data-f="${id}" data-i="${i}" data-m="1">Otra respuesta…</button></div>${st.r[i] === 'x' ? libreLinea(st.libre[i]) : ''}</div>`).join('')}
+      <div class="m-pie"><span class="vivo">${(() => { const x = calc(id); return `Encontrado: <b>${rangoF(x.min, x.max)}</b> al mes · ${x.calculando ? '<span class="calc-pill">Calculando…</span>' : x.conf}`; })()}</span><button class="btn" data-a="cerrar">Listo</button></div>`, '', mantener);
+    $('#modal').dataset.afinar = id;
 }
 
 function mPorque(id) {
     const x = calc(id), f = FR[id], v = ventasMes(), st = fr(id);
-    const resp = f.q.map((qq, i) => st.r[i] != null ? `<li>${esc(qq[0])} <b>${esc(qq[1][st.r[i]][0])}</b> → × ${qq[1][st.r[i]][1]}</li>` : '').join('');
+    const resp = f.q.map((qq, i) => { const pt = x.partes[i]; const extra = st.r[i] === 'x' && st.libre[i] && st.libre[i].nota ? ` <i>(${esc(st.libre[i].nota)})</i>` : '';
+        return pt ? `<li>${esc(qq[0])} <b>${esc(respTexto(f, st, i))}</b>${extra} → ${pt.max < 1 ? 'no suma fuga' : `suma ${rango(pt.min, pt.max)}`}</li>` : `<li class="sut">${esc(qq[0])} → ${st.r[i] === 'x' ? 'calculando su respuesta escrita' : 'sin responder'} (suma 0)</li>`; }).join('');
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>¿De dónde sale este número?</h2>
       <ol class="calc">
         <li>Ventas mensuales que usamos: <b>${dinero(redondo(v))}</b>${S.perfil.exacta ? ' (las que usted escribió)' : ' (punto medio del rango que eligió)'}</li>
-        <li>En negocios parecidos, esta fuga suele estar entre <b>${f.base[0]}% y ${f.base[1]}%</b> de las ventas.</li>
+        <li>En negocios parecidos, esta fuga (${esc(f.fin.toLowerCase())}) suele estar entre <b>${f.base[0]}% y ${f.base[1]}%</b> de las ventas. Se reparte entre sus ${f.q.length} preguntas.</li>
         <li>Ajuste por su tipo de negocio${id === 'personal' ? ' y tamaño' : id === 'sedes' ? ' y número de sedes' : ''}: <b>× ${Math.round(x.peso * 100) / 100}</b></li>
         <li>Factor de prudencia (preferimos quedarnos cortos): <b>× ${PRUDENCIA}</b></li>
-        ${resp ? `<li>Sus respuestas:<ul>${resp}</ul></li>` : '<li>Todavía no hay respuestas suyas en este frente: por eso el rango es amplio.</li>'}
+        <li>El frente empieza en cero. Cada respuesta suma su parte según la gravedad: una buena práctica no suma nada, una respuesta intermedia suma su parte completa y una mala hasta un poco más del doble.<ul>${resp}</ul></li>
       </ol>
-      <p class="resul">Resultado: <b>${rango(x.min, x.max)}</b> al mes.</p>
+      <p class="resul">Encontrado: <b>${rangoF(x.min, x.max)}</b> al mes${x.max >= 1 ? ` · ${rangoPts(x.min / v * 100, x.max / v * 100)} puntos de rentabilidad` : ''}.</p>
       <p class="disc">Los porcentajes de referencia son aproximados y sirven para priorizar, no para la contabilidad. Si conoce la cifra real de su empresa, anótela en las notas del plan.</p>`);
 }
 
@@ -451,7 +522,7 @@ function mBloqueado(id) {
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(FR[id].t)} · ${rango(x.min, x.max)} al mes</p>
       <h2>Desbloquee el plan de todos sus frentes</h2>
       <div class="borroso" aria-hidden="true"><p>████████ ██████ ████ ███████ ██ ████████ ███ ████</p><p>██████ ███ ██████████ █████ ██ ███████</p><p>█████ ██████ ███ ███████████ ██████ ██</p></div>
-      <p>Usted ya vio el plan gratuito de <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : 'un frente')}</b>. Sus otros frentes suman <b>${rango(T.enc.min, T.enc.max)}</b> al mes en posibles fugas.</p>
+      <p>Usted ya vio el plan gratuito de <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : 'un frente')}</b>. En total lleva encontrado <b>${rangoF(T.enc.min, T.enc.max)}</b> al mes en fugas.</p>
       <button class="btn full" data-a="precios">Ver planes</button>`, 'chico');
 }
 
@@ -464,7 +535,7 @@ async function mPrecios() {
     const sel = UI.planSel || (plans[1] && plans[1].id) || (plans[0] && plans[0].id);
     UI.planSel = sel;
     abrir(`<h2>Recupere lo que se está yendo</h2>
-      <p class="sub">Sus posibles fugas: <b>${rango(T.enc.min, T.enc.max)}</b> al mes. Elija por cuánto tiempo quiere acceso completo.</p>
+      <p class="sub">${T.enc.max >= 1 ? `Fugas encontradas: <b>${rango(T.enc.min, T.enc.max)}</b> al mes (${rangoPts(T.pts.min, T.pts.max)} puntos de rentabilidad).` : 'Revise sus frentes para ver cuánto se le está yendo.'} Elija por cuánto tiempo quiere acceso completo.</p>
       <div class="planes">${plans.map(p => `<button class="plan-c ${p.id === sel ? 'on' : ''}" data-a="plan-sel" data-p="${p.id}"><b>${esc(p.label)}</b><span class="precio">US$${Number(p.usd).toFixed(0)}</span><small>${esc(p.note || '')}</small></button>`).join('')}</div>
       <ul class="incluye"><li>Plan a la medida de cada frente, con pasos, fechas y mensajes listos</li><li>Planes que se afinan con sus respuestas, todas las veces que quiera</li><li>Acciones con calendario y registro de lo recuperado</li><li>Informe en PDF para socios o contador</li></ul>
       <p class="nota">Pago único con PayPal (o tarjeta a través de PayPal). No se renueva solo.${CFG.garantia ? ' ' + esc(CFG.garantia) : ''}</p>
@@ -564,7 +635,7 @@ async function generarPlan(id) {
         frente: id,
         perfil: { negocio: (NEGOCIOS.find(n => n.id === p.negocio) || {}).t, detalle: p.detalle || '', personas: (PERSONAS.find(n => n.id === p.personas) || {}).t,
             ventas: corto(ventasMes()), moneda: mon().s + ' ' + (p.moneda || ''), pais: '' },
-        datos: { titulo: f.t + ' — ' + f.f, rango: rango(x.min, x.max), respuestas: f.q.map((qq, i) => st.r[i] != null ? { q: qq[0], a: qq[1][st.r[i]][0] } : null).filter(Boolean), extra, notas: st.notas || '' }
+        datos: { titulo: f.t + ' (' + f.fin + ') — ' + f.f, rango: rangoF(x.min, x.max) + ' (' + rangoPts(x.min / (ventasMes() || 1) * 100, x.max / (ventasMes() || 1) * 100) + ' puntos de margen sobre ventas)', respuestas: f.q.map((qq, i) => st.r[i] != null ? { q: qq[0], a: respTexto(f, st, i) } : null).filter(Boolean), extra, notas: st.notas || '' }
     });
     if (r.status === 401) { pendiente = { tipo: 'plan', id }; cerrar(); return pedirLogin('signup'); }
     if (r.status === 402) { if (r.freeFrente) ACCESO.freeFrente = r.freeFrente; render(); return mBloqueado(id); }
@@ -612,16 +683,34 @@ document.addEventListener('click', (e) => {
         case 'tab': UI.tab = b.dataset.tab; if (UI.vista !== 'app' && S.perfil) UI.vista = 'app'; render(); window.scrollTo(0, 0); break;
         case 'resp': {
             const st = fr(id), i = Number(b.dataset.i), k = Number(b.dataset.k);
-            st.r[i] = k; guardar(); track('respuesta', { frente: id, i, k });
-            if (b.dataset.m) { render(); mAfinar(id, true); } else { render(); toast('Listo: el número se ajustó.'); }
+            const antes = calc(id);
+            st.r[i] = k; delete st.libre[i]; guardar(); track('respuesta', { frente: id, i, k });
+            const ahora = calc(id), dMin = ahora.min - antes.min, dMax = ahora.max - antes.max;
+            const aviso = dMax >= 1 ? `+${rango(dMin, dMax)} al mes en ${FR[id].t}` : dMax <= -1 ? `${FR[id].t}: la fuga bajó a ${rangoF(ahora.min, ahora.max)}` : `Bien: aquí no hay fuga en ${FR[id].t.toLowerCase()}`;
+            if (b.dataset.m) { render(); mAfinar(id, true); } else { render(); }
+            toast(aviso);
             break;
         }
         case 'afinar': mAfinar(id); break;
+        case 'libre': {
+            const st = fr(id), i = Number(b.dataset.i);
+            if (st.r[i] === 'x' && st.libre[i] && st.libre[i].estado === 'error') { interpretar(id, i); break; }
+            mLibre(id, i, !!b.dataset.m); break;
+        }
+        case 'libre-ok': {
+            const t = (($('#libreTxt') || {}).value || '').trim();
+            if (t.length < 2) { $('#libreTxt').focus(); break; }
+            const st = fr(id), i = Number(b.dataset.i);
+            st.r[i] = 'x'; st.libre[i] = { texto: t.slice(0, 500), estado: 'calc' }; guardar();
+            if (b.dataset.m) mAfinar(id); else cerrar();
+            render(); interpretar(id, i); break;
+        }
         case 'porque': mPorque(id); track('porque', { frente: id }); break;
         case 'menu': mMenu(id); break;
         case 'ocultar': fr(id).oculto = true; guardar(); cerrar(); render(); toast('Frente oculto. Puede volver a mostrarlo abajo.'); break;
         case 'mostrar': fr(id).oculto = false; guardar(); render(); break;
         case 'plan': {
+            if (calc(id).n === 0) { mAfinar(id); break; }
             track('plan_click', { frente: id });
             const st = fr(id);
             if (st.plan) { mPlan(id); break; }
@@ -717,5 +806,6 @@ if (window.netlifyIdentity) {
 }
 fetch('/.netlify/functions/rinde-config').then(r => r.json()).then(c => { CONF = c; }).catch(() => {});
 track(S.perfil ? 'visita_vuelta' : 'visita_nueva');
+if (S.perfil) Object.entries(S.fr || {}).forEach(([id, st]) => { if (FR[id] && st.libre) Object.keys(st.libre).forEach(i => { if (st.r[i] === 'x' && st.libre[i].estado === 'calc') setTimeout(() => interpretar(id, Number(i)), 300); }); });
 render();
 })();
