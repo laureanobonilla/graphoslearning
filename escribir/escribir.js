@@ -158,13 +158,24 @@
   function updateSend() { $('#btnSend').disabled = wc($('#ansIn').value) < 3; }
   $('#ansIn').addEventListener('input', updateSend);
 
-  $('#btnSkip').addEventListener('click', () => {
+  let skipFailed = false;
+  $('#btnSkip').addEventListener('click', async () => {
     if (busyNow) return;
     const q = S.qs[S.i];
-    S.results.push({ q, ans: '', conf: 0, skipped: true, fb: null, failed: true });
+    if (skipFailed) {   // el análisis no se pudo generar: la segunda vez se salta sin él
+      skipFailed = false; S.results.push({ q, ans: '', conf: 0, skipped: true, fb: null, failed: true });
+      registerFail(q); track('esc_skip', { level: q.level, analysis: false }); next(); return;
+    }
+    const msg = $('#askMsg'); msg.className = 'msg'; msg.textContent = 'Preparando el análisis…';
+    busyNow = true; $('#btnSkip').disabled = true; $('#btnSend').disabled = true;
+    const r = await callRetry({ action: 'esc_feedback', skipped: true, topic: q.topic || S.topic, question: q.q, focus: q.focus, level: q.level });
+    busyNow = false; $('#btnSkip').disabled = false; updateSend();
+    if (!r.ok) { skipFailed = true; msg.className = 'msg err'; msg.textContent = failText(r.kind) + ' Pulsa «No lo sé» otra vez para saltar sin análisis.'; afterFail(r.kind); return; }
+    msg.textContent = '';
+    S.results.push({ q, ans: '', conf: 0, skipped: true, fb: r.data, failed: true });
     registerFail(q);
-    track('esc_skip', { level: q.level });
-    next();
+    track('esc_skip', { level: q.level, analysis: true });
+    renderFb(S.results[S.results.length - 1]);
   });
 
   $('#btnSend').addEventListener('click', async () => {
@@ -208,7 +219,21 @@
     show('Fb'); setProg();
     $('#fNum').textContent = 'Pregunta ' + (S.i + 1) + ' de ' + S.qs.length;
     $('#fQ').textContent = res.q.q;
-    $('#fAns').textContent = res.ans;
+    $('#fAns').textContent = res.ans; $('#fAns').hidden = !!res.skipped;
+    if (res.skipped) {
+      let k = '';
+      if (fb.summary) k += '<p>' + esc(fb.summary) + '</p>';
+      if (fb.missing.length) k += '<div class="card"><h3>Ideas clave para responderla</h3><ul>' + fb.missing.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></div>';
+      if (fb.concepts && fb.concepts.length) k += '<div class="card"><h3>Conceptos para practicar</h3><div class="chips">' + fb.concepts.map((c) => '<span class="chip">' + esc(c) + '</span>').join('') + '</div>' +
+        (S.parent ? '' : '<button class="ghost" data-pract="concepts" type="button">Practicar estos conceptos</button><p class="small">Después podrás volver aquí, a la pregunta ' + (S.i + 2 <= S.qs.length ? (S.i + 2) : 'final') + '.</p>') + '</div>';
+      if (fb.steps && fb.steps.length) k += '<div class="card"><h3>Cómo estudiarlo</h3><ul>' + fb.steps.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></div>';
+      k += '<div class="card"><h3>Respuesta modelo</h3><div class="model">' + esc(fb.modelAnswer) + '</div></div>';
+      $('#fbBody').innerHTML = k;
+      document.querySelectorAll('#fbBody [data-pract]').forEach((bc) => bc.addEventListener('click', () => practiceConcepts((fb.concepts || []).slice(0, 4), bc, 'skip')));
+      syncBack();
+      $('#btnNext').textContent = S.i + 1 >= S.qs.length ? 'Ver resumen' : 'Siguiente';
+      return;
+    }
     let h = '<div class="card"><h3>Por criterios</h3>';
     Object.keys(CRIT).forEach((k) => { const c = fb.criteria[k]; h += '<div class="crit"><div><span class="lv ' + c.level + '">' + LVTXT[c.level] + '</span><br><small>' + CRIT[k] + '</small></div><p>' + esc(c.note) + '</p></div>'; });
     h += '</div>';

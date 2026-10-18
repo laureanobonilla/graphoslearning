@@ -64,7 +64,7 @@ function computeCost(action, d) {
         case 'm_map':             return d.root ? 1 + len(d.branches) : 0;
         case 'm_text':            return d.root ? 1 + len(d.branches) : 0;
         case 'lang_map':          return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
-        case 'esc_feedback':      return d.criteria ? 1 : 0;
+        case 'esc_feedback':      return (d.criteria || d.skipped) ? 1 : 0;
         // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
         default:                  return 0;
     }
