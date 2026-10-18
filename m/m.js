@@ -181,6 +181,7 @@
     busy(btn, false);
     if (!r.ok) {
       track('m_map_error', { kind: r.kind, status: r.data && r.data.error, used: r.data && r.data.used, where: 'home' });
+      if (r.kind === 'login') { try { localStorage.setItem('gk_m_pending', JSON.stringify({ topic, at: Date.now() })); } catch { /* nada */ } }
       if (handleBlocked(r.kind, 'home')) { msg.textContent = ''; return; }
       msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return;
     }
@@ -212,6 +213,15 @@
   }, 300);
   if (TICKET && APR_TOPIC.length >= 2) setTimeout(() => { try { if (G && G.rootId) return; $('#topicInput').value = APR_TOPIC; track('m_aprende_arrival', {}); $('#homeForm').requestSubmit(); } catch { /* nada */ } }, 300);
 
+  /* Si el muro de registro detuvo un mapa, al iniciar sesión se retoma el mismo tema solo (y mientras tanto el campo no se borra). */
+  function resumeMobile() {
+    let p = null; try { p = JSON.parse(localStorage.getItem('gk_m_pending') || 'null'); } catch { /* nada */ }
+    if (!p || !p.topic || Date.now() - (p.at || 0) > 30 * 60 * 1000) { try { localStorage.removeItem('gk_m_pending'); } catch { /* nada */ } return; }
+    if (!user() || (G && G.rootId)) return;
+    try { localStorage.removeItem('gk_m_pending'); } catch { /* nada */ }
+    closeModals(); $('#topicInput').value = p.topic; track('m_login_resume', {});
+    $('#homeForm').requestSubmit();
+  }
   function addChildren(parentId, branches) {
     (branches || []).slice(0, 8).forEach((b, i) => {
       if (!b || !b.label) return;
@@ -714,8 +724,8 @@
   });
   if (window.netlifyIdentity) {
     netlifyIdentity.init({ locale: 'es' });
-    netlifyIdentity.on('init', () => { updateLogin(); fetchBalance(); });
-    netlifyIdentity.on('login', () => { netlifyIdentity.close(); closeModals(); updateLogin(); track('m_login_success'); toast('Sesión iniciada'); fetchBalance(); if (G.rootId) scheduleSave(); });
+    netlifyIdentity.on('init', () => { updateLogin(); fetchBalance(); setTimeout(resumeMobile, 700); });
+    netlifyIdentity.on('login', () => { netlifyIdentity.close(); closeModals(); updateLogin(); track('m_login_success'); toast('Sesión iniciada'); fetchBalance(); if (G.rootId) scheduleSave(); setTimeout(resumeMobile, 500); });
     netlifyIdentity.on('logout', () => { updateLogin(); fetchBalance(); toast('Sesión cerrada'); });
   }
   updateLogin();

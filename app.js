@@ -1922,7 +1922,13 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         const { ok, status, data } = resp;
         if (!ok) {
             const handled = handleBillingError(status, data);
-            if (!handled) { appAlert(tr("js.intenta_de_nuevo_en_unos")); clearPendingGen(); const st = document.getElementById('startTopic'); if (st && !isLong && !st.value) st.value = topicText.trim().slice(0, 160); }
+            // Lo que la persona escribió NO se pierde: si no se pudo generar (también por el muro de registro), el tema vuelve al campo.
+            if (!isLong && !attachToNodeId) {
+                const back = topicText.trim().slice(0, 160);
+                const st = document.getElementById('startTopic'); if (st && !st.value) st.value = back;
+                const ob = document.getElementById('onbTopicInput'); if (ob && !ob.value) { ob.value = back; ob.dispatchEvent(new Event('input')); }
+            }
+            if (!handled) { appAlert(tr("js.intenta_de_nuevo_en_unos")); clearPendingGen(); }
             else if (!(status === 402 && data?.error === 'guest_limit_reached') && status !== 401) clearPendingGen(); // solo el muro de login conserva el pedido
             track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(data?.error || status).slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
             return;
