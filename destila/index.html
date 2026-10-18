@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Destila · tus audios de WhatsApp, en una idea</title>
+<meta name="description" content="Sube o comparte notas de voz de WhatsApp: Destila las transcribe y te da la idea principal de cada una y de todas juntas. El primer audio es gratis.">
+<meta property="og:title" content="Destila · tus audios de WhatsApp, en una idea">
+<meta property="og:description" content="Transcribe tus notas de voz de WhatsApp y saca la idea principal. El primer audio es gratis.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#1b1740">
+<link rel="manifest" href="/destila/manifest.webmanifest">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Gloock&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/cs/cs.css?v=3">
+<style>
+  .drop{ display:block; border:2px dashed var(--ink); border-radius:18px; background:var(--paper); padding:24px 16px; text-align:center; cursor:pointer; }
+  .drop b{ display:block; font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.3rem; margin-bottom:4px; }
+  .drop span{ color:var(--muted); font-size:.93rem; }
+  .drop.over{ border-style:solid; background:#fff6dc; }
+  .how{ display:grid; gap:8px; margin:14px 0 0; }
+  .how div{ background:var(--paper); border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; font-size:.9rem; color:var(--muted); }
+  .how b{ color:var(--ink); }
+  .bar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin:4px 0 12px; }
+  .bar .count{ font-weight:700; }
+  .bar .btn-quiet{ padding:6px 4px; }
+  .list{ list-style:none; margin:0; padding:0; display:grid; gap:12px; }
+  .it{ background:var(--paper); border:1.5px solid var(--ink); border-radius:16px; padding:14px; }
+  .it.locked{ border-style:dashed; }
+  .it-head{ display:flex; gap:10px; align-items:flex-start; }
+  .it-head input{ width:20px; height:20px; margin:2px 0 0; accent-color:var(--magenta); flex:0 0 auto; }
+  .it-meta{ flex:1; min-width:0; }
+  .it-who{ font-weight:700; overflow-wrap:anywhere; }
+  .it-sub{ color:var(--muted); font-size:.8rem; overflow-wrap:anywhere; }
+  .pill{ font-size:.74rem; font-weight:700; padding:3px 10px; border-radius:99px; white-space:nowrap; background:#ecebf7; color:var(--muted); }
+  .pill.ok{ background:#dff3e7; color:var(--wa); } .pill.go{ background:#fff1cc; color:#8a5a00; } .pill.bad{ background:#fde2df; color:#b3261e; } .pill.free{ background:var(--mango); color:var(--ink); }
+  .idea{ background:#fff6dc; border-radius:12px; padding:10px 12px; margin:10px 0 0; font-size:1.02rem; line-height:1.45; }
+  .idea small{ display:block; font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#8a5a00; margin-bottom:2px; }
+  .pts{ margin:8px 0 0; padding-left:1.15em; font-size:.93rem; }
+  .acts{ margin:8px 0 0; display:grid; gap:4px; font-size:.93rem; }
+  .acts div::before{ content:"☐  "; color:var(--magenta); font-weight:700; }
+  details.tx{ margin:8px 0 0; } details.tx summary{ cursor:pointer; color:var(--magenta); font-weight:700; font-size:.88rem; }
+  details.tx p{ white-space:pre-wrap; color:var(--muted); font-size:.92rem; margin:6px 0 0; }
+  .it .cs-err{ font-size:.86rem; }
+  .it .retry{ margin-top:6px; padding:6px 0; }
+  .lockline{ color:var(--muted); font-size:.88rem; margin:8px 0 0; }
+  .buy{ background:var(--ink); color:#fff; border-radius:20px; padding:20px 16px; margin:14px 0 0; }
+  .buy h3{ font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.35rem; margin:0 0 6px; color:var(--mango); }
+  .buy p{ margin:0 0 12px; color:#e4e3f6; font-size:.95rem; }
+  #paypalBox{ background:#fff; border-radius:14px; padding:12px; min-height:60px; }
+  .general{ background:var(--paper); border:2px solid var(--ink); border-radius:20px; padding:18px 16px; margin:0 0 14px; box-shadow:4px 4px 0 var(--mango); }
+  .general h3{ font-family:'Gloock',Georgia,serif; font-weight:400; font-size:1.35rem; margin:0 0 4px; }
+  .general .lead{ font-size:1.06rem; line-height:1.5; margin:6px 0 10px; }
+  .general h4{ margin:12px 0 4px; font-size:.95rem; }
+  .general ul{ margin:0; padding-left:1.15em; font-size:.93rem; }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 0; }
+  .row .btn{ flex:1 1 auto; padding:13px 18px; }
+  .btn-ink{ background:var(--ink); color:#fff; }
+  .btn-ghost2{ background:transparent; border:2px solid var(--ink); color:var(--ink); }
+  .keep{ background:var(--paper); border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; font-size:.82rem; color:var(--muted); word-break:break-all; margin:12px 0 0; }
+  .toast{ position:fixed; left:50%; bottom:calc(20px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 16px; border-radius:12px; font-weight:600; font-size:.9rem; z-index:20; max-width:calc(100% - 32px); text-align:center; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar"><span class="brand">destila</span><button class="btn-quiet is-hidden" id="newBtn" type="button">Empezar otro lote</button></div>
+  <section class="hero">
+    <svg id="coverWave" viewBox="0 0 320 92" role="img" aria-label="Una onda de sonido"></svg>
+    <h1 class="display">Tus audios de WhatsApp, en una idea</h1>
+    <p class="sub">Transcribe tus notas de voz y te dice lo importante de cada una y de todas juntas. El primer audio es gratis.</p>
+  </section>
+
+  <div class="sec" id="main">
+    <label class="drop" id="drop" for="fileIn"><b>Elegir audios o el chat exportado</b><span>Notas de voz (.opus), mp3, m4a, wav o el .zip de «Exportar chat»</span></label>
+    <input type="file" id="fileIn" multiple accept="audio/*,.opus,.ogg,.m4a,.mp3,.wav,.aac,.amr,.zip,application/zip" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
+    <p class="cs-err is-hidden" id="upErr" role="alert"></p>
+    <div class="how" id="how">
+      <div id="howShare"><b>Sin descargar nada (Android):</b> instala Destila con el menú de Chrome → «Instalar app» o «Agregar a la pantalla principal». Luego, en WhatsApp, mantén presionados los audios → Compartir → Destila.</div>
+      <div><b>Un chat completo:</b> en WhatsApp abre el chat → ⋮ (o el nombre del contacto) → Más → Exportar chat → Incluir archivos. Sube ese .zip aquí y Destila sabe quién mandó cada audio y cuándo.</div>
+    </div>
+
+    <div id="work" class="is-hidden" style="margin-top:22px">
+      <div class="general is-hidden" id="general" aria-live="polite"></div>
+      <div class="bar"><span class="count" id="count"></span><span><button class="btn-quiet" id="selAll" type="button">Marcar todos</button><button class="btn-quiet" id="addMore" type="button">Agregar más</button></span></div>
+      <ul class="list" id="list"></ul>
+      <p class="cs-fine" id="reselect" style="text-align:center"></p>
+      <button class="btn btn-primary" id="tryBtn" type="button" style="width:100%;margin-top:14px">Probar gratis con el primer audio</button>
+      <div class="buy is-hidden" id="buyBox">
+        <h3 id="buyTitle">Desbloquea todo el lote</h3>
+        <p id="buyText"></p>
+        <div id="paypalBox"></div>
+        <p class="cs-err is-hidden" id="payErr" role="alert" style="color:#ffb4ab"></p>
+      </div>
+      <div class="row is-hidden" id="paidRow">
+        <button class="btn btn-primary" id="genBtn" type="button">Idea general de los marcados</button>
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost2" id="copyBtn" type="button">Copiar resultados</button>
+        <button class="btn btn-ghost2" id="dlBtn" type="button">Descargar .txt</button>
+      </div>
+      <div class="keep is-hidden" id="keep">Guarda este enlace para volver a ver tus resultados:<br><span id="keepLink"></span></div>
+    </div>
+  </div>
+  <p class="disclaimer">Usa audios tuyos o de conversaciones en las que participas. Tus audios no se guardan: se usan solo para transcribirlos y se descartan; queda únicamente el texto, para que puedas volver a tu enlace. La transcripción y los resúmenes se hacen con inteligencia artificial y pueden tener errores; revisa lo importante en el audio original.</p>
+</div>
+<script src="/cs/cs.js?v=10"></script>
+<script>
+(function () {
+  'use strict';
+  var APP = 'destila', $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  var AUDIO_RE = /\.(opus|ogg|oga|m4a|mp3|wav|aac|amr|flac|webm)$/i, PARALLEL = 3;
+  var FREEKEY = null; try { var qk = new URLSearchParams(location.search).get('k'); if (qk) localStorage.setItem('dst_k', qk); FREEKEY = qk || localStorage.getItem('dst_k'); } catch (e) { /* ok */ }
+  var sget = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  var sset = function (k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch (e) { /* ok */ } };
+
+  // files[i] = { file, name, type, sender, date, seconds } (puede faltar file si se volvió a abrir el enlace)
+  // res[i]   = resultado del servidor;  st[i] = '', 'trabajando', 'listo', 'error';  err[i] = mensaje
+  var S = { cfg: null, jobId: null, job: null, files: [], res: {}, st: {}, err: {}, sel: {}, open: {}, busy: false };
+  CS.drawWave($('coverWave'));
+  CS.track(APP, 'landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 200) : null, standalone: matchMedia('(display-mode: standalone)').matches });
+  var cfgP = fetch('/.netlify/functions/dst-config', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (d) { S.cfg = d; render(); return d; }).catch(function () { return null; });
+
+  // ---------- Leer el chat exportado (quién y cuándo) ----------
+  function parseChat(text) {
+    var map = {}, n = 0, fileRe = /([\w\-]+\.(?:opus|ogg|oga|m4a|mp3|wav|aac|amr))/i;
+    text.split(/\r?\n/).forEach(function (line) {
+      line = line.replace(/[‎‏‪-‮﻿]/g, '');
+      var m = line.match(fileRe); if (!m) return;
+      var date = '', sender = '', rest = line, ios = rest.match(/^\[([^\]]+)\]\s*(.*)$/);
+      if (ios) { date = ios[1]; rest = ios[2]; }
+      else { var and = rest.match(/^(\d{1,4}[\/.\-]\d{1,2}[\/.\-]\d{1,4},?\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?)\s+-\s+(.*)$/i); if (and) { date = and[1]; rest = and[2]; } }
+      var c = rest.indexOf(': '); if (c > 0 && c < rest.indexOf(m[1])) sender = rest.slice(0, c).trim();
+      map[m[1]] = { sender: sender, date: date.replace(/\s+/g, ' ').trim(), order: n++ };
+    });
+    return map;
+  }
+  var zipLib = null;
+  function loadZip() {
+    if (window.JSZip) return Promise.resolve(window.JSZip);
+    if (!zipLib) zipLib = new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = function () { res(window.JSZip); }; s.onerror = function () { zipLib = null; rej(new Error('No se pudo abrir el .zip. Revisa tu conexión.')); }; document.head.appendChild(s); });
+    return zipLib;
+  }
+  async function fromZip(file) {
+    var JSZip = await loadZip(), zip = await JSZip.loadAsync(file), entries = Object.values(zip.files).filter(function (e) { return !e.dir && e.name.indexOf('__MACOSX') !== 0; });
+    var chat = entries.find(function (e) { return /\.txt$/i.test(e.name) && /chat/i.test(e.name); }) || entries.find(function (e) { return /\.txt$/i.test(e.name); });
+    var meta = chat ? parseChat(await chat.async('string')) : {}, out = [];
+    for (var e of entries.filter(function (e) { return AUDIO_RE.test(e.name); })) {
+      var base = e.name.split('/').pop(), m = meta[base] || {}, blob = await e.async('blob');
+      out.push({ file: blob, name: base, type: CS.typeOf({ name: base }), sender: m.sender || '', date: m.date || '', order: m.order == null ? 1e9 : m.order });
+    }
+    return out.sort(function (a, b) { return a.order - b.order || a.name.localeCompare(b.name); });
+  }
+
+  // ---------- Agregar audios ----------
+  async function addFiles(list, how) {
+    setErr('');
+    var add = [];
+    for (var f of Array.from(list)) {
+      if (/\.zip$/i.test(f.name) || f.type === 'application/zip') { try { add = add.concat(await fromZip(f)); } catch (e) { setErr(e.message || 'No se pudo abrir el .zip.'); } }
+      else if (AUDIO_RE.test(f.name) || /^audio\//.test(f.type || '')) add.push({ file: f, name: f.name || 'audio.ogg', type: CS.typeOf(f), sender: '', date: '' });
+    }
+    if (!add.length) { setErr('No encontramos audios en lo que elegiste.'); return; }
+    // Si se volvió a abrir un lote y faltan los archivos, los nuevos llenan esos huecos en orden.
+    var holes = S.files.map(function (x, i) { return x.file ? -1 : i; }).filter(function (i) { return i >= 0 && !S.res[i]; });
+    add.forEach(function (a) { if (holes.length) { var i = holes.shift(); S.files[i] = Object.assign({}, S.files[i], a, { sender: S.files[i].sender || a.sender, date: S.files[i].date || a.date }); } else S.files.push(a); });
+    var max = S.cfg && S.cfg.maxAudios;
+    if (max && S.files.length > max) { S.files = S.files.slice(0, max); toast('Un lote admite hasta ' + max + ' audios; dejamos los primeros ' + max + '.'); }
+    if (S.job && S.job.paid && S.files.length > S.job.count) { S.files = S.files.slice(0, S.job.count); toast('Este lote ya está pagado para ' + S.job.count + ' audios. Para más, empieza otro lote.'); }
+    S.files.forEach(function (x, i) { if (S.sel[i] == null) S.sel[i] = true; });
+    CS.track(APP, 'audios_added', { n: add.length, total: S.files.length, how: how || 'picker' });
+    measure();
+    render();
+    if (S.jobId && !S.job.paid) { try { await syncJob(); } catch (e) { /* el precio se actualiza al pagar */ } }
+    if (S.job && S.job.paid) runPending();
+  }
+  function measure() { S.files.forEach(function (x) { if (x.file && x.seconds == null) { x.seconds = 0; CS.audioDuration(x.file).then(function (s) { x.seconds = s ? Math.round(s) : 0; render(); }); } }); }
+
+  // ---------- Servidor ----------
+  function uuid() { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); var b = crypto.getRandomValues(new Uint8Array(16)); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128; var h = Array.from(b, function (x) { return x.toString(16).padStart(2, '0'); }).join(''); return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20); }
+  async function syncJob() {
+    if (!S.jobId) { S.jobId = uuid(); sset('dst_job', S.jobId); }
+    S.job = await CS.postFn('dst-start', { jobId: S.jobId, count: S.files.length, anonId: CS.anonId, key: FREEKEY });
+    (S.job.items || []).forEach(function (it) { S.res[it.index] = it; S.st[it.index] = 'listo'; });
+    render(); return S.job;
+  }
+  function readB64(blob) { return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result)); }; r.onerror = function () { rej(new Error('No pudimos leer el archivo.')); }; r.readAsDataURL(blob); }); }
+  async function processOne(i) {
+    var f = S.files[i]; if (!f || !f.file || S.res[i]) return;
+    S.st[i] = 'trabajando'; S.err[i] = ''; render();
+    try {
+      if (S.cfg && f.file.size > S.cfg.maxMb * 1048576) throw new Error('Este audio pesa más de ' + S.cfg.maxMb + ' MB. Recórtalo o súbelo en partes.');
+      var data = await readB64(f.file), tries = 0, r;
+      for (;;) {
+        try { r = await CS.postFn('dst-audio', { jobId: S.jobId, index: i, data: data, type: f.type || f.file.type, name: f.name, sender: f.sender, date: f.date, seconds: f.seconds || 0 }); break; }
+        catch (e) { if ((e.status === 502 || !e.status) && tries++ < 1) { await new Promise(function (ok) { setTimeout(ok, 1500); }); continue; } throw e; }
+      }
+      S.res[i] = r; S.st[i] = 'listo';
+    } catch (e) { S.st[i] = 'error'; S.err[i] = e.status === 413 ? 'Este audio es demasiado pesado. Recórtalo o súbelo en partes.' : (e.message || 'No pudimos leer este audio.'); CS.track(APP, 'audio_failed', { idx: i, status: e.status || 0 }); }
+    render();
+  }
+  async function pool(idxs) { var k = 0; await Promise.all(Array.from({ length: Math.min(PARALLEL, idxs.length) }, async function () { while (k < idxs.length) await processOne(idxs[k++]); })); }
+  async function runPending() {
+    if (S.busy) return; S.busy = true; render();
+    var todo = S.files.map(function (x, i) { return i; }).filter(function (i) { return S.files[i].file && !S.res[i] && S.st[i] !== 'error'; });
+    await pool(todo); S.busy = false; render();
+    var ready = Object.keys(S.res).length;
+    if (todo.length && ready >= 2 && !(S.job && S.job.general)) makeGeneral();
+  }
+  async function tryFree() {
+    if (!S.files.length || S.busy) return;
+    CS.track(APP, 'try_free_clicked', { n: S.files.length });
+    S.busy = true; render();
+    try { await syncJob(); } catch (e) { S.busy = false; setErr(e.message || 'No pudimos empezar.'); render(); return; }
+    S.busy = false;
+    if (S.job.paid) { toast('Lote desbloqueado.'); return runPending(); }
+    await processOne(0);
+    if (S.res[0]) CS.track(APP, 'free_ready', { n: S.files.length });
+    drawPay();
+  }
+  async function makeGeneral() {
+    var idxs = Object.keys(S.res).map(Number).filter(function (i) { return S.sel[i] !== false && !S.res[i].noSpeech; });
+    if (idxs.length < 2) { toast('Marca al menos dos audios ya transcritos.'); return; }
+    var box = $('general'); box.classList.remove('is-hidden'); box.replaceChildren(el('h3', '', 'Idea general'), el('p', 'lead', 'Leyendo los ' + idxs.length + ' audios marcados…'));
+    $('genBtn').disabled = true;
+    try { var d = await CS.postFn('dst-general', { jobId: S.jobId, indexes: idxs }); S.job.general = d.general; S.job.generalCount = d.generalCount; CS.track(APP, 'general_ready', { n: d.generalCount }); }
+    catch (e) { box.replaceChildren(el('h3', '', 'Idea general'), el('p', 'cs-err', e.message || 'No pudimos armar la idea general.')); }
+    $('genBtn').disabled = false; render();
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ---------- Pago ----------
+  var payDrawn = false;
+  async function drawPay() {
+    render();
+    if (payDrawn || !S.job || S.job.paid || S.files.length < 2) return;
+    var cfg = await cfgP; if (!cfg || !cfg.clientId) { $('buyText').textContent = 'Los pagos se activan pronto.'; return; }
+    payDrawn = true; var box = $('paypalBox'); box.textContent = '';
+    try {
+      if (!window.paypal) await new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(cfg.clientId) + '&currency=USD'; s.onload = res; s.onerror = function () { rej(new Error('No se pudo cargar PayPal.')); }; document.head.appendChild(s); });
+      window.paypal.Buttons({
+        style: { layout: 'vertical', shape: 'pill', label: 'pay' },
+        createOrder: async function () { setPayErr(''); await syncJob(); CS.track(APP, 'pay_clicked', { n: S.job.count, usd: S.job.price }); var d = await CS.postFn('dst-pay-create', { jobId: S.jobId }); return d.orderID; },
+        onApprove: async function (data) {
+          try { await CS.postFn('dst-pay-capture', { jobId: S.jobId, orderID: data.orderID }); CS.track(APP, 'pay_ok', { n: S.job.count }); S.job.paid = true; toast('¡Listo! Procesando el resto de tus audios…'); render(); runPending(); }
+          catch (e) { CS.track(APP, 'pay_failed', { status: e.status || 0 }); setPayErr(e.message); }
+        },
+        onCancel: function () { CS.track(APP, 'pay_cancel', {}); },
+        onError: function () { setPayErr('PayPal tuvo un problema. Inténtalo de nuevo.'); }
+      }).render('#paypalBox');
+    } catch (e) { payDrawn = false; setPayErr(e.message); }
+  }
+
+  // ---------- Dibujar ----------
+  function fmtSec(s) { return s ? Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') : ''; }
+  function card(i) {
+    var f = S.files[i] || {}, r = S.res[i], st = S.st[i] || '', paid = !!(S.job && S.job.paid), locked = !paid && i > 0;
+    var li = el('li', 'it' + (locked ? ' locked' : '')), head = el('div', 'it-head');
+    var cb = el('input'); cb.type = 'checkbox'; cb.id = 'sel-' + i; cb.checked = S.sel[i] !== false; cb.setAttribute('aria-label', 'Incluir en la idea general');
+    cb.addEventListener('change', function () { S.sel[i] = cb.checked; }); cb.hidden = !paid;
+    var meta = el('div', 'it-meta'); meta.append(el('div', 'it-who', f.sender || (r && r.sender) || f.name || ('Audio ' + (i + 1))), el('div', 'it-sub', [f.date || (r && r.date), fmtSec(f.seconds || (r && r.seconds)), f.sender ? f.name : ''].filter(Boolean).join(' · ')));
+    var pill = el('span', 'pill');
+    if (st === 'listo') { pill.textContent = 'Listo'; pill.className = 'pill ok'; }
+    else if (st === 'trabajando') { pill.textContent = 'Leyendo…'; pill.className = 'pill go'; }
+    else if (st === 'error') { pill.textContent = 'Error'; pill.className = 'pill bad'; }
+    else if (!paid && i === 0) { pill.textContent = 'Gratis'; pill.className = 'pill free'; }
+    else if (locked) pill.textContent = 'Bloqueado';
+    else pill.textContent = f.file ? 'En espera' : 'Falta el archivo';
+    head.append(cb, meta, pill); li.append(head);
+    if (r) {
+      var idea = el('div', 'idea'); idea.append(el('small', '', 'Idea principal'), document.createTextNode(r.idea)); li.append(idea);
+      if (r.points && r.points.length) { var ul = el('ul', 'pts'); r.points.forEach(function (p) { ul.append(el('li', '', p)); }); li.append(ul); }
+      if (r.actions && r.actions.length) { var ac = el('div', 'acts'); r.actions.forEach(function (a) { ac.append(el('div', '', a)); }); li.append(ac); }
+      if (r.transcript) { var d = el('details', 'tx'); d.open = !!S.open[i]; d.addEventListener('toggle', function () { S.open[i] = d.open; }); d.append(el('summary', '', 'Ver transcripción'), el('p', '', r.transcript)); li.append(d); }
+    } else if (locked) li.append(el('p', 'lockline', 'Se transcribe y resume al desbloquear el lote.'));
+    if (st === 'error') {
+      li.append(el('p', 'cs-err', S.err[i]));
+      var rb = el('button', 'btn-quiet retry', 'Reintentar'); rb.type = 'button'; rb.addEventListener('click', function () { S.st[i] = ''; processOne(i); }); li.append(rb);
+    }
+    return li;
+  }
+  function render() {
+    var n = S.files.length, has = n > 0, paid = !!(S.job && S.job.paid), done = Object.keys(S.res).length;
+    $('work').classList.toggle('is-hidden', !has);
+    $('how').classList.toggle('is-hidden', has);
+    $('newBtn').classList.toggle('is-hidden', !has);
+    if (!has) return;
+    $('count').textContent = n + (n === 1 ? ' audio' : ' audios') + (done ? ' · ' + done + ' listo' + (done === 1 ? '' : 's') : '');
+    $('list').replaceChildren.apply($('list'), S.files.map(function (x, i) { return card(i); }));
+    var missing = S.files.filter(function (x, i) { return !x.file && !S.res[i]; }).length;
+    $('reselect').textContent = missing ? 'Para terminar, vuelve a elegir los ' + missing + ' audios que faltan (en el mismo orden).' : '';
+    var started = !!S.res[0] || S.st[0] === 'trabajando';
+    $('tryBtn').classList.toggle('is-hidden', paid || started);
+    $('tryBtn').disabled = S.busy;
+    $('tryBtn').textContent = S.busy ? 'Empezando…' : (FREEKEY ? 'Empezar' : 'Probar gratis con el primer audio');
+    var showBuy = !!S.job && !paid && n > 1 && started;
+    $('buyBox').classList.toggle('is-hidden', !showBuy);
+    if (showBuy) {
+      var price = S.job.price ? 'US$' + S.job.price : '';
+      $('buyTitle').textContent = 'Desbloquea los ' + n + ' audios';
+      $('buyText').textContent = 'Transcripción e idea principal de cada audio, más la idea general de todo el lote, por ' + price + ' (un solo pago, sin suscripción).';
+    }
+    $('paidRow').classList.toggle('is-hidden', !paid || done < 2);
+    $('selAll').classList.toggle('is-hidden', !paid);
+    $('addMore').classList.toggle('is-hidden', paid && n >= S.job.count);
+    var g = S.job && S.job.general, box = $('general');
+    if (g) {
+      box.classList.remove('is-hidden'); box.replaceChildren(el('h3', '', 'Idea general · ' + (S.job.generalCount || '') + ' audios'), el('p', 'lead', g.idea));
+      var sec = function (title, arr) { if (!arr || !arr.length) return; var ul = el('ul'); arr.forEach(function (t) { ul.append(el('li', '', t)); }); box.append(el('h4', '', title), ul); };
+      sec('Acciones y pedidos', (g.actions || []).map(function (a) { return (a.who ? a.who + ': ' : '') + a.what; }));
+      sec('Temas', g.topics); sec('Quedó pendiente', g.pending);
+    } else if (!box.querySelector('.lead')) box.classList.add('is-hidden');
+    var link = S.jobId ? location.origin + '/destila/?lote=' + S.jobId : '';
+    $('keep').classList.toggle('is-hidden', !link || !done); $('keepLink').textContent = link;
+  }
+
+  // ---------- Exportar ----------
+  function asText() {
+    var out = [], g = S.job && S.job.general;
+    if (g) { out.push('IDEA GENERAL', g.idea, ''); (g.actions || []).forEach(function (a) { out.push('[ ] ' + (a.who ? a.who + ': ' : '') + a.what); }); if ((g.pending || []).length) { out.push('', 'Pendiente:'); g.pending.forEach(function (p) { out.push('- ' + p); }); } out.push('', '========================================', ''); }
+    S.files.forEach(function (f, i) { var r = S.res[i]; if (!r) return; out.push('#' + (i + 1) + ' ' + (f.sender || r.sender || f.name || '') + (f.date || r.date ? ' · ' + (f.date || r.date) : ''), 'Idea principal: ' + r.idea); (r.points || []).forEach(function (p) { out.push('  • ' + p); }); (r.actions || []).forEach(function (a) { out.push('  [ ] ' + a); }); out.push('Transcripción: ' + r.transcript, ''); });
+    return out.join('\n').trim();
+  }
+  $('copyBtn').addEventListener('click', async function () { var t = asText(); if (!t) return toast('Todavía no hay resultados.'); try { await navigator.clipboard.writeText(t); toast('Resultados copiados'); CS.track(APP, 'copied', {}); } catch (e) { toast('No se pudo copiar. Usa «Descargar .txt».'); } });
+  $('dlBtn').addEventListener('click', function () { var t = asText(); if (!t) return toast('Todavía no hay resultados.'); var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([t], { type: 'text/plain;charset=utf-8' })); a.download = 'destila.txt'; document.body.append(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 3000); CS.track(APP, 'downloaded', {}); });
+
+  // ---------- Eventos ----------
+  var drop = $('drop');
+  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { if (e.dataTransfer && e.dataTransfer.files.length) addFiles(e.dataTransfer.files, 'drop'); });
+  $('fileIn').addEventListener('change', function (e) { addFiles(e.target.files, 'picker'); e.target.value = ''; });
+  $('addMore').addEventListener('click', function () { $('fileIn').click(); });
+  $('tryBtn').addEventListener('click', tryFree);
+  $('genBtn').addEventListener('click', makeGeneral);
+  $('selAll').addEventListener('click', function () { var all = S.files.every(function (x, i) { return S.sel[i] !== false; }); S.files.forEach(function (x, i) { S.sel[i] = !all; }); render(); });
+  $('newBtn').addEventListener('click', function () { sset('dst_job', null); location.href = '/destila/'; });
+
+  function setErr(m) { $('upErr').textContent = m || ''; $('upErr').classList.toggle('is-hidden', !m); }
+  function setPayErr(m) { $('payErr').textContent = m || ''; $('payErr').classList.toggle('is-hidden', !m); }
+  var tt; function toast(m) { var t = document.querySelector('.toast') || document.body.appendChild(el('div', 'toast')); t.setAttribute('role', 'status'); t.textContent = m; t.hidden = false; clearTimeout(tt); tt = setTimeout(function () { t.hidden = true; }, 3600); }
+
+  // ---------- Volver a un lote, o recibir audios compartidos desde WhatsApp ----------
+  async function reopen(id) {
+    try {
+      var r = await fetch('/.netlify/functions/dst-status?job=' + encodeURIComponent(id), { cache: 'no-store' }), d = await r.json();
+      if (!r.ok) { if (r.status === 404) sset('dst_job', null); return false; }
+      S.jobId = id; S.job = d; sset('dst_job', id);
+      S.files = Array.from({ length: d.count }, function () { return { name: '' }; });
+      (d.items || []).forEach(function (it) { S.res[it.index] = it; S.st[it.index] = 'listo'; S.files[it.index] = { name: 'Audio ' + (it.index + 1), sender: it.sender, date: it.date, seconds: it.seconds }; });
+      S.files.forEach(function (x, i) { if (!x.name) x.name = 'Audio ' + (i + 1); S.sel[i] = true; });
+      CS.track(APP, 'lote_reopened', { paid: d.paid, count: d.count });
+      render(); if (!d.paid && S.res[0]) drawPay(); return true;
+    } catch (e) { return false; }
+  }
+  async function receiveShared() {
+    if (!new URLSearchParams(location.search).has('compartido') || !('caches' in window)) return;
+    history.replaceState(null, '', '/destila/');
+    try {
+      var cache = await caches.open('destila-compartidos'), files = [];
+      for (var k of await cache.keys()) { var res = await cache.match(k), blob = await res.blob(); files.push(new File([blob], decodeURIComponent(res.headers.get('x-nombre') || 'audio.ogg'), { type: blob.type })); await cache.delete(k); }
+      if (files.length) { sset('dst_job', null); S.jobId = null; S.job = null; await addFiles(files, 'share'); tryFree(); }
+    } catch (e) { setErr('No pudimos recibir los audios compartidos. Elígelos aquí.'); }
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/destila/sw.js', { scope: '/destila/' }).catch(function () { /* sin app instalable */ });
+  else $('howShare').classList.add('is-hidden');
+  (async function () {
+    var q = new URLSearchParams(location.search), lote = q.get('lote') || (q.has('compartido') ? null : sget('dst_job'));
+    if (lote && /^[0-9a-f-]{36}$/i.test(lote)) await reopen(lote);
+    await receiveShared();
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
