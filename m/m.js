@@ -177,7 +177,7 @@
     msg.textContent = 'Armando tu mapa mental…'; busy(btn, true); input.blur();
     const started = Date.now();
     await TICKET_P;
-    const r = await callGemini({ action: 'm_welcome', topic, ticket: TICKET || undefined });
+    const r = await callGemini({ action: 'm_welcome', topic, levels: 3, ticket: TICKET || undefined });
     busy(btn, false);
     if (!r.ok) {
       track('m_map_error', { kind: r.kind, status: r.data && r.data.error, used: r.data && r.data.used, where: 'home' });
@@ -189,7 +189,7 @@
     G = emptyG();
     const root = newNode(clip(r.data.root && r.data.root.label, 80) || topic, '', null);
     G.rootId = root.id;
-    addChildren(root.id, r.data.branches);
+    addTree(root.id, r.data);
     mapsCount++;
     if (window.GK_INSTALL) window.GK_INSTALL.maybe();
     track('m_map_ok', { depth: 0, branches: root.children.length, ms: Date.now() - started });
@@ -203,12 +203,12 @@
       if (G && G.rootId) return;
       const msg = $('#homeMsg'), btn = $('#btnGenerate'); msg.className = 'msg'; msg.textContent = 'Armando el mapa de tu texto…'; busy(btn, true);
       track('m_from_escribir', { chars: PEND_TEXT.text.length });
-      const r = await callGemini({ action: 'm_text', text: PEND_TEXT.text, topic: PEND_TEXT.title });
+      const r = await callGemini({ action: 'm_text', text: PEND_TEXT.text, topic: PEND_TEXT.title, levels: 3 });
       busy(btn, false);
       if (!r.ok) { if (handleBlocked(r.kind, 'escribir')) { msg.textContent = ''; return; } msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return; }
       msg.textContent = ''; G = emptyG();
       const root = newNode(clip(r.data.root && r.data.root.label, 80) || PEND_TEXT.title || 'Mi texto', '', null); G.rootId = root.id;
-      addChildren(root.id, r.data.branches); mapsCount++; scheduleSave(); go('map', root.id, true);
+      addTree(root.id, r.data); mapsCount++; scheduleSave(); go('map', root.id, true);
     } catch { /* nada */ }
   }, 300);
   if (TICKET && APR_TOPIC.length >= 2) setTimeout(() => { try { if (G && G.rootId) return; $('#topicInput').value = APR_TOPIC; track('m_aprende_arrival', {}); $('#homeForm').requestSubmit(); } catch { /* nada */ } }, 300);
@@ -221,6 +221,16 @@
     try { localStorage.removeItem('gk_m_pending'); } catch { /* nada */ }
     closeModals(); $('#topicInput').value = p.topic; track('m_login_resume', {});
     $('#homeForm').requestSubmit();
+  }
+  /* Árbol de 3 niveles (como en escritorio): ramas y sub-ramas. Las sub-ramas quedan listas, sin ampliar. */
+  function addTree(parentId, data) {
+    addChildren(parentId, data.branches);
+    const kids = G.nodes[parentId].children.slice(-(data.branches || []).length || undefined);
+    const byB = {}; (data.branches || []).forEach((b, i) => { if (b && b.id && kids[i]) byB[b.id] = kids[i]; });
+    (data.subBranches || []).slice(0, 24).forEach((s) => {
+      const pid = byB[s && s.parentId]; if (!pid || !s.label) return;
+      const c = newNode(clip(s.label, 60), clip(s.relationship, 40), pid); c.color = G.nodes[pid].color;
+    });
   }
   function addChildren(parentId, branches) {
     (branches || []).slice(0, 8).forEach((b, i) => {
@@ -353,14 +363,15 @@
     track('m_expand_clicked', { depth: depthOf(n.id) });
     busy(btn, true);
     const started = Date.now();
-    const r = await callGemini({ action: 'm_map', topic: n.label, contextPath: pathOf(n.id).concat([]).join(' > ').slice(0, 380) });
+    const deep = depthOf(n.id) >= 2;   // un nodo del 3er nivel (listo, sin ampliar) se amplía como un esquema nuevo de 3 niveles, en su propia vista
+    const r = await callGemini({ action: 'm_map', topic: n.label, levels: deep ? 3 : 2, contextPath: pathOf(n.id).concat([]).join(' > ').slice(0, 380) });
     busy(btn, false);
     if (!r.ok) {
       track('m_map_error', { kind: r.kind, where: 'expand' });
       if (handleBlocked(r.kind, 'expand')) { closeSheet(); return; }
       msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return;
     }
-    if (n.children.length === 0) addChildren(n.id, r.data.branches);
+    if (n.children.length === 0) { if (deep) addTree(n.id, r.data); else addChildren(n.id, r.data.branches); }
     mapsCount++;
     track('m_expand_ok', { depth: depthOf(n.id), branches: n.children.length, ms: Date.now() - started });
     scheduleSave();

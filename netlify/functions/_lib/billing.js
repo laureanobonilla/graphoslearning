@@ -61,8 +61,8 @@ function computeCost(action, d) {
         case 'socratic_evaluate': return 1;
         case 'extract_key_terms': return len(d.terms);
         case 'analyze_text':      return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
-        case 'm_map':             return d.root ? 1 + len(d.branches) : 0;
-        case 'm_text':            return d.root ? 1 + len(d.branches) : 0;
+        case 'm_map':             return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
+        case 'm_text':            return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         case 'lang_map':          return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         case 'esc_feedback':      return (d.criteria || d.skipped) ? 1 : 0;
         // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
