@@ -468,7 +468,7 @@ function goSeeAll(from) {
 async function showPrepay() {
   const closedWords = statsData ? Number(statsData.hiddenWords) || 0 : chapters.reduce((a, c) => a + (c.words || 0), 0);
   const info = await priceInfo();
-  $('ppP1').textContent = tt('n_pp_p1', { n: TOTAL });
+  $('ppP1').textContent = tt('n_pp_p1', { n: answers.filter(Boolean).length || TOTAL });
   const inc = tt('n_pp_inc');
   $('ppInc').innerHTML = (Array.isArray(inc) ? inc : []).map(x => `<li>${escapeHtml(String(x).split('{c}').join(chapters.length).split('{w}').join(fmtInt(closedWords)))}</li>`).join('');
   $('ppP2').textContent = tt('n_pp_p2', { price: info.full });
@@ -482,7 +482,7 @@ $('btnPrepayGo').addEventListener('click', () => { track('prepay_continue', { pa
 function showPay(forceReal) {
   $('paywall').classList.remove('is-hidden');
   $('skippedNote').classList.add('is-hidden'); $('payBlock').classList.remove('is-hidden');
-  $('paywallCommitment').textContent = tt('pay_commitment', { n: TOTAL });
+  $('paywallCommitment').textContent = tt('pay_commitment', { n: answers.filter(Boolean).length || TOTAL });
   $('payCovers').textContent = tt('n_pay_covers', { c: chapters.length });
   if (SEALED && SEALED.lead) { const pre = document.querySelector('.paywall-price span'); if (pre) pre.textContent = SEALED.lead; }
   showScreen('pay');
@@ -521,6 +521,25 @@ function loadPaypalSdk(clientId) {
     document.head.appendChild(sc);
   });
 }
+// Correo antes de pagar (solo apps con CFG.askEmail, p. ej. /aptitud/): los botones de PayPal quedan desactivados hasta
+// que haya un correo válido, y ese correo viaja a la captura para mandar ahí el resultado (además de verse en pantalla).
+const EMAIL_KEY = `qer_email_${APP}`;
+const validEmail = (v) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || '').trim());
+function ensureAskEmail() {
+  if (!CFG.askEmail) return null;
+  let w = $('askEmailBox');
+  if (!w) {
+    w = document.createElement('div'); w.id = 'askEmailBox'; w.className = 'ask-email';
+    const lb = document.createElement('label'); lb.htmlFor = 'askEmailInput'; lb.className = 'ask-email-label'; lb.textContent = tt('n_ask_email_label');
+    const inp = document.createElement('input'); inp.type = 'email'; inp.id = 'askEmailInput'; inp.autocomplete = 'email'; inp.inputMode = 'email'; inp.placeholder = tt('n_email_ph') || 'tu@correo.com';
+    try { inp.value = localStorage.getItem(EMAIL_KEY) || ''; } catch { /* ok */ }
+    const note = document.createElement('p'); note.className = 'ask-email-note'; note.textContent = tt('n_ask_email_note');
+    w.append(lb, inp, note);
+    const intl = $('payIntl'); intl.insertBefore(w, intl.firstChild);
+  }
+  return w;
+}
+const askedEmail = () => { const i = $('askEmailInput'); const v = i ? i.value.trim() : ''; return validEmail(v) ? v : ''; };
 async function mountPaypal(forReadingId) {
   const box = $('paypal-button-container'), msg = $('paypalMsg');
   box.innerHTML = '';
@@ -530,8 +549,22 @@ async function mountPaypal(forReadingId) {
   if (cfg.error) { say('n_pp_error'); track('paypal_config_error', { paywallVersion: PAYWALL_VERSION }); return; }
   try { await loadPaypalSdk(cfg.clientId); } catch { say('n_pp_error'); track('paypal_sdk_error', { paywallVersion: PAYWALL_VERSION }); return; }
   msg.classList.add('is-hidden');
+  ensureAskEmail();
+  const emailOpts = !CFG.askEmail ? {} : {
+    onInit: (data, actions) => {
+      const sync = () => { if (askedEmail()) { actions.enable(); if (msg.textContent === tt('n_ask_email_needed')) msg.classList.add('is-hidden'); } else actions.disable(); };
+      sync(); const inp = $('askEmailInput'); if (inp) inp.addEventListener('input', sync);
+    },
+    onClick: () => {
+      const e = askedEmail();
+      if (!e) { say('n_ask_email_needed'); const inp = $('askEmailInput'); if (inp) inp.focus(); return; }
+      try { localStorage.setItem(EMAIL_KEY, e); } catch { /* ok */ }
+      track('email_given_before_pay', { paywallVersion: PAYWALL_VERSION });
+    }
+  };
   const make = (fs, sel, isCard) => {
     const btn = window.paypal.Buttons({
+        ...emailOpts,
         fundingSource: fs,
         style: isCard ? { layout: 'vertical', color: 'black', shape: 'pill', label: 'pay', height: 55 } : { layout: 'vertical', color: 'gold', shape: 'pill', label: 'paypal', height: 48 },
       createOrder: async () => {
@@ -542,7 +575,7 @@ async function mountPaypal(forReadingId) {
       onApprove: async (data) => {
         say('n_pp_paying');
         try {
-          const view = await postFn('qer-paypal-capture-order', { orderID: data.orderID, readingId: forReadingId, app: APP });
+          const view = await postFn('qer-paypal-capture-order', { orderID: data.orderID, readingId: forReadingId, app: APP, ...(CFG.askEmail && askedEmail() ? { email: askedEmail() } : {}) });
           track('payment_verified_client', { method: 'paypal_orders', country, paywallVersion: PAYWALL_VERSION });
           unlockReading(view);
         } catch (err) { track('payment_capture_failed', { reason: String(err.message).slice(0, 200), paywallVersion: PAYWALL_VERSION }); say('n_pp_failed'); }

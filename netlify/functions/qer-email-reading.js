@@ -6,7 +6,7 @@ const { fullView } = require('./_lib/qer-reading-view');
 const { deliverReading, isEmail } = require('./_lib/qer-email');
 const store = require('./_lib/store');
 
-const APPS = new Set(['quien-eres', 'who-are-you', 'quien-es-tu-pareja', 'who-is-your-partner']);
+const APPS = new Set(['quien-eres', 'who-are-you', 'quien-es-tu-pareja', 'who-is-your-partner', 'aptitud']);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_PER_READING = 4;
 const sent = new Map(); // por instancia de la función: freno básico, no un contador exacto

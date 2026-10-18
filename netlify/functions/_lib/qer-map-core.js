@@ -264,6 +264,7 @@ function registerPaid(name, file, lang) {
 registerPaid('paid-self-en', './qer-prompts/self-en', 'en');
 registerPaid('paid-partner-es', './qer-prompts/partner-es', 'es');
 registerPaid('paid-partner-en', './qer-prompts/partner-en', 'en');
+registerPaid('paid-aptitud-es', './qer-prompts/aptitud-es', 'es');   // /aptitud/: examen de aptitudes (informe profesional)
 const formatOf = (name) => FORMATS[name] || FORMATS.map;
 const isKnownFormat = (name) => Object.prototype.hasOwnProperty.call(FORMATS, name);
 

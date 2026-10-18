@@ -16,8 +16,11 @@ const TXT = {
     en: { subject: (a) => `Your full reading${a ? ': ' + a : ''}`, intro: 'Here is your full reading. It is yours for good: keep this email.', profile: 'Your profile', word: 'Your word', phrase: 'The sentence that defines you', open: 'Open it again on the page', foot: 'This is a symbolic interpretation for self-knowledge and entertainment; it is not a diagnosis.' }
 };
 
+// Examen de aptitudes (/aptitud/): otro vocabulario («informe», no «lectura») y otro color de títulos.
+TXT.apt = { subject: (a) => `Tu informe de aptitudes${a ? ': ' + a : ''}`, intro: 'Aquí está tu informe completo. Guarda este correo para volver a él cuando lo necesites.', profile: 'Tus aptitudes', word: 'Tu palabra profesional', phrase: 'La frase que te define', open: 'Abrir tu informe en la página', foot: 'Este informe es una orientación basada en tus respuestas; no es una prueba psicométrica oficial ni garantiza ingresos.', color: '#0f766e' };
 function render(view, format, link) {
-    const t = TXT[LANG_OF(format)];
+    const t = format === 'paid-aptitud-es' ? TXT.apt : TXT[LANG_OF(format)];
+    const accent = t.color || '#7c2d37';
     const p = view.profile;
     const paras = (txt) => String(txt || '').split(/\n+/).map(x => x.trim()).filter(Boolean);
     const htmlParts = [`<div style="font-family:Georgia,serif;max-width:560px;margin:0 auto;color:#222;line-height:1.65">`,
@@ -34,11 +37,11 @@ function render(view, format, link) {
         textParts.push('');
     }
     view.nodes.forEach((n, i) => {
-        htmlParts.push(`<h2 style="font-size:20px;margin:30px 0 8px;color:#7c2d37">${i + 1}. ${esc(n.label)}</h2>` + paras(n.text).map(x => `<p>${esc(x)}</p>`).join(''));
+        htmlParts.push(`<h2 style="font-size:20px;margin:30px 0 8px;color:${accent}">${i + 1}. ${esc(n.label)}</h2>` + paras(n.text).map(x => `<p>${esc(x)}</p>`).join(''));
         textParts.push(`${i + 1}. ${n.label}`, '', ...paras(n.text).flatMap(x => [x, '']));
     });
-    if (view.closingLine) { htmlParts.push(`<p style="font-size:19px;font-style:italic;text-align:center;margin:34px 0;color:#7c2d37">${esc(view.closingLine)}</p>`); textParts.push(view.closingLine, ''); }
-    if (link) { htmlParts.push(`<p style="text-align:center"><a href="${esc(link)}" style="color:#7c2d37">${esc(t.open)}</a></p>`); textParts.push(`${t.open}: ${link}`); }
+    if (view.closingLine) { htmlParts.push(`<p style="font-size:19px;font-style:italic;text-align:center;margin:34px 0;color:${accent}">${esc(view.closingLine)}</p>`); textParts.push(view.closingLine, ''); }
+    if (link) { htmlParts.push(`<p style="text-align:center"><a href="${esc(link)}" style="color:${accent}">${esc(t.open)}</a></p>`); textParts.push(`${t.open}: ${link}`); }
     htmlParts.push(`<p style="color:#999;font-size:12px;margin-top:28px">${esc(t.foot)}</p></div>`);
     textParts.push('', t.foot);
     return { subject: t.subject(view.archetypeName), html: htmlParts.join(''), text: textParts.join('\n') };

@@ -8,7 +8,7 @@ const { fullView } = require('./_lib/qer-reading-view');
 const { deliverReading, OWNER } = require('./_lib/qer-email');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const APPS = new Set(['quien-eres', 'who-are-you', 'quien-es-tu-pareja', 'who-is-your-partner']);
+const APPS = new Set(['quien-eres', 'who-are-you', 'quien-es-tu-pareja', 'who-is-your-partner', 'aptitud']);
 const MAX_PER_HOUR = 12;
 let windowStart = Date.now(), count = 0; // por instancia: freno básico contra abuso
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });

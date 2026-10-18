@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Prueba · Descubre cómo ser mejor profesional y ganar más dinero</title>
+<meta name="description" content="Un examen de aptitudes que te muestra tus fortalezas, qué aprender primero y cómo convertirlo en ingresos.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink: #16111f;
+    --ink-2: #1e1830;
+    --ink-3: #251d3a;
+    --parchment: #f2ecdf;
+    --muted: #9c92ac;
+    --brass: #34d399;
+    --brass-dim: #8a7343;
+    --rosewood: #7c2d37;
+    --rosewood-bright: #9c3b47;
+    --line: rgba(242,236,223,0.14);
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--ink);
+    color: var(--parchment);
+    font-family: 'Work Sans', -apple-system, sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .display{ font-family: 'Fraunces', serif; }
+
+  .shell{
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0 28px;
+    overflow-x: hidden;
+  }
+
+  /* --- Barra de progreso: una línea delgada, sin números ni porcentaje escrito —
+       el cuestionario no debería sentirse como un formulario con "paso 3 de 10",
+       sino como una conversación que avanza sola. --- */
+  #progress{
+    position: sticky;
+    top: 0;
+    height: 2px;
+    background: var(--line);
+    margin: 0 -28px;
+    z-index: 5;
+  }
+  #progress.is-hidden{ display:none; }
+  #progressFill{
+    height: 100%;
+    width: 0%;
+    background: var(--brass);
+    transition: width 0.45s ease;
+  }
+
+  .screen{ display:none; flex:1; flex-direction: column; }
+  .screen.is-active{ display:flex; }
+
+  /* ===================== PORTADA ===================== */
+  #screen-cover{ align-items:center; justify-content:center; text-align:center; padding: 48px 0 40px; gap: 4px; }
+  .mask-wrap{ width: 128px; height: 128px; margin-bottom: 22px; opacity: 0; transform: translateY(6px); animation: riseIn 0.9s ease forwards; }
+  @keyframes riseIn{ to{ opacity:1; transform:none; } }
+  .mask-crack{ stroke-dasharray: 160; stroke-dashoffset: 160; animation: drawCrack 1.4s 0.4s ease forwards; }
+  @keyframes drawCrack{ to{ stroke-dashoffset: 0; } }
+
+  #screen-cover h1{ font-size: 2.3rem; line-height: 1.15; font-weight: 500; margin: 0 0 14px; max-width: 320px; }
+  #screen-cover .sub{ color: var(--muted); font-size: 1.02rem; line-height: 1.5; max-width: 300px; margin: 0 0 30px; }
+  .meta-line{ color: var(--brass-dim); font-size: 0.78rem; letter-spacing: 0.01em; margin-bottom: 36px; }
+  .meta-line b{ color: var(--brass); font-weight: 500; }
+
+  .btn{
+    appearance: none; border: none; cursor: pointer;
+    font-family: 'Work Sans', sans-serif; font-weight: 600; font-size: 0.95rem;
+    border-radius: 999px; padding: 15px 34px;
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+  .btn:active{ transform: scale(0.97); }
+  .btn-primary{ background: var(--brass); color: #211a0c; }
+  .btn-primary:hover{ background: #d4b366; }
+  .btn-primary:disabled{ background: #4a4436; color: #8a8575; cursor: default; }
+  .btn-ghost{ background: transparent; color: var(--muted); font-weight: 500; font-size: 0.85rem; padding: 10px 14px; text-decoration: underline; text-decoration-color: var(--line); }
+
+  /* ===================== CUESTIONARIO ===================== */
+  #screen-quiz{ padding-top: 22px; }
+  .quiz-top{ display:flex; align-items:center; min-height: 28px; margin-bottom: 8px; }
+  #btnBack{ background:none; border:none; color: var(--muted); font-size: 1.3rem; cursor:pointer; padding: 4px 8px; margin-left: -8px; line-height:1; }
+  #btnBack.is-hidden{ visibility:hidden; }
+
+  .quiz-body{ flex:1; display:flex; flex-direction:column; justify-content:flex-start; padding-top: 28px; }
+  .q-prompt{ font-size: 1.5rem; line-height: 1.32; font-weight: 500; text-align:center; margin: 0 0 34px; }
+
+  .options{ display:flex; flex-direction:column; }
+  .option{
+    text-align:left; background:none; border:none; color: var(--parchment);
+    font-family:'Work Sans', sans-serif; font-size: 0.98rem; line-height: 1.4;
+    padding: 16px 4px; border-top: 1px solid var(--line); cursor:pointer;
+    display:flex; align-items:center; gap: 12px;
+  }
+  .options .option:last-child{ border-bottom: 1px solid var(--line); }
+  .option .dot{ width:8px; height:8px; border-radius:50%; border: 1.5px solid var(--muted); flex-shrink:0; transition: all 0.15s ease; }
+  .option.is-selected{ color: var(--brass); }
+  .option.is-selected .dot{ background: var(--brass); border-color: var(--brass); }
+
+  .short-input-wrap{ margin-top: 4px; }
+  .short-input{
+    width:100%; background:none; border:none; border-bottom: 1.5px solid var(--line);
+    color: var(--parchment); font-family:'Work Sans', sans-serif; font-size: 1.05rem;
+    padding: 10px 2px; outline:none; resize:none; line-height:1.5;
+  }
+  .short-input:focus{ border-bottom-color: var(--brass); }
+  .short-input::placeholder{ color: #5c5370; }
+  .short-hint{ color: var(--muted); font-size: 0.8rem; margin-top: 10px; }
+
+  .blot-wrap{ display:flex; justify-content:center; margin-bottom: 26px; }
+  .blot-wrap svg{ width: 150px; height: 150px; }
+
+  .quiz-bottom{ padding: 22px 0 36px; }
+  .quiz-bottom .btn{ width:100%; }
+
+  /* ===================== CARGANDO ===================== */
+  #screen-loading{ align-items:center; justify-content:center; text-align:center; gap: 18px; }
+  .pulse-mask{ width: 72px; height:72px; animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse{ 0%,100%{ opacity: 0.35; } 50%{ opacity: 1; } }
+  #loadingLabel{ color: var(--muted); font-size: 0.92rem; }
+
+  /* ===================== ERROR ===================== */
+  .error-box{ text-align:center; padding: 30px 6px; }
+  .error-box p{ color: var(--muted); line-height:1.5; margin-bottom: 22px; }
+
+  /* ===================== REVELACIÓN ===================== */
+  #screen-reveal{ padding: 40px 0 60px; }
+  .reveal-mask{ width: 92px; height:92px; margin: 0 auto 20px; display:block; }
+  .archetype-name{ text-align:center; font-size: 2.05rem; line-height:1.18; font-weight:500; margin: 0 0 4px; }
+  .rule{ width: 46px; height: 1px; background: var(--brass-dim); margin: 16px auto 18px; }
+  .hook-line{ text-align:center; font-style: italic; color: var(--muted); font-size: 1rem; max-width: 300px; margin: 0 auto 34px; line-height:1.5; }
+
+  .reading-text p{ font-size: 1.02rem; line-height: 1.75; margin: 0 0 20px; max-width: 34ch; margin-left:auto; margin-right:auto; }
+
+  .teaser-fade{ position:relative; }
+  .teaser-fade::after{
+    content:''; position:absolute; left:0; right:0; bottom:0; height: 90px;
+    background: linear-gradient(to bottom, transparent, var(--ink));
+    pointer-events:none;
+  }
+
+  .paywall{
+    background: var(--rosewood);
+    margin: -6px 0 28px;
+    padding: 30px 26px 26px;
+    position: relative;
+    clip-path: polygon(0% 10px, 4% 0%, 8% 10px, 12% 0%, 16% 10px, 20% 0%, 24% 10px, 28% 0%, 32% 10px, 36% 0%, 40% 10px, 44% 0%, 48% 10px, 52% 0%, 56% 10px, 60% 0%, 64% 10px, 68% 0%, 72% 10px, 76% 0%, 80% 10px, 84% 0%, 88% 10px, 92% 0%, 96% 10px, 100% 0%, 100% 100%, 0% 100%);
+  }
+  /* Ancla de compromiso: deliberadamente discreta (no es el gancho, es el
+     contexto antes del gancho) — letra chica, en mayúsculas espaciadas como
+     una "credencial" ganada, no como un titular. */
+  /* Variante «sellada» (window.QER_SEALED): sin ningún resultado a la vista; una frase y el pago. */
+  .sealed-phrase{ display:none; text-align:center; font-size:1.4rem; line-height:1.4; font-weight:500; color:#fff; margin: 4px 0 26px; }
+  body.sealed .sealed-phrase{ display:block; }
+  body.sealed .paywall-commitment, body.sealed .paywall-label, body.sealed .pay-covers, body.sealed #btnSkipPaywall{ display:none; }
+  body.sealed .paywall-price{ font-size: 1.02rem; }
+  .paywall-commitment{ text-align:center; color: #c9a08f; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; margin: 0 0 8px; opacity: 0.85; }
+  .paywall-label{ font-family:'Fraunces', serif; font-size: 1.15rem; line-height: 1.35; font-weight:500; text-align:center; margin: 0 0 10px; }
+  .paywall-price{ text-align:center; color: #e9c9ba; font-size: 0.92rem; margin-bottom: 20px; }
+  .paywall-price b{ color:#fff; font-size: 1.15rem; }
+  #paypal-button-container{ min-height: 48px; margin-bottom: 14px; }
+  .paywall-note{ text-align:center; color: #d8a79d; font-size: 0.74rem; margin-bottom: 4px; }
+  /* Alternativa al pago con PayPal: contacto directo (WhatsApp / correo) para coordinar otro método. */
+  .song-offer{ margin: 26px 0 8px; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--line); background: rgba(198,163,88,0.07); }
+  .song-offer h3{ margin: 0 0 8px; font-size: 1.15rem; color: var(--brass); }
+  .song-offer p{ margin: 0 0 12px; font-size: 0.88rem; line-height: 1.5; color: var(--muted); }
+  .song-offer .song-label{ margin: 0 0 8px; color:#e9e2d0; font-weight: 500; }
+  .song-offer .song-fine{ margin: 8px 0 12px; font-size: 0.76rem; }
+  .song-offer .song-fine a{ color: var(--muted); }
+  .song-offer .song-error{ margin: 10px 0 0; color:#f2b3a6; font-size: 0.84rem; }
+  .song-styles{ display:flex; flex-wrap:wrap; gap:8px; margin: 0 0 16px; }
+  .song-chip{ appearance:none; cursor:pointer; border: 1px solid var(--line); background: transparent; color: #e9e2d0; border-radius: 999px; padding: 7px 14px; font-family:'Work Sans',sans-serif; font-size: 0.82rem; }
+  .song-chip[aria-pressed="true"]{ border-color: var(--brass); background: rgba(198,163,88,0.16); color: #f4e9c9; }
+  .song-phone{ display:flex; gap:8px; }
+  .song-phone select, .song-phone input{ appearance:none; border:1px solid var(--line); background: rgba(0,0,0,0.25); color:#f4efe2; border-radius: 12px; padding: 12px; font-family:'Work Sans',sans-serif; font-size: 1rem; min-width:0; }
+  .song-phone select{ flex: 0 0 38%; font-size: 0.88rem; }
+  .song-phone input{ flex: 1 1 auto; }
+  .song-go{ appearance:none; width:100%; border:none; cursor:pointer; border-radius: 999px; padding: 14px 18px; background: var(--brass); color:#211a0c; font-family:'Work Sans',sans-serif; font-size: 0.98rem; font-weight: 600; }
+  .song-go:disabled{ background:#4a4436; color:#8a8575; cursor:default; }
+  .song-form.is-hidden, .song-teaser.is-hidden, #songTeaser.is-hidden, .song-done.is-hidden, .song-error.is-hidden{ display:none; }
+  .song-offer .song-title{ margin: 2px 0 8px; font-size: 1.3rem; line-height: 1.25; color:#f4e9c9; }
+  .classic-pay{ margin: 0 0 14px; text-align:center; }
+  .classic-pay.is-hidden{ display:none; }
+  .btn-classic-pay{ appearance:none; width:100%; border:none; cursor:pointer; border-radius:999px; padding:15px 20px; background:#ffc439; color:#1a1a1a; font-family:'Work Sans',sans-serif; font-size:1rem; font-weight:600; }
+  .btn-classic-pay:active{ background:#f2b72e; }
+  .classic-pay-note{ margin:8px 0 0; font-size:0.74rem; color:#d8a79d; }
+  .pay-wait{ margin: 14px 0; padding: 12px 14px; border-radius: 12px; text-align:center; font-size:0.9rem; color:#f2e3d6; background: rgba(255,255,255,0.08); }
+  .pay-wait.is-hidden{ display:none; }
+  .alt-pay{ margin: 14px 0 6px; padding: 12px 14px; border: 1px dashed rgba(233,201,186,0.35); border-radius: 12px; text-align:center; }
+  .alt-pay.is-nudged{ border-style: solid; border-color:#f2c9a8; background: rgba(242,201,168,0.12); }
+  .alt-pay p{ margin: 0 0 10px; font-size: 0.82rem; line-height: 1.45; color: #e9c9ba; }
+  .alt-pay .alt-links{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .alt-pay a{ display:inline-block; padding: 9px 14px; border-radius: 999px; border:1px solid rgba(233,201,186,0.55); color:#f6e7de; font-size:0.82rem; text-decoration:none; }
+  .alt-pay a:hover, .alt-pay a:focus-visible{ background: rgba(233,201,186,0.14); }
+  /* Botón de "seguir sin pagar": sigue ahí, siempre disponible y legible
+     (no es un patrón oscuro ocultarlo), pero con más distancia del bloque
+     de pago y menos peso visual, para que no compita al mismo nivel que el
+     botón de PayPal — ver conversación sobre "pain of paying" del
+     2026-10-04. */
+  .paywall-skip{ text-align:center; margin-top: 30px; }
+  .paywall-skip button{ background:none; border:none; color: #e9c9ba; font-size: 0.74rem; text-decoration:underline; cursor:pointer; opacity: 0.55; }
+
+  #fullContainer.is-hidden{ display:none; }
+  /* Sin estas reglas, add/remove('is-hidden') sobre estos elementos no tenía
+     ningún efecto visual (solo existían para #progress, #btnBack y
+     #fullContainer): "Seguir sin pagar" no ocultaba el paywall y la nota de
+     "Está bien…" se veía desde el principio. */
+  #paywall.is-hidden, #skippedNote.is-hidden, #skipReasonBox.is-hidden, #skipReasonThanks.is-hidden{ display:none; }
+  #fullContainer{ animation: fadeUp 0.6s ease; }
+  @keyframes fadeUp{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform:none; } }
+  .closing-line{ font-family:'Fraunces', serif; font-style: italic; text-align:center; font-size: 1.15rem; line-height:1.5; max-width: 30ch; margin: 30px auto 36px; color: var(--brass); }
+
+  .unlocked-badge{ text-align:center; color: var(--brass); font-size: 0.8rem; letter-spacing:0.02em; margin-bottom: 24px; }
+
+  .reveal-actions{ display:flex; flex-direction:column; gap:14px; align-items:center; margin-top: 10px; }
+  .disclaimer{ color:#5c5370; font-size: 0.72rem; text-align:center; line-height:1.5; max-width: 32ch; margin: 30px auto 0; }
+
+  @media (prefers-reduced-motion: reduce){
+    .mask-wrap, .mask-crack, #fullContainer, .pulse-mask{ animation: none !important; }
+  }
+
+  /* ===================== MAPA (variante) ===================== */
+  #screen-reveal{ padding: 34px 0 60px; }
+  .map-counter{ text-align:center; color: var(--brass); font-size: 0.8rem; letter-spacing: 0.02em; margin: 0 0 6px; }
+  .map-wrap{ margin: 0 -14px; }
+  #mapSvg{ width:100%; height:auto; display:block; overflow:visible; }
+  .map-hint{ text-align:center; color: var(--muted); font-size: 0.8rem; margin: 2px 0 30px; }
+  .map-orbit{ fill:none; stroke: var(--line); stroke-width:1; }
+  .map-link{ stroke: var(--brass-dim); stroke-width:1; opacity:.55; }
+  .map-link.is-locked{ stroke-dasharray: 3 4; opacity:.35; }
+  .map-core-ring{ fill:none; stroke: var(--brass); stroke-width:1; opacity:.35; }
+  .map-core{ fill: var(--brass); }
+  .map-node{ cursor:pointer; outline:none; opacity:0; animation: nodeIn .6s ease forwards; -webkit-tap-highlight-color: transparent; }
+  @keyframes nodeIn{ to{ opacity:1; } }
+  .map-node .touch{ fill: transparent; }
+  .map-node .body{ fill: var(--ink-3); stroke: var(--brass-dim); stroke-width:1.4; stroke-dasharray: 3 3; transition: transform .15s ease; transform-box: fill-box; transform-origin:center; }
+  .map-node.is-open .body{ fill: var(--brass); stroke: var(--brass); stroke-dasharray:none; }
+  .map-node:active .body{ transform: scale(.94); }
+  .map-node:focus-visible .body{ stroke: var(--parchment); stroke-width:2.4; stroke-dasharray:none; }
+  .map-node .glyph{ fill:none; stroke: var(--brass); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  .map-node.is-open .glyph{ stroke: #211a0c; }
+  .map-label{ fill: var(--parchment); font-family:'Work Sans', sans-serif; text-anchor:middle; pointer-events:none; }
+  .map-node:not(.is-open) .map-label{ fill: var(--muted); }
+  .map-node.is-open.is-seen .body{ fill: #a98a42; stroke:#a98a42; }
+  .map-pulse{ animation: pulseRing 1.6s ease-out 2; }
+  @keyframes pulseRing{ 0%{ box-shadow:0 0 0 0 rgba(242,236,223,.5);} 100%{ box-shadow:0 0 0 18px rgba(242,236,223,0);} }
+
+  .btn-ghost{ appearance:none; border:none; cursor:pointer; font-family:'Work Sans', sans-serif; }
+  /* Hoja inferior: lo que se abre al tocar un punto. */
+  .sheet-backdrop{ position:fixed; inset:0; background: rgba(8,5,14,.62); opacity:0; pointer-events:none; transition: opacity .25s ease; z-index: 20; }
+  .sheet-backdrop.is-open{ opacity:1; pointer-events:auto; }
+  .sheet{ position:fixed; left:0; right:0; bottom:0; margin:0 auto; max-width:480px; max-height: 78vh; overflow-y:auto;
+    background: var(--ink-2); border-top: 1px solid var(--brass-dim); border-radius: 18px 18px 0 0;
+    padding: 26px 28px calc(26px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .3s ease; z-index: 21; visibility:hidden; }
+  .sheet.is-open{ transform:none; visibility:visible; }
+  .sheet h3{ font-family:'Fraunces', serif; font-weight:500; font-size:1.35rem; margin:0 0 12px; color: var(--brass); }
+  .sheet p{ font-size:1.02rem; line-height:1.7; margin:0 0 20px; }
+  .sheet .locked-note{ color: var(--muted); font-size:.86rem; line-height:1.5; margin: -8px 0 20px; }
+  .sheet-actions{ display:flex; flex-direction:column; gap:10px; align-items:center; }
+  .sheet-actions .btn{ width:100%; }
+  #unlockPanel.is-flash{ animation: flash 1.2s ease 1; }
+  @keyframes flash{ 0%,100%{ filter:none; } 40%{ filter: brightness(1.35); } }
+  @media (prefers-reduced-motion: reduce){
+    .map-node{ animation:none; opacity:1; }
+    .sheet, .sheet-backdrop{ transition:none; }
+    #unlockPanel.is-flash{ animation:none; }
+  }
+
+  /* "No desbloquear por ahora" y "¿Qué te frena?": explícitos, con borde y tamaño de
+     botón real — antes eran texto tenue y casi nadie los veía como opción. */
+  .btn-outline{ appearance:none; display:block; width:100%; margin-top:18px; background:transparent; color:#fff; border:1.5px solid rgba(255,255,255,.7); border-radius:999px; padding:14px 20px; font-family:'Work Sans',sans-serif; font-size:.98rem; font-weight:500; cursor:pointer; }
+  .btn-outline:active{ background:rgba(255,255,255,.12); }
+  #btnRestartFromSkip{ display:block; width:100%; margin-top:10px; color:#f2ddd3; text-decoration-color:rgba(255,255,255,.4); }
+  .skipped-text{ text-align:center; color:#f2ddd3; font-size:.95rem; line-height:1.5; margin:0 0 4px; }
+  .reason-block{ margin-top:26px; padding-top:22px; border-top:1px solid rgba(255,255,255,.25); }
+  .reason-title{ text-align:center; color:#fff; font-size:.98rem; font-weight:500; margin:0 0 14px; }
+  .reason-list{ display:flex; flex-direction:column; gap:10px; }
+  .reason-btn{ appearance:none; width:100%; background:rgba(255,255,255,.1); color:#fff; border:1.5px solid rgba(255,255,255,.55); border-radius:12px; padding:13px 14px; font-family:'Work Sans',sans-serif; font-size:.95rem; text-align:left; cursor:pointer; }
+  .reason-btn:active{ background:rgba(255,255,255,.22); }
+  .reason-thanks{ text-align:center; color:#fff; font-size:.95rem; margin:4px 0 0; }
+  #payBlock.is-hidden, #reasonBlock.is-hidden{ display:none; }
+  .map-label{ paint-order: stroke; stroke: var(--ink); stroke-width: 3px; stroke-linejoin: round; font-size: 10.5px; }
+
+  /* ===================== LECTURA EN CAPÍTULOS ===================== */
+  .q-act{ text-align:center; color: var(--brass-dim); font-size:.78rem; letter-spacing:.02em; margin: 0 0 16px; min-height: 1em; }
+  .q-prompt{ margin-bottom: 26px; }
+  .short-input{ font-size: 1.05rem; min-height: 5.2em; }
+  #screen-reveal .map-counter{ margin: 0 0 26px; }
+  .chapters{ margin: 0 0 8px; }
+  .chapter{ padding: 0 0 8px; margin: 0 0 30px; }
+  .chapter + .chapter{ border-top: 1px solid var(--line); padding-top: 28px; }
+  .chapter-title{ font-size: 1.3rem; line-height: 1.3; font-weight: 500; color: var(--brass); margin: 0 0 14px; }
+  .chapter p{ font-size: 1.03rem; line-height: 1.78; margin: 0 0 16px; }
+  .locked-list{ margin: 6px 0 26px; padding: 22px 0 0; border-top: 1px solid var(--line); }
+  .locked-list.is-hidden{ display:none; }
+  .locked-intro{ color: var(--muted); font-size: .92rem; margin: 0 0 16px; }
+  .locked-item{ display:flex; gap: 14px; align-items:flex-start; border: 1px dashed var(--brass-dim); border-radius: 12px; padding: 14px 16px; margin: 0 0 12px; }
+  .lock-ico{ width: 20px; height: 20px; flex-shrink:0; margin-top: 3px; fill:none; stroke: var(--brass); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+  .locked-title{ font-size: 1.08rem; line-height:1.3; margin: 0 0 6px; color: var(--parchment); }
+  .locked-hook{ font-size: .92rem; line-height: 1.5; color: var(--muted); margin: 0 0 6px; }
+  .locked-words{ font-size: .78rem; color: var(--brass-dim); margin: 0; }
+  #btnResume.is-hidden{ display:none; }
+
+  /* --- pago por país (SINPE / PayPal) --- */
+  .pay-panel{ margin: 0 0 14px; padding: 16px 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.35); background: rgba(0,0,0,.14); text-align:center; }
+  .pay-panel.is-hidden{ display:none; }
+  .pay-title{ margin: 0 0 10px; font-size: 1rem; color:#fff; }
+  .pay-steps{ list-style:none; margin: 0 0 14px; padding: 0; text-align:left; color:#f6e7de; font-size:.9rem; line-height:1.5; }
+  .pay-steps li{ margin: 0 0 6px; padding-left: 22px; position:relative; }
+  .pay-steps li::before{ content: attr(data-n); position:absolute; left:0; top:0; color:#ffd9a8; font-weight:600; }
+  .pay-copy{ appearance:none; background:transparent; border:1px solid rgba(255,255,255,.55); color:#fff; border-radius:999px; padding:7px 14px; font-size:.8rem; cursor:pointer; margin-bottom: 12px; }
+  .pay-upload{ display:block; width:100%; appearance:none; border:none; cursor:pointer; border-radius:999px; padding:15px 20px; background:#ffc439; color:#1a1a1a; font-weight:600; font-size:1rem; font-family:inherit; }
+  .pay-upload:disabled{ opacity:.6; cursor:default; }
+  .pay-msg{ margin: 10px 0 0; font-size:.84rem; color:#ffe3c9; line-height:1.4; }
+  .pay-msg.is-hidden{ display:none; }
+  .pay-note{ margin: 10px 0 0; font-size:.76rem; color:#d8a79d; }
+  .pay-help{ margin: 14px 0 6px; text-align:center; font-size:.82rem; line-height:1.45; color:#e9c9ba; }
+  .pay-help a{ color:#f6e7de; margin: 0 4px; }
+  .other-wrap{ margin-top: 10px; }
+  .other-wrap.is-hidden{ display:none; }
+  .other-wrap .short-input{ min-height: 56px; }
+  .options .option.is-other{ border-style: dashed; }
+  .finish-early{ margin-top: 18px; text-align:center; }
+  .finish-early.is-hidden{ display:none; }
+  .finish-early p{ margin: 0 0 6px; font-size: .8rem; line-height:1.45; color: var(--muted); }
+  .finish-early .btn-ghost{ color: var(--parchment); font-size: .9rem; text-decoration: underline; text-decoration-color: var(--brass-dim); text-underline-offset: 3px; padding: 8px 6px; }
+  .pay-covers{ text-align:center; margin: -8px 0 14px; font-size:.88rem; color:#fff; font-weight:500; }
+  .locked-teaser{ margin: 4px 0 6px; font-size:.95rem; line-height:1.5; color: var(--parchment); }
+  .read-more{ appearance:none; background:none; border:none; padding:2px 0; cursor:pointer; font: inherit; font-size:.88rem; font-weight:600; color: var(--brass); text-decoration: underline; text-underline-offset: 3px; }
+  #paywall.pay-flash{ animation: payflash 1.6s ease-out 1; }
+  @keyframes payflash{ 0%{ box-shadow: 0 0 0 0 rgba(255,217,168,.9);} 100%{ box-shadow: 0 0 0 22px rgba(255,217,168,0);} }
+  @media (prefers-reduced-motion: reduce){ #paywall.pay-flash{ animation:none; } }
+
+  /* ===================== FLUJO CERRADO → MOTIVACIÓN → PAGO ===================== */
+  .profile-box.is-hidden, .unlock-cta.is-hidden, .delivery-line.is-hidden, .email-msg.is-hidden, #payTest.is-hidden, #payChecking.is-hidden, #paypal-card-container.is-hidden, .card-or.is-hidden, .card-brands.is-hidden, .card-box.is-hidden{ display:none; }
+  .profile-box{ margin: 0 0 26px; padding: 18px 16px 20px; border: 1px solid var(--brass-dim); border-radius: 16px; background: rgba(198,163,88,.06); }
+  .profile-head{ display:flex; align-items:baseline; justify-content:space-between; margin: 0 0 4px; }
+  .profile-title{ font-size: 1.12rem; color: var(--brass); margin: 0; font-weight: 500; }
+  .profile-lock-note{ font-size: .74rem; color: var(--brass-dim); display:flex; align-items:center; gap:5px; }
+  .profile-lock-note svg{ width:13px; height:13px; fill:none; stroke: var(--brass-dim); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .radar-wrap{ position:relative; margin: 0 auto; max-width: 340px; }
+  .radar-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .radar-grid{ fill:none; stroke: var(--line); stroke-width:1; }
+  .radar-axis{ stroke: var(--line); stroke-width:1; }
+  .radar-shape{ fill: rgba(198,163,88,.30); stroke: var(--brass); stroke-width:1.6; stroke-linejoin:round; }
+  .radar-dot{ fill: var(--brass); }
+  .radar-val{ fill: var(--parchment); font-size: 10px; font-family:'Work Sans',sans-serif; text-anchor:middle; }
+  .radar-label{ fill: var(--parchment); font-size: 11px; font-family:'Work Sans',sans-serif; }
+  .radar-wrap.is-locked .radar-shape-g{ filter: blur(7px); opacity:.9; }
+  .radar-pad{ position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:44px; height:44px; border-radius:50%; background: var(--ink-2); border:1px solid var(--brass-dim); display:flex; align-items:center; justify-content:center; }
+  .radar-pad svg{ width:20px; height:20px; fill:none; stroke: var(--brass); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .radar-top{ stroke: var(--brass); stroke-width:3; stroke-linecap:round; }
+  .radar-dash{ stroke: var(--brass-dim); stroke-width:1.2; stroke-dasharray:3 4; }
+  .radar-q{ fill: var(--ink-2); stroke: var(--brass-dim); stroke-width:1.2; }
+  .radar-qt{ fill: var(--brass); font: 600 11px 'Work Sans',sans-serif; text-anchor:middle; }
+  .profile-others{ margin: 2px 0 0; text-align:center; font-size:.78rem; color: var(--brass-dim); }
+  .profile-riddle{ font-size:.9rem; line-height:1.5; color: var(--brass-dim); display:inline-flex; align-items:center; gap:6px; }
+  .profile-riddle svg{ width:13px; height:13px; flex-shrink:0; fill:none; stroke: var(--brass-dim); stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+  .closed-chip{ display:inline-block; margin-left:8px; vertical-align:middle; font: 600 .62rem 'Work Sans',sans-serif; letter-spacing:.04em; color: var(--brass); border:1px solid var(--brass-dim); border-radius:999px; padding:2px 8px; }
+  .locked-teaser{ font-style:italic; }
+  .profile-rows{ margin: 10px 0 0; display:flex; flex-direction:column; gap:10px; }
+  .profile-row{ font-size:.92rem; line-height:1.45; color: var(--parchment); }
+  .profile-row .k{ display:block; color: var(--muted); font-size:.76rem; margin-bottom:2px; }
+  .profile-row b{ color: var(--brass); font-weight:600; }
+  .redact{ display:inline-block; vertical-align:middle; height:.8em; border-radius:3px; background: rgba(242,236,223,.16); margin: 0 3px 2px 0; filter: blur(1.5px); }
+  .profile-word{ font-family:'Fraunces',serif; font-size:1.5rem; color: var(--parchment); }
+  .profile-quote{ font-family:'Fraunces',serif; font-style:italic; font-size:1.06rem; line-height:1.5; }
+  .profile-stats{ margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); font-size:.8rem; color: var(--brass); text-align:center; }
+  .profile-closing{ margin: 6px 0 0; font-size:.8rem; color: var(--muted); text-align:center; font-style:italic; }
+
+  .unlock-cta{ position:fixed; left:0; right:0; bottom:0; z-index:15; margin:0 auto; max-width:480px; padding: 22px 28px calc(14px + env(safe-area-inset-bottom)); background: linear-gradient(to bottom, rgba(22,17,31,0), var(--ink) 38%); text-align:center; }
+  .cta-btn{ width:100%; padding: 16px 20px; font-size: 1.02rem; }
+  .cta-sub{ margin: 8px 0 0; font-size:.76rem; color: var(--muted); }
+  #screen-reveal.has-cta{ padding-bottom: 150px; }
+
+  #screen-prepay{ padding: 38px 0 150px; }
+  .prepay{ text-align:center; }
+  .prepay-mask{ width:64px; height:64px; margin: 0 auto 14px; display:block; opacity:.9; }
+  .prepay-title{ font-size:1.7rem; line-height:1.2; font-weight:500; margin: 0 0 16px; }
+  .prepay-p{ font-size:1rem; line-height:1.65; margin: 0 0 16px; text-align:left; }
+  .prepay-soft{ color:#d9d0bd; }
+  .prepay-inc-title{ text-align:left; margin: 6px 0 8px; font-size:.9rem; color: var(--brass); }
+  .prepay-inc{ list-style:none; margin:0 0 20px; padding:0; text-align:left; }
+  .prepay-inc li{ position:relative; padding: 9px 0 9px 28px; border-top:1px solid var(--line); font-size:.96rem; line-height:1.4; }
+  .prepay-inc li:last-child{ border-bottom:1px solid var(--line); }
+  .prepay-inc li::before{ content:''; position:absolute; left:4px; top:13px; width:10px; height:6px; border-left:2px solid var(--brass); border-bottom:2px solid var(--brass); transform: rotate(-45deg); }
+  .prepay-secure{ margin: 10px 0 6px; font-size:.76rem; color: var(--muted); }
+  #screen-pay{ padding: 34px 0 40px; }
+
+  .delivery-box{ margin: 6px 0 26px; padding: 16px; border:1px solid var(--line); border-radius:14px; background: rgba(255,255,255,.03); text-align:center; }
+  .delivery-line{ font-size:.88rem; line-height:1.5; color: var(--parchment); margin: 0 0 10px; }
+  .btn-outline-soft{ appearance:none; border:1px solid var(--brass-dim); background:transparent; color: var(--brass); border-radius:999px; padding:9px 16px; font:500 .84rem 'Work Sans',sans-serif; cursor:pointer; margin: 0 0 14px; }
+  .email-title{ margin: 0 0 8px; font-size:.88rem; color: var(--muted); }
+  .email-row{ display:flex; gap:8px; }
+  .email-row input{ flex:1 1 auto; min-width:0; border:1px solid var(--line); background: rgba(0,0,0,.25); color: var(--parchment); border-radius:12px; padding:12px; font:1rem 'Work Sans',sans-serif; }
+  .email-row .song-go{ width:auto; flex:0 0 auto; padding: 12px 16px; font-size:.9rem; }
+  .email-msg{ margin: 8px 0 0; font-size:.82rem; color: var(--brass); }
+  .test-banner{ position:fixed; left:0; right:0; top:0; z-index:50; text-align:center; font-size:.7rem; color:#34d399; background: rgba(22,17,31,.94); padding:5px 8px; }
+  #paypal-button-container{ min-height: 48px; margin: 0 0 8px; }
+  #paypal-card-container{ min-height: 55px; margin: 0 0 4px; }
+  .card-box{ background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.75); border-radius: 18px; padding: 14px 14px 12px; margin: 0 0 4px; }
+  .card-title{ margin: 0 0 8px; font-size: 1.15rem; font-weight: 700; text-align: center; color:#fff; }
+  .card-or{ margin: 14px 0 10px; font-size:.86rem; color:#f6e7de; display:flex; align-items:center; gap:10px; }
+  .card-or::before, .card-or::after{ content:''; flex:1; height:1px; background: rgba(255,255,255,.3); }
+  .card-brands{ list-style:none; margin: 0 0 12px; padding:0; display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+  .card-brands li{ font-size:.68rem; font-weight:600; letter-spacing:.03em; color:#fff; border:1px solid rgba(255,255,255,.5); border-radius:6px; padding:3px 8px; background: rgba(255,255,255,.08); }
+</style>
+
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&display=swap" rel="stylesheet">
+<style id="tema-aptitud">
+  /* Estilo propio del examen de aptitudes: azul noche, verde de crecimiento y un panel de pago azul sereno (nada de rojo). */
+  :root{
+    --ink:#0b1220; --ink-2:#111a2e; --ink-3:#17223b; --parchment:#eef2f7; --muted:#94a3b8;
+    --brass:#34d399; --brass-dim:#2f8f74; --rosewood:#14324c; --rosewood-bright:#1b4463; --line:rgba(238,242,247,.12);
+  }
+  .display, .paywall-label, .closing-line, .sheet h3, .profile-word, .profile-quote{ font-family:'Sora', 'Work Sans', sans-serif !important; letter-spacing:-.01em; }
+  #screen-cover h1{ font-weight:600; font-size:2.05rem; max-width:340px; }
+  .q-prompt{ font-weight:600; font-size:1.35rem; }
+  .btn-primary, .song-go{ color:#05261b; }
+  .btn-primary:hover{ background:#4ee0ad; }
+  .btn-primary:disabled, .song-go:disabled{ background:#263247; color:#6b7a90; }
+  .short-input::placeholder{ color:#5b6b85; }
+  .disclaimer{ color:#5b6b85; }
+  .profile-box{ background:rgba(52,211,153,.06); }
+  .radar-shape{ fill:rgba(52,211,153,.26); }
+  .redact{ background:rgba(238,242,247,.14); }
+  .unlock-cta{ background:linear-gradient(to bottom, rgba(11,18,32,0), var(--ink) 38%); }
+  .prepay-soft{ color:#c4cfdd; }
+  .paywall{ clip-path:none; border-radius:20px; border:1px solid rgba(255,255,255,.12); box-shadow:0 10px 40px rgba(0,0,0,.35); }
+  .paywall-commitment{ color:#9fc7e0; }
+  .paywall-price{ color:#cfe3f1; }
+  .pay-note, .classic-pay-note{ color:#a9c6da; }
+  .pay-help{ color:#cfe3f1; }
+  .pay-help a{ color:#fff; }
+  .pay-msg{ color:#d9f2ff; }
+  .card-or{ color:#d9ecf7; }
+  .skipped-text, #btnRestartFromSkip{ color:#e2eef7; }
+  .ask-email{ text-align:left; margin:0 0 16px; padding:14px; border-radius:14px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.28); }
+  .ask-email-label{ display:block; font-weight:600; color:#fff; margin:0 0 8px; font-size:.95rem; }
+  .ask-email input{ width:100%; border:1px solid rgba(255,255,255,.45); background:rgba(0,0,0,.25); color:#fff; border-radius:12px; padding:13px 12px; font:1rem 'Work Sans',sans-serif; }
+  .ask-email input:focus{ outline:2px solid var(--brass); outline-offset:1px; }
+  .ask-email-note{ margin:8px 0 0; font-size:.78rem; color:#cfe3f1; line-height:1.4; }
+  .chapter p{ white-space:pre-line; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div id="progress" class="is-hidden"><div id="progressFill"></div></div>
+
+  <section id="screen-cover" class="screen is-active">
+    <div class="mask-wrap">
+      <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M50 8a42 42 0 1 1 -0.01 0Z" stroke="#34d399" stroke-width="1.4" opacity="0.9"/>
+        <path class="mask-crack" d="M24 72 L40 56 L52 64 L76 36 M63 36 L76 36 L76 49" stroke="#34d399" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        
+        
+      </svg>
+    </div>
+    <h1 class="display" data-t="cover_title"></h1>
+    <p class="sub" data-t="cover_sub"></p>
+    <p class="meta-line" data-t="cover_meta"></p>
+    <button id="btnStart" class="btn btn-primary" data-t="btn_start"></button>
+    <button id="btnResume" class="btn-ghost is-hidden" style="margin-top:14px;"></button>
+  </section>
+
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-top"><button id="btnBack" data-aria="back_aria">‹</button></div>
+    <div class="quiz-body">
+      <p id="qAct" class="q-act"></p>
+      <p id="qPrompt" class="q-prompt display"></p>
+      <div id="qBody"></div>
+    </div>
+    <div class="quiz-bottom">
+      <button id="btnNext" class="btn btn-primary" disabled data-t="btn_next"></button>
+      <div id="finishEarly" class="finish-early is-hidden">
+        <p data-t="finish_early_note"></p>
+        <button type="button" id="btnFinishEarly" class="btn-ghost" data-t="finish_early_btn"></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-loading" class="screen">
+    <svg class="pulse-mask" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M50 8a42 42 0 1 1 -0.01 0Z" stroke="#34d399" stroke-width="1.4"/>
+      <path d="M24 72 L40 56 L52 64 L76 36 M63 36 L76 36 L76 49" stroke="#34d399" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <p id="loadingLabel" class="display"></p>
+  </section>
+
+  <section id="screen-error" class="screen">
+    <div class="error-box">
+      <p id="errorMsg" class="display" style="font-size:1.2rem; color:var(--parchment);"></p>
+      <p id="errorDetail"></p>
+      <button id="btnRetry" class="btn btn-primary" data-t="err_retry"></button>
+    </div>
+  </section>
+
+  <section id="screen-reveal" class="screen">
+    <h2 id="archetypeName" class="archetype-name display"></h2>
+    <div class="rule"></div>
+    <p id="hookLine" class="hook-line" style="margin-bottom:20px;"></p>
+
+    <div id="profileBox" class="profile-box is-hidden"></div>
+
+    <div id="chapters" class="chapters"></div>
+    <div id="lockedList" class="locked-list is-hidden"></div>
+
+    <div id="fullContainer" class="is-hidden">
+      <p class="unlocked-badge" data-t="unlocked_badge"></p>
+      <p id="closingLine" class="closing-line"></p>
+      <div id="deliveryBox" class="delivery-box">
+        <p id="emailedLine" class="delivery-line is-hidden"></p>
+        <button type="button" id="btnCopyLink" class="btn-outline-soft"></button>
+        <form id="emailForm" class="email-form" novalidate>
+          <p class="email-title" id="emailTitle"></p>
+          <div class="email-row"><input type="email" id="emailInput" autocomplete="email" inputmode="email"><button type="submit" id="emailBtn" class="song-go"></button></div>
+          <p id="emailMsg" class="email-msg is-hidden" role="status"></p>
+        </form>
+      </div>
+      <div class="reveal-actions">
+        <button id="btnRestart" class="btn-ghost" data-t="redo_btn"></button>
+      </div>
+    </div>
+
+    <div class="reveal-actions" style="margin-top:26px;">
+      <button id="btnShare" class="btn-ghost" style="text-decoration-color: var(--brass-dim);" data-t="share_btn"></button>
+    </div>
+    <p class="disclaimer" data-t="disclaimer"></p>
+  </section>
+
+  <div id="unlockCta" class="unlock-cta is-hidden">
+    <button type="button" id="btnSeeAll" class="btn btn-primary cta-btn" data-t="n_cta"></button>
+    <p class="cta-sub" data-t="n_cta_sub"></p>
+  </div>
+
+  <section id="screen-prepay" class="screen">
+    <div class="prepay">
+      <svg class="prepay-mask" viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M50 8a42 42 0 1 1 -0.01 0Z" stroke="#34d399" stroke-width="1.4"/><path d="M24 72 L40 56 L52 64 L76 36 M63 36 L76 36 L76 49" stroke="#34d399" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h2 class="prepay-title display" data-t="n_pp_title"></h2>
+      <p id="ppP1" class="prepay-p"></p>
+      <p class="prepay-inc-title" data-t="n_pp_inc_title"></p>
+      <ul id="ppInc" class="prepay-inc"></ul>
+      <p id="ppP2" class="prepay-p"></p>
+      <p id="ppP3" class="prepay-p prepay-soft"></p>
+      <button type="button" id="btnPrepayBack" class="btn-ghost" data-t="n_pp_back"></button>
+    </div>
+    <div class="unlock-cta prepay-bar">
+      <button type="button" id="btnPrepayGo" class="btn btn-primary cta-btn" data-t="n_pp_btn"></button>
+      <p class="cta-sub" data-t="n_pp_secure"></p>
+    </div>
+  </section>
+
+  <section id="screen-pay" class="screen">
+    <div id="paywall" class="paywall">
+      <div id="payBlock">
+        <p id="sealedPhrase" class="sealed-phrase display"></p>
+        <p id="paywallCommitment" class="paywall-commitment"></p>
+        <p class="paywall-label display" data-t="n_pay_title"></p>
+        <p class="paywall-price"><span data-t="n_pay_price_pre"></span> <b id="priceLabel"></b></p>
+        <p id="payCovers" class="pay-covers"></p>
+        <p id="payChecking" class="pay-note" data-t="pay_checking_country"></p>
+
+        <div id="payIntl" class="pay-panel is-hidden">
+          <div class="card-box" id="cardBox">
+            <p class="card-title display" data-t="n_card_title"></p>
+            <ul class="card-brands" aria-label="Visa, Mastercard, American Express"><li>VISA</li><li>Mastercard</li><li>AMEX</li><li data-t="n_card_debit"></li></ul>
+            <div id="paypal-card-container"></div>
+          </div>
+          <p class="card-or" data-t="n_card_or"></p>
+          <div id="paypal-button-container"></div>
+          <p id="paypalMsg" class="pay-msg is-hidden" role="status"></p>
+          <p id="paypalNote" class="pay-note"></p>
+        </div>
+
+        <div id="payTest" class="pay-panel is-hidden">
+          <p class="pay-note" style="margin:0 0 12px" data-t="n_test_note"></p>
+          <button type="button" id="btnTestSend" class="pay-upload" data-t="n_test_btn"></button>
+          <p id="testMsg" class="pay-msg is-hidden" role="status"></p>
+          <button type="button" id="btnTestReal" class="pay-copy" style="margin:14px 0 0" data-t="n_test_real"></button>
+        </div>
+
+        <p class="pay-help"><span data-t="help_lead"></span><br><a id="helpWa" href="#" target="_blank" rel="noopener" data-t="help_wa"></a>·<a id="helpMail" href="#" data-t="help_mail"></a></p>
+        <button id="btnSkipPaywall" class="btn-outline" data-t="skip_btn"></button>
+      </div>
+
+      <div id="skippedNote" class="is-hidden">
+        <p class="skipped-text" data-t="skipped_text"></p>
+        <p class="skipped-text" style="font-size:0.85rem"><span data-t="skipped_help"></span>
+          <a id="helpWa2" href="#" target="_blank" rel="noopener" style="color:#f6e7de" data-t="help_wa"></a> ·
+          <a id="helpMail2" href="#" style="color:#f6e7de" data-t="help_mail"></a></p>
+        <div id="reasonBlock" class="reason-block">
+          <p class="reason-title" data-t="reason_title"></p>
+          <div id="skipReasonBox" class="reason-list">
+            <button class="reason-btn skip-reason" data-reason="precio"></button>
+            <button class="reason-btn skip-reason" data-reason="metodo_pago"></button>
+            <button class="reason-btn skip-reason" data-reason="solo_ver"></button>
+            <button class="reason-btn skip-reason" data-reason="sin_interes"></button>
+          </div>
+          <p id="skipReasonThanks" class="is-hidden reason-thanks" data-t="reason_thanks"></p>
+        </div>
+        <button id="btnShowPay" class="btn-outline" data-t="show_pay_btn"></button>
+        <button id="btnRestartFromSkip" class="btn-ghost" data-t="redo_btn"></button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="/qer-shared/qer-pay-config.js"></script>
+<script src="/qer-shared/qer-strings.js"></script>
+<script>window.QER_TEST = { ownerEmail: "bonillapretiz@gmail.com", key: (function(){try{var k=new URLSearchParams(location.search).get("k");if(k){localStorage.setItem("qer_test_key",k);return k;}return localStorage.getItem("qer_test_key")||"";}catch(e){return "";}})(), answers: ["Trabajo por mi cuenta", "Administración de empresas; trabajo en una ferretería atendiendo clientes.", "Bastante", "Arreglar o construir cosas", "De 2 a 5 horas", "4.000", "40", "Que Ana no es vendedora", "Destornillador", "Busco cómo lo resolvieron otros", "Hablar con gente y convencer", "En un equipo pequeño", "Empiezo y voy ajustando", "Que soy creativo", "Organicé la mudanza de la tienda en un fin de semana y no se perdió nada.", "Escucho más de lo que hablo", "Busco un punto medio", "Bien, si creo en lo que vendo", "Le escribo un paso a paso", "Me piden ayuda con Excel y con las cuentas de la casa.", "Leyendo", "Leo, pero no retengo", "Subrayo y tomo notas", "Alguien que me exija", "Excel avanzado y cómo vender por internet.", "Aprender cosas nuevas", "Tener mi propio negocio", "Ganar por resultados, aunque varíe", "Enseñar a mis sobrinos matemáticas.", "Salud", "9.600", "Sábado", "Luis", "Olvidar", "3", "Lo invierto en algo que me dé más", "Algunas veces", "Cobro poco para conseguir clientes", "Que me critiquen", "Un 25 % más", "Falta de dinero", "La mayoría de las veces", "Me molestan, pero las escucho", "Hablar en público y el inglés.", "Para lo básico", "Tener mi propio negocio de asesoría a pequeñas tiendas, con horario flexible.", "Invertir dinero en cursos", "Con una carrera o un título formal", "Tengo ganas, pero no sé qué quiero", "¿Vale la pena estudiar algo nuevo a mi edad o mejor emprender?"] };</script>
+<script src="/aptitud/config.js"></script>
+<script src="/qer-shared/qer-app.js"></script>
+</body>
+</html>

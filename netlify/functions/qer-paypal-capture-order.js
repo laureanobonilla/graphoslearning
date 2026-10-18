@@ -8,7 +8,7 @@ const { fullView } = require('./_lib/qer-reading-view');
 const { deliverReading, isEmail } = require('./_lib/qer-email');
 const store = require('./_lib/store');
 
-const APPS = new Set(['quien-eres', 'who-are-you', 'quien-es-tu-pareja', 'who-is-your-partner']);
+const APPS = new Set(['quien-eres', 'who-are-you', 'quien-es-tu-pareja', 'who-is-your-partner', 'aptitud']);
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 const baseUrl = (event) => String(process.env.URL || (event.headers && (event.headers.origin || (event.headers.host ? 'https://' + event.headers.host : ''))) || '').replace(/\/$/, '');
 const mask = (e) => String(e).replace(/^(.).*(@.*)$/, '$1•••$2');
@@ -52,17 +52,20 @@ exports.handler = async (event) => {
 
         const view = fullView(reading);
         const payerEmail = String(order.payer?.email_address || '').trim();
+        // Correo que la persona escribió ANTES de pagar (apps con askEmail, p. ej. /aptitud/): tiene prioridad sobre el de PayPal.
+        const typedEmail = isEmail(String(body.email || '')) ? String(body.email).trim() : '';
+        const toEmail = typedEmail || (isEmail(payerEmail) ? payerEmail : '');
         const link = baseUrl(event) ? `${baseUrl(event)}/${app}/?r=${encodeURIComponent(readingId)}` : '';
         // Correo: mejor esfuerzo. Si falla, la persona ya tiene su lectura en pantalla y el dueño recibe la copia.
         let emailed = false;
         try {
-            const sent = await deliverReading({ view, format: reading.format, to: isEmail(payerEmail) ? payerEmail : '', link,
-                ownerNote: `Pago PayPal de US$${paidAmount} (${app}) · pagador: ${payerEmail || '(PayPal no dio correo)'} · lectura ${readingId}` });
+            const sent = await deliverReading({ view, format: reading.format, to: toEmail, link,
+                ownerNote: `Pago PayPal de US$${paidAmount} (${app}) · pagador: ${payerEmail || '(PayPal no dio correo)'}${typedEmail ? ' · correo escrito: ' + typedEmail : ''} · lectura ${readingId}` });
             emailed = !!(sent.customer && sent.customer.ok);
-            try { await store.logEvent(readingId, 'anon', readingId, 'payment_verified_paypal', { amount: paidAmount, app, payerEmail: payerEmail || null, emailedCustomer: emailed, emailedOwner: !!(sent.owner && sent.owner.ok), customerReason: sent.customer && !sent.customer.ok ? sent.customer.reason : undefined }, null, app); } catch (_e) { /* no crítico */ }
+            try { await store.logEvent(readingId, 'anon', readingId, 'payment_verified_paypal', { amount: paidAmount, app, payerEmail: payerEmail || null, typedEmail: typedEmail || null, emailedCustomer: emailed, emailedOwner: !!(sent.owner && sent.owner.ok), customerReason: sent.customer && !sent.customer.ok ? sent.customer.reason : undefined }, null, app); } catch (_e) { /* no crítico */ }
         } catch (err) { console.error('[paypal-capture-order] correo', err.message); }
 
-        return json(200, { ...view, emailedTo: emailed ? mask(payerEmail) : null, payerEmail: isEmail(payerEmail) ? payerEmail : null });
+        return json(200, { ...view, emailedTo: emailed ? mask(toEmail) : null, payerEmail: toEmail || null });
     } catch (err) {
         console.error('[paypal-capture-order]', err.message);
         return json(502, { error: 'No se pudo confirmar el pago con PayPal. Si el cargo sí se hizo, escríbenos y te lo resolvemos a mano. / We could not confirm the payment. If you were charged, contact us.' });
