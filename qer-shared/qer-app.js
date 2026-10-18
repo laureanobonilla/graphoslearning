@@ -416,12 +416,15 @@ function renderReveal(data, opts) {
   $('archetypeName').textContent = data.archetypeName || '';
   $('hookLine').textContent = data.hookLine || '';
   $('fullContainer').classList.add('is-hidden');
-  drawChapters(); drawProfile(); showScreen('reveal');
+  drawChapters(); drawProfile();
+  // CFG.directPrepay (p. ej. /aptitud/): sin resultado cerrado a la vista; directo a «Esto es lo que recibes».
+  if (!CFG.directPrepay || (opts && opts.skipPaywall)) showScreen('reveal');
   setupHelpLinks(data.readingId, data.archetypeName);
   if (opts && opts.skipPaywall) return;
   savePending({ readingId: data.readingId, format: CFG.format, archetypeName: data.archetypeName, hookLine: data.hookLine, nodes: chapters, preview: previewData, stats: statsData });
   track('reveal_shown', { archetypeName: data.archetypeName || '', paywallVersion: PAYWALL_VERSION, hasPreview: !!previewData, totalChapters: chapters.length });
   if (SEALED) showSealed();
+  else if (CFG.directPrepay) showPrepay();
 }
 // Variante sellada: el resultado existe pero no se enseña nada; solo una frase y directo al pago (PayPal).
 function showSealed() {
@@ -477,7 +480,12 @@ async function showPrepay() {
   track('prepay_shown', { paywallVersion: PAYWALL_VERSION, country, shownAmount: info.shown });
 }
 $('btnSeeAll').addEventListener('click', () => goSeeAll('cta'));
-$('btnPrepayBack').addEventListener('click', () => { track('prepay_back', { paywallVersion: PAYWALL_VERSION }); showScreen('reveal'); });
+$('btnPrepayBack').addEventListener('click', () => {
+  track('prepay_back', { paywallVersion: PAYWALL_VERSION });
+  if (!CFG.directPrepay) { showScreen('reveal'); return; }
+  // Sin resultado cerrado al que volver: se muestra la nota de «ahora no» (motivos + volver a ver el informe).
+  showPay(); $('payBlock').classList.add('is-hidden'); $('skippedNote').classList.remove('is-hidden');
+});
 $('btnPrepayGo').addEventListener('click', () => { track('prepay_continue', { paywallVersion: PAYWALL_VERSION }); showPay(); });
 function showPay(forceReal) {
   $('paywall').classList.remove('is-hidden');

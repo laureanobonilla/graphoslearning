@@ -772,5 +772,6 @@ window.QER_CFG = {
    "prompt": "Si este informe pudiera responderte una sola pregunta sobre tu futuro profesional, ¿cuál sería?",
    "placeholder": "Tu pregunta"
   }
- ]
+ ],
+ "directPrepay": true
 };
