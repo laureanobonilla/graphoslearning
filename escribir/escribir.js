@@ -191,11 +191,11 @@
     S.results.push({ q, ans, conf, fb, failed });
     if (failed) registerFail(q); else clearFail(q);
     (fb.errors || []).forEach(bumpErr);
-    track('esc_feedback', { level: q.level, conf, failed, wc: wc(ans), p: fb.criteria.precision.level, c: fb.criteria.completitud.level, l: fb.criteria.claridad.level });
+    track('esc_feedback', { level: q.level, conf, failed, wc: wc(ans), wrong: (fb.wrong || []).length, off: (fb.irrelevant || []).length, p: fb.criteria.precision.level, c: fb.criteria.completitud.level, l: fb.criteria.claridad.level });
     renderFb(S.results[S.results.length - 1]);
   });
 
-  function isFailed(fb) { const v = Object.values(fb.criteria).map((c) => c.level); return v.includes('falta') || v.filter((x) => x === 'parcial').length >= 2; }
+  function isFailed(fb) { const v = Object.values(fb.criteria).map((c) => c.level); return (fb.wrong && fb.wrong.length > 0) || v.includes('falta') || v.filter((x) => x === 'parcial').length >= 2; }
   function key(q) { return (q.topic || (S && S.topic) || '') + '|' + q.q; }
   function registerFail(q) {
     const list = ls(LS.fail, []).filter((f) => f.key !== key(q));
@@ -239,6 +239,8 @@
     h += '</div>';
     if (fb.summary) h += '<p>' + esc(fb.summary) + '</p>';
     const cal = calibration(res); if (cal) h += '<p class="calib">' + esc(cal) + '</p>';
+    if (fb.wrong && fb.wrong.length) { h += '<div class="card"><h3>Lo que está equivocado</h3>'; fb.wrong.forEach((t) => { h += '<div class="sug"><s>' + esc(t.said) + '</s><br>→ <b>' + esc(t.correct) + '</b>' + (t.why ? '<em>' + esc(t.why) + '</em>' : '') + '</div>'; }); h += '</div>'; }
+    if (fb.irrelevant && fb.irrelevant.length) { h += '<div class="card"><h3>Lo que no viene al caso</h3><p class="small">No es una forma equivocada de responder: simplemente no pertenece a esta respuesta.</p>'; fb.irrelevant.forEach((t) => { h += '<div class="sug"><s>' + esc(t.said) + '</s><em>' + esc(t.why) + '</em></div>'; }); h += '</div>'; }
     if (fb.terms.length) { h += '<div class="card"><h3>Palabras más exactas</h3>'; fb.terms.forEach((t) => { h += '<div class="sug"><s>' + esc(t.said) + '</s> → <b>' + esc(t.better) + '</b><em>' + esc(t.why) + '</em></div>'; }); h += practBtn('terms') + '</div>'; }
     if (fb.synthesis.length) { h += '<div class="card"><h3>Dilo más preciso</h3>'; fb.synthesis.forEach((t) => { h += '<div class="sug"><s>' + esc(t.long) + '</s><br>→ <b>' + esc(t.short) + '</b></div>'; }); h += practBtn('synthesis') + '</div>'; }
     if (fb.missing.length) { h += '<div class="card"><h3>Lo que faltó</h3><ul>' + fb.missing.map((m) => '<li>' + esc(m) + '</li>').join('') + '</ul></div>'; }
