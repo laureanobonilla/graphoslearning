@@ -107,17 +107,57 @@ const FRENTES = [
 const FR = Object.fromEntries(FRENTES.map(f => [f.id, f]));
 
 // ---------- Estado ----------
-const KEY = 'rinde.v1';
+// Una cuenta puede tener VARIAS empresas. E = { v: 2, activa, empresas: { id: S }, actualizado }; S = la empresa abierta
+// (mismo formato v1 de siempre: perfil, frentes, acciones). Lo guardado antes como un solo proyecto (v1) se convierte solo.
+const KEY = 'rinde.v1', KEY2 = 'rinde.v2';
 const nuevo = () => ({ v: 1, perfil: null, fr: {}, acciones: [], creado: Date.now(), actualizado: Date.now() });
-let S = cargar();
+const nuevoId = () => 'e' + Math.random().toString(36).slice(2, 10);
+// Convierte lo que venga (v1 = un proyecto, v2 = varias empresas) al formato de varias empresas.
+function normalizar(d) {
+    if (d && d.v === 2 && d.empresas && typeof d.empresas === 'object') {
+        const empresas = {};
+        Object.entries(d.empresas).forEach(([id, x]) => { if (x && x.v === 1) empresas[id] = Object.assign(nuevo(), x); });
+        const ids = Object.keys(empresas);
+        if (ids.length) return { v: 2, activa: empresas[d.activa] ? d.activa : ids[0], empresas, actualizado: d.actualizado || 0 };
+    }
+    if (d && d.v === 1) { const id = nuevoId(); return { v: 2, activa: id, empresas: { [id]: Object.assign(nuevo(), d) }, actualizado: d.actualizado || 0 }; }
+    return null;
+}
+function cargarTodo() {
+    try { const e = normalizar(JSON.parse(localStorage.getItem(KEY2))); if (e) return e; } catch (_e) {}
+    try { const e = normalizar(JSON.parse(localStorage.getItem(KEY))); if (e) return e; } catch (_e) {}
+    const id = nuevoId(); return { v: 2, activa: id, empresas: { [id]: nuevo() }, actualizado: 0 };
+}
+let E = cargarTodo();
+let S = E.empresas[E.activa];
 let UI = { vista: S.perfil ? 'app' : 'inicio', tab: 'panel', paso: 1, borrador: null, mes: null };
 let USER = null, ACCESO = { active: false, freeFrente: null }, CONF = null, guardarT = null, pendiente = null;
 
-function cargar() { try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.v === 1) return Object.assign(nuevo(), s); } catch (_e) {} return nuevo(); }
+const hayDatos = () => Object.values(E.empresas).some(x => x.perfil);
 function guardar(sync = true) {
-    S.actualizado = Date.now();
-    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (_e) {}
+    S.actualizado = Date.now(); E.empresas[E.activa] = S; E.actualizado = S.actualizado;
+    try { localStorage.setItem(KEY2, JSON.stringify(E)); } catch (_e) {}
     if (sync && USER) { clearTimeout(guardarT); guardarT = setTimeout(subir, 1200); }
+}
+// Nombre que se muestra de una empresa: el que escribió, o su tipo de negocio y detalle.
+function nombreEmp(x) {
+    if (!x || !x.perfil) return 'Empresa nueva';
+    if (x.perfil.nombre) return x.perfil.nombre;
+    const n = NEGOCIOS.find(k => k.id === x.perfil.negocio);
+    return (n ? n.t : 'Mi empresa') + (x.perfil.detalle ? ' · ' + x.perfil.detalle : '');
+}
+// Las empresas que se empezaron a agregar pero nunca se llenaron se descartan (menos la que está abierta).
+function limpiarVacias() { Object.keys(E.empresas).forEach(id => { if (id !== E.activa && !E.empresas[id].perfil) delete E.empresas[id]; }); }
+function abrirEmpresa(id) {
+    if (!E.empresas[id]) return;
+    guardar(false); E.activa = id; S = E.empresas[id]; limpiarVacias(); UI.tab = 'panel'; UI.mes = null;
+    guardar();
+    if (S.perfil) { UI.vista = 'app'; render(); window.scrollTo(0, 0); } else empezarOnb();
+}
+function empezarOnb() {
+    const pa = PAIS_MONEDA[(CONF && CONF.country) || ''] || 'CRC';
+    UI.borrador = Object.assign({ nombre: '', negocio: null, personas: null, sedes: 's1', ventas: null, moneda: pa, exacta: 0, detalle: '' }, S.perfil || {});
+    UI.paso = 1; UI.vista = 'onb'; cerrar(); render(); window.scrollTo(0, 0);
 }
 const fr = (id) => { const st = (S.fr[id] = S.fr[id] || { r: {}, oculto: false, plan: null, extra: {} }); st.libre = st.libre || {}; return st; };
 // Texto de una respuesta: la opción elegida, o lo que el dueño escribió («Otra respuesta…»).
@@ -234,6 +274,7 @@ function cabecera(enApp) {
       <a class="marca" href="#" data-a="${enApp ? 'tab' : 'nada'}" data-tab="panel">${logo()}<span>Rinde</span></a>
       <div class="top-d">
         ${enApp ? `<nav class="tabs-d">${tabsHTML()}</nav>` : ''}
+        ${enApp && S.perfil ? `<div class="emp-wrap"><button class="emp-btn" data-a="emp-menu" aria-haspopup="menu" aria-expanded="${UI.menu ? 'true' : 'false'}">${icon('sedes', 'mini')}<span class="emp-txt"><small>Empresa</small><span>${esc(nombreEmp(S))}</span></span><b aria-hidden="true">▾</b></button>${UI.menu ? menuEmp() : ''}</div>` : ''}
         ${USER ? `<button class="btn-q" data-a="cuenta">${ACCESO.active ? '<span class="pill ok">Plan activo</span>' : ''}<span class="mail">${esc(USER.email || 'Mi cuenta')}</span></button>`
                : `<button class="btn-q" data-a="login">Entrar</button>`}
       </div></header>`;
@@ -293,7 +334,8 @@ function vOnb() {
     const prog = `<div class="prog"><i style="width:${UI.paso * 33.3}%"></i></div><p class="paso-n">Paso ${UI.paso} de 3</p>`;
     let cuerpo = '';
     if (UI.paso === 1) {
-        cuerpo = `<h2>¿A qué se dedica su empresa?</h2>
+        cuerpo = `<label class="campo"><span>Nombre de su empresa <em>(opcional: sirve si maneja varias)</em></span><input id="nombreEmp" maxlength="60" value="${esc(b.nombre || '')}" placeholder="Ej.: Ferretería El Roble"></label>
+        <h2>¿A qué se dedica su empresa?</h2>
         <div class="opciones grid2">${NEGOCIOS.map(n => `<button class="opc ${b.negocio === n.id ? 'on' : ''}" data-a="onb-set" data-k="negocio" data-v="${n.id}"><b>${n.t}</b><span>${n.d}</span></button>`).join('')}</div>
         ${b.negocio ? `<label class="campo"><span>En una línea, ¿qué vende o qué hace? <em>(opcional)</em></span><input id="detalle" maxlength="120" value="${esc(b.detalle || '')}" placeholder="Ej.: ferretería de barrio, venta al detalle y a constructores"></label>` : ''}`;
     } else if (UI.paso === 2) {
@@ -311,7 +353,7 @@ function vOnb() {
     }
     const listo = (UI.paso === 1 && b.negocio) || (UI.paso === 2 && b.personas && b.sedes) || (UI.paso === 3 && (b.ventas != null || b.exacta > 0));
     return `${cabecera(false)}<main class="onb">${prog}${cuerpo}
-      <div class="onb-nav">${UI.paso > 1 ? '<button class="btn ghost" data-a="onb-atras">Atrás</button>' : '<span></span>'}
+      <div class="onb-nav">${UI.paso > 1 ? '<button class="btn ghost" data-a="onb-atras">Atrás</button>' : (S.perfil || Object.values(E.empresas).some(x => x !== S && x.perfil)) ? '<button class="btn ghost" data-a="onb-cancelar">Cancelar</button>' : '<span></span>'}
       <button class="btn" data-a="onb-sig" ${listo ? '' : 'disabled'}>${UI.paso === 3 ? 'Ver mi diagnóstico' : 'Siguiente'}</button></div></main>`;
 }
 
@@ -341,7 +383,7 @@ function vPanel() {
       ${T.l.map((x, idx) => tarjeta(x, idx, max)).join('')}
     </section>
     ${ocultos.length ? `<p class="ocultos">Ocultos: ${ocultos.map(f => `<button class="lnk" data-a="mostrar" data-f="${f.id}">${esc(f.t)}</button>`).join(' · ')}</p>` : ''}
-    <p class="disc">Cada frente empieza en cero y suma solo lo que sus respuestas muestran, con rangos de referencia prudentes. «Puntos de rentabilidad» = la fuga como porcentaje de sus ventas. Sirve para decidir por dónde empezar, no sustituye la contabilidad. <button class="lnk" data-a="perfil">Editar datos de la empresa</button></p>`;
+    <p class="disc">Cada frente empieza en cero y suma solo lo que sus respuestas muestran, con rangos de referencia prudentes. «Puntos de rentabilidad» = la fuga como porcentaje de sus ventas. Sirve para decidir por dónde empezar, no sustituye la contabilidad. <button class="lnk" data-a="perfil">Editar datos de la empresa</button> · <button class="lnk" data-a="empresas">Agregar otra empresa</button> · <button class="lnk" data-a="limpiar">Limpiar proyecto</button></p>`;
 }
 
 function tarjeta(x, idx, max) {
@@ -402,7 +444,7 @@ function vInforme() {
     const T = totales(), neg = NEGOCIOS.find(n => n.id === S.perfil.negocio), max = Math.max(...T.l.map(x => x.max), 1);
     const pers = PERSONAS.find(x => x.id === S.perfil.personas), sed = SEDES.find(x => x.id === S.perfil.sedes);
     return `<section class="informe">
-      <div class="inf-h"><div><h2>Diagnóstico de rentabilidad</h2><p class="sub">${esc(neg ? neg.t : '')}${S.perfil.detalle ? ' · ' + esc(S.perfil.detalle) : ''} · ${pers ? pers.t : ''} personas · ${sed ? sed.t.toLowerCase() : ''} sede(s) · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+      <div class="inf-h"><div><h2>Diagnóstico de rentabilidad</h2><p class="sub">${S.perfil.nombre ? '<b>' + esc(S.perfil.nombre) + '</b> · ' : ''}${esc(neg ? neg.t : '')}${S.perfil.detalle ? ' · ' + esc(S.perfil.detalle) : ''} · ${pers ? pers.t : ''} personas · ${sed ? sed.t.toLowerCase() : ''} sede(s) · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
         <button class="btn ghost no-print" data-a="imprimir">Descargar PDF</button></div>
       <div class="kpis"><div><p class="lbl">Fugas encontradas al mes</p><p class="big">${rangoF(T.enc.min, T.enc.max)}</p></div><div><p class="lbl">Al año</p><p class="big">${rangoF(T.enc.min * 12, T.enc.max * 12)}</p></div><div><p class="lbl">Impacto en rentabilidad</p><p class="big">${T.enc.max < 1 ? '0' : rangoPts(T.pts.min, T.pts.max)}<small> puntos de margen</small></p></div><div><p class="lbl">Recuperado</p><p class="big verde">${dinero(redondo(T.unaVez))}${T.mensual ? `<small> + ${corto(T.mensual)}/mes</small>` : ''}</p></div></div>
       <p class="sub">Empresa revisada: ${T.resp} de ${T.posibles} preguntas (${T.revisado}%). Los frentes sin revisar aparecen en cero.</p>
@@ -588,10 +630,42 @@ function mHecho(id) {
       <div class="m-pie"><button class="btn ghost" data-a="cerrar">Cancelar</button><button class="btn" data-a="hecho-ok" data-id="${id}">Guardar</button></div>`, 'chico');
 }
 
+// Menú de empresa (arriba, junto al nombre): cambiar de empresa, agregar otra, editar datos y limpiar el proyecto.
+function menuEmp() {
+    const otras = Object.entries(E.empresas).filter(([id, x]) => id !== E.activa && x.perfil);
+    return `<div class="emp-menu" role="menu">
+      <p class="emp-m-lbl">Empresa abierta</p><p class="emp-m-act">${esc(nombreEmp(S))}</p>
+      ${otras.length ? `<p class="emp-m-lbl">Cambiar a</p>${otras.map(([id, x]) => `<button role="menuitem" data-a="emp-abrir" data-id="${id}">${icon('sedes', 'mini')} ${esc(nombreEmp(x))}</button>`).join('')}` : ''}
+      <hr><button role="menuitem" class="emp-m-nueva" data-a="emp-nueva">＋ Agregar empresa</button>
+      <button role="menuitem" data-a="perfil">✎ Editar datos de la empresa</button>
+      <button role="menuitem" data-a="limpiar">↺ Limpiar proyecto</button>
+    </div>`;
+}
+function mEmpresas() {
+    const lista = Object.entries(E.empresas).filter(([, x]) => x.perfil);
+    abrir(`<h2>Sus empresas</h2><p class="sub">Cada empresa tiene su propio diagnóstico, planes y acciones.${ACCESO.active ? ' Su plan cubre todas.' : ''}</p>
+      <div class="lista-b">${lista.map(([id, x]) => { const n = NEGOCIOS.find(k => k.id === x.perfil.negocio);
+        return `<button class="opc linea emp-op ${id === E.activa ? 'on' : ''}" data-a="emp-abrir" data-id="${id}"><b>${esc(nombreEmp(x))}</b><span>${[x.perfil.nombre && n ? n.t : '', id === E.activa ? 'Abierta ahora' : ''].filter(Boolean).join(' · ')}</span></button>`; }).join('')}
+        <button class="opc linea emp-nueva" data-a="emp-nueva">+ Agregar empresa</button></div>
+      <div class="lista-b"><button class="opc linea" data-a="perfil">Editar datos de «${esc(nombreEmp(S))}»</button><button class="opc linea" data-a="limpiar">Limpiar proyecto de «${esc(nombreEmp(S))}»</button></div>`, 'chico');
+}
+function mLimpiar() {
+    abrir(`<h2>Limpiar proyecto</h2><p class="sub">De «${esc(nombreEmp(S))}». Elija qué borrar. No se puede deshacer.</p>
+      <div class="lista-b">
+        <button class="opc linea" data-a="limpiar-resp"><b>Empezar el diagnóstico de nuevo</b><span>Borra respuestas, planes y acciones. Conserva el nombre, tipo de negocio, tamaño y ventas.</span></button>
+        <button class="opc linea" data-a="limpiar-todo"><b>Borrar todo</b><span>Deja el proyecto vacío y vuelve a preguntar los datos de la empresa.</span></button>
+        ${Object.keys(E.empresas).filter(k => k !== E.activa && E.empresas[k].perfil).length ? '<button class="opc linea peligro" data-a="emp-eliminar"><b>Eliminar esta empresa</b><span>La quita de su lista, con todo su diagnóstico.</span></button>' : ''}
+      </div><div class="m-pie"><button class="btn ghost" data-a="cerrar">Cancelar</button></div>`, 'chico');
+}
+function mEliminar() {
+    abrir(`<h2>¿Eliminar «${esc(nombreEmp(S))}»?</h2><p class="sub">Se borran su diagnóstico, planes, acciones y lo recuperado. No se puede deshacer.</p>
+      <div class="m-pie"><button class="btn ghost" data-a="cerrar">Cancelar</button><button class="btn peligro" data-a="emp-eliminar-ok">Sí, eliminar</button></div>`, 'chico');
+}
+
 function mCuenta() {
     abrir(`<h2>Mi cuenta</h2><p class="sub">${esc(USER.email || '')}</p>
       ${ACCESO.active ? `<p><span class="pill ok">Plan activo</span> ${ACCESO.admin ? '(administrador)' : `hasta el ${new Date(ACCESO.paidUntil).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}`}</p>` : `<p>Plan gratuito${ACCESO.freeFrente ? ` · frente gratis: <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : '')}</b>` : ''}</p><button class="btn full" data-a="precios">Ver planes</button>`}
-      <div class="lista-b"><button class="opc linea" data-a="perfil">Editar datos de la empresa</button><button class="opc linea" data-a="logout">Cerrar sesión</button></div>
+      <div class="lista-b"><button class="opc linea" data-a="empresas">Mis empresas (${Object.values(E.empresas).filter(x => x.perfil).length}) · agregar o cambiar</button><button class="opc linea" data-a="perfil">Editar datos de la empresa</button><button class="opc linea" data-a="limpiar">Limpiar proyecto</button><button class="opc linea" data-a="logout">Cerrar sesión</button></div>
       <p class="disc">Su diagnóstico se guarda en su cuenta y puede abrirlo desde el teléfono o la computadora.</p>`, 'chico');
 }
 
@@ -618,14 +692,15 @@ async function bajar() {
     const r = await api('rinde-data');
     if (r.error) return;
     ACCESO = r.access || ACCESO;
-    const remoto = r.data;
-    if (remoto && remoto.v === 1 && remoto.perfil && (!S.perfil || (remoto.actualizado || 0) > (S.actualizado || 0))) {
-        S = Object.assign(nuevo(), remoto); guardar(false);
-        if (UI.vista !== 'app') UI.vista = 'app';
-    } else if (S.perfil) await subir();
+    const remoto = normalizar(r.data);
+    if (remoto && Object.values(remoto.empresas).some(x => x.perfil) && (!hayDatos() || (remoto.actualizado || 0) > (E.actualizado || 0))) {
+        E = remoto; S = E.empresas[E.activa];
+        try { localStorage.setItem(KEY2, JSON.stringify(E)); } catch (_e) {}
+        if (S.perfil && UI.vista !== 'onb') UI.vista = 'app';
+    } else if (hayDatos()) await subir();
     render();
 }
-async function subir() { if (!USER || !S.perfil) return; const r = await api('rinde-data', { data: S }); if (r.error && r.status !== 401) console.warn('[rinde] no se pudo guardar en la nube', r.error); }
+async function subir() { if (!USER || !hayDatos()) return; const r = await api('rinde-data', { data: E }); if (r.error && r.status !== 401) console.warn('[rinde] no se pudo guardar en la nube', r.error); }
 
 async function generarPlan(id) {
     const x = calc(id), st = fr(id), p = S.perfil, f = FR[id];
@@ -656,14 +731,29 @@ function pedirLogin(modo) {
 //  Eventos
 // =====================================================================================
 document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-a]'); if (!b) return;
+    const b = e.target.closest('[data-a]');
+    if (UI.menu && (!b || b.dataset.a !== 'emp-menu')) { UI.menu = false; if (!b) { render(); return; } }
+    if (!b) return;
     const a = b.dataset.a, id = b.dataset.f;
     if (b.tagName === 'A') e.preventDefault();
     switch (a) {
-        case 'empezar': case 'perfil': {
-            const pa = PAIS_MONEDA[(CONF && CONF.country) || ''] || 'CRC';
-            UI.borrador = Object.assign({ negocio: null, personas: null, sedes: 's1', ventas: null, moneda: pa, exacta: 0, detalle: '' }, S.perfil || {});
-            UI.paso = 1; UI.vista = 'onb'; cerrar(); render(); window.scrollTo(0, 0); track(a === 'empezar' ? 'empezar' : 'editar_perfil'); break;
+        case 'empezar': case 'perfil': empezarOnb(); track(a === 'empezar' ? 'empezar' : 'editar_perfil'); break;
+        case 'empresas': mEmpresas(); break;
+        case 'emp-menu': UI.menu = !UI.menu; render(); track('menu_empresa', { abierto: UI.menu }); break;
+        case 'emp-abrir': cerrar(); abrirEmpresa(b.dataset.id); track('empresa_cambiada'); break;
+        case 'emp-nueva': { guardar(false); const nid = nuevoId(); E.empresas[nid] = nuevo(); E.activa = nid; S = E.empresas[nid]; limpiarVacias(); UI.tab = 'panel'; empezarOnb(); track('empresa_nueva', { empresas: Object.keys(E.empresas).length }); break; }
+        case 'limpiar': mLimpiar(); break;
+        case 'limpiar-resp': {
+            S = Object.assign(nuevo(), { perfil: S.perfil, creado: S.creado }); guardar(); cerrar(); UI.vista = 'app'; UI.tab = 'panel'; render(); window.scrollTo(0, 0);
+            track('proyecto_limpiado', { modo: 'respuestas' }); toast('Listo: empezamos otra vez desde cero, con los mismos datos de la empresa.'); break;
+        }
+        case 'limpiar-todo': { S = nuevo(); guardar(); track('proyecto_limpiado', { modo: 'todo' }); empezarOnb(); toast('Proyecto borrado. Cuéntenos de nuevo sobre su empresa.'); break; }
+        case 'emp-eliminar': mEliminar(); break;
+        case 'emp-eliminar-ok': {
+            const ids = Object.keys(E.empresas).filter(k => k !== E.activa && E.empresas[k].perfil);
+            if (!ids.length) break;
+            delete E.empresas[E.activa]; E.activa = ids[0]; S = E.empresas[ids[0]]; guardar(); cerrar(); UI.vista = 'app'; UI.tab = 'panel'; render(); window.scrollTo(0, 0);
+            track('empresa_eliminada'); toast('Empresa eliminada.'); break;
         }
         case 'onb-set': {
             const k = b.dataset.k; let v = b.dataset.v;
@@ -671,13 +761,14 @@ document.addEventListener('click', (e) => {
             UI.borrador[k] = v; render(); break;
         }
         case 'onb-atras': leerOnb(); UI.paso--; render(); break;
+        case 'onb-cancelar': { const otra = Object.keys(E.empresas).find(k => k !== E.activa && E.empresas[k].perfil); if (otra) { delete E.empresas[E.activa]; E.activa = otra; S = E.empresas[otra]; guardar(false); } UI.vista = S.perfil ? 'app' : 'inicio'; render(); window.scrollTo(0, 0); break; }
         case 'onb-sig': {
             leerOnb();
             if (UI.paso < 3) { UI.paso++; render(); window.scrollTo(0, 0); break; }
             const nuevoPerfil = !S.perfil;
-            S.perfil = { negocio: UI.borrador.negocio, detalle: UI.borrador.detalle, personas: UI.borrador.personas, sedes: UI.borrador.sedes, ventas: UI.borrador.ventas == null ? 2 : UI.borrador.ventas, exacta: UI.borrador.exacta || 0, moneda: UI.borrador.moneda };
+            S.perfil = { nombre: UI.borrador.nombre || '', negocio: UI.borrador.negocio, detalle: UI.borrador.detalle, personas: UI.borrador.personas, sedes: UI.borrador.sedes, ventas: UI.borrador.ventas == null ? 2 : UI.borrador.ventas, exacta: UI.borrador.exacta || 0, moneda: UI.borrador.moneda };
             guardar(); UI.vista = 'app'; UI.tab = 'panel'; render(); window.scrollTo(0, 0);
-            track(nuevoPerfil ? 'diagnostico_listo' : 'perfil_editado', { negocio: S.perfil.negocio, personas: S.perfil.personas, ventas: S.perfil.ventas });
+            track(nuevoPerfil ? 'diagnostico_listo' : 'perfil_editado', { negocio: S.perfil.negocio, personas: S.perfil.personas, ventas: S.perfil.ventas, empresas: Object.keys(E.empresas).length });
             break;
         }
         case 'tab': UI.tab = b.dataset.tab; if (UI.vista !== 'app' && S.perfil) UI.vista = 'app'; render(); window.scrollTo(0, 0); break;
@@ -765,11 +856,12 @@ document.addEventListener('change', (e) => {
 document.addEventListener('input', (e) => {
     if (e.target.id === 'exacta') { const n = Number(e.target.value.replace(/[^\d]/g, '')) || 0; const s = $('[data-a="onb-sig"]'); if (s) s.disabled = !(n > 0 || UI.borrador.ventas != null); }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#modal').hidden) cerrar(); });
+document.addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (!$('#modal').hidden) cerrar(); else if (UI.menu) { UI.menu = false; render(); } });
 
 function leerOnb() {
     const b = UI.borrador; if (!b) return;
     const d = $('#detalle'); if (d) b.detalle = d.value.trim().slice(0, 120);
+    const nm = $('#nombreEmp'); if (nm) b.nombre = nm.value.trim().slice(0, 60);
     const x = $('#exacta'); if (x) { const n = Number(x.value.replace(/[^\d]/g, '')) || 0; if (n > 0) { b.exacta = n; b.ventas = null; } }
     const m = $('#moneda'); if (m) b.moneda = m.value;
 }

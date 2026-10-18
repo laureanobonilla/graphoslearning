@@ -1,8 +1,10 @@
-// Rinde: guarda y devuelve el proyecto de la persona (un solo JSON por cuenta) y su estado de acceso.
+// Rinde: guarda y devuelve los proyectos de la persona (un solo JSON por cuenta) y su estado de acceso.
+// data = { v: 2, activa, empresas: { id: proyecto } } (varias empresas); las cuentas antiguas traen un solo proyecto (v: 1)
+// y el navegador lo convierte solo.
 // GET  → { data, updatedAt, access }
-// POST { data } → guarda (máx. ~300 KB)
+// POST { data } → guarda (máx. ~1,5 MB)
 const core = require('./_lib/rinde-core');
-const MAX_BYTES = 300 * 1024;
+const MAX_BYTES = 1536 * 1024, MAX_EMPRESAS = 30;
 
 exports.handler = async (event, context) => {
     const user = core.requireUser(context);
@@ -17,6 +19,7 @@ exports.handler = async (event, context) => {
             if ((event.body || '').length > MAX_BYTES) return core.json(413, { error: 'El proyecto es demasiado grande.' });
             let b; try { b = JSON.parse(event.body || '{}'); } catch { return core.json(400, { error: 'JSON inválido' }); }
             if (!b.data || typeof b.data !== 'object' || Array.isArray(b.data)) return core.json(400, { error: 'Datos inválidos' });
+            if (b.data.v === 2 && (!b.data.empresas || typeof b.data.empresas !== 'object' || Object.keys(b.data.empresas).length > MAX_EMPRESAS)) return core.json(400, { error: `Puede tener hasta ${MAX_EMPRESAS} empresas.` });
             await core.upsert('rinde_projects', { user_id: user.id, email: user.email, data: b.data });
             return core.json(200, { ok: true, updatedAt: new Date().toISOString() });
         }
