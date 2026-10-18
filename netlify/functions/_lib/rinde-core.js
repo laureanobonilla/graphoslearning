@@ -1,4 +1,4 @@
-// «Rinde» (/rinde/): encuentre dónde se le va el dinero a su empresa y recupérelo.
+// «Rinde» (/rinde/): encuentre fugas de dinero en su empresa y recupérelo.
 // Piezas compartidas por las funciones rinde-*. Usa las MISMAS variables de entorno que ya tiene Graphikosmos:
 //   SUPABASE_URL, SUPABASE_SERVICE_KEY, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_ENV, GEMINI_API_KEY,
 //   y opcionalmente RESEND_API_KEY + FEEDBACK_TO_EMAIL (aviso por correo de cada pago).

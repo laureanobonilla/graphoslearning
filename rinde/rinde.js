@@ -1,5 +1,5 @@
 /* =====================================================================================
-   Rinde — encuentre dónde se le va el dinero a su empresa y recupérelo.
+   Rinde — encuentre fugas de dinero en su empresa y recupérelo.
    Todo el diagnóstico se calcula AQUÍ con fórmulas fijas (rangos de referencia × respuestas);
    la IA (función rinde-plan) solo redacta planes, preguntas y mensajes. Así cada cifra se puede explicar.
    ===================================================================================== */
@@ -222,7 +222,7 @@ function vInicio() {
     <main class="inicio">
       <section class="hero">
         <p class="eyebrow">Diagnóstico para dueños de negocio</p>
-        <h1>Encuentre dónde se le está yendo el dinero.<br><em>Y recupérelo.</em></h1>
+        <h1>Encuentre fugas de dinero en su empresa.<br><em>Y recupérelo.</em></h1>
         <p class="lead">En un minuto, con tres preguntas, Rinde le muestra en qué partes de su empresa es más probable que esté perdiendo dinero, cuánto podría ser y qué hacer primero.</p>
         <div class="cta-row"><button class="btn xl" data-a="empezar">Empezar · 1 minuto</button><span class="nota">Sin tarjeta. Sin registrarse para ver el resultado.</span></div>
       </section>
@@ -251,7 +251,7 @@ function vInicio() {
         <details><summary>¿Sirve para mi tipo de negocio?</summary><p>Rinde ajusta los frentes según el tipo de negocio, su tamaño y si tiene varias sedes. Lo que no aplica a su empresa, no aparece.</p></details>
         <details><summary>¿Y si el número no se parece a mi realidad?</summary><p>Afínelo: cada tarjeta tiene preguntas de una línea que lo ajustan. También puede ocultar un frente que no le aplica.</p></details>
       </section>
-      <section class="cierre"><h2>¿Cuánto se le está yendo este mes?</h2><button class="btn xl" data-a="empezar">Averiguarlo ahora</button></section>
+      <section class="cierre"><h2>¿Cuántas fugas de dinero tiene su empresa?</h2><button class="btn xl" data-a="empezar">Averiguarlo ahora</button></section>
       <footer class="pie">Rinde · ${new Date().getFullYear()}${CFG.contacto ? ' · ' + esc(CFG.contacto) : ''}</footer>
     </main>`;
 }

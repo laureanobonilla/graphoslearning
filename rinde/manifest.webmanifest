@@ -1,7 +1,7 @@
 {
   "name": "Rinde",
   "short_name": "Rinde",
-  "description": "Encuentre dónde se le va el dinero a su empresa y recupérelo.",
+  "description": "Encuentre fugas de dinero en su empresa y recupérelo.",
   "start_url": "/rinde/",
   "scope": "/rinde/",
   "display": "standalone",
