@@ -312,3 +312,18 @@ p { margin: 0 0 .8em; }
 .opc.chip.otra { border-style: dashed; color: var(--verde-2); }
 .libre-txt { margin: 8px 0 0; font-size: .88rem; color: var(--suave); font-style: italic; }
 .libre-txt .calc-pill, .libre-txt .error { font-style: normal; }
+
+/* ---------- Varias empresas y limpiar proyecto ---------- */
+.emp-btn { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 42vw; background: var(--papel); border: 1.5px solid var(--linea); border-radius: 999px;
+  padding: 6px 12px; cursor: pointer; color: var(--tinta); font-weight: 600; font-size: .88rem; }
+.emp-btn:hover { border-color: var(--suave); }
+.emp-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.emp-btn b { color: var(--suave); font-weight: 500; }
+.emp-btn .ic { flex: 0 0 auto; color: var(--verde-2); }
+.top-d { min-width: 0; }
+.emp-op.on { border-color: var(--verde); }
+.emp-nueva { color: var(--verde-2); font-weight: 700; border-style: dashed; }
+.opc.peligro b, .btn.peligro { color: var(--rojo); }
+.btn.peligro { background: transparent; border: 1.5px solid var(--rojo); }
+.btn.peligro:hover { background: color-mix(in srgb, var(--rojo) 10%, transparent); }
+@media (max-width: 560px) { .top-d .mail { max-width: 84px; } .top-d { gap: 8px; } .marca span { display: none; } }
