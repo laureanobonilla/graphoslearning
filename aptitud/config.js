@@ -8,7 +8,7 @@ window.QER_CFG = {
  "kind": "self",
  "freeCount": 0,
  "totalChapters": 10,
- "finishEarlyAfter": 25,
+ "finishEarlyAfter": 15,
  "askEmail": true,
  "acts": [
   "Tu punto de partida",
@@ -26,8 +26,8 @@ window.QER_CFG = {
   "doc_title": "Descubre cómo ser mejor profesional y ganar más dinero",
   "doc_desc": "Un examen de aptitudes que te muestra tus fortalezas, qué aprender primero y cómo convertirlo en ingresos.",
   "cover_title": "Descubre cómo ser mejor profesional y ganar más dinero",
-  "cover_sub": "Un examen de aptitudes, de una pregunta a la vez. Con 25 respuestas ya tienes resultado; si llegas a las 50, el informe sale más preciso.",
-  "cover_meta": "Unos 8 minutos · Sin registrarte",
+  "cover_sub": "Responde con un toque. Al terminar ves tu perfil y tu aptitud más fuerte.",
+  "cover_meta": "Sin registrarte · Empieza aquí abajo",
   "btn_start": "Empezar el examen",
   "btn_resume": "Continuar donde quedaste (pregunta {n} de {total})",
   "btn_next": "Siguiente",
@@ -37,7 +37,7 @@ window.QER_CFG = {
   "unknown_option": "No estoy seguro",
   "other_option": "Otra (escríbela)",
   "other_placeholder": "Escribe la tuya",
-  "finish_early_note": "Ya tienes suficientes respuestas para tu informe. Cada pregunta más lo hace más preciso: te recomiendo llegar a las 50.",
+  "finish_early_note": "Ya tienes suficientes respuestas para tu informe. Cada pregunta más lo hace más preciso: si tienes unos minutos, sigue un poco más.",
   "finish_early_btn": "Terminar aquí y ver mi resultado",
   "loading_steps": [
    "Revisando tus respuestas y tus ejercicios…",
@@ -137,7 +137,9 @@ window.QER_CFG = {
   "n_test_sent": "Enviado a {email}. Revisa tu bandeja (y spam).",
   "n_test_fail": "No se pudo enviar el correo de prueba ({reason}).",
   "n_test_real": "Ver el pago real (cobra de verdad)",
-  "n_test_note": "Esta es la pantalla de pago. En modo prueba, en vez de cobrar, se arma el informe y se envía a tu correo."
+  "n_test_note": "Esta es la pantalla de pago. En modo prueba, en vez de cobrar, se arma el informe y se envía a tu correo.",
+  "cover_q_label": "Pregunta 1",
+  "cover_example_label": "Así se ve tu resultado (ejemplo)"
  },
  "questions": [
   {
@@ -773,5 +775,23 @@ window.QER_CFG = {
    "placeholder": "Tu pregunta"
   }
  ],
- "directPrepay": true
+ "directPrepay": true,
+ "coverQuestion": true,
+ "coverExample": {
+  "profile": "El Organizador Práctico",
+  "bars": [
+   [
+    "Organización",
+    86
+   ],
+   [
+    "Razonamiento numérico",
+    74
+   ],
+   [
+    "Trato con clientes",
+    63
+   ]
+  ]
+ }
 };

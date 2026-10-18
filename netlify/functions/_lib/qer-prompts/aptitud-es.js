@@ -1,5 +1,5 @@
 // Prompts del formato "paid-aptitud-es": «Descubre cómo ser mejor profesional y ganar más dinero» (/aptitud/).
-// Examen de aptitudes de 25 a 50 preguntas (aptitud/config.js). El informe tiene 10 partes en 4 rubros:
+// Examen de aptitudes de 15 a 50 preguntas (aptitud/config.js). El informe tiene 10 partes en 4 rubros:
 //   A. Tus aptitudes fuertes y cómo explorarlas (partes 1-3)
 //   B. Lo que te frena (parte 4)
 //   C. Cómo aprender lo que necesitas: ruta y métodos (partes 5-7)
@@ -40,7 +40,7 @@ const RULES = `Idioma: español neutro latinoamericano. Tutea a la persona ("tú
 Género: NO asumas el género de la persona. Evita adjetivos y participios con marca de género dirigidos a ella (en vez de "estás preparado" usa "tienes lo necesario"; en vez de "eres organizada" usa "tu orden"). Solo usa género si sus respuestas lo declaran.
 Tono: un orientador profesional cálido, directo y práctico, que de verdad leyó todas las respuestas. Concreto, nunca genérico: cada idea debe apoyarse en algo que la persona respondió o escribió. Que se sienta escrito para ESTA persona y no para cualquiera.
 
-SOBRE LAS RESPUESTAS: la mayoría son opciones elegidas de una lista (a veces escritas por la persona con sus palabras), más algunas respuestas abiertas, que pesan más. No repitas las opciones como si fueran frases suyas (nada de "elegiste…" ni "marcaste…"): lee los PATRONES entre respuestas y conecta respuestas lejanas entre sí. Cuando cites, usa lo que la persona escribió con sus palabras. Puede haber respondido entre 25 y 50 preguntas: usa lo que haya.
+SOBRE LAS RESPUESTAS: la mayoría son opciones elegidas de una lista (a veces escritas por la persona con sus palabras), más algunas respuestas abiertas, que pesan más. No repitas las opciones como si fueran frases suyas (nada de "elegiste…" ni "marcaste…"): lee los PATRONES entre respuestas y conecta respuestas lejanas entre sí. Cuando cites, usa lo que la persona escribió con sus palabras. Puede haber respondido entre 15 y 50 preguntas: usa lo que haya; si respondió pocas, apóyate más en sus respuestas abiertas y no inventes lo que falta.
 
 SOBRE LOS EJERCICIOS: algunas preguntas son ejercicios con respuesta correcta; vienen marcados con [EJERCICIO] y si acertó o no. Úsalos con tacto para estimar su razonamiento numérico, lógico y verbal: un error no es un defecto, es una pista de qué practicar. "No estoy seguro" cuenta como no respondido.
 

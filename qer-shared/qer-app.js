@@ -256,6 +256,47 @@ $('btnStart').addEventListener('click', () => {
   track('quiz_started', {});
   clearQuizProgress(); answers.fill(null); currentIndex = 0; renderQuestion(0); showScreen('quiz');
 });
+// Portada con la primera pregunta (solo si la app lo pide con CFG.coverQuestion, p. ej. /aptitud/): la persona empieza
+// respondiendo con un toque, sin pasar por «Empezar». Debajo, un ejemplo de cómo se ve el resultado (CFG.coverExample).
+if (CFG.coverQuestion && QUESTIONS[0] && QUESTIONS[0].type === 'choice') {
+  const cover = $('screen-cover'), q0 = QUESTIONS[0];
+  const box = document.createElement('div'); box.className = 'cover-q';
+  const lab = document.createElement('p'); lab.className = 'cover-q-label'; lab.textContent = tt('cover_q_label');
+  const pr = document.createElement('p'); pr.className = 'cover-q-prompt display'; pr.textContent = q0.prompt;
+  const grid = document.createElement('div'); grid.className = 'cover-q-options';
+  q0.options.forEach(opt => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'cover-q-opt'; b.textContent = opt;
+    b.addEventListener('click', () => {
+      b.classList.add('is-selected');
+      track('quiz_started', { from: 'cover' });
+      clearQuizProgress(); answers.fill(null); answers[0] = opt;
+      track('question_answered', { questionIndex: 1, questionId: q0.id, questionType: q0.type, question: q0.prompt, answer: opt, seconds: Math.round((Date.now() - pageStartedAt) / 1000), from: 'cover' });
+      currentIndex = 1; saveQuizProgress();
+      setTimeout(() => { renderQuestion(1); showScreen('quiz'); }, 220);
+    });
+    grid.appendChild(b);
+  });
+  box.append(lab, pr, grid);
+  $('btnStart').style.display = 'none';   // la pregunta 1 reemplaza al botón «Empezar»
+  cover.insertBefore(box, $('btnStart'));
+  const ex = CFG.coverExample;
+  if (ex && Array.isArray(ex.bars)) {
+    const card = document.createElement('div'); card.className = 'cover-example'; card.setAttribute('aria-label', tt('cover_example_label'));
+    const l = document.createElement('p'); l.className = 'cover-example-label'; l.textContent = tt('cover_example_label');
+    const n = document.createElement('p'); n.className = 'cover-example-name display'; n.textContent = ex.profile || '';
+    card.append(l, n);
+    ex.bars.forEach(([name, val]) => {
+      const row = document.createElement('div'); row.className = 'cover-example-row';
+      const s = document.createElement('span'); s.textContent = name;
+      const v = document.createElement('b'); v.textContent = String(val);
+      const bar = document.createElement('i'); const fill = document.createElement('i'); fill.style.width = Math.max(0, Math.min(100, Number(val) || 0)) + '%'; bar.appendChild(fill);
+      row.append(s, v, bar); card.appendChild(row);
+    });
+    cover.insertBefore(card, $('btnResume').nextSibling);
+  }
+  cover.classList.add('has-cover-q');
+}
+
 const savedProgress = loadQuizProgress();
 if (savedProgress) {
   const br = $('btnResume');
