@@ -67,7 +67,7 @@
 <div class="wrap">
   <div id="loginView" class="login" hidden>
     <h1>Mantenimiento</h1>
-    <p>Entra con tu correo para ver y actualizar los pedidos de canciones y de tu-audio.</p>
+    <p>Entra con tu correo para ver y actualizar los pedidos de canciones, de tu-audio y de Destila.</p>
     <button class="btn" id="btnLogin" type="button">Entrar</button>
   </div>
 
@@ -91,7 +91,7 @@
 <script>
 (function () {
   var FN = '/.netlify/functions/mnt-orders';
-  var APPS = [['all', 'Todas'], ['tu-cancion', 'tu-cancion'], ['tu-voz', 'tu-voz'], ['tu-voz-video', 'tu-voz-video'], ['tu-cancion-video', 'tu-cancion-video'], ['tu-audio', 'tu-audio']];
+  var APPS = [['all', 'Todas'], ['tu-cancion', 'tu-cancion'], ['tu-voz', 'tu-voz'], ['tu-voz-video', 'tu-voz-video'], ['tu-cancion-video', 'tu-cancion-video'], ['tu-audio', 'tu-audio'], ['destila', 'Destila']];
   var STATUS_LABEL = { nuevo: 'Nuevo', contactado: 'Contactado', muestra_enviada: 'Muestra enviada', pagado: 'Pagado', entregado: 'Entregado', cancelado: 'Cancelado' };
   var state = { orders: [], app: 'all', statuses: [] };
   var $ = function (id) { return document.getElementById(id); };
@@ -228,7 +228,7 @@
     if (o.lyrics) { var dl = document.createElement('details'); dl.appendChild(el('summary', '', 'Letra')); dl.appendChild(el('pre', '', o.lyrics)); c.appendChild(dl); }
 
     // Al marcar «Pagó» sin monto, se propone el precio de lista; al marcar estado «pagado», se marca «Pagó».
-    if (o.auto) { st.disabled = true; pc.disabled = true; am.disabled = true; stL.title = 'En tu-audio el estado y el pago se llenan solos'; }
+    if (o.auto) { st.disabled = true; pc.disabled = true; am.disabled = true; stL.title = 'En ' + o.app + ' el estado y el pago se llenan solos'; }
     pc.addEventListener('change', function () { if (pc.checked && !am.value && o.price_amount) am.value = o.price_amount; if (pc.checked && st.value !== 'entregado') st.value = 'pagado'; });
     st.addEventListener('change', function () { if (st.value === 'pagado' && !pc.checked) { pc.checked = true; if (!am.value && o.price_amount) am.value = o.price_amount; } });
     save.addEventListener('click', async function () {

@@ -1,0 +1,22 @@
+{
+  "name": "Destila",
+  "short_name": "Destila",
+  "description": "Transcribe tus notas de voz de WhatsApp y saca la idea principal.",
+  "start_url": "/destila/",
+  "scope": "/destila/",
+  "display": "standalone",
+  "background_color": "#e7eaff",
+  "theme_color": "#1b1740",
+  "lang": "es",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "share_target": {
+    "action": "/destila/compartir",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": { "files": [ { "name": "audios", "accept": ["audio/*", "audio/ogg", ".opus", ".ogg", ".m4a", ".mp3", ".wav", "application/zip", ".zip"] } ] }
+  }
+}
