@@ -155,6 +155,7 @@ with ev as (
          replace(event_name, 'rinde_', '') as e
   from public.events
   where app = 'rinde' and created_at >= now() - interval '7 days'
+    and event_name not like 'rinde_srv_%'   -- los del servidor repiten lo mismo sin el id del navegador
 ), pasos as (   -- recorrido sin repetir el mismo paso seguido (10 respuestas seguidas = «respuesta×10»)
   select quien, e, created_at, metadata,
          case when e = lag(e) over (partition by quien order by created_at) then 0 else 1 end as nuevo
