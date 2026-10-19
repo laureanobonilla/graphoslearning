@@ -8,10 +8,18 @@ const { getUser } = require('./auth');
 const { json, scrub, scrubOne, countryOf } = require('./tc-core');
 
 // >>> EDITA AQUÍ los planes y precios (US$, lo que cobra PayPal). Son pagos únicos: no hay renovación automática. <<<
+// El precio depende del tamaño de la empresa (pyme / mediana / grande), que el navegador calcula con el perfil
+// (personas y ventas) y guarda en cada empresa. Se cobra según la empresa MÁS grande de la cuenta.
+const PRECIOS = {
+    pyme:    { mes: '19.00',  trimestre: '45.00',  anio: '149.00' },
+    mediana: { mes: '49.00',  trimestre: '129.00', anio: '390.00' },
+    grande:  { mes: '149.00', trimestre: '390.00', anio: '1190.00' }
+};
+const NIVELES = ['pyme', 'mediana', 'grande'];
 const PLANS = {
-    mes:       { label: '1 mes',   months: 1,  usd: '19.00',  note: 'Para probar a fondo' },
-    trimestre: { label: '3 meses', months: 3,  usd: '45.00',  note: 'El más elegido' },
-    anio:      { label: '12 meses', months: 12, usd: '149.00', note: 'Ahorra 35%' },
+    mes:       { label: '1 mes',   months: 1,  usd: PRECIOS.pyme.mes,       note: 'Para probar a fondo' },
+    trimestre: { label: '3 meses', months: 3,  usd: PRECIOS.pyme.trimestre, note: 'El más elegido' },
+    anio:      { label: '12 meses', months: 12, usd: PRECIOS.pyme.anio,      note: 'Ahorra 35%' },
     // Plan OCULTO para que el dueño pruebe el cobro real por US$1 (un día de acceso). Solo existe con la clave del dueño:
     // abrir /rinde/?k=CLAVE (se recuerda en ese navegador). La clave se puede cambiar con la variable RINDE_TEST_KEY de Netlify.
     prueba:    { label: 'Prueba del dueño', months: 0, days: 1, usd: '1.00', note: '1 día · solo con tu clave', hidden: true }
@@ -63,8 +71,28 @@ async function getAccess(user) {
 // Extiende el acceso: si todavía tiene días pagados, se suman al final; si no, desde hoy.
 const TEST_KEY = process.env.RINDE_TEST_KEY || 'rinde-MnCfYEKhvS8';
 const testKeyOk = (k) => { const a = Buffer.from(String(k || '')), b = Buffer.from(TEST_KEY); return a.length === b.length && crypto.timingSafeEqual(a, b); };
+const nivelOk = (n) => (NIVELES.includes(n) ? n : 'pyme');
+const mayorNivel = (...l) => NIVELES[Math.max(0, ...l.map(n => NIVELES.indexOf(n)))];
+// Precio de un plan para un tamaño de empresa (el plan oculto de prueba siempre cuesta lo mismo).
+function planNivel(id, nivel) {
+    const p = PLANS[id]; if (!p) return null;
+    if (p.hidden) return { ...p };
+    const usd = PRECIOS[nivelOk(nivel)][id], mes = Number(PRECIOS[nivelOk(nivel)].mes);
+    const ahorro = Math.round((1 - Number(usd) / (mes * p.months)) * 100);
+    return { ...p, usd, note: id === 'anio' ? `Ahorra ${ahorro}%` : p.note };
+}
 // Planes que puede ver/comprar esta persona: los visibles, más los ocultos si trae la clave del dueño.
-const planesPara = (k) => Object.entries(PLANS).filter(([, p]) => !p.hidden || testKeyOk(k));
+const planesPara = (k, nivel) => Object.keys(PLANS).filter(id => !PLANS[id].hidden || testKeyOk(k)).map(id => [id, planNivel(id, nivel)]);
+// Tamaño que se cobra: el mayor entre lo que dice el navegador y las empresas guardadas en la cuenta.
+async function nivelCuenta(user, nivelCliente) {
+    const l = [nivelOk(nivelCliente)];
+    try {
+        const row = await one('rinde_projects', 'user_id', user.id), d = row && row.data;
+        if (d && d.empresas && typeof d.empresas === 'object') Object.values(d.empresas).forEach(x => { if (x && x.nivel) l.push(nivelOk(x.nivel)); });
+        else if (d && d.nivel) l.push(nivelOk(d.nivel));
+    } catch (_e) {}
+    return mayorNivel(...l);
+}
 
 function extendFrom(current, months, days) {
     const now = new Date();
@@ -85,4 +113,4 @@ async function evento(user, nombre, meta) {
     catch (e) { console.error('[rinde] evento', nombre, e.message); }
 }
 
-module.exports = { evento, PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };
+module.exports = { evento, PLANS, PRECIOS, testKeyOk, planesPara, planNivel, nivelCuenta, nivelOk, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };

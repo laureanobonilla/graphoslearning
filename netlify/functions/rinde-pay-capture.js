@@ -19,7 +19,7 @@ exports.handler = async (event, context) => {
         const order = await captureOrder(orderID);
         if (order.status !== 'COMPLETED') { await core.evento(user, 'srv_pago_fallido', { orderID, estado: order.status }); return core.json(402, { error: `El pago no se completó (estado: ${order.status}).` }); }
         const cap = order.purchase_units?.[0]?.payments?.captures?.[0];
-        if (!cap || cap.amount.currency_code !== 'USD' || Number(cap.amount.value) < Number(plan.usd) - 0.01) {
+        if (!cap || cap.amount.currency_code !== 'USD' || Number(cap.amount.value) < Number(ord.usd || plan.usd) - 0.01) {
             console.error('[rinde-pay-capture] monto no coincide', orderID, cap && cap.amount);
             await core.evento(user, 'srv_pago_fallido', { orderID, motivo: 'monto', pagado: cap && cap.amount && cap.amount.value });
             return core.json(402, { error: 'El monto pagado no corresponde al plan.' });

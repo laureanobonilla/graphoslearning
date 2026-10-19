@@ -155,7 +155,7 @@ let USER = null, ACCESO = { active: false, freeFrente: null }, CONF = null, guar
 
 const hayDatos = () => Object.values(E.empresas).some(x => x.perfil);
 function guardar(sync = true) {
-    S.actualizado = Date.now(); E.empresas[E.activa] = S; E.actualizado = S.actualizado;
+    S.actualizado = Date.now(); if (S.perfil) S.nivel = nivel(S.perfil); E.empresas[E.activa] = S; E.actualizado = S.actualizado;
     try { localStorage.setItem(KEY2, JSON.stringify(E)); } catch (_e) {}
     if (sync && USER) { clearTimeout(guardarT); guardarT = setTimeout(subir, 1200); }
 }
@@ -188,6 +188,13 @@ const respTexto = (f, st, i) => (st.r[i] === 'x' ? '«' + ((st.libre[i] || {}).t
 
 // Clave del dueño (?k=…): muestra el plan oculto de prueba (US$1). Se recuerda en este navegador; ?k=salir la borra.
 const CLAVE = (() => { try { const q = new URLSearchParams(location.search).get('k'); if (q === 'salir') { localStorage.removeItem('rinde.k'); return ''; } if (q) localStorage.setItem('rinde.k', q); return localStorage.getItem('rinde.k') || ''; } catch (_e) { return ''; } })();
+// Tamaño que define la tarifa: la empresa más grande de la cuenta (el servidor lo vuelve a comprobar al cobrar).
+function nivelTarifa() {
+    const orden = ['pyme', 'mediana', 'grande'];
+    return Object.values(E.empresas).filter(x => x && x.perfil).map(x => (x === S ? nivel(x.perfil) : x.nivel || nivel(x.perfil)))
+        .reduce((a, n) => (orden.indexOf(n) > orden.indexOf(a) ? n : a), 'pyme');
+}
+const urlConfig = () => conClave('/.netlify/functions/rinde-config?nivel=' + nivelTarifa());
 const conClave = (u) => CLAVE ? u + (u.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(CLAVE) : u;
 
 // ---------- Utilidades ----------
@@ -447,7 +454,7 @@ function vInicio() {
       ${F.nombre ? `<section class="fundador"><h2>Quién está detrás</h2><p><b>${esc(F.nombre)}</b>${F.rol ? ' · ' + esc(F.rol) : ''}</p>${F.texto ? `<p>${esc(F.texto)}</p>` : ''}${F.contacto ? `<p class="nota">${esc(F.contacto)}</p>` : ''}</section>` : ''}
       <section class="faq">
         <h2>Preguntas frecuentes</h2>
-        <details><summary>¿Cuánto cuesta?</summary><p>El diagnóstico inicial no tiene costo e incluye el plan completo de un frente, para que evalúe la herramienta con sus propios datos. Para ver los planes de todos los frentes, con seguimiento, hay planes desde US$19 por un mes. Es un pago único: no se renueva solo.</p></details>
+        <details><summary>¿Cuánto cuesta?</summary><p>El diagnóstico inicial no tiene costo e incluye el plan completo de un frente, para que evalúe la herramienta con sus propios datos. Para ver los planes de todos los frentes, con seguimiento, hay planes desde US$19 por un mes; la tarifa depende del tamaño de la empresa (pyme, mediana o grande). Es un pago único: no se renueva solo.</p></details>
         <details><summary>¿Qué nivel técnico usa?</summary><p>Rinde ajusta el lenguaje al tamaño de la empresa. En pymes, cada frente muestra su indicador financiero (margen bruto, DSO, rotación de inventario) con una explicación breve. En medianas y grandes habla en términos de gerencia y de accionistas: impacto en EBITDA, margen, capital de trabajo y valor de empresa.</p></details>
         <details><summary>¿Puedo usar mis cifras reales?</summary><p>Sí. En la pestaña Finanzas anota ventas, costo de ventas, gastos operativos, cuentas por cobrar, inventario y cuentas por pagar de los últimos 12 meses. Rinde calcula sus indicadores reales, los compara con su sector y estima el efectivo que hoy está atrapado en cartera e inventario.</p></details>
         <details><summary>¿Sirve para mi tipo de negocio?</summary><p>Rinde ajusta los frentes según el tipo de negocio, su tamaño y si tiene varias sedes. Lo que no aplica a su empresa, no aparece.</p></details>
@@ -754,13 +761,15 @@ function mBloqueado(id) {
 async function mPrecios() {
     track('precios_visto');
     const T = totales();
-    if (!CONF) { try { CONF = await (await fetch(conClave('/.netlify/functions/rinde-config'))).json(); } catch (_e) { CONF = { plans: [] }; } }
+    const nv = nivelTarifa();
+    if (!CONF || !CONF.plans || !CONF.plans.length || (CONF.nivel && CONF.nivel !== nv)) { try { CONF = await (await fetch(urlConfig())).json(); } catch (_e) { CONF = CONF || { plans: [] }; } }
     const plans = CONF.plans || [];
     const visibles = plans.filter(p => !p.hidden), sel = UI.planSel || (visibles[1] && visibles[1].id) || (plans[0] && plans[0].id);
     UI.planSel = sel;
     abrir(`<h2>Recupere lo que se está yendo</h2>
       <p class="sub">${T.enc.max >= 1 ? `Fugas encontradas: <b>${rango(T.enc.min, T.enc.max)}</b> al mes (${rangoPts(T.pts.min, T.pts.max)} puntos de rentabilidad).` : 'Revise sus frentes para ver cuánto se le está yendo.'} Elija por cuánto tiempo quiere acceso completo.</p>
-      <div class="planes">${plans.map(p => `<button class="plan-c ${p.id === sel ? 'on' : ''} ${p.hidden ? 'oculto' : ''}" data-a="plan-sel" data-p="${p.id}"><b>${esc(p.label)}</b><span class="precio">US$${Number(p.usd) % 1 || p.hidden ? Number(p.usd).toFixed(2) : Number(p.usd).toFixed(0)}</span><small>${esc(p.note || '')}</small></button>`).join('')}</div>
+      <p class="nota">Tarifa ${esc(NIVEL_TXT[(CONF && CONF.nivel) || nv].toLowerCase())}${Object.values(E.empresas).filter(x => x && x.perfil).length > 1 ? ', según la empresa más grande de su cuenta' : ''}. Incluye todas sus empresas.</p>
+      <div class="planes">${plans.map(p => `<button class="plan-c ${p.id === sel ? 'on' : ''} ${p.hidden ? 'oculto' : ''}" data-a="plan-sel" data-p="${p.id}"><b>${esc(p.label)}</b><span class="precio">US$${Number(p.usd) % 1 || p.hidden ? Number(p.usd).toFixed(2) : sep(Number(p.usd), true)}</span><small>${esc(p.note || '')}</small></button>`).join('')}</div>
       <ul class="incluye"><li>Plan a la medida de cada frente, con pasos, fechas y mensajes listos</li><li>Planes que se afinan con sus respuestas, todas las veces que quiera</li><li>Acciones con calendario y registro de lo recuperado</li><li>Informe en PDF para socios o contador</li></ul>
       <p class="nota">Pago único con PayPal (o tarjeta a través de PayPal). No se renueva solo.${CFG.garantia ? ' ' + esc(CFG.garantia) : ''}${CFG.contacto ? ' ' + esc(CFG.contacto) + '.' : ''} <a href="/privacidad/#pagos" target="_blank" rel="noopener">Condiciones</a></p>
       ${USER ? '<div id="pp"></div>' : '<button class="btn full" data-a="login-pagar">Crear cuenta o entrar para pagar</button>'}`, 'chico');
@@ -787,9 +796,9 @@ async function pintarPaypal() {
         paypal.Buttons({
             style: { layout: 'vertical', shape: 'pill', label: 'pay' },
             createOrder: async () => {
-                const r = await api('rinde-pay-create', { plan: UI.planSel, k: CLAVE || undefined });
+                const r = await api('rinde-pay-create', { plan: UI.planSel, k: CLAVE || undefined, nivel: nivelTarifa() });
                 if (!r.orderID) throw new Error(r.error || 'No se pudo iniciar el pago');
-                track('pago_iniciado', { plan: UI.planSel });
+                track('pago_iniciado', { plan: UI.planSel, nivel: r.nivel, usd: r.usd });
                 return r.orderID;
             },
             onApprove: async (data) => {
@@ -1099,7 +1108,7 @@ if (window.netlifyIdentity) {
     netlifyIdentity.on('logout', () => { alEntrar(null); toast('Sesión cerrada. Su diagnóstico sigue en este dispositivo.'); });
     netlifyIdentity.init({ locale: 'es' });
 }
-fetch(conClave('/.netlify/functions/rinde-config')).then(r => r.json()).then(c => { const antes = monedaVisitante(); CONF = c; if (UI.vista === 'inicio' && monedaVisitante() !== antes) render(); }).catch(() => {});
+fetch(urlConfig()).then(r => r.json()).then(c => { const antes = monedaVisitante(); CONF = c; if (UI.vista === 'inicio' && monedaVisitante() !== antes) render(); }).catch(() => {});
 track(S.perfil ? 'visita_vuelta' : 'visita_nueva', { ref: document.referrer ? document.referrer.slice(0, 120) : null, utm: (location.search.match(/utm_campaign=([\w.-]{1,40})/) || [])[1] || null, ad: (location.search.match(/utm_content=([\w.-]{1,40})/) || [])[1] || null, fb: /fbclid=/.test(location.search) });
 const inicioPagina = Date.now();
 document.addEventListener('visibilitychange', () => {
