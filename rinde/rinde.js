@@ -234,6 +234,7 @@ const fechaBonita = (iso) => { try { return new Date(iso + 'T12:00:00').toLocale
 function ventasMes(p = S.perfil) {
     if (!p) return 0;
     const m = MONEDAS[p.moneda] || MONEDAS.CRC;
+    if (p === S.perfil && S.cifras && S.cifras.ventas > 0) return S.cifras.ventas / 12;   // cifras reales (pestaña Finanzas)
     if (p.exacta > 0) return p.exacta;
     const v = VENTAS[p.ventas] || VENTAS[2];
     return v[2] * m.usd;
@@ -297,6 +298,95 @@ function siguientePregunta() {
 const puedeVer = (id) => ACCESO.active || (USER && (ACCESO.freeFrente === id || !ACCESO.freeFrente));
 
 // =====================================================================================
+//  Capa financiera: nivel de la empresa, EBITDA, cascada, valor para el accionista y cifras reales
+// =====================================================================================
+// Margen EBITDA típico por sector (% de ventas). Es una REFERENCIA para dibujar la cascada mientras la empresa no anote
+// sus cifras reales (pestaña Finanzas); con cifras reales se usa su propio EBITDA.
+const MARGEN_REF = { comercio: 6, restaurante: 10, servicios: 15, taller: 10, construccion: 8, salud: 14, educacion: 12, transporte: 9, agro: 10, turismo: 14, otro: 10 };
+// Rangos sanos por sector para los indicadores de la pestaña Finanzas: margen bruto [mín, máx] %, DSO y DIO máximos en días.
+const REF_SECTOR = {
+    comercio: { mb: [25, 40], dso: 30, dio: 60 }, restaurante: { mb: [60, 70], dso: 5, dio: 10 }, servicios: { mb: [45, 70], dso: 45, dio: 0 },
+    taller: { mb: [30, 45], dso: 45, dio: 50 }, construccion: { mb: [15, 30], dso: 60, dio: 30 }, salud: { mb: [40, 65], dso: 40, dio: 30 },
+    educacion: { mb: [45, 70], dso: 30, dio: 0 }, transporte: { mb: [20, 35], dso: 45, dio: 15 }, agro: { mb: [20, 35], dso: 45, dio: 45 },
+    turismo: { mb: [45, 65], dso: 20, dio: 10 }, otro: { mb: [25, 45], dso: 45, dio: 45 }
+};
+// Indicador financiero que mueve cada frente (se muestra en lenguaje gerencial).
+const KPI = { cobros: 'DSO · capital de trabajo', compras: 'Costo de ventas (COGS) · margen bruto', inventario: 'DIO · rotación y merma', precios: 'Margen bruto · política de precios',
+    fijos: 'OPEX fijo', personal: 'Costo laboral · productividad', servicios: 'OPEX energético y logístico', sedes: 'Rentabilidad por unidad de negocio' };
+const MULTIPLO = [5, 7];   // múltiplo EBITDA ilustrativo para el valor de empresa (pymes y medianas latinoamericanas suelen negociarse en ese rango)
+
+const ventasUSD = (p = S.perfil) => ventasMes(p) / ((MONEDAS[(p && p.moneda) || 'CRC'] || MONEDAS.CRC).usd || 1);
+// pyme (hasta 20 personas y < US$30 mil/mes), mediana, grande (más de 50 personas o ≥ US$300 mil/mes). Define el lenguaje y las capas.
+function nivel(p = S.perfil) {
+    if (!p) return 'pyme';
+    const u = ventasUSD(p);
+    if (p.personas === 'p4' || u >= 300000) return 'grande';
+    if (p.personas === 'p3' || u >= 30000) return 'mediana';
+    return 'pyme';
+}
+const NIVEL_TXT = { pyme: 'Pyme', mediana: 'Mediana empresa', grande: 'Gran empresa' };
+const pctTxt = (n, d = 1) => (Math.round(n * Math.pow(10, d)) / Math.pow(10, d)).toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+// Cifras reales (anuales, en la moneda de la empresa). Se guardan en S.cifras.
+const CIFRAS = [
+    ['ventas', 'Ventas netas', 'Ingresos de los últimos 12 meses, sin impuestos.'],
+    ['costo', 'Costo de ventas (COGS)', 'Lo que costó lo que vendió: mercadería, materia prima, mano de obra directa.'],
+    ['opex', 'Gastos operativos (OPEX)', 'Salarios administrativos, alquileres, servicios, mercadeo. Sin depreciación ni intereses.'],
+    ['cxc', 'Cuentas por cobrar', 'Saldo al cierre: lo que sus clientes le deben.'],
+    ['inventario', 'Inventario', 'Valor al costo al cierre.'],
+    ['cxp', 'Cuentas por pagar', 'Saldo al cierre: lo que usted le debe a proveedores.'],
+    ['utilidad', 'Utilidad neta', 'Después de impuestos e intereses (opcional, para el ROE).'],
+    ['patrimonio', 'Patrimonio', 'Capital de los socios al cierre (opcional, para el ROE).']
+];
+const cif = (p = S) => (p && p.cifras) || {};
+const tieneCifras = () => cif().ventas > 0;
+const pl = () => { const c = cif(); return c.ventas > 0 && c.costo >= 0 && c.opex >= 0 && c.costo != null && c.opex != null; };
+function refSector(p = S.perfil) {   // con varios negocios: el primero manda la referencia
+    const id = (negsDe(p)[0]) || 'otro';
+    return { margen: MARGEN_REF[id] != null ? MARGEN_REF[id] : 10, ...(REF_SECTOR[id] || REF_SECTOR.otro) };
+}
+// Indicadores calculados a partir de las cifras reales.
+function indicadores() {
+    const c = cif(); if (!(c.ventas > 0)) return null;
+    const r = refSector(), v = c.ventas, k = {};
+    if (c.costo != null) { k.mb = (v - c.costo) / v * 100; }
+    if (c.costo != null && c.opex != null) { k.ebitda = v - c.costo - c.opex; k.me = k.ebitda / v * 100; }
+    if (c.cxc != null) { k.dso = c.cxc / v * 365; if (k.dso > r.dso) k.atrapadoCxc = (k.dso - r.dso) * v / 365; }
+    if (c.inventario != null && c.costo > 0) { k.dio = c.inventario / c.costo * 365; if (r.dio && k.dio > r.dio) k.atrapadoInv = (k.dio - r.dio) * c.costo / 365; }
+    if (c.cxp != null && c.costo > 0) k.dpo = c.cxp / c.costo * 365;
+    if (k.dso != null && k.dpo != null) k.ccc = k.dso + (k.dio || 0) - k.dpo;
+    if (c.cxc != null || c.inventario != null || c.cxp != null) k.ctn = (c.cxc || 0) + (c.inventario || 0) - (c.cxp || 0);
+    if (c.utilidad != null && c.patrimonio > 0) k.roe = c.utilidad / c.patrimonio * 100;
+    k.atrapado = (k.atrapadoCxc || 0) + (k.atrapadoInv || 0);
+    return k;
+}
+// EBITDA mensual de partida: el real si hay cifras; si no, ventas × margen de referencia del sector.
+function ebitdaBase() {
+    const k = indicadores();
+    if (k && k.ebitda != null) return { mes: k.ebitda / 12, margen: k.me, real: true };
+    const m = refSector().margen;
+    return { mes: ventasMes() * m / 100, margen: m, real: false };
+}
+// Resumen de la capa financiera para el panel, el informe y los planes.
+function finanzas() {
+    const T = totales(), b = ebitdaBase(), vm = ventasMes() || 1;
+    const mid = (T.enc.min + T.enc.max) / 2;
+    return { T, base: b, potMin: b.mes + T.enc.min, potMax: b.mes + T.enc.max, potMid: b.mes + mid,
+        margenPot: [b.margen + T.enc.min / vm * 100, b.margen + T.enc.max / vm * 100],
+        valor: [T.enc.min * 12 * MULTIPLO[0], T.enc.max * 12 * MULTIPLO[1]], nivel: nivel() };
+}
+// Cascada horizontal: EBITDA actual + lo recuperable por frente = EBITDA potencial (valores del punto medio de cada rango).
+function cascadaHTML(base, filas, fmt, etiquetas) {
+    const tot = base + filas.reduce((a, f) => a + f.v, 0), max = Math.max(tot, base, 1);
+    let acc = base;
+    const fila = (lbl, desde, hasta, cls, val, sub) => `<div class="cas-f ${cls}"><span class="cas-l">${lbl}${sub ? `<small>${sub}</small>` : ''}</span><span class="cas-t"><i style="left:${desde / max * 100}%;width:${Math.max(0.6, (hasta - desde) / max * 100)}%"></i></span><span class="cas-v">${val}</span></div>`;
+    return `<div class="cascada" role="img" aria-label="${esc(etiquetas.aria)}">
+      ${fila(etiquetas.base, 0, base, 'base', fmt(base), etiquetas.baseSub)}
+      ${filas.map(f => { const h = fila(f.lbl, acc, acc + f.v, 'paso', '+' + fmt(f.v), f.sub); acc += f.v; return h; }).join('')}
+      ${fila(etiquetas.pot, 0, tot, 'pot', fmt(tot), etiquetas.potSub)}</div>`;
+}
+
+// =====================================================================================
 //  Pantallas
 // =====================================================================================
 function render() {
@@ -318,7 +408,7 @@ function cabecera(enApp) {
 }
 const logo = () => `<svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="currentColor"/><path d="M16 42c6 0 8-10 14-10s7 6 12 6 6-14 6-14" fill="none" stroke="var(--oro)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="48" cy="24" r="4" fill="var(--oro)"/></svg>`;
 function tabsHTML() {
-    const t = [['panel', 'Panel', '<path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/>'], ['acciones', 'Acciones', '<path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>'], ['informe', 'Informe', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>']];
+    const t = [['panel', 'Panel', '<path d="M3 3h8v8H3zM13 3h8v5h-8zM13 10h8v11h-8zM3 13h8v8H3z"/>'], ['acciones', 'Acciones', '<path d="M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>'], ['finanzas', 'Finanzas', '<path d="M3 21h18M5 21V10M10 21V5M15 21v-8M20 21V8"/>'], ['informe', 'Informe', '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>']];
     const pend = S.acciones.filter(a => !a.hecho).length;
     return t.map(([id, n, p]) => `<button class="tab ${UI.tab === id ? 'on' : ''}" data-a="tab" data-tab="${id}"><svg class="ic" viewBox="0 0 24 24">${p}</svg><span>${n}</span>${id === 'acciones' && pend ? `<b class="badge">${pend}</b>` : ''}</button>`).join('');
 }
@@ -327,24 +417,24 @@ function tabsHTML() {
 function vInicio() {
     const F = CFG.fundador;
     // Ejemplo en la moneda del visitante (montos base en US$, convertidos con el tipo de cambio aproximado de MONEDAS).
-    const mv = MONEDAS[monedaVisitante()] || MONEDAS.USD, ej = (a, b) => rango(a * mv.usd, b * mv.usd, mv);
-    const ejemplo = [['cobros', 'Cobros', ej(820, 1920), 70], ['precios', 'Precios y ganancia', ej(610, 1490), 55], ['fijos', 'Gastos fijos', ej(175, 510), 22]];
+    const mv = MONEDAS[monedaVisitante()] || MONEDAS.USD, cx = (n) => corto(n * mv.usd, mv);
+    const ejemplo = [{ lbl: 'Cobros', sub: 'DSO · capital de trabajo', v: 2600 }, { lbl: 'Precios y ganancia', sub: 'Margen bruto', v: 2100 }, { lbl: 'Inventario', sub: 'DIO · rotación y merma', v: 1500 }, { lbl: 'Gastos fijos', sub: 'OPEX fijo', v: 700 }];
     return `${cabecera(false)}
     <main class="inicio">
       <section class="hero">
-        <p class="eyebrow">Diagnóstico de rentabilidad para pymes</p>
-        <h1>Encuentre fugas de dinero en su empresa.<br><em>Y recupérelo.</em></h1>
-        <p class="lead">Empezamos en cero. Con cada pregunta de un toque, Rinde destapa cuánto se le está yendo en cobros, compras, inventario, precios y gastos, cuánto le resta a su rentabilidad y qué hacer primero.</p>
-        <div class="cta-row"><button class="btn xl" data-a="empezar">Empezar · 1 minuto</button><span class="nota">Sin tarjeta. Sin registro para ver el resultado.</span></div>
+        <p class="eyebrow">Control de rentabilidad para empresas</p>
+        <h1>¿Cuántas fugas de dinero tiene su empresa cada mes?<br><em>Rinde las encuentra y prioriza.</em></h1>
+        <p class="lead">Cobros atrasados, precios sin revisar, inventario sin rotación y gasto fijo sin auditar le restan margen todos los meses. Rinde estima cuánto le cuesta cada uno, en su moneda, en puntos de margen y en EBITDA, y le dice qué atender primero.</p>
+        <div class="cta-row"><button class="btn xl" data-a="empezar">Iniciar diagnóstico · 1 minuto</button><span class="nota">Sin documentos para empezar. Con sus estados financieros, indicadores reales.</span></div>
       </section>
       <section class="demo" aria-label="Ejemplo de resultado">
-        <div class="demo-top"><span>Ejemplo: tienda con 12 personas, tras 9 respuestas</span><strong>${ej(1610, 3920)} <small>al mes · 2,3 a 5,6 puntos de rentabilidad</small></strong></div>
-        ${ejemplo.map(([id, t, r, w]) => `<div class="demo-row">${icon(id)}<span class="dt">${t}</span><span class="bar"><i style="width:${w}%"></i></span><span class="dr">${r}</span></div>`).join('')}
+        <div class="demo-top"><span>Ejemplo · distribuidora con 35 colaboradores · puente de EBITDA mensual</span><strong>Margen EBITDA 6,0 % → 11,8 % <small>· valor de empresa en juego: ${rango(82800 * 5 * mv.usd, 82800 * 7 * mv.usd, mv)} (ilustrativo)</small></strong></div>
+        ${cascadaHTML(7200, ejemplo, cx, { aria: 'Ejemplo de puente de EBITDA', base: 'EBITDA actual', baseSub: '6,0 % de margen', pot: 'EBITDA potencial', potSub: '11,8 % de margen' })}
       </section>
       <section class="tres">
-        <div><b>1</b><h3>Responda 3 preguntas</h3><p>A qué se dedica, cuántas personas trabajan y cuánto vende más o menos. Nada de documentos.</p></div>
-        <div><b>2</b><h3>Destape sus fugas</h3><p>Cada frente empieza en cero. Cada respuesta de un toque suma lo que se está fugando ahí, y usted ve el total crecer.</p></div>
-        <div><b>3</b><h3>Recupere paso a paso</h3><p>Un plan concreto, mensajes listos para enviar y un registro de lo que ya recuperó.</p></div>
+        <div><b>1</b><h3>Perfil de la empresa</h3><p>Sector, tamaño, sedes y nivel de ventas. Rinde ajusta los frentes y el lenguaje: de pyme, gerencial o de accionistas.</p></div>
+        <div><b>2</b><h3>Diagnóstico por frente</h3><p>Cada frente parte de cero y cada respuesta suma su impacto en margen y EBITDA. Con sus estados financieros, calcula DSO, DIO, ciclo de caja y margen reales.</p></div>
+        <div><b>3</b><h3>Plan y seguimiento</h3><p>Planes de acción por frente, comunicaciones listas, calendario de ejecución y registro de lo recuperado. Informe en PDF para socios o junta.</p></div>
       </section>
       <section class="porque">
         <h2>Por qué confiar en las cifras</h2>
@@ -358,11 +448,12 @@ function vInicio() {
       <section class="faq">
         <h2>Preguntas frecuentes</h2>
         <details><summary>¿Cuánto cuesta?</summary><p>El diagnóstico inicial no tiene costo e incluye el plan completo de un frente, para que evalúe la herramienta con sus propios datos. Para ver los planes de todos los frentes, con seguimiento, hay planes desde US$19 por un mes. Es un pago único: no se renueva solo.</p></details>
-        <details><summary>¿Necesito saber de finanzas?</summary><p>No. Todo está en lenguaje sencillo, y cada frente indica también su término financiero (margen bruto, días de cobro, rotación de inventario…) para quien lo maneja, o para pasárselo al contador.</p></details>
+        <details><summary>¿Qué nivel técnico usa?</summary><p>Rinde ajusta el lenguaje al tamaño de la empresa. En pymes, cada frente muestra su indicador financiero (margen bruto, DSO, rotación de inventario) con una explicación breve. En medianas y grandes habla en términos de gerencia y de accionistas: impacto en EBITDA, margen, capital de trabajo y valor de empresa.</p></details>
+        <details><summary>¿Puedo usar mis cifras reales?</summary><p>Sí. En la pestaña Finanzas anota ventas, costo de ventas, gastos operativos, cuentas por cobrar, inventario y cuentas por pagar de los últimos 12 meses. Rinde calcula sus indicadores reales, los compara con su sector y estima el efectivo que hoy está atrapado en cartera e inventario.</p></details>
         <details><summary>¿Sirve para mi tipo de negocio?</summary><p>Rinde ajusta los frentes según el tipo de negocio, su tamaño y si tiene varias sedes. Lo que no aplica a su empresa, no aparece.</p></details>
         <details><summary>¿Y si el número no se parece a mi realidad?</summary><p>Cada cifra sale solo de sus respuestas: puede cambiarlas cuando quiera, ver el cálculo exacto o ocultar un frente que no le aplica.</p></details>
       </section>
-      <section class="cierre"><h2>¿Cuántas fugas de dinero tiene su empresa?</h2><button class="btn xl" data-a="empezar">Averiguarlo ahora</button></section>
+      <section class="cierre"><h2>¿Cuánto margen está dejando ir su empresa?</h2><button class="btn xl" data-a="empezar">Iniciar diagnóstico</button></section>
       <footer class="pie">Rinde · ${new Date().getFullYear()}${CFG.contacto ? ' · ' + esc(CFG.contacto) : ''} · <a href="/privacidad/">Privacidad y condiciones</a></footer>
     </main>`;
 }
@@ -402,38 +493,49 @@ function vApp() {
     let c = '';
     if (UI.tab === 'panel') c = vPanel();
     else if (UI.tab === 'acciones') c = vAcciones();
+    else if (UI.tab === 'finanzas') c = vFinanzas();
     else c = vInforme();
     return `${cabecera(true)}<main class="app">${c}</main><nav class="tabs-m">${tabsHTML()}</nav>`;
 }
 
 function vPanel() {
-    const T = totales(), sig = siguientePregunta(), max = Math.max(...T.l.map(x => x.max), 1);
-    const neg = negObj(S.perfil);
+    const F = finanzas(), T = F.T, sig = siguientePregunta(), max = Math.max(...T.l.map(x => x.max), 1);
+    const neg = negObj(S.perfil), niv = F.nivel, ger = niv !== 'pyme', vm = ventasMes() || 1;
     const ocultos = FRENTES.filter(f => aplica(f) && fr(f.id).oculto);
+    const hay = T.enc.max >= 1;
+    const kpis = [
+        `<div class="kpi k-main"><p class="lbl">${ger ? 'Impacto estimado en EBITDA' : 'Fugas encontradas'}</p><p class="big">${rangoF(T.enc.min, T.enc.max)}${T.calculando ? ' <span class="calc-pill">Calculando…</span>' : ''}<small> /mes</small></p>
+          <p class="per">${hay ? `${rango(T.enc.min * 12, T.enc.max * 12)} al año · ${rangoPts(T.pts.min, T.pts.max)} pts de margen` : 'Responda las preguntas rápidas: cada una puede destapar una fuga.'}</p></div>`,
+        `<div class="kpi"><p class="lbl">Margen EBITDA</p><p class="big">${pctTxt(F.base.margen)} %${hay ? ` <span class="flecha">→</span> ${pctTxt(F.margenPot[0])}–${pctTxt(F.margenPot[1])} %` : ''}</p>
+          <p class="per">${F.base.real ? 'con sus cifras reales' : `referencia del sector · <button class="lnk" data-a="tab" data-tab="finanzas">anotar cifras reales</button>`}</p></div>`,
+        niv === 'grande' ? `<div class="kpi"><p class="lbl">Valor de empresa en juego</p><p class="big">${hay ? rango(F.valor[0], F.valor[1]) : dinero(0)}</p><p class="per">fuga anual × ${MULTIPLO[0]}–${MULTIPLO[1]} veces EBITDA · ilustrativo</p></div>` : '',
+        `<div class="kpi"><p class="lbl">Recuperado</p><p class="big verde">${dinero(redondo(T.unaVez))}</p><p class="per">${T.mensual ? `+ ${corto(T.mensual)} al mes en ahorros nuevos` : 'Marque acciones como hechas para verlo crecer'}</p></div>`,
+        `<div class="kpi"><p class="lbl">Cobertura del diagnóstico</p><div class="meter"><i style="width:${T.revisado}%"></i></div><p class="per">${T.resp} de ${T.posibles} preguntas · ${T.revisado === 0 ? 'empiece por la pregunta rápida' : T.revisado < 100 ? 'el total puede seguir subiendo' : 'revisión completa'}</p></div>`
+    ].filter(Boolean);
+    const filas = T.l.filter(x => x.max >= 1).map(x => ({ lbl: esc(FR[x.id].t), sub: ger ? esc(KPI[x.id] || '') : '', v: (x.min + x.max) / 2 })).sort((a, b) => b.v - a.v);
+    const puente = hay ? cascadaHTML(F.base.mes, filas, (n) => corto(n), { aria: 'Puente de EBITDA mensual', base: ger ? 'EBITDA actual' : 'Lo que le queda hoy', baseSub: `${pctTxt(F.base.margen)} % de margen${F.base.real ? '' : ' (ref.)'}`, pot: ger ? 'EBITDA potencial' : 'Lo que le podría quedar', potSub: `${pctTxt(F.margenPot[0])}–${pctTxt(F.margenPot[1])} % de margen` }) : '';
     return `
-    <section class="resumen">
-      <div class="r-enc"><p class="lbl">Fugas encontradas hasta ahora</p><p class="big">${rangoF(T.enc.min, T.enc.max)}${T.calculando ? ' <span class="calc-pill">Calculando…</span>' : ''}</p><p class="per">cada mes · ${esc(neg ? neg.t : '')}</p>
-        <p class="anual">${T.enc.max < 1 ? 'Responda las preguntas rápidas: cada una puede destapar una fuga.' : `Al año: ${rango(T.enc.min * 12, T.enc.max * 12)} · le resta ${rangoPts(T.pts.min, T.pts.max)} puntos de rentabilidad`}</p></div>
-      <div class="r-rec"><p class="lbl">Recuperado</p><p class="big verde">${dinero(redondo(T.unaVez))}</p><p class="per">${T.mensual ? `+ ${corto(T.mensual)} al mes en ahorros nuevos` : 'Marque acciones como hechas para verlo crecer'}</p></div>
-      <div class="r-prec"><p class="lbl">Empresa revisada</p><div class="meter"><i style="width:${T.revisado}%"></i></div><p class="per">${T.resp} de ${T.posibles} preguntas · ${T.revisado === 0 ? 'empiece por la pregunta rápida' : T.revisado < 100 ? 'el total puede seguir subiendo' : 'revisión completa'}</p></div>
-    </section>
+    <section class="nivel-b"><span class="pill nv">${NIVEL_TXT[niv]}</span><span>${esc(neg ? neg.t : '')}</span></section>
+    <section class="kpi-strip k${kpis.length}">${kpis.join('')}</section>
+    ${hay ? `<section class="card-fin"><div class="cf-h"><h3>${ger ? 'Puente de EBITDA mensual' : 'Su margen hoy y su margen posible'}</h3><p class="sub">${ger ? 'EBITDA de partida más lo recuperable en cada frente (punto medio de cada rango).' : 'Lo que le queda cada mes antes de impuestos, más lo que podría recuperar en cada frente.'}</p></div>${puente}</section>` : ''}
     ${sig ? `<section class="pdia"><div><p class="lbl">Pregunta rápida · ${esc(FR[sig.id].t)}</p><p class="pq">${esc(FR[sig.id].q[sig.i][0])}</p></div>
       <div class="opciones fila">${opsDe(FR[sig.id].q[sig.i]).map(({ o, k }) => `<button class="opc chip ${o[1] === 0 ? 'na' : ''}" data-a="resp" data-f="${sig.id}" data-i="${sig.i}" data-k="${k}">${esc(o[0])}</button>`).join('')}<button class="opc chip otra" data-a="libre" data-f="${sig.id}" data-i="${sig.i}">Otra respuesta…</button></div></section>` : ''}
     <section class="tarjetas">
-      ${T.l.map((x, idx) => tarjeta(x, idx, max)).join('')}
+      ${T.l.map((x, idx) => tarjeta(x, idx, max, ger, vm)).join('')}
     </section>
     ${ocultos.length ? `<p class="ocultos">Ocultos: ${ocultos.map(f => `<button class="lnk" data-a="mostrar" data-f="${f.id}">${esc(f.t)}</button>`).join(' · ')}</p>` : ''}
-    <p class="disc">Cada frente empieza en cero y suma solo lo que sus respuestas muestran, con rangos de referencia prudentes. «Puntos de rentabilidad» = la fuga como porcentaje de sus ventas. Sirve para decidir por dónde empezar, no sustituye la contabilidad. <button class="lnk" data-a="perfil">Editar datos de la empresa</button> · <button class="lnk" data-a="empresas">Agregar otra empresa</button> · <button class="lnk" data-a="limpiar">Limpiar proyecto</button></p>`;
+    <p class="disc">Cada frente empieza en cero y suma solo lo que muestran sus respuestas, con rangos de referencia prudentes. «Puntos de margen» = la fuga como porcentaje de las ventas. ${F.base.real ? 'El EBITDA de partida sale de sus cifras reales.' : `El EBITDA de partida usa el margen típico del sector (${pctTxt(F.base.margen, 0)} %) hasta que anote sus cifras en Finanzas.`}${niv === 'grande' ? ' El valor de empresa es ilustrativo: aplica un múltiplo típico de EBITDA a la fuga anual; no es una valoración.' : ''} Es un diagnóstico de priorización, no sustituye la contabilidad. <button class="lnk" data-a="perfil">Editar datos de la empresa</button> · <button class="lnk" data-a="empresas">Agregar otra empresa</button> · <button class="lnk" data-a="limpiar">Limpiar proyecto</button></p>`;
 }
 
-function tarjeta(x, idx, max) {
+function tarjeta(x, idx, max, ger, vm) {
     const f = FR[x.id], st = fr(x.id), libre = ACCESO.active || !ACCESO.freeFrente || ACCESO.freeFrente === x.id, tienePlan = !!st.plan;
     const accs = S.acciones.filter(a => a.frente === x.id), hechas = accs.filter(a => a.hecho).length;
     const cero = x.n === 0;
     return `<article class="card ${idx === 0 ? 'top1' : ''} ${cero ? 'cero' : ''}">
-      <header><span class="ci">${icon(x.id)}</span><div><h3>${esc(f.t)}</h3><p class="fin">${esc(f.fin)}</p><p>${esc(f.f)}</p></div>
+      <header><span class="ci">${icon(x.id)}</span><div><h3>${esc(f.t)}</h3><p class="fin">${esc(ger ? (KPI[x.id] || f.fin) : f.fin)}</p>${ger ? '' : `<p>${esc(f.f)}</p>`}</div>
         <button class="mas" data-a="menu" data-f="${x.id}" aria-label="Opciones">⋯</button></header>
       <p class="monto">${rangoF(x.min, x.max)}<small> /mes</small>${x.calculando ? ' <span class="calc-pill">Calculando…</span>' : ''}</p>
+      ${ger && x.max >= 1 ? `<p class="pts-m">${rangoPts(x.min / (vm || 1) * 100, x.max / (vm || 1) * 100)} pts de margen · ${rango(x.min * 12, x.max * 12)} al año</p>` : ''}
       <div class="bar"><i style="left:${x.min / max * 100}%;width:${x.max < 1 ? 0 : Math.max(2, (x.max - x.min) / max * 100)}%"></i></div>
       <div class="meta"><span class="conf c-${x.cc}">${x.conf}</span>${x.n > 0 && x.n < x.total ? `<button class="lnk" data-a="afinar" data-f="${x.id}">Seguir revisando (${x.total - x.n})</button>` : ''}
         ${x.n > 0 ? `<button class="lnk sut" data-a="porque" data-f="${x.id}">¿De dónde sale?</button>` : ''}</div>
@@ -480,14 +582,52 @@ function calendario() {
       <div class="cal-g">${['L', 'M', 'M', 'J', 'V', 'S', 'D'].map(d => `<em>${d}</em>`).join('')}${cells}</div></div>`;
 }
 
+// ---------- Finanzas (cifras reales e indicadores) ----------
+function vFinanzas() {
+    const c = cif(), m = mon(), k = indicadores(), r = refSector();
+    const num = (v) => (v == null || v === '' ? '' : sep(v, m.dots));
+    const est = (e) => `<span class="sem s-${e}">${e === 'ok' ? 'Sano' : e === 'warn' ? 'Atención' : e === 'bad' ? 'Crítico' : 'Dato'}</span>`;
+    const ind = [];
+    if (k) {
+        if (k.mb != null) ind.push(['Margen bruto', pctTxt(k.mb) + ' %', `Sector: ${r.mb[0]}–${r.mb[1]} %`, k.mb < r.mb[0] * 0.8 ? 'bad' : k.mb < r.mb[0] ? 'warn' : 'ok']);
+        if (k.me != null) ind.push(['Margen EBITDA', pctTxt(k.me) + ' %', `Referencia: ${r.margen} %`, k.me < r.margen * 0.5 ? 'bad' : k.me < r.margen ? 'warn' : 'ok']);
+        if (k.ebitda != null) ind.push(['EBITDA anual', dinero(redondo(k.ebitda)), corto(k.ebitda / 12) + ' al mes', k.ebitda < 0 ? 'bad' : 'info']);
+        if (k.dso != null) ind.push(['DSO · días de cobro', Math.round(k.dso) + ' días', `Sector: hasta ${r.dso} días`, k.dso > r.dso * 1.5 ? 'bad' : k.dso > r.dso ? 'warn' : 'ok']);
+        if (k.dio != null && r.dio) ind.push(['DIO · días de inventario', Math.round(k.dio) + ' días', `Sector: hasta ${r.dio} días`, k.dio > r.dio * 1.5 ? 'bad' : k.dio > r.dio ? 'warn' : 'ok']);
+        if (k.dpo != null) ind.push(['DPO · días de pago', Math.round(k.dpo) + ' días', 'Plazo que le dan sus proveedores', 'info']);
+        if (k.ccc != null) ind.push(['Ciclo de conversión de efectivo', Math.round(k.ccc) + ' días', 'DSO + DIO − DPO: mientras menor, mejor', k.ccc > 90 ? 'bad' : k.ccc > 45 ? 'warn' : 'ok']);
+        if (k.ctn != null) ind.push(['Capital de trabajo neto', dinero(redondo(k.ctn)), 'Cartera + inventario − proveedores', 'info']);
+        if (k.roe != null) ind.push(['ROE · rentabilidad del patrimonio', pctTxt(k.roe) + ' %', 'Utilidad neta / patrimonio', k.roe < 0 ? 'bad' : k.roe < 10 ? 'warn' : 'ok']);
+    }
+    return `<section class="finz">
+      <div class="inf-h"><div><h2>Finanzas</h2><p class="sub">Cifras de los últimos 12 meses, en ${esc(m.nombre.toLowerCase())}. Con ellas Rinde calcula sus indicadores reales, los compara con su sector (${esc(negTxt(S.perfil) || 'su sector')}) y los usa en el puente de EBITDA, el informe y los planes.</p></div></div>
+      ${k && k.atrapado >= 1 ? `<div class="atrapado"><p class="lbl">Efectivo atrapado en capital de trabajo</p><p class="big">${dinero(redondo(k.atrapado))}</p><p class="per">${[k.atrapadoCxc ? `${corto(k.atrapadoCxc)} en cartera (DSO de ${Math.round(k.dso)} días vs. ${r.dso} del sector)` : '', k.atrapadoInv ? `${corto(k.atrapadoInv)} en inventario (DIO de ${Math.round(k.dio)} días vs. ${r.dio})` : ''].filter(Boolean).join(' · ')}. Es caja que se liberaría al llevar esos días a la referencia, una sola vez.</p></div>` : ''}
+      <div class="fin-grid">
+        <div class="fin-form">
+          ${CIFRAS.map(([id, t, h]) => `<label class="campo"><span>${esc(t)}${['utilidad', 'patrimonio'].includes(id) ? ' <em>(opcional)</em>' : ''}</span><input id="cif-${id}" inputmode="numeric" value="${num(c[id])}" placeholder="${m.s}"><small class="ayuda">${esc(h)}</small></label>`).join('')}
+          <div class="m-pie"><button class="btn" data-a="cifras-ok">Calcular indicadores</button>${tieneCifras() ? '<button class="btn ghost" data-a="cifras-borrar">Borrar cifras</button>' : ''}</div>
+          <p class="disc">Las cifras se guardan solo en este diagnóstico (y en su cuenta, si tiene). No se piden cuentas bancarias ni facturas.</p>
+        </div>
+        <div class="fin-ind">${ind.length ? ind.map(([t, v, ref, e]) => `<div class="ind"><div><p class="lbl">${t}</p><p class="iv">${v}</p><p class="per">${ref}</p></div>${est(e)}</div>`).join('')
+          : `<div class="vacio-fin"><h3>Lo que verá aquí</h3><ul><li>Margen bruto y margen EBITDA reales, contra su sector</li><li>DSO, DIO, DPO y ciclo de conversión de efectivo</li><li>Capital de trabajo neto y efectivo atrapado en cartera e inventario</li><li>ROE, si anota utilidad neta y patrimonio</li></ul><p class="per">Con ventas, costo de ventas y gastos operativos, el puente de EBITDA del panel pasa a usar su EBITDA real.</p></div>`}</div>
+      </div>
+    </section>`;
+}
+
 function vInforme() {
     const T = totales(), neg = negObj(S.perfil), max = Math.max(...T.l.map(x => x.max), 1);
     const pers = PERSONAS.find(x => x.id === S.perfil.personas), sed = SEDES.find(x => x.id === S.perfil.sedes);
     return `<section class="informe">
-      <div class="inf-h"><div><h2>Diagnóstico de rentabilidad</h2><p class="sub">${S.perfil.nombre ? '<b>' + esc(S.perfil.nombre) + '</b> · ' : ''}${esc(neg ? neg.t : '')}${S.perfil.detalle ? ' · ' + esc(S.perfil.detalle) : ''} · ${pers ? pers.t : ''} personas · ${sed ? sed.t.toLowerCase() : ''} sede(s) · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+      <div class="inf-h"><div><h2>Diagnóstico de rentabilidad</h2><p class="sub">${NIVEL_TXT[nivel()]} · ${S.perfil.nombre ? '<b>' + esc(S.perfil.nombre) + '</b> · ' : ''}${esc(neg ? neg.t : '')}${S.perfil.detalle ? ' · ' + esc(S.perfil.detalle) : ''} · ${pers ? pers.t : ''} personas · ${sed ? sed.t.toLowerCase() : ''} sede(s) · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
         <button class="btn ghost no-print" data-a="imprimir">Descargar PDF</button></div>
       <div class="kpis"><div><p class="lbl">Fugas encontradas al mes</p><p class="big">${rangoF(T.enc.min, T.enc.max)}</p></div><div><p class="lbl">Al año</p><p class="big">${rangoF(T.enc.min * 12, T.enc.max * 12)}</p></div><div><p class="lbl">Impacto en rentabilidad</p><p class="big">${T.enc.max < 1 ? '0' : rangoPts(T.pts.min, T.pts.max)}<small> puntos de margen</small></p></div><div><p class="lbl">Recuperado</p><p class="big verde">${dinero(redondo(T.unaVez))}${T.mensual ? `<small> + ${corto(T.mensual)}/mes</small>` : ''}</p></div></div>
-      <p class="sub">Empresa revisada: ${T.resp} de ${T.posibles} preguntas (${T.revisado}%). Los frentes sin revisar aparecen en cero.</p>
+      ${(() => { const F = finanzas(), ger = F.nivel !== 'pyme', filas = T.l.filter(x => x.max >= 1).map(x => ({ lbl: esc(FR[x.id].t), sub: ger ? esc(KPI[x.id] || '') : '', v: (x.min + x.max) / 2 })).sort((a, b) => b.v - a.v);
+        const k = indicadores();
+        return (filas.length ? `<h3 class="h3s">Puente de EBITDA mensual</h3>${cascadaHTML(F.base.mes, filas, (n) => corto(n), { aria: 'Puente de EBITDA', base: 'EBITDA actual', baseSub: `${pctTxt(F.base.margen)} %${F.base.real ? '' : ' (ref. sector)'}`, pot: 'EBITDA potencial', potSub: `${pctTxt(F.margenPot[0])}–${pctTxt(F.margenPot[1])} %` })}` : '')
+          + (F.nivel === 'grande' && filas.length ? `<p class="sub"><b>Para accionistas:</b> la fuga anual equivale a ${rango(F.valor[0], F.valor[1])} de valor de empresa a ${MULTIPLO[0]}–${MULTIPLO[1]} veces EBITDA (ilustrativo, no es una valoración).</p>` : '')
+          + (k ? `<h3 class="h3s">Indicadores con cifras reales</h3><p class="sub">${[k.mb != null ? `Margen bruto ${pctTxt(k.mb)} %` : '', k.me != null ? `margen EBITDA ${pctTxt(k.me)} %` : '', k.dso != null ? `DSO ${Math.round(k.dso)} días` : '', k.dio != null ? `DIO ${Math.round(k.dio)} días` : '', k.ccc != null ? `ciclo de caja ${Math.round(k.ccc)} días` : '', k.roe != null ? `ROE ${pctTxt(k.roe)} %` : '', k.atrapado >= 1 ? `efectivo atrapado ${corto(k.atrapado)}` : ''].filter(Boolean).join(' · ')}.</p>` : '');
+      })()}
+      <p class="sub">Cobertura del diagnóstico: ${T.resp} de ${T.posibles} preguntas (${T.revisado}%). Los frentes sin revisar aparecen en cero.</p>
       <div class="tabla-w"><table class="tabla"><thead><tr><th>Frente · indicador</th><th>Fuga al mes</th><th class="h-bar"></th><th class="h-prec">% de ventas</th><th>Acciones</th></tr></thead><tbody>
       ${T.l.map(x => { const a = S.acciones.filter(z => z.frente === x.id), vm = ventasMes() || 1; return `<tr><td>${icon(x.id, 'mini')} ${esc(FR[x.id].t)}<br><small class="fin">${esc(FR[x.id].fin)}</small></td><td class="num">${x.n ? rangoF(x.min, x.max) : '<span class="sut">Sin revisar</span>'}</td><td class="h-bar"><span class="bar"><i style="left:${x.min / max * 100}%;width:${x.max < 1 ? 0 : Math.max(2, (x.max - x.min) / max * 100)}%"></i></span></td><td class="h-prec">${x.max < 1 ? '—' : rangoPts(x.min / vm * 100, x.max / vm * 100) + ' %'}</td><td>${a.filter(z => z.hecho).length}/${a.length}</td></tr>`; }).join('')}
       </tbody></table></div>
@@ -751,6 +891,7 @@ async function generarPlan(id) {
     const extra = Object.entries(st.extra || {}).filter(([, v]) => v).map(([q, a]) => ({ q, a }));
     const r = await api('rinde-plan', {
         frente: id,
+        nivel: nivel(), finanzas: resumenFin(),
         perfil: { negocio: negTxt(p), detalle: p.detalle || '', personas: (PERSONAS.find(n => n.id === p.personas) || {}).t,
             ventas: corto(ventasMes()), moneda: mon().s + ' ' + (p.moneda || ''), pais: '' },
         datos: { titulo: f.t + ' (' + f.fin + ') — ' + f.f, rango: rangoF(x.min, x.max) + ' (' + rangoPts(x.min / (ventasMes() || 1) * 100, x.max / (ventasMes() || 1) * 100) + ' puntos de margen sobre ventas)', respuestas: f.q.map((qq, i) => st.r[i] != null ? { q: qq[0], a: respTexto(f, st, i) } : null).filter(Boolean), extra, notas: st.notas || '' }
@@ -764,6 +905,15 @@ async function generarPlan(id) {
     render(); mPlan(id);
 }
 
+// Resumen financiero en texto para los planes de la IA (solo cifras ya calculadas aquí).
+function resumenFin() {
+    const F = finanzas(), k = indicadores();
+    const t = [`Margen EBITDA ${pctTxt(F.base.margen)} % (${F.base.real ? 'real' : 'referencia del sector'})`, F.T.enc.max >= 1 ? `potencial ${pctTxt(F.margenPot[0])}–${pctTxt(F.margenPot[1])} %` : ''];
+    if (k) t.push(...[k.mb != null ? `margen bruto ${pctTxt(k.mb)} %` : '', k.dso != null ? `DSO ${Math.round(k.dso)} días (ref. ${refSector().dso})` : '', k.dio != null ? `DIO ${Math.round(k.dio)} días (ref. ${refSector().dio})` : '',
+        k.dpo != null ? `DPO ${Math.round(k.dpo)} días` : '', k.ccc != null ? `ciclo de caja ${Math.round(k.ccc)} días` : '', k.roe != null ? `ROE ${pctTxt(k.roe)} %` : '', k.atrapado >= 1 ? `efectivo atrapado ${corto(k.atrapado)}` : '']);
+    if (F.nivel === 'grande' && F.T.enc.max >= 1) t.push(`valor de empresa en juego ${rango(F.valor[0], F.valor[1])} a ${MULTIPLO[0]}–${MULTIPLO[1]}× EBITDA (ilustrativo)`);
+    return t.filter(Boolean).join('; ');
+}
 function pedirLogin(modo) {
     if (!window.netlifyIdentity) return toast('No se pudo cargar el inicio de sesión. Recargue la página.');
     track('login_visto', { modo });
@@ -786,6 +936,14 @@ document.addEventListener('click', (e) => {
         case 'emp-abrir': cerrar(); abrirEmpresa(b.dataset.id); track('empresa_cambiada'); break;
         case 'emp-nueva': { guardar(false); const nid = nuevoId(); E.empresas[nid] = nuevo(); E.activa = nid; S = E.empresas[nid]; limpiarVacias(); UI.tab = 'panel'; empezarOnb(); track('empresa_nueva', { empresas: Object.keys(E.empresas).length }); break; }
         case 'limpiar': mLimpiar(); break;
+        case 'cifras-ok': {
+            const c = {};
+            CIFRAS.forEach(([k]) => { const el = $('#cif-' + k); if (!el) return; const t = el.value.trim(); if (!t) return; const neg = /^-/.test(t), n = Number(t.replace(/[^\d]/g, '')); if (Number.isFinite(n) && t.replace(/[^\d]/g, '')) c[k] = neg ? -n : n; });
+            if (!(c.ventas > 0)) { toast('Anote al menos las ventas netas de los últimos 12 meses.'); const v = $('#cif-ventas'); if (v) v.focus(); break; }
+            S.cifras = c; guardar(); track('cifras_guardadas', { campos: Object.keys(c).length, nivel: nivel() }); render(); window.scrollTo(0, 0);
+            toast('Indicadores calculados con sus cifras reales.'); break;
+        }
+        case 'cifras-borrar': delete S.cifras; guardar(); track('cifras_borradas'); render(); toast('Cifras borradas: se vuelve a la referencia del sector.'); break;
         case 'limpiar-resp': {
             S = Object.assign(nuevo(), { perfil: S.perfil, creado: S.creado }); guardar(); cerrar(); UI.vista = 'app'; UI.tab = 'panel'; render(); window.scrollTo(0, 0);
             track('proyecto_limpiado', { modo: 'respuestas' }); toast('Listo: empezamos otra vez desde cero, con los mismos datos de la empresa.'); break;
