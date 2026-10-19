@@ -9060,8 +9060,18 @@ async function exportReportRtf() {
         syncTimer = setTimeout(() => {
             if (isOpen()) {
                 const sc = view.querySelector('.dv-scroll'); const keep = sc.scrollTop;
+                // Lo que se acaba de desplegar en el mapa también se despliega aquí (y lo que se plegó, se pliega).
+                folded.forEach(id => { openMore.delete(id); });
                 const l = render(); reopenMore();
                 if (toTop) { sc.scrollTop = 0; toTop = false; } else sc.scrollTop = keep;
+                let target = null;
+                unfolded.forEach(id => {
+                    const row = ensureRow(id); if (!row) return;
+                    const b = row.querySelector(':scope > .dv-foot .dv-more'); if (b && !b._open) b.click();
+                    openMore.add(id); target = row;
+                });
+                if (target) { target.scrollIntoView({ block: 'start', behavior: 'smooth' }); flashRow(target); track('defs_follow_unfold', { n: unfolded.size }); }
+                unfolded.clear(); folded.clear();
                 loadAll(l); return;
             }
             let closed = false; try { closed = localStorage.getItem('gk_defs_closed') === '1'; } catch (_e) { /* ok */ }
@@ -9070,7 +9080,18 @@ async function exportReportRtf() {
     };
     nodes.on('add', () => { toTop = true; syncSoon(); }); nodes.on('remove', syncSoon);
     // Solo cuando cambia lo plegado/desplegado del mapa (no cuando llegan definiciones, que también disparan 'update').
-    nodes.on('update', (_ev, p) => { if (p && p.data && p.data.some((d, i) => d && (!!d.hidden !== !!(p.oldData && p.oldData[i] && p.oldData[i].hidden)))) syncSoon(); });
+    const unfolded = new Set(), folded = new Set();
+    const parentOf = (id) => { const e = plainEdges().find(x => String(x.to) === String(id) && !(isRelatedEdgeLabel && isRelatedEdgeLabel(x.label))); return e ? String(e.from) : null; };
+    nodes.on('update', (_ev, p) => {
+        if (!(p && p.data)) return; let changed = false;
+        p.data.forEach((d, i) => {
+            if (!d || !('hidden' in d)) return;
+            const was = !!(p.oldData && p.oldData[i] && p.oldData[i].hidden); if (!!d.hidden === was) return;
+            changed = true; const par = parentOf(p.items ? p.items[i] : d.id); if (par == null) return;
+            if (!d.hidden) { unfolded.add(par); folded.delete(par); } else { folded.add(par); unfolded.delete(par); }
+        });
+        if (changed) syncSoon();
+    });
     setTimeout(syncSoon, 1500);
 })();
 if (typeof I18N !== 'undefined' && I18N.lang === 'en') { const sp = document.querySelector('#btnExitSubscheme span'); if (sp) sp.textContent = 'Back'; }
