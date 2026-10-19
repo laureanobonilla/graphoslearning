@@ -64,6 +64,13 @@
     E.show('Write'); render(); if (fresh) save(); doc.focus();
     if (!fresh) { prune(); schedule(800); E.track('esc_open', { n: items.length }); }
   }
+  // Para que escribir.js pueda volver a abrir el escrito tras una recarga (por ejemplo, al iniciar sesión).
+  window.ESC_W = {
+    cur: () => (P && !$('#vWrite').hidden ? P.id : null),
+    openId: (id) => { const p = load().find((x) => x.id === id); if (!p) return false; open(p); return true; },
+    retry: () => { if (P) analyze(true); }
+  };
+  window.addEventListener('pagehide', () => { if (P) { clearTimeout(saveT); save(); } });
   $('#btnWBack').addEventListener('click', () => { clearTimeout(timer); clearTimeout(saveT); save(); P = null; if (load().length) renderProj(); else E.renderHome(); });
   $('#wTitle').addEventListener('input', saveSoon);
   $('#wLevel').addEventListener('change', () => { level = $('#wLevel').value; done = {}; items = []; render(); schedule(300); saveSoon(); E.track('esc_level', { level }); });
@@ -109,7 +116,7 @@
     const r = await E.callRetry({ action: 'esc_analyze', text: para, documentContext: before, purpose: genre, level });
     busy = false;
     if (!P) return;
-    if (!r.ok) { $('#wMsg').className = 'msg err'; $('#wMsg').textContent = E.failText(r.kind); E.afterFail(r.kind); return; }
+    if (!r.ok) { $('#wMsg').className = 'msg err'; $('#wMsg').textContent = E.failText(r.kind); E.afterFail(r.kind, 'analyze'); return; }
     $('#wMsg').textContent = '';
     done[para] = key(para);
     items = items.filter((it) => it.para !== para);

@@ -606,6 +606,30 @@
             #vizPanel .vz-rh-lg { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 500 12px 'Inter', sans-serif; color: var(--p-ink2); }
             #vizPanel .vz-lg i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
             #vizPanel .vz-rhz { width: 100%; border: 1px solid var(--p-rule); border-radius: 12px; background: #fbfaf6; }
+            #vizPanel .vz-rh-ctl select { border: 1px solid var(--p-rule); background: #fff; border-radius: 8px; padding: 4px 6px; font: 600 12px 'Inter', sans-serif; color: var(--p-ink2); }
+            #vizPanel .vz-ghost.on { color: var(--p-acc); border-color: var(--p-acc); background: var(--p-acc-bg); }
+            #vizPanel .vz-rh-wrap.with-read { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 12px; }
+            #vizPanel .vz-rd { height: var(--rh); overflow-y: auto; border: 1px solid var(--p-rule); border-radius: 12px; background: #fff; padding: 12px 14px; font: 400 13px/1.5 'Inter', sans-serif; color: var(--p-ink2); }
+            #vizPanel .vz-rd h4 { margin: 14px 0 2px; font: 700 11.5px 'Inter', sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--p-mute); }
+            #vizPanel .vz-rd-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; color: var(--p-ink); }
+            #vizPanel .vz-rd-k p { margin: 6px 0 0; }
+            #vizPanel .vz-rd-kind { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 700 12px 'Inter', sans-serif; background: var(--p-acc-bg); color: var(--p-acc); }
+            #vizPanel .vz-rd-kind.k-disperso, #vizPanel .vz-rd-kind.k-sesgado { background: #fbefd9; color: #a3650f; }
+            #vizPanel .vz-rd-m, #vizPanel .vz-rd-s { color: var(--p-mute); font-size: 12px; margin: 2px 0 6px; }
+            #vizPanel .vz-rd-b { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+            #vizPanel .vz-rd-b li { display: grid; grid-template-columns: minmax(0, auto) 1fr; gap: 8px; align-items: center; }
+            #vizPanel .vz-rd-bar { height: 6px; background: #efece3; border-radius: 99px; overflow: hidden; }
+            #vizPanel .vz-rd-bar i { display: block; height: 100%; background: var(--p-acc); }
+            #vizPanel .vz-rd-g { display: grid; gap: 8px; }
+            #vizPanel .vz-rd-gi > div { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+            #vizPanel .vz-rd-gb { border: 0; background: none; padding: 0; font: 700 12px 'Inter', sans-serif; color: var(--p-ink); cursor: pointer; }
+            #vizPanel .vz-rd-gb i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+            #vizPanel .vz-rd-gap, #vizPanel .vz-rd-sp { border-top: 1px solid var(--p-rule); padding: 8px 0; }
+            #vizPanel .vz-rd-gap p { margin: 0 0 6px; line-height: 1.9; }
+            #vizPanel .vz-rd-sp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+            #vizPanel .vz-rd-sp small { flex-basis: 100%; color: var(--p-mute); }
+            #vizPanel .vz-rd .vz-chip { max-width: 100%; }
+            @media (max-width: 760px) { #vizPanel .vz-rh-wrap.with-read { grid-template-columns: 1fr; } #vizPanel .vz-rd { height: auto; max-height: 60vh; } }
             #vizPanel .vz-rl-wrap { width: 100%; }
             #vizPanel .vz-rl { display: block; width: 100%; border: 1px solid var(--p-rule); border-radius: 12px; touch-action: none; }
             #vizPanel .vz-nn-wrap { width: 100%; }

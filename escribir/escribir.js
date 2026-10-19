@@ -12,6 +12,7 @@
 
   let S = null; // { topic, level, qs:[{q,level,focus}], i, results:[], asked:[], review }
   let count = 5, pickLv = 1, conf = 0, busyNow = false;
+  let curView = 'Home', pend = null, snapT = 0;   // para no perder nada si la página se recarga (p. ej. al iniciar sesión)
 
   /* ---------- utilidades ---------- */
   const clip = (s, n) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
@@ -65,7 +66,7 @@
   try {
     if (window.netlifyIdentity) {
       netlifyIdentity.on('init', () => { updateLogin(); fetchBalance(); });
-      netlifyIdentity.on('login', () => { try { netlifyIdentity.close(); } catch { /* nada */ } updateLogin(); fetchBalance(); });
+      netlifyIdentity.on('login', () => { try { netlifyIdentity.close(); } catch { /* nada */ } updateLogin(); fetchBalance(); resumePending(); });
       netlifyIdentity.on('logout', () => { updateLogin(); fetchBalance(); });
       netlifyIdentity.init({ locale: 'es' });
     }
@@ -89,14 +90,15 @@
   function failText(k) {
     return ({ login: lastReason === 'direct' ? 'Para usar Practicar y Escribir crea tu cuenta gratis o inicia sesión.' : lastReason === 'esc_trial_over' ? 'Terminó tu prueba rápida. Crea tu cuenta gratis para seguir.' : 'Para seguir, crea tu cuenta gratis o inicia sesión.', nobalance: 'Se acabaron tus gemas. Consigue más para seguir.', rate: 'Hay mucha actividad en tu cuenta. Espera unos minutos e intenta de nuevo.', network: 'Sin conexión. Revisa tu internet e intenta de nuevo.' })[k] || 'No pudimos hacerlo. Intenta de nuevo.';
   }
-  function afterFail(k) {
+  function afterFail(k, act) {
     if (k === 'login' || k === 'nobalance') track('paywall_shown', { kind: k, reason: k === 'login' ? lastReason : undefined, entry: ENTRY || 'direct' });
+    if (k === 'login' && act) { pend = act; snap(); }   // al entrar, se reintenta solo lo que quedó pendiente
     if (k === 'login') { try { window.netlifyIdentity && netlifyIdentity.open('signup'); } catch { /* nada */ } }
     if (k === 'nobalance' && window.GK_GEMS) window.GK_GEMS.openShop({ from: 'escribir' });
   }
 
   /* ---------- navegación ---------- */
-  function show(v) { ['Home', 'Setup', 'Ask', 'Fb', 'End', 'Genre', 'Write', 'Proj'].forEach((n) => { $('#v' + n).hidden = n !== v; }); window.scrollTo(0, 0); }
+  function show(v) { curView = v; snapSoon(); ['Home', 'Setup', 'Ask', 'Fb', 'End', 'Genre', 'Write', 'Proj'].forEach((n) => { $('#v' + n).hidden = n !== v; }); window.scrollTo(0, 0); }
   document.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { if (b.dataset.go === 'home') renderHome(); } });
 
   function dueReviews() { const now = Date.now(); return ls(LS.fail, []).filter((f) => f.due <= now); }
@@ -116,15 +118,15 @@
 
   /* ---------- preparar ---------- */
   const topicIn = $('#topicIn'), btnStart = $('#btnStart');
-  topicIn.addEventListener('input', () => { btnStart.disabled = clip(topicIn.value, 160).length < 2; });
+  topicIn.addEventListener('input', () => { btnStart.disabled = clip(topicIn.value, 160).length < 2; snapSoon(); });
   $('#countSeg').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-n]'); if (!b) return;
-    count = Number(b.dataset.n);
+    count = Number(b.dataset.n); snapSoon();
     document.querySelectorAll('#countSeg button').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
   });
   $('#levelPick').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-lv]'); if (!b) return;
-    pickLv = Number(b.dataset.lv);
+    pickLv = Number(b.dataset.lv); snapSoon();
     document.querySelectorAll('#levelPick button').forEach((x) => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
   });
   async function fetchQuestions(topic, level, n, avoid) {
@@ -138,7 +140,7 @@
     const topic = clip(topicIn.value, 160);
     const r = await fetchQuestions(topic, pickLv, count, []);
     busyNow = false; btnStart.disabled = false;
-    if (!r.ok) { msg.className = 'msg err'; msg.textContent = failText(r.kind); afterFail(r.kind); return; }
+    if (!r.ok) { msg.className = 'msg err'; msg.textContent = failText(r.kind); afterFail(r.kind, 'start'); return; }
     msg.textContent = '';
     track('esc_start', { count, level: pickLv, topicLen: topic.length });
     begin(r.data.topic || topic, pickLv, r.data.questions, false);
@@ -174,11 +176,12 @@
     const b = e.target.closest('button[data-c]'); if (!b) return;
     const c = Number(b.dataset.c);
     conf = conf === c ? 0 : c;   // volver a tocar la opción la quita
+    snapSoon();
     document.querySelectorAll('#confSeg button').forEach((x) => x.classList.toggle('on', conf && Number(x.dataset.c) === conf));
   });
   function wc(s) { return s.trim().split(/\s+/).filter(Boolean).length; }
   function updateSend() { $('#btnSend').disabled = wc($('#ansIn').value) < 3; }
-  $('#ansIn').addEventListener('input', updateSend);
+  $('#ansIn').addEventListener('input', () => { updateSend(); snapSoon(); });
 
   let skipFailed = false;
   $('#btnSkip').addEventListener('click', async () => {
@@ -192,7 +195,7 @@
     busyNow = true; $('#btnSkip').disabled = true; $('#btnSend').disabled = true;
     const r = await callRetry({ action: 'esc_feedback', skipped: true, topic: q.topic || S.topic, question: q.q, focus: q.focus, level: q.level });
     busyNow = false; $('#btnSkip').disabled = false; updateSend();
-    if (!r.ok) { skipFailed = true; msg.className = 'msg err'; msg.textContent = failText(r.kind) + ' Pulsa «No lo sé» otra vez para saltar sin análisis.'; afterFail(r.kind); return; }
+    if (!r.ok) { if (r.kind === 'login') { msg.className = 'msg err'; msg.textContent = failText(r.kind); afterFail(r.kind, 'skip'); return; } skipFailed = true; msg.className = 'msg err'; msg.textContent = failText(r.kind) + ' Pulsa «No lo sé» otra vez para saltar sin análisis.'; afterFail(r.kind); return; }
     msg.textContent = '';
     S.results.push({ q, ans: '', conf: 0, skipped: true, fb: r.data, failed: true });
     registerFail(q);
@@ -207,7 +210,7 @@
     busyNow = true; $('#btnSend').disabled = true;
     const r = await callRetry({ action: 'esc_feedback', topic: q.topic || S.topic, question: q.q, focus: q.focus, level: q.level, userAnswer: ans });
     busyNow = false;
-    if (!r.ok) { msg.className = 'msg err'; msg.textContent = failText(r.kind); updateSend(); afterFail(r.kind); return; }
+    if (!r.ok) { msg.className = 'msg err'; msg.textContent = failText(r.kind); updateSend(); afterFail(r.kind, 'send'); return; }
     const fb = r.data;
     const failed = isFailed(fb);
     S.results.push({ q, ans, conf, fb, failed });
@@ -256,9 +259,7 @@
       $('#btnNext').textContent = S.i + 1 >= S.qs.length ? 'Ver resumen' : 'Siguiente';
       return;
     }
-    let h = '<div class="card"><h3>Por criterios</h3>';
-    Object.keys(CRIT).forEach((k) => { const c = fb.criteria[k]; h += '<div class="crit"><div><span class="lv ' + c.level + '">' + LVTXT[c.level] + '</span><br><small>' + CRIT[k] + '</small></div><p>' + esc(c.note) + '</p></div>'; });
-    h += '</div>';
+    let h = '';
     if (fb.summary) h += '<p>' + esc(fb.summary) + '</p>';
     const cal = calibration(res); if (cal) h += '<p class="calib">' + esc(cal) + '</p>';
     if (fb.wrong && fb.wrong.length) { h += '<div class="card"><h3>Lo que está equivocado</h3>'; fb.wrong.forEach((t) => { h += '<div class="sug"><s>' + esc(t.said) + '</s><br>→ <b>' + esc(t.correct) + '</b>' + (t.why ? '<em>' + esc(t.why) + '</em>' : '') + '</div>'; }); h += '</div>'; }
@@ -272,6 +273,9 @@
         (S.parent ? '' : '<p class="small">Después podrás volver aquí, a la pregunta ' + (S.i + 2 <= S.qs.length ? (S.i + 2) : 'final') + '.</p>') + '</div>';
     }
     h += '<div class="card"><h3>Respuesta modelo</h3><div class="model">' + esc(fb.modelAnswer) + '</div></div>';
+    h += '<div class="card"><h3>Por criterios</h3>';   // la evaluación por criterios va al final del análisis
+    Object.keys(CRIT).forEach((k) => { const c = fb.criteria[k]; h += '<div class="crit"><div><span class="lv ' + c.level + '">' + LVTXT[c.level] + '</span><br><small>' + CRIT[k] + '</small></div><p>' + esc(c.note) + '</p></div>'; });
+    h += '</div>';
     $('#fbBody').innerHTML = h;
     document.querySelectorAll('#fbBody [data-pract]').forEach((bc) => bc.addEventListener('click', () => {
       const k = bc.dataset.pract;
@@ -345,7 +349,7 @@
     const lvl = Math.min(3, S.level + 1);
     const r = await fetchQuestions(S.topic, lvl, [2, 3, 5, 8].includes(S.qs.length) ? S.qs.length : 5, S.qs.map((q) => q.q));
     busyNow = false; b.disabled = false; b.textContent = old;
-    if (!r.ok) { toast(failText(r.kind)); afterFail(r.kind); return; }
+    if (!r.ok) { toast(failText(r.kind)); afterFail(r.kind, 'levelup'); return; }
     track('esc_levelup', { level: lvl });
     begin(S.topic, lvl, r.data.questions, false);
   });
@@ -363,6 +367,56 @@
     $(b.dataset.nav === 'practice' ? '#modePractice' : '#modeWrite').click();
   }));
 
+  /* ---------- no perder el trabajo al iniciar sesión ----------
+     Iniciar sesión (sobre todo con Google o al confirmar el correo) puede recargar la página. Se guarda una foto
+     de la pantalla actual (tema, nivel, preguntas, respuesta a medio escribir, escrito abierto) y se vuelve a ella.
+     Además, la acción que pidió la cuenta (empezar, enviar, «no lo sé», subir de nivel) se reintenta sola al entrar. */
+  const SNAP = 'esc_snap';
+  function snap() {
+    clearTimeout(snapT);
+    lsSet(SNAP, { t: Date.now(), view: curView, topic: topicIn.value, count, pickLv, S, ans: $('#ansIn').value, conf, pend, wid: window.ESC_W ? window.ESC_W.cur() : null });
+  }
+  function snapSoon() { clearTimeout(snapT); snapT = setTimeout(snap, 400); }
+  window.addEventListener('pagehide', snap);
+  function setSeg(sel, attr, val) { document.querySelectorAll(sel + ' button').forEach((x) => { const on = String(x.dataset[attr]) === String(val); x.classList.toggle('on', on); x.setAttribute('aria-checked', on); }); }
+  function restore() {
+    const d = ls(SNAP, null); if (!d || !d.t || Date.now() - d.t > 6 * 3600000) return false;
+    if (d.topic) { topicIn.value = d.topic; btnStart.disabled = clip(topicIn.value, 160).length < 2; }
+    if (d.count) { count = d.count; setSeg('#countSeg', 'n', count); }
+    if (d.pickLv) { pickLv = d.pickLv; setSeg('#levelPick', 'lv', pickLv); }
+    pend = d.pend || null;
+    if (d.view === 'Write' && d.wid && window.ESC_W && window.ESC_W.openId(d.wid)) return true;
+    if (d.S && Array.isArray(d.S.qs) && d.S.qs.length && ['Ask', 'Fb', 'End'].includes(d.view)) {
+      S = d.S;
+      if (d.view === 'Ask' && S.i < S.qs.length) {
+        askCurrent(); $('#ansIn').value = d.ans || ''; updateSend();
+        if (d.conf) { conf = d.conf; document.querySelectorAll('#confSeg button').forEach((x) => x.classList.toggle('on', Number(x.dataset.c) === conf)); }
+        return true;
+      }
+      if (d.view === 'Fb' && S.results.length) { renderFb(S.results[S.results.length - 1]); return true; }
+      if (d.view === 'End' && S.results.length) { renderEnd(); return true; }
+      S = null;
+    }
+    if (d.view === 'Setup') { show('Setup'); return true; }
+    if (d.view === 'Proj' || d.view === 'Genre') { $('#modeWrite').click(); return true; }
+    return false;
+  }
+  function resumePending() {
+    const p = pend; pend = null; snap(); if (!p) return;
+    setTimeout(() => {
+      if (p === 'start' && !$('#vSetup').hidden && !btnStart.disabled) $('#setupForm').requestSubmit();
+      else if (p === 'send' && !$('#vAsk').hidden && !$('#btnSend').disabled) $('#btnSend').click();
+      else if (p === 'skip' && !$('#vAsk').hidden) $('#btnSkip').click();
+      else if (p === 'levelup' && !$('#vEnd').hidden) $('#btnLevelUp').click();
+      else if (p === 'analyze' && window.ESC_W) window.ESC_W.retry();
+      track('esc_resume_after_login', { act: p });
+    }, 300);
+  }
+
   window.ESC = { show, renderHome, callRetry, failText, afterFail, track, toast, esc, clip, ls, lsSet };
   renderHome();
+  setTimeout(() => {   // después de que cargue el modo Escribir (escribir-w.js)
+    if (new URLSearchParams(location.search).get('practicar')) return;
+    if (restore()) { track('esc_restored', { view: curView }); if (pend && user()) resumePending(); }
+  }, 0);
 })();

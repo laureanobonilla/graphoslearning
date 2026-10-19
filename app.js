@@ -9328,7 +9328,7 @@ const vizUI = (() => {
     // ---------- rizoma ----------
     // El mismo mapa, sin jerarquía: cada concepto se acerca a los que comparten significado con él (venga de la rama que venga).
     // Las uniones transversales las propone la IA (se guardan en la raíz); mientras llegan se usa el vocabulario compartido.
-    let rnet = null, rSig = '', rBusy = false, rShowTree = true, rNote = '';
+    let rnet = null, rSig = '', rBusy = false, rShowTree = true, rNote = '', rColor = 'branch', rSize = 'bridge', rRead = true, rLast = null;
     const BRANCH_COLORS = ['#0e857c', '#d9822b', '#6b5bd2', '#c2410c', '#2b7de9', '#b83280', '#4d7c0f', '#0891b2'];
     const RSTOP = new Set('de la el los las un una unos unas y o u en del al que se por con para como su sus es son lo le les mas pero sin sobre entre desde hasta este esta estos estas ese esa eso muy the of and to in is are for on with as by that this from or an be it its'.split(' '));
     function rhizomeModel() {
@@ -9380,24 +9380,160 @@ const vizUI = (() => {
             if (tab === 'rhizome' && open) renderRhizome();
         } else rSetNote(L('Conexiones por vocabulario compartido (no se pudieron pedir las de significado).', 'Connections by shared vocabulary (meaning connections could not be fetched).'));
     }
+
+    // ---------- análisis de la red (lectura del mapa) ----------
+    // Todo se calcula aquí, en el navegador, sobre el árbol + las uniones de significado: sin IA ni costo.
+    //  · «Puente» = centralidad de intermediación (Brandes): cuántos caminos cortos entre conceptos pasan por él.
+    //  · Grupos = comunidades por modularidad (Louvain), con el árbol pesando menos que las uniones de significado.
+    //  · Brechas = pares de grupos grandes con muy pocas uniones entre sí. Inesperadas = uniones entre conceptos lejanos en el árbol.
+    function rBetweenness(ids, adj) {
+        const C = new Map(ids.map(i => [i, 0]));
+        ids.forEach(s0 => {
+            const S = [], P = new Map(ids.map(i => [i, []])), sg = new Map(ids.map(i => [i, 0])), d = new Map(ids.map(i => [i, -1]));
+            sg.set(s0, 1); d.set(s0, 0); const Q = [s0]; let h = 0;
+            while (h < Q.length) { const v = Q[h++]; S.push(v); (adj.get(v) || new Map()).forEach((_w, w) => { if (d.get(w) < 0) { Q.push(w); d.set(w, d.get(v) + 1); } if (d.get(w) === d.get(v) + 1) { sg.set(w, sg.get(w) + sg.get(v)); P.get(w).push(v); } }); }
+            const dl = new Map(ids.map(i => [i, 0]));
+            while (S.length) { const w = S.pop(); P.get(w).forEach(v => dl.set(v, dl.get(v) + sg.get(v) / sg.get(w) * (1 + dl.get(w)))); if (w !== s0) C.set(w, C.get(w) + dl.get(w)); }
+        });
+        const n = ids.length, norm = n > 2 ? (n - 1) * (n - 2) : 1;   // no dirigido: cada par se cuenta dos veces → /2, y se normaliza a 0–1
+        C.forEach((v, k) => C.set(k, v / norm));
+        return C;
+    }
+    function rLouvain(ids, wedges) {
+        // Louvain clásico (fase local + agregación), en orden fijo para que el resultado no cambie entre aperturas.
+        let n = ids.length, member = ids.map((_x, i) => i);
+        let adj = Array.from({ length: n }, () => new Map()), self = new Array(n).fill(0);
+        const ix = new Map(ids.map((x, i) => [x, i]));
+        wedges.forEach(e => { const a = ix.get(e.a), b = ix.get(e.b); if (a == null || b == null || a === b) return; adj[a].set(b, (adj[a].get(b) || 0) + e.w); adj[b].set(a, (adj[b].get(a) || 0) + e.w); });
+        for (let pass = 0; pass < 8; pass++) {
+            const k = adj.map((m, i) => 2 * self[i] + [...m.values()].reduce((x, y) => x + y, 0));
+            const m2 = k.reduce((x, y) => x + y, 0); if (!m2) break;
+            const comm = k.map((_x, i) => i), tot = k.slice();
+            let moved = true, any = false, it = 0;
+            while (moved && it++ < 30) {
+                moved = false;
+                for (let i = 0; i < n; i++) {
+                    const ci = comm[i]; tot[ci] -= k[i];
+                    const kin = new Map(); adj[i].forEach((w, j) => kin.set(comm[j], (kin.get(comm[j]) || 0) + w));
+                    let best = ci, gain = (kin.get(ci) || 0) - tot[ci] * k[i] / m2;
+                    kin.forEach((w, c) => { const g = w - tot[c] * k[i] / m2; if (g > gain + 1e-12) { gain = g; best = c; } });
+                    comm[i] = best; tot[best] += k[i]; if (best !== ci) { moved = true; any = true; }
+                }
+            }
+            if (!any) break;
+            const ren = new Map(); comm.forEach(c => { if (!ren.has(c)) ren.set(c, ren.size); });
+            const n2 = ren.size, adj2 = Array.from({ length: n2 }, () => new Map()), self2 = new Array(n2).fill(0);
+            for (let i = 0; i < n; i++) {
+                const ci = ren.get(comm[i]); self2[ci] += self[i];
+                adj[i].forEach((w, j) => { const cj = ren.get(comm[j]); if (ci === cj) { if (i < j) self2[ci] += w; } else adj2[ci].set(cj, (adj2[ci].get(cj) || 0) + w); });
+            }
+            member = member.map(x => ren.get(comm[x])); n = n2; adj = adj2; self = self2;
+        }
+        return new Map(ids.map((x, i) => [x, member[i]]));
+    }
+    function analyzeRhizome(m, links) {
+        const ids = m.nodes.map(n => n.id), byId = new Map(m.nodes.map(n => [n.id, n])), has = (x) => byId.has(x);
+        const adj = new Map(ids.map(i => [i, new Map()])), wedges = [];
+        const add = (a, b, w) => { if (!has(a) || !has(b) || a === b) return; adj.get(a).set(b, 1); adj.get(b).set(a, 1); wedges.push({ a, b, w }); };
+        m.tree.forEach(e => add(e.a, e.b, 0.35)); links.forEach(l => add(l.a, l.b, 1));
+        const bet = rBetweenness(ids, adj);
+        const raw = rLouvain(ids, wedges);
+        // grupos ordenados por tamaño; los de 1 concepto se juntan en «sueltos»
+        const groups = new Map(); raw.forEach((c, id) => { if (!groups.has(c)) groups.set(c, []); groups.get(c).push(id); });
+        const big = [...groups.values()].filter(g => g.length >= 2).sort((a, b) => b.length - a.length);
+        const comm = new Map(); big.forEach((g, i) => g.forEach(id => comm.set(id, i)));
+        const sueltos = ids.filter(id => !comm.has(id)); sueltos.forEach(id => comm.set(id, -1));
+        const top = (g) => g.slice().sort((a, b) => bet.get(b) - bet.get(a) || String(byId.get(a).label).length - String(byId.get(b).label).length);
+        const comms = big.map((g, i) => ({ i, members: g, top: top(g) }));
+        // modularidad sobre la red de significado
+        const W = wedges.reduce((x, e) => x + e.w, 0) || 1, kc = new Map(), inn = new Map();
+        wedges.forEach(e => { const ca = comm.get(e.a), cb = comm.get(e.b); kc.set(ca, (kc.get(ca) || 0) + e.w); kc.set(cb, (kc.get(cb) || 0) + e.w); if (ca === cb && ca !== -1) inn.set(ca, (inn.get(ca) || 0) + e.w); });
+        let Q = 0; kc.forEach((k, c) => { if (c === -1) return; Q += (inn.get(c) || 0) / W - Math.pow(k / (2 * W), 2); });
+        const share = comms.length ? comms[0].members.length / ids.length : 1;
+        const kind = comms.length <= 1 || share > 0.5 ? 'sesgado' : Q < 0.35 ? 'enfocado' : Q <= 0.62 ? 'diverso' : 'disperso';
+        // distancia en el árbol (para las uniones inesperadas)
+        const tadj = new Map(ids.map(i => [i, []])); m.tree.forEach(e => { if (has(e.a) && has(e.b)) { tadj.get(e.a).push(e.b); tadj.get(e.b).push(e.a); } });
+        const tdist = (a, b) => { const d = new Map([[a, 0]]), q = [a]; let h = 0; while (h < q.length) { const v = q[h++]; if (v === b) return d.get(v); tadj.get(v).forEach(w => { if (!d.has(w)) { d.set(w, d.get(v) + 1); q.push(w); } }); } return 99; };
+        const surprises = links.filter(l => has(l.a) && has(l.b) && byId.get(l.a).branch !== byId.get(l.b).branch)
+            .map(l => ({ ...l, d: tdist(l.a, l.b) })).sort((x, y) => y.d - x.d).slice(0, 5);
+        // brechas: pares de grupos (de 3+ conceptos) con la menor densidad de uniones entre sí
+        // para las preguntas se prefiere un concepto concreto (no la raíz ni el nombre de una rama)
+        const qTop = (c) => c.top.find(id => id !== m.rootId && !(m.parent && m.parent.get(id) === m.rootId)) || c.top[0];
+        const gaps = [], cand = comms.filter(c => c.members.length >= 3).slice(0, 6);
+        for (let i = 0; i < cand.length; i++) for (let j = i + 1; j < cand.length; j++) {
+            const A = new Set(cand[i].members), B = new Set(cand[j].members); let x = 0;
+            links.forEach(l => { if ((A.has(l.a) && B.has(l.b)) || (A.has(l.b) && B.has(l.a))) x++; });
+            gaps.push({ a: cand[i], b: cand[j], qa: qTop(cand[i]), qb: qTop(cand[j]), links: x, dens: x / (A.size * B.size) });
+        }
+        gaps.sort((x, y) => x.dens - y.dens || (y.a.members.length + y.b.members.length) - (x.a.members.length + x.b.members.length));
+        const bridges = ids.filter(id => id !== m.rootId).sort((a, b) => bet.get(b) - bet.get(a)).slice(0, 6).filter(id => bet.get(id) > 0);
+        return { bet, comm, comms, sueltos, Q, kind, share, surprises, gaps: gaps.slice(0, 3), bridges, nLinks: links.length };
+    }
+    const KIND_TXT = {
+        sesgado: ['Concentrado en un solo tema', 'Concentrated on one topic', 'Un grupo de ideas domina el mapa. Si el tema es amplio, quizá falten perspectivas; si es un tema puntual, es lo esperable.', 'One group of ideas dominates the map. If the topic is broad, some perspectives may be missing; if it is narrow, that is expected.'],
+        enfocado: ['Enfocado', 'Focused', 'Hay varios grupos pero muy entrelazados: el mapa gira alrededor de pocas ideas centrales. Bueno para dominar un núcleo; menos para ver alternativas.', 'There are several groups but they are tightly interlinked: the map revolves around a few central ideas. Good to master a core; less so to see alternatives.'],
+        diverso: ['Diverso y conectado', 'Diverse and connected', 'Varios grupos de ideas bien diferenciados y con puentes entre ellos: es el equilibrio que suele indicar una buena comprensión del tema.', 'Several distinct groups of ideas with bridges between them: the balance that usually signals a good grasp of the topic.'],
+        disperso: ['Disperso', 'Dispersed', 'Los grupos casi no se tocan: el tema está fragmentado. Vale la pena trabajar las brechas de abajo para entender cómo se relacionan las partes.', 'The groups barely touch: the topic is fragmented. Worth working on the gaps below to understand how the parts relate.']
+    };
+    function lecturaMd(m, A, lab) {
+        const T = (l) => (lab(l) || '').replace(/\n/g, ' ');
+        const k = KIND_TXT[A.kind];
+        const out = [`# ${L('Lectura del mapa', 'Map reading')}: ${m.rootLabel}`, '', `${L('Conceptos', 'Concepts')}: ${m.nodes.length} · ${L('uniones de significado', 'meaning links')}: ${A.nLinks} · ${L('grupos', 'groups')}: ${A.comms.length}`, '',
+            `## ${L('Estructura', 'Structure')}: ${L(k[0], k[1])}`, L(k[2], k[3]), '', `## ${L('Conceptos puente', 'Bridge concepts')}`, ...A.bridges.map((id, i) => `${i + 1}. ${T(id)}`), '',
+            `## ${L('Grupos de ideas', 'Idea groups')}`, ...A.comms.map((c, i) => `- **${L('Grupo', 'Group')} ${i + 1}** (${c.members.length}): ${c.top.slice(0, 6).map(T).join(', ')}`), ''];
+        if (A.gaps.length) out.push(`## ${L('Brechas para explorar', 'Gaps to explore')}`, ...A.gaps.map(g => `- ${L('¿Cómo se relaciona', 'How does')} «${T(g.qa)}» ${L('con', 'relate to')} «${T(g.qb)}»? (${g.links} ${L('uniones entre esos grupos', 'links between those groups')})`), '');
+        if (A.surprises.length) out.push(`## ${L('Conexiones inesperadas', 'Unexpected connections')}`, ...A.surprises.map(l => `- ${T(l.a)} ↔ ${T(l.b)}${l.why ? ': ' + l.why : ''}`), '');
+        out.push('_' + L('Generado por Graphikosmos. «Puente»: centralidad de intermediación; grupos: comunidades por modularidad.', 'Generated by Graphikosmos. «Bridge»: betweenness centrality; groups: modularity communities.') + '_');
+        return out.join('\n');
+    }
+    function renderLectura(m, A, byId, colorOfComm) {
+        const el = document.getElementById('vzRhPane'); if (!el) return;
+        const lab = (id) => (byId.get(id) || {}).label || '';
+        const chip = (id) => `<button type="button" class="vz-chip" data-nid="${esc(id)}" title="${esc(lab(id))}">${esc(lab(id))}</button>`;
+        const k = KIND_TXT[A.kind], maxB = Math.max(...A.bridges.map(id => A.bet.get(id)), 1e-9);
+        el.innerHTML = `<div class="vz-rd-h"><b>${esc(L('Lectura del mapa', 'Map reading'))}</b><button type="button" class="vz-ghost" id="vzRdMd">${esc(L('Descargar (.md)', 'Download (.md)'))}</button></div>
+          <div class="vz-rd-k"><span class="vz-rd-kind k-${A.kind}">${esc(L(k[0], k[1]))}</span><p>${esc(L(k[2], k[3]))}</p><p class="vz-rd-m">${m.nodes.length} ${esc(L('conceptos', 'concepts'))} · ${A.nLinks} ${esc(L('uniones de significado', 'meaning links'))} · ${A.comms.length} ${esc(L('grupos', 'groups'))} · ${esc(L('modularidad', 'modularity'))} ${A.Q.toFixed(2)}</p></div>
+          <h4>${esc(L('Conceptos puente', 'Bridge concepts'))}</h4><p class="vz-rd-s">${esc(L('Por ellos pasan más caminos entre ideas distintas. Si los entiendes bien, entiendes cómo se arma el tema.', 'Most paths between different ideas go through them. Understand these and you understand how the topic fits together.'))}</p>
+          ${A.bridges.length ? `<ol class="vz-rd-b">${A.bridges.map(id => `<li>${chip(id)}<span class="vz-rd-bar"><i style="width:${Math.max(6, A.bet.get(id) / maxB * 100)}%"></i></span></li>`).join('')}</ol>` : `<p class="vz-rd-s">${esc(L('Todavía no hay suficientes uniones.', 'Not enough links yet.'))}</p>`}
+          <h4>${esc(L('Grupos de ideas', 'Idea groups'))}</h4>
+          <div class="vz-rd-g">${A.comms.map((c, i) => `<div class="vz-rd-gi"><button type="button" class="vz-rd-gb" data-grp="${i}"><i style="background:${colorOfComm(i)}"></i>${esc(L('Grupo', 'Group'))} ${i + 1} · ${c.members.length}</button><div>${c.top.slice(0, 5).map(chip).join('')}</div></div>`).join('')}</div>
+          ${A.gaps.length ? `<h4>${esc(L('Brechas para explorar', 'Gaps to explore'))}</h4><p class="vz-rd-s">${esc(L('Grupos que casi no se conectan. Responder estas preguntas es donde más se aprende.', 'Groups that barely connect. Answering these questions is where most learning happens.'))}</p>
+          ${A.gaps.map((g, i) => `<div class="vz-rd-gap"><p>${esc(L('¿Cómo se relaciona', 'How does'))} ${chip(g.qa)} ${esc(L('con', 'relate to'))} ${chip(g.qb)}?</p><button type="button" class="vz-ghost" data-gap="${i}">${esc(L('Ver ambos grupos', 'Show both groups'))}</button></div>`).join('')}` : ''}
+          ${A.surprises.length ? `<h4>${esc(L('Conexiones inesperadas', 'Unexpected connections'))}</h4><p class="vz-rd-s">${esc(L('Conceptos de ramas lejanas que comparten significado.', 'Concepts from distant branches that share meaning.'))}</p>
+          ${A.surprises.map(l => `<div class="vz-rd-sp">${chip(l.a)}<span>↔</span>${chip(l.b)}${l.why ? `<small>${esc(l.why)}</small>` : ''}</div>`).join('')}` : ''}`;
+        const focus = (list) => { try { rnet.selectNodes(list); if (list.length === 1) rnet.focus(list[0], { scale: 1.1, animation: { duration: 400 } }); else rnet.fit({ nodes: list, animation: { duration: 400 } }); } catch (_e) { /* ok */ } };
+        el.querySelectorAll('[data-nid]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.nid, n = byId.get(id); focus([id]); showQuote(n ? (n.def || n.simple || n.path.concat(n.label).join(' › ')) : null, { noFind: true }); try { network.selectNodes([id]); } catch (_e) { /* ok */ } }));
+        el.querySelectorAll('[data-grp]').forEach(b => b.addEventListener('click', () => focus(A.comms[Number(b.dataset.grp)].members)));
+        el.querySelectorAll('[data-gap]').forEach(b => b.addEventListener('click', () => { const g = A.gaps[Number(b.dataset.gap)]; focus(g.a.members.concat(g.b.members)); track('lectura_brecha', {}); }));
+        document.getElementById('vzRdMd').addEventListener('click', () => {
+            const blob = new Blob([lecturaMd(m, A, lab)], { type: 'text/markdown;charset=utf-8' }), a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); a.download = (m.rootLabel || 'mapa').replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 60) + '-lectura.md'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+            track('lectura_md', { nodes: m.nodes.length });
+        });
+    }
     function renderRhizome() {
         const m = rhizomeModel();
         if (m.nodes.length < 5) { bodyEl.innerHTML = `<div class="vz-empty">${esc(L('Necesitas al menos 5 conceptos para ver el rizoma.', 'You need at least 5 concepts to see the rhizome.'))}</div>`; return; }
         const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
         const saved = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links : null;
         const links = saved || localRhizomeLinks(m);
-        const sig = m.hash + '|' + (saved ? 'ai' : 'local') + '|' + rShowTree + '|' + links.length;
+        const sig = m.hash + '|' + (saved ? 'ai' : 'local') + '|' + rShowTree + '|' + links.length + '|' + rColor + rSize + rRead;
         if (rnet && sig === rSig) return;
         rSig = sig; if (rnet) { try { rnet.destroy(); } catch (_e) { /* ok */ } rnet = null; }
         const brs = []; m.nodes.forEach(n => { if (!brs.includes(n.branch)) brs.push(n.branch); });
-        const colorOf = (n) => BRANCH_COLORS[brs.indexOf(n.branch) % BRANCH_COLORS.length];
         const byId = new Map(m.nodes.map(n => [n.id, n]));
-        const legend = brs.map(b => { const bn = byId.get(b); return `<span class="vz-lg"><i style="background:${BRANCH_COLORS[brs.indexOf(b) % BRANCH_COLORS.length]}"></i>${esc(bn ? bn.label : '')}</span>`; }).join('');
+        const A = analyzeRhizome(m, links); rLast = A;
+        const colorOfComm = (i) => (i < 0 ? '#b9b4a6' : BRANCH_COLORS[i % BRANCH_COLORS.length]);
+        const colorOf = (n) => (rColor === 'group' ? colorOfComm(A.comm.get(n.id)) : BRANCH_COLORS[brs.indexOf(n.branch) % BRANCH_COLORS.length]);
+        const legend = rColor === 'group'
+            ? A.comms.map((c, i) => `<span class="vz-lg"><i style="background:${colorOfComm(i)}"></i>${esc(L('Grupo', 'Group'))} ${i + 1}: ${esc((byId.get(c.top[0]) || {}).label || '')}</span>`).join('')
+            : brs.map(b => { const bn = byId.get(b); return `<span class="vz-lg"><i style="background:${BRANCH_COLORS[brs.indexOf(b) % BRANCH_COLORS.length]}"></i>${esc(bn ? bn.label : '')}</span>`; }).join('');
         const h = Math.max(240, bodyEl.clientHeight - 92);
-        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('Cada concepto se acerca a los que comparten significado con él, sin importar de qué rama vengan. El tamaño indica cuántas conexiones tiene y el color, su rama de origen.', 'Each concept moves toward the ones it shares meaning with, whatever branch they come from. Size shows how many connections it has; color, the branch it comes from.'))}</div><div class="vz-rh-ctl"><label><input type="checkbox" id="vzRhTree"${rShowTree ? ' checked' : ''}> ${esc(L('Mostrar el árbol original', 'Show the original tree'))}</label><button type="button" class="vz-ghost" id="vzRhShake">${esc(L('Reacomodar', 'Re-arrange'))}</button><button type="button" class="vz-ghost" id="vzRhAi">${esc(L('Recalcular conexiones', 'Recompute connections'))}</button><span class="vz-rh-note" id="vzRhNote">${esc(saved ? L('Conexiones de significado propuestas por la IA. Toca una línea para ver qué las une.', 'Meaning connections proposed by the AI. Tap a line to see what links them.') : L('Mostrando conexiones por vocabulario compartido…', 'Showing connections by shared vocabulary…'))}</span></div><div class="vz-rh-lg">${legend}</div></div><div class="vz-rhz" id="vzRhz" style="height:${h}px"></div>`;
+        const maxBet = Math.max(...m.nodes.map(n => A.bet.get(n.id) || 0), 1e-9);
+        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('Cada concepto se acerca a los que comparten significado con él, sin importar de qué rama vengan.', 'Each concept moves toward the ones it shares meaning with, whatever branch they come from.'))} ${esc(rSize === 'bridge' ? L('El tamaño indica cuánto sirve de puente entre ideas;', 'Size shows how much it bridges ideas;') : L('El tamaño indica cuántas conexiones tiene;', 'Size shows how many connections it has;'))} ${esc(rColor === 'group' ? L('el color, su grupo de ideas.', 'color, its idea group.') : L('el color, su rama de origen.', 'color, the branch it comes from.'))}</div><div class="vz-rh-ctl"><label><input type="checkbox" id="vzRhTree"${rShowTree ? ' checked' : ''}> ${esc(L('Mostrar el árbol original', 'Show the original tree'))}</label><button type="button" class="vz-ghost" id="vzRhShake">${esc(L('Reacomodar', 'Re-arrange'))}</button><button type="button" class="vz-ghost" id="vzRhAi">${esc(L('Recalcular conexiones', 'Recompute connections'))}</button><label>${esc(L('Color', 'Color'))} <select id="vzRhColor"><option value="branch"${rColor === 'branch' ? ' selected' : ''}>${esc(L('por rama', 'by branch'))}</option><option value="group"${rColor === 'group' ? ' selected' : ''}>${esc(L('por grupo de ideas', 'by idea group'))}</option></select></label><label>${esc(L('Tamaño', 'Size'))} <select id="vzRhSize"><option value="bridge"${rSize === 'bridge' ? ' selected' : ''}>${esc(L('concepto puente', 'bridge concept'))}</option><option value="deg"${rSize === 'deg' ? ' selected' : ''}>${esc(L('n.º de conexiones', 'no. of connections'))}</option></select></label><button type="button" class="vz-ghost${rRead ? ' on' : ''}" id="vzRhRead">${esc(rRead ? L('Ocultar lectura', 'Hide reading') : L('Lectura del mapa', 'Map reading'))}</button><span class="vz-rh-note" id="vzRhNote">${esc(saved ? L('Conexiones de significado propuestas por la IA. Toca una línea para ver qué las une.', 'Meaning connections proposed by the AI. Tap a line to see what links them.') : L('Mostrando conexiones por vocabulario compartido…', 'Showing connections by shared vocabulary…'))}</span></div><div class="vz-rh-lg">${legend}</div></div><div class="vz-rh-wrap${rRead ? ' with-read' : ''}" style="--rh:${h}px"><div class="vz-rhz" id="vzRhz" style="height:${h}px"></div>${rRead ? '<aside class="vz-rd" id="vzRhPane"></aside>' : ''}</div>`;
         const deg = new Map(m.nodes.map(n => [n.id, 0])); links.forEach(l => { if (deg.has(l.a) && deg.has(l.b)) { deg.set(l.a, deg.get(l.a) + 1); deg.set(l.b, deg.get(l.b) + 1); } });
         const wrap = (t) => { const w = String(t).split(' '); const out = []; let line = ''; w.forEach(x => { if ((line + ' ' + x).trim().length > 16 && line) { out.push(line); line = x; } else line = (line + ' ' + x).trim(); }); if (line) out.push(line); return out.join('\n'); };
-        const vn = new vis.DataSet(m.nodes.map(n => ({ id: n.id, label: wrap(n.label), shape: 'dot', size: (n.id === m.rootId ? 20 : 8) + Math.min(18, (deg.get(n.id) || 0) * 3.5), color: { background: colorOf(n), border: '#ffffff', highlight: { background: colorOf(n), border: '#1d2330' } }, borderWidth: 2, font: { size: 13, face: 'Inter, sans-serif', color: '#1d2330', strokeWidth: 4, strokeColor: '#f7f6f1' } })));
+        const vn = new vis.DataSet(m.nodes.map(n => ({ id: n.id, label: wrap(n.label), shape: 'dot', size: rSize === 'bridge' ? 7 + 26 * Math.sqrt((A.bet.get(n.id) || 0) / maxBet) : (n.id === m.rootId ? 20 : 8) + Math.min(18, (deg.get(n.id) || 0) * 3.5), color: { background: colorOf(n), border: '#ffffff', highlight: { background: colorOf(n), border: '#1d2330' } }, borderWidth: 2, font: { size: 13, face: 'Inter, sans-serif', color: '#1d2330', strokeWidth: 4, strokeColor: '#f7f6f1' } })));
         const ve = new vis.DataSet();
         if (rShowTree) m.tree.forEach((e, i) => ve.add({ id: 't' + i, from: e.a, to: e.b, width: 1, dashes: [2, 5], color: { color: '#cfcbbd', highlight: '#9aa3b2' }, length: 210, smooth: false, selectionWidth: 0, hoverWidth: 0 }));
         links.forEach((l, i) => { if (!byId.has(l.a) || !byId.has(l.b)) return; ve.add({ id: 'c' + i, from: l.a, to: l.b, why: l.why, width: 2.2, color: { color: 'rgba(14,133,124,.55)', highlight: '#0e857c' }, length: 95, smooth: { enabled: true, type: 'curvedCW', roundness: 0.18 }, title: l.why }); });
@@ -9417,12 +9553,17 @@ const vizUI = (() => {
         document.getElementById('vzRhTree').addEventListener('change', (e) => { rShowTree = e.target.checked; renderRhizome(); });
         document.getElementById('vzRhShake').addEventListener('click', () => { rSig = ''; renderRhizome(); });
         document.getElementById('vzRhAi').addEventListener('click', () => { const r = rhizomeModel(); askRhizomeAi(r); });
+        document.getElementById('vzRhColor').addEventListener('change', (e) => { rColor = e.target.value; track('rhizome_color', { v: rColor }); renderRhizome(); });
+        document.getElementById('vzRhSize').addEventListener('change', (e) => { rSize = e.target.value; renderRhizome(); });
+        document.getElementById('vzRhRead').addEventListener('click', () => { rRead = !rRead; track('lectura_toggle', { open: rRead }); renderRhizome(); });
+        if (rRead) renderLectura(m, A, byId, colorOfComm);
         if (!saved) askRhizomeAi(m);
-        track('rhizome_view', { nodes: m.nodes.length, links: links.length, ai: !!saved });
+        track('rhizome_view', { nodes: m.nodes.length, links: links.length, ai: !!saved, grupos: A.comms.length, tipo: A.kind });
     }
     function fitRhizome() {
         const el = document.getElementById('vzRhz'); if (!el || !rnet) return;
         el.style.height = Math.max(240, bodyEl.clientHeight - 92) + 'px';
+        const wr = el.parentElement; if (wr && wr.classList.contains('vz-rh-wrap')) wr.style.setProperty('--rh', el.style.height);
         try { rnet.setSize('100%', el.style.height); rnet.redraw(); } catch (_e) { /* ok */ }
     }
     function renderBody() {
