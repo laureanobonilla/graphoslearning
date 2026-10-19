@@ -16,6 +16,8 @@ const KNOWN = new Set([
     'topic_text', 'views', 'rhizome',
     // Rizoma › Lectura del mapa: explicar cómo se conectan dos grupos de ideas que casi no se tocan (1 nodo).
     'bridge_gap',
+    // Definiciones › conceptos clave que el mapa da por sabidos (filtrar candidatos y definirlos; gratis).
+    'key_concepts',
     // Documentos muy largos: resumen por fragmentos (gratis); el esquema final se cobra como parse_text.
     'long_outline',
     // Idiomas (/idiomas/): mapa de bloques con rol gramatical (se cobra por nodo) y palabra suelta en contexto (gratis).
@@ -27,7 +29,7 @@ const KNOWN = new Set([
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome', 'esc_questions', 'esc_analyze']);
+const FREE = new Set(['key_concepts', 'define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome', 'esc_questions', 'esc_analyze']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.

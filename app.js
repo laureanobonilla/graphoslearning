@@ -8823,7 +8823,7 @@ async function exportReportRtf() {
     function putCell(row, i, text) {
         const t = String(text || '').trim(); if (!t) return false;
         const c = row._cells[i]; c.textContent = '';
-        c.appendChild(document.createTextNode(t)); return true;
+        c.appendChild(document.createTextNode(t)); kcMark(c); return true;
     }
     function fillRow(row, n) {
         const vals = [n.definition, n.simple, n.example];
@@ -8886,7 +8886,7 @@ async function exportReportRtf() {
         [T.term, T.def, T.simple, T.ex].forEach(t => { const d = document.createElement('div'); d.textContent = t; h.appendChild(d); });
         grid.appendChild(h);
         list.forEach(({ n, depth }) => grid.appendChild(makeRow(n, depth)));
-        updateProgress();
+        updateProgress(); kcLoadSaved(); kcPaint(); kcSoon(1200);
         return list;
     }
     // Se piden en bloques pequeños (5) y 3 a la vez: cada bloque que llega rellena sus filas
@@ -8942,6 +8942,7 @@ async function exportReportRtf() {
                         });
                     } finally { isApplyingUndo = false; }
                     chunk.forEach(({ n }) => { const row = rowOf.get(String(n.id)); const fresh = nodes.get(n.id); if (row && fresh) fillRow(row, fresh); });
+                    kcSoon();
                     pendingRows -= chunk.length; updateProgress();
                 } catch (_e) { failed = true; pendingRows -= chunk.length; }
             }
@@ -8964,6 +8965,127 @@ async function exportReportRtf() {
         const rest = [...allById.values()].filter(n => !shown.has(String(n.id))).map(n => ({ n, depth: 0 }));
         return loadMissing(list.concat(rest), ++loadMissing.token);
     }
+    // ---------- conceptos clave que el mapa da por sabidos ----------
+    // Términos (1 a 3 palabras) que aparecen en las definiciones de varios conceptos distintos sin tener nodo propio.
+    // El conteo se hace aquí, gratis; la IA solo descarta los genéricos y los define (acción gratuita `key_concepts`).
+    // Se guardan en la raíz (`keyConcepts`) y se subrayan dentro de las definiciones.
+    const KC_STOP = new Set(('a al algo algun alguna algunas algunos ante antes aquel aquella asi aun aunque bajo bien cada casi como con contra cual cuales cuando de del desde donde dos e el ella ellas ellos en entre era eran es esa esas ese eso esos esta estas este esto estos fue fueron ha han hasta hay la las le les lo los mas me mientras mismo misma mucho mucha muchos muchas muy ni no nos o otra otras otro otros para pero poco por porque que quien se ser si sido sin sobre solo son su sus tal tambien tan tanto te tiene tienen todo toda todos todas tras tu un una uno unos unas y ya cuyo cuya donde segun the of and to in is are for on with as by that this from or an be it its which into their more than when also can such these those other'
+        + ' forma formas manera maneras parte partes tipo tipos modo modos caso casos ejemplo ejemplos vez veces cosa cosas hecho hechos idea ideas tema temas nivel niveles aspecto aspectos elemento elementos persona personas gente mundo vida tiempo momento lugar mayor menor gran grande grandes nuevo nueva nuevos nuevas propio propia propios propias importante importantes general generales diferente diferentes distintos distintas cierto cierta ciertos ciertas mediante traves permite permiten puede pueden hace hacen hacer sirve sirven decir significa explica explicacion definicion sencilla sencillo concreto concreta cuenta uso usos funcion funciones relacion relaciones manera conjunto serie base cambio cambios problema problemas resultado resultados trabajo personas grupo grupos cantidad numero sentido medida principal principales actual actuales posible posibles necesario necesaria capaz principio final inicio ejemplo situacion situaciones ambito area areas accion acciones efecto efectos objetivo objetivos tipo valor valores punto puntos').split(' '));
+    const kcNorm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    let KC = null, kcSel = -1, kcBusy = '', kcT = null, kcRe = null;
+    const kcRoot = () => { const hasIn = new Set(plainEdges().filter(e => !(isRelatedEdgeLabel && isRelatedEdgeLabel(e.label))).map(e => String(e.to))); return nodes.get().find(n => !n.isSubscheme && !hasIn.has(String(n.id))) || null; };
+    function kcCandidates() {
+        const all = nodes.get().filter(n => !n.isSubscheme && !n.isPointer);
+        const withDef = all.filter(n => String(n.definition || '').trim());
+        if (all.length < 5 || withDef.length < Math.max(5, all.length * 0.6)) return null;   // aún llegan definiciones
+        const labels = all.map(n => kcNorm(cleanLabel(n))).filter(Boolean);
+        const par = new Map(); plainEdges().forEach(e => { if (!(isRelatedEdgeLabel && isRelatedEdgeLabel(e.label))) par.set(String(e.to), String(e.from)); });
+        const branchOf = (id) => { let c = String(id), prev = c, g = 0; while (par.has(c) && g++ < 12) { prev = c; c = par.get(c); } return prev; };
+        const stat = new Map();   // norma → { forms: Map, nodes: Set, br: Set, n }
+        withDef.forEach(nd => {
+            const txt = [nd.definition, nd.simple, nd.example].map(x => String(x || '')).join(' . ');
+            const words = txt.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*|[.,;:()¿?¡!]/gu) || [];
+            const seenHere = new Set();
+            for (let i = 0; i < words.length; i++) for (let n = 1; n <= 3 && i + n <= words.length; n++) {
+                const seg = words.slice(i, i + n); if (seg.some(w => /^[.,;:()¿?¡!]$/.test(w))) break;
+                const nw = seg.map(kcNorm), first = nw[0], last = nw[n - 1];
+                if (KC_STOP.has(first) || KC_STOP.has(last) || /^\d/.test(first) || last.length < 3) continue;
+                if (n === 1 && (first.length < 6 || /(ar|er|ir|ando|iendo|mente)$/.test(first))) continue;
+                if (n > 1 && nw.filter(w => !KC_STOP.has(w)).length < 2 && n === 3) continue;
+                const key = nw.join(' '); if (seenHere.has(key)) continue; seenHere.add(key);
+                let o = stat.get(key); if (!o) { o = { forms: new Map(), nodes: new Set(), br: new Set(), n }; stat.set(key, o); }
+                const form = seg.join(' '); o.forms.set(form, (o.forms.get(form) || 0) + 1); o.nodes.add(String(nd.id)); o.br.add(branchOf(nd.id));
+            }
+        });
+        const minDf = all.length < 12 ? 2 : 3;
+        const sing = (t) => t.split(' ').map(w => w.length > 4 ? w.replace(/(es|s)$/, '') : w).join(' ');   // «multiplicidades» = «multiplicidad»
+        const labS = labels.map(sing);
+        let list = [...stat.entries()].filter(([k, o]) => o.nodes.size >= minDf && !labS.some(l => l === sing(k) || (' ' + l + ' ').includes(' ' + sing(k) + ' ')))
+            .map(([k, o]) => { const form = [...o.forms.entries()].sort((a, b) => b[1] - a[1])[0][0]; return { k, t: o.n === 1 || /^\p{Lu}/u.test(form) ? form : form.charAt(0).toLowerCase() + form.slice(1), df: o.nodes.size, nodes: [...o.nodes], score: o.nodes.size * (1 + 0.3 * (o.br.size - 1)) + (o.n > 1 ? 0.6 : 0) }; });
+        // si una frase más larga se repite casi igual, se queda la frase (no sus palabras sueltas)
+        list = list.filter(c => !list.some(d => d !== c && d.k.split(' ').length > c.k.split(' ').length && (' ' + d.k + ' ').includes(' ' + c.k + ' ') && d.df >= c.df * 0.75));
+        list.sort((a, b) => b.score - a.score);
+        return { cands: list.slice(0, 30), labels: all.map(cleanLabel).filter(Boolean) };
+    }
+    function kcBuildRe() {
+        kcRe = null; if (!KC || !KC.items.length) return;
+        const alt = KC.items.map((it, i) => ({ i, src: kcNorm(it.term).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') })).sort((a, b) => b.src.length - a.src.length);
+        kcRe = { re: new RegExp('(^|[^\\p{L}\\p{N}])(' + alt.map(a => a.src).join('|') + ')(?=$|[^\\p{L}\\p{N}])', 'gu'), byNorm: new Map(KC.items.map((it, i) => [kcNorm(it.term), i])) };
+    }
+    // Subraya los conceptos clave dentro de una celda de texto (se compara sin tildes ni mayúsculas).
+    function kcMark(cell) {
+        if (!kcRe || !cell || cell.querySelector('.dv-wr')) return;
+        const t = cell.textContent; if (!t) return;
+        const norm = kcNorm(t); if (norm.length !== t.length) return;   // por seguridad: solo si las posiciones coinciden
+        const frag = document.createDocumentFragment(); let last = 0, m, hit = false; kcRe.re.lastIndex = 0;
+        while ((m = kcRe.re.exec(norm))) {
+            const st = m.index + m[1].length, en = st + m[2].length, i = kcRe.byNorm.get(m[2]); if (i == null) continue;
+            frag.appendChild(document.createTextNode(t.slice(last, st)));
+            const sp = document.createElement('span'); sp.className = 'dv-kc'; sp.dataset.kc = String(i); sp.textContent = t.slice(st, en); sp.title = KC.items[i].simple || KC.items[i].definition;
+            frag.appendChild(sp); last = en; hit = true;
+        }
+        if (!hit) return; frag.appendChild(document.createTextNode(t.slice(last))); cell.textContent = ''; cell.appendChild(frag);
+    }
+    const kcMarkAll = () => grid.querySelectorAll('.dv-row[data-id] .dv-cell').forEach(c => { if (c.querySelector('.dv-kc')) c.textContent = c.textContent; kcMark(c); });
+    function kcBox() {
+        let box = document.getElementById('dvKC');
+        if (!box) { box = document.createElement('section'); box.id = 'dvKC'; box.className = 'dv-kcbox'; grid.parentElement.insertBefore(box, grid); }
+        return box;
+    }
+    function kcPaint() {
+        const box = kcBox();
+        if (!KC || !KC.items.length) { box.innerHTML = kcBusy ? `<div class="kc-h"><b>${en ? 'Key concepts' : 'Conceptos clave'}</b><span class="kc-load"><i class="dv-spin"></i>${en ? 'Looking for the concepts the map takes for granted…' : 'Buscando los conceptos que el mapa da por sabidos…'}</span></div>` : ''; box.hidden = !kcBusy; return; }
+        box.hidden = false;
+        const it = KC.items[kcSel];
+        const nodeChip = (id) => { const n = allById.get(String(id)) || nodes.get(id); return n ? `<button type="button" class="kc-n" data-goto="${String(id).replace(/"/g, '&quot;')}">${escH(cleanLabel(n))}</button>` : ''; };
+        box.innerHTML = `<div class="kc-h"><b>${en ? 'Key concepts' : 'Conceptos clave'}</b><span>${en ? 'used across the definitions but not explained by the map' : 'que las definiciones usan y el mapa no explica'}</span></div>
+          <div class="kc-chips">${KC.items.map((x, i) => `<button type="button" class="kc-chip${i === kcSel ? ' on' : ''}" data-kci="${i}">${escH(x.term)}<small>${x.nodes.length}</small></button>`).join('')}</div>
+          ${it ? `<div class="kc-card"><p class="kc-def">${escH(it.definition)}</p>${it.simple ? `<p class="kc-simple">${escH(it.simple)}</p>` : ''}<p class="kc-in">${en ? 'Appears in the definitions of' : 'Aparece en las definiciones de'}: ${it.nodes.slice(0, 8).map(nodeChip).join('')}${it.nodes.length > 8 ? ' +' + (it.nodes.length - 8) : ''}</p></div>` : ''}`;
+        box.querySelectorAll('[data-kci]').forEach(b => b.addEventListener('click', () => { const i = Number(b.dataset.kci); kcSel = kcSel === i ? -1 : i; kcPaint(); track('defs_kc_open', { i }); }));
+        box.querySelectorAll('[data-goto]').forEach(b => b.addEventListener('click', () => goToNode(b.dataset.goto)));
+    }
+    const escH = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    function goToNode(id) {
+        const nd = nodes.get(id) || nodes.get(Number(id)); if (!nd) return;
+        const row = ensureRow(nd.id); if (row) { row.scrollIntoView({ block: 'center', behavior: 'smooth' }); flashRow(row); }
+        try { revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); } catch (_e) { /* ok */ }
+        document.dispatchEvent(new CustomEvent('gk:nodepick', { detail: nd.id }));
+    }
+    function kcLoadSaved() {
+        const r = kcRoot(); const kc = r && r.keyConcepts;
+        if (kc && Array.isArray(kc.items)) { if (!KC || KC.hash !== kc.hash) { KC = kc; kcSel = -1; kcBuildRe(); } } else { KC = null; kcRe = null; }
+    }
+    async function kcUpdate() {
+        if (!isOpen()) return;
+        kcLoadSaved();
+        const c = kcCandidates(); if (!c) { kcPaint(); kcMarkAll(); return; }
+        const hash = c.cands.map(x => x.k + ':' + x.df).join('|');
+        if (!c.cands.length) { KC = null; kcRe = null; kcPaint(); return; }
+        if (KC && KC.hash === hash) { kcPaint(); kcMarkAll(); return; }
+        if (KC && KC.items.length && kcBusy !== hash) {   // si ya hay una lista y solo cambió un poco, no se vuelve a pedir
+            const now = new Set(c.cands.map(x => x.k)); const keep = KC.items.filter(x => now.has(kcNorm(x.term)) || now.has(x.k)).length;
+            if (keep >= KC.items.length * 0.7 && Date.now() - (KC.t || 0) < 10 * 60000) { kcPaint(); kcMarkAll(); return; }
+        }
+        if (kcBusy === hash) return; kcBusy = hash; kcPaint();
+        const rootN = kcRoot(); const topic = rootN ? cleanLabel(rootN) : '';
+        let data = null;
+        try { const r = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'key_concepts', topic, candidates: c.cands.map(x => ({ t: x.t, df: x.df })), labels: c.labels.slice(0, 120), lang: en ? 'en' : 'es' }) }); data = r.ok ? await r.json() : null; } catch (_e) { data = null; }
+        if (kcBusy !== hash) return; kcBusy = '';
+        if (!data || !Array.isArray(data.items)) { kcPaint(); track('defs_kc_error', {}); return; }
+        const byT = new Map(c.cands.map(x => [x.t, x]));
+        const items = data.items.map(it => { const cd = byT.get(it.term); return cd ? { term: it.term, k: cd.k, definition: it.definition, simple: it.simple, nodes: cd.nodes } : null; }).filter(Boolean);
+        KC = { hash, items, t: Date.now() }; kcSel = -1; kcBuildRe();
+        const r2 = kcRoot(); if (r2) { isApplyingUndo = true; try { nodes.update({ id: r2.id, keyConcepts: KC }); } finally { isApplyingUndo = false; } }
+        track('defs_kc_ready', { n: items.length, cands: c.cands.length });
+        kcPaint(); kcMarkAll();
+    }
+    const kcSoon = (ms) => { clearTimeout(kcT); kcT = setTimeout(kcUpdate, ms == null ? 2500 : ms); };
+    grid.addEventListener('click', (e) => {
+        const s = e.target.closest('.dv-kc'); if (!s) return;
+        e.stopPropagation(); kcSel = Number(s.dataset.kc); kcPaint();
+        const box = document.getElementById('dvKC'); if (box) box.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        track('defs_kc_inline', {});
+    }, true);
     // Lleva a la fila de un nodo; si está más abajo de lo mostrado, despliega los «Ver más» de sus ancestros.
     function ensureRow(id) {
         id = String(id); if (rowOf.get(id)) return rowOf.get(id);

@@ -516,6 +516,24 @@
         #defsView .dv-row:nth-of-type(even) { background: var(--p-bg2); }
         #defsView .dv-row.dv-flash { background: var(--p-acc-bg) !important; }
         #defsView .dv-row.dv-h { display: none; }
+        #defsView .dv-kcbox { padding: 16px 22px 14px 26px; border-bottom: 1px solid var(--p-rule); background: var(--p-head, var(--p-bg)); }
+        #defsView .dv-kcbox[hidden] { display: none; }
+        #defsView .kc-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin-bottom: 10px; }
+        #defsView .kc-h b { font: 700 13px 'Sora', sans-serif; letter-spacing: .04em; text-transform: uppercase; color: var(--p-ink); }
+        #defsView .kc-h span { font: 400 12.5px 'Inter', sans-serif; color: var(--p-mute); }
+        #defsView .kc-load { display: inline-flex; align-items: center; gap: 8px; }
+        #defsView .kc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        #defsView .kc-chip { border: 1px solid var(--p-rule); background: #fff; color: var(--p-ink); border-radius: 999px; padding: 5px 11px; font: 600 13px 'Inter', sans-serif; cursor: pointer; transition: border-color .15s, background .15s; }
+        #defsView .kc-chip small { margin-left: 6px; font-weight: 700; color: var(--p-acc); }
+        #defsView .kc-chip:hover, #defsView .kc-chip.on { border-color: var(--p-acc); background: var(--p-acc-bg); }
+        #defsView .kc-card { margin-top: 12px; padding: 12px 14px; border-left: 3px solid var(--p-acc); background: #fff; border-radius: 0 10px 10px 0; }
+        #defsView .kc-def { margin: 0 0 6px; font: 400 15px/1.6 Charter, Georgia, serif; color: var(--p-ink); }
+        #defsView .kc-simple { margin: 0 0 8px; font: 400 13.5px/1.55 'Inter', sans-serif; color: var(--p-ink2); }
+        #defsView .kc-in { margin: 0; font: 500 12px/1.9 'Inter', sans-serif; color: var(--p-mute); }
+        #defsView .kc-n { border: 0; background: var(--p-bg2); color: var(--p-ink2); border-radius: 6px; padding: 2px 8px; margin: 0 4px 0 0; font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+        #defsView .kc-n:hover { color: var(--p-acc); }
+        #defsView .dv-kc { border-bottom: 1.5px dotted var(--p-acc); cursor: help; }
+        #defsView .dv-kc:hover { background: var(--p-acc-bg); }
         #defsView .dv-term { font: 700 17px/1.3 'Sora', sans-serif; color: var(--p-ink); overflow-wrap: anywhere; border: 0; padding: 0 0 0 14px; position: relative; margin-bottom: 10px; }
         #defsView .dv-term::before { content: ''; position: absolute; left: 0; top: .12em; bottom: .12em; width: 4px; border-radius: 4px; background: var(--c, var(--p-acc)); }
         #defsView .dv-cell { margin: 0 0 12px 14px; color: var(--p-ink2); font-size: 14.5px; line-height: 1.65; max-width: 64ch; }
