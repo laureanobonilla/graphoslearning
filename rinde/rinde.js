@@ -47,6 +47,11 @@ const NEGOCIOS = [
     { id: 'turismo', t: 'Hotel o turismo', d: 'Hospedaje, tours, eventos' },
     { id: 'otro', t: 'Otro', d: 'Lo describe usted en una línea' }
 ];
+// Una empresa puede dedicarse a VARIAS cosas (p. ej. tienda + taller): perfil.negocios; perfil.negocio guarda la primera.
+const negsDe = (p) => (p && Array.isArray(p.negocios) && p.negocios.length ? p.negocios : (p && p.negocio ? [p.negocio] : []));
+const negTxt = (p) => negsDe(p).map(id => (NEGOCIOS.find(n => n.id === id) || {}).t).filter(Boolean).join(' + ');
+const negObj = (p) => (negsDe(p).length ? { t: negTxt(p) } : null);
+const pesoBase = (f, p) => Math.max(...(negsDe(p).length ? negsDe(p) : ['otro']).map(id => (PESOS[id] || PESOS.otro)[f.p]));
 const PERSONAS = [{ id: 'p1', t: '1 a 5', k: 0.75 }, { id: 'p2', t: '6 a 20', k: 1 }, { id: 'p3', t: '21 a 50', k: 1.1 }, { id: 'p4', t: 'Más de 50', k: 1.2 }];
 const SEDES = [{ id: 's1', t: 'Una', k: 0 }, { id: 's2', t: '2 o 3', k: 1 }, { id: 's3', t: '4 o más', k: 1.4 }];
 
@@ -144,7 +149,7 @@ function guardar(sync = true) {
 function nombreEmp(x) {
     if (!x || !x.perfil) return 'Empresa nueva';
     if (x.perfil.nombre) return x.perfil.nombre;
-    const n = NEGOCIOS.find(k => k.id === x.perfil.negocio);
+    const n = negObj(x.perfil);
     return (n ? n.t : 'Mi empresa') + (x.perfil.detalle ? ' · ' + x.perfil.detalle : '');
 }
 // Las empresas que se empezaron a agregar pero nunca se llenaron se descartan (menos la que está abierta).
@@ -157,7 +162,7 @@ function abrirEmpresa(id) {
 }
 function empezarOnb() {
     const pa = PAIS_MONEDA[(CONF && CONF.country) || ''] || 'CRC';
-    UI.borrador = Object.assign({ nombre: '', negocio: null, personas: null, sedes: 's1', ventas: null, moneda: pa, exacta: 0, detalle: '' }, S.perfil || {});
+    UI.borrador = Object.assign({ nombre: '', personas: null, sedes: 's1', ventas: null, moneda: pa, exacta: 0, detalle: '' }, S.perfil || {}, { negocios: negsDe(S.perfil).slice() });
     UI.paso = 1; UI.vista = 'onb'; cerrar(); render(); window.scrollTo(0, 0);
 }
 const fr = (id) => { const st = (S.fr[id] = S.fr[id] || { r: {}, oculto: false, plan: null, extra: {} }); st.libre = st.libre || {}; return st; };
@@ -211,7 +216,7 @@ function ventasMes(p = S.perfil) {
 }
 function aplica(f, p = S.perfil) {
     if (f.id === 'sedes') return (SEDES.find(s => s.id === p.sedes) || SEDES[0]).k > 0;
-    return (PESOS[p.negocio] || PESOS.otro)[f.p] > 0;
+    return pesoBase(f, p) > 0;
 }
 // DESDE CERO HACIA ARRIBA: cada frente empieza en 0. Cada pregunta respondida «destapa» su parte de la fuga:
 // parte = (ventas × prudencia × peso × % de referencia) ÷ nº de preguntas, multiplicada por la gravedad de la respuesta.
@@ -219,7 +224,7 @@ function aplica(f, p = S.perfil) {
 // Con todas las preguntas en «normal» se llega exactamente al rango de referencia de ese frente.
 const gravedad = (factor) => Math.max(0, Math.min(2.2, (factor - 0.5) / 0.5));
 function pesoDe(f, p = S.perfil) {
-    let peso = f.id === 'sedes' ? (SEDES.find(s => s.id === p.sedes) || SEDES[0]).k : (PESOS[p.negocio] || PESOS.otro)[f.p];
+    let peso = f.id === 'sedes' ? (SEDES.find(s => s.id === p.sedes) || SEDES[0]).k : pesoBase(f, p);
     if (f.id === 'personal') peso *= (PERSONAS.find(x => x.id === p.personas) || PERSONAS[1]).k;
     return peso;
 }
@@ -344,8 +349,9 @@ function vOnb() {
     if (UI.paso === 1) {
         cuerpo = `<label class="campo"><span>Nombre de su empresa <em>(opcional: sirve si maneja varias)</em></span><input id="nombreEmp" maxlength="60" value="${esc(b.nombre || '')}" placeholder="Ej.: Ferretería El Roble"></label>
         <h2>¿A qué se dedica su empresa?</h2>
-        <div class="opciones grid2">${NEGOCIOS.map(n => `<button class="opc ${b.negocio === n.id ? 'on' : ''}" data-a="onb-set" data-k="negocio" data-v="${n.id}"><b>${n.t}</b><span>${n.d}</span></button>`).join('')}</div>
-        ${b.negocio ? `<label class="campo"><span>En una línea, ¿qué vende o qué hace? <em>(opcional)</em></span><input id="detalle" maxlength="120" value="${esc(b.detalle || '')}" placeholder="Ej.: ferretería de barrio, venta al detalle y a constructores"></label>` : ''}`;
+        <p class="sub">Si hace varias cosas (por ejemplo, tienda y taller), elija todas.</p>
+        <div class="opciones grid2">${NEGOCIOS.map(n => `<button class="opc ${b.negocios.includes(n.id) ? 'on' : ''}" data-a="onb-set" data-k="negocios" data-v="${n.id}" aria-pressed="${b.negocios.includes(n.id)}"><b>${n.t}</b><span>${n.d}</span></button>`).join('')}</div>
+        ${b.negocios.length ? `<label class="campo"><span>En una línea, ¿qué vende o qué hace? <em>(opcional)</em></span><input id="detalle" maxlength="120" value="${esc(b.detalle || '')}" placeholder="Ej.: ferretería de barrio, venta al detalle y a constructores"></label>` : ''}`;
     } else if (UI.paso === 2) {
         cuerpo = `<h2>¿Cuántas personas trabajan con usted?</h2>
         <p class="sub">Contándose usted.</p>
@@ -359,7 +365,7 @@ function vOnb() {
         <div class="opciones">${VENTAS.map((v, i) => `<button class="opc linea ${b.ventas === i ? 'on' : ''}" data-a="onb-set" data-k="ventas" data-v="${i}">${v[1] == null ? 'Más de ' + corto(v[0] * m.usd, m) : i === 0 ? 'Menos de ' + corto(v[1] * m.usd, m) : rango(v[0] * m.usd, v[1] * m.usd, m)}</button>`).join('')}</div>
         <details class="exacta"><summary>Prefiero escribir el número exacto</summary><label class="campo"><span>Ventas de un mes normal (${m.s})</span><input id="exacta" inputmode="numeric" value="${b.exacta ? b.exacta : ''}" placeholder="Ej.: ${sep(VENTAS[2][2] * m.usd, m.dots)}"></label></details>`;
     }
-    const listo = (UI.paso === 1 && b.negocio) || (UI.paso === 2 && b.personas && b.sedes) || (UI.paso === 3 && (b.ventas != null || b.exacta > 0));
+    const listo = (UI.paso === 1 && b.negocios.length) || (UI.paso === 2 && b.personas && b.sedes) || (UI.paso === 3 && (b.ventas != null || b.exacta > 0));
     return `${cabecera(false)}<main class="onb">${prog}${cuerpo}
       <div class="onb-nav">${UI.paso > 1 ? '<button class="btn ghost" data-a="onb-atras">Atrás</button>' : (S.perfil || Object.values(E.empresas).some(x => x !== S && x.perfil)) ? '<button class="btn ghost" data-a="onb-cancelar">Cancelar</button>' : '<span></span>'}
       <button class="btn" data-a="onb-sig" ${listo ? '' : 'disabled'}>${UI.paso === 3 ? 'Ver mi diagnóstico' : 'Siguiente'}</button></div></main>`;
@@ -376,7 +382,7 @@ function vApp() {
 
 function vPanel() {
     const T = totales(), sig = siguientePregunta(), max = Math.max(...T.l.map(x => x.max), 1);
-    const neg = NEGOCIOS.find(n => n.id === S.perfil.negocio);
+    const neg = negObj(S.perfil);
     const ocultos = FRENTES.filter(f => aplica(f) && fr(f.id).oculto);
     return `
     <section class="resumen">
@@ -449,7 +455,7 @@ function calendario() {
 }
 
 function vInforme() {
-    const T = totales(), neg = NEGOCIOS.find(n => n.id === S.perfil.negocio), max = Math.max(...T.l.map(x => x.max), 1);
+    const T = totales(), neg = negObj(S.perfil), max = Math.max(...T.l.map(x => x.max), 1);
     const pers = PERSONAS.find(x => x.id === S.perfil.personas), sed = SEDES.find(x => x.id === S.perfil.sedes);
     return `<section class="informe">
       <div class="inf-h"><div><h2>Diagnóstico de rentabilidad</h2><p class="sub">${S.perfil.nombre ? '<b>' + esc(S.perfil.nombre) + '</b> · ' : ''}${esc(neg ? neg.t : '')}${S.perfil.detalle ? ' · ' + esc(S.perfil.detalle) : ''} · ${pers ? pers.t : ''} personas · ${sed ? sed.t.toLowerCase() : ''} sede(s) · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
@@ -499,7 +505,7 @@ async function interpretar(id, i) {
     try {
         const res = await fetch('/.netlify/functions/rinde-interpretar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
             frente: f.t + ' (' + f.fin + ')', pregunta: f.q[i][0], opciones: f.q[i][1].map(o => ({ t: o[0], f: o[1] })), texto: L.texto,
-            negocio: ((NEGOCIOS.find(n => n.id === S.perfil.negocio) || {}).t || '') + (S.perfil.detalle ? ' · ' + S.perfil.detalle : '') }) });
+            negocio: negTxt(S.perfil) + (S.perfil.detalle ? ' · ' + S.perfil.detalle : '') }) });
         r = await res.json().catch(() => ({}));
         if (!res.ok || !Number.isFinite(Number(r.factor))) throw new Error(r.error || 'Error');
     } catch (_e) { r = null; }
@@ -652,7 +658,7 @@ function menuEmp() {
 function mEmpresas() {
     const lista = Object.entries(E.empresas).filter(([, x]) => x.perfil);
     abrir(`<h2>Sus empresas</h2><p class="sub">Cada empresa tiene su propio diagnóstico, planes y acciones.${ACCESO.active ? ' Su plan cubre todas.' : ''}</p>
-      <div class="lista-b">${lista.map(([id, x]) => { const n = NEGOCIOS.find(k => k.id === x.perfil.negocio);
+      <div class="lista-b">${lista.map(([id, x]) => { const n = negObj(x.perfil);
         return `<button class="opc linea emp-op ${id === E.activa ? 'on' : ''}" data-a="emp-abrir" data-id="${id}"><b>${esc(nombreEmp(x))}</b><span>${[x.perfil.nombre && n ? n.t : '', id === E.activa ? 'Abierta ahora' : ''].filter(Boolean).join(' · ')}</span></button>`; }).join('')}
         <button class="opc linea emp-nueva" data-a="emp-nueva">+ Agregar empresa</button></div>
       <div class="lista-b"><button class="opc linea" data-a="perfil">Editar datos de «${esc(nombreEmp(S))}»</button><button class="opc linea" data-a="limpiar">Limpiar proyecto de «${esc(nombreEmp(S))}»</button></div>`, 'chico');
@@ -717,7 +723,7 @@ async function generarPlan(id) {
     const extra = Object.entries(st.extra || {}).filter(([, v]) => v).map(([q, a]) => ({ q, a }));
     const r = await api('rinde-plan', {
         frente: id,
-        perfil: { negocio: (NEGOCIOS.find(n => n.id === p.negocio) || {}).t, detalle: p.detalle || '', personas: (PERSONAS.find(n => n.id === p.personas) || {}).t,
+        perfil: { negocio: negTxt(p), detalle: p.detalle || '', personas: (PERSONAS.find(n => n.id === p.personas) || {}).t,
             ventas: corto(ventasMes()), moneda: mon().s + ' ' + (p.moneda || ''), pais: '' },
         datos: { titulo: f.t + ' (' + f.fin + ') — ' + f.f, rango: rangoF(x.min, x.max) + ' (' + rangoPts(x.min / (ventasMes() || 1) * 100, x.max / (ventasMes() || 1) * 100) + ' puntos de margen sobre ventas)', respuestas: f.q.map((qq, i) => st.r[i] != null ? { q: qq[0], a: respTexto(f, st, i) } : null).filter(Boolean), extra, notas: st.notas || '' }
     });
@@ -767,7 +773,9 @@ document.addEventListener('click', (e) => {
         case 'onb-set': {
             const k = b.dataset.k; let v = b.dataset.v;
             leerOnb(); if (k === 'ventas') { v = Number(v); UI.borrador.exacta = 0; }
-            UI.borrador[k] = v; render(); break;
+            if (k === 'negocios') { const l = UI.borrador.negocios, i = l.indexOf(v); if (i >= 0) l.splice(i, 1); else l.push(v); }
+            else UI.borrador[k] = v;
+            render(); break;
         }
         case 'onb-atras': leerOnb(); UI.paso--; render(); break;
         case 'onb-cancelar': { const otra = Object.keys(E.empresas).find(k => k !== E.activa && E.empresas[k].perfil); if (otra) { delete E.empresas[E.activa]; E.activa = otra; S = E.empresas[otra]; guardar(false); } UI.vista = S.perfil ? 'app' : 'inicio'; render(); window.scrollTo(0, 0); break; }
@@ -775,9 +783,9 @@ document.addEventListener('click', (e) => {
             leerOnb();
             if (UI.paso < 3) { UI.paso++; render(); window.scrollTo(0, 0); break; }
             const nuevoPerfil = !S.perfil;
-            S.perfil = { nombre: UI.borrador.nombre || '', negocio: UI.borrador.negocio, detalle: UI.borrador.detalle, personas: UI.borrador.personas, sedes: UI.borrador.sedes, ventas: UI.borrador.ventas == null ? 2 : UI.borrador.ventas, exacta: UI.borrador.exacta || 0, moneda: UI.borrador.moneda };
+            S.perfil = { nombre: UI.borrador.nombre || '', negocios: UI.borrador.negocios.slice(), negocio: UI.borrador.negocios[0], detalle: UI.borrador.detalle, personas: UI.borrador.personas, sedes: UI.borrador.sedes, ventas: UI.borrador.ventas == null ? 2 : UI.borrador.ventas, exacta: UI.borrador.exacta || 0, moneda: UI.borrador.moneda };
             guardar(); UI.vista = 'app'; UI.tab = 'panel'; render(); window.scrollTo(0, 0);
-            track(nuevoPerfil ? 'diagnostico_listo' : 'perfil_editado', { negocio: S.perfil.negocio, personas: S.perfil.personas, ventas: S.perfil.ventas, empresas: Object.keys(E.empresas).length });
+            track(nuevoPerfil ? 'diagnostico_listo' : 'perfil_editado', { negocio: negsDe(S.perfil).join('+'), personas: S.perfil.personas, ventas: S.perfil.ventas, empresas: Object.keys(E.empresas).length });
             break;
         }
         case 'tab': UI.tab = b.dataset.tab; if (UI.vista !== 'app' && S.perfil) UI.vista = 'app'; render(); window.scrollTo(0, 0); break;

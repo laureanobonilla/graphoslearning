@@ -22,10 +22,18 @@ const SITUACIONES = [
     { id: 'empleo', t: 'Trabajo para otros', d: 'Empleo con horario o por metas' },
     { id: 'propio', t: 'Trabajo por mi cuenta', d: 'Negocio propio, independiente o freelance' },
     { id: 'estudio', t: 'Estudio', d: 'Colegio, universidad o cursos' },
-    { id: 'mixto', t: 'Estudio y trabajo', d: 'Las dos cosas a la vez' },
     { id: 'hogar', t: 'Cuido la casa o a mi familia', d: 'Hijos, padres, la casa' },
     { id: 'busco', t: 'Estoy buscando trabajo', d: 'O cambiando de rumbo' }
 ];
+// Se pueden elegir VARIAS situaciones y varias metas (perfil.situaciones / perfil.metas). perfil.situacion y perfil.meta
+// guardan la primera, por compatibilidad. «Estudio y trabajo» (mixto) ya no se ofrece: se elige Estudio + Trabajo,
+// pero sigue existiendo para los diagnósticos guardados antes.
+const SIT_TODAS = SITUACIONES.concat([{ id: 'mixto', t: 'Estudio y trabajo' }]);
+const sitsDe = (p) => (p && Array.isArray(p.situaciones) && p.situaciones.length ? p.situaciones : (p && p.situacion ? [p.situacion] : []));
+const metasDe = (p) => (p && Array.isArray(p.metas) && p.metas.length ? p.metas : (p && p.meta ? [p.meta] : []));
+const unir = (l) => (l.length <= 1 ? (l[0] || '') : l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1]);
+const sitTxt = (p) => sitsDe(p).map(id => (SIT_TODAS.find(x => x.id === id) || {}).t).filter(Boolean).join(' · ');
+const metaTxt = (p) => unir(metasDe(p).map(id => (METAS.find(x => x.id === id) || {}).t).filter(Boolean).map((t, i) => i ? t.toLowerCase() : t));
 const DEPENDEN = [{ id: 'd1', t: 'Solo yo', k: 0.85 }, { id: 'd2', t: 'Pareja o familiares', k: 1 }, { id: 'd3', t: 'Hijos pequeños', k: 1.25 }, { id: 'd4', t: 'Hijos y otras personas', k: 1.35 }];
 const LUGARES = [{ id: 'fuera', t: 'Fuera de casa' }, { id: 'casa', t: 'Desde casa' }, { id: 'ambos', t: 'Un poco de cada' }];
 const METAS = [
@@ -148,7 +156,9 @@ const tOf = (lista, id) => (lista.find(x => x.id === id) || {}).t || '';
 
 // ---------- Motor de cálculo ----------
 function pesoDe(f, p = S.perfil) {
-    let peso = (PESOS[p.situacion] || PESOS.empleo)[f.p];
+    // Varias situaciones: se toma la que más pesa en este frente, y un poco más por cada situación extra (hasta +25 %).
+    const ids = sitsDe(p).length ? sitsDe(p) : ['empleo'];
+    let peso = Math.max(...ids.map(id => (PESOS[id] || PESOS.empleo)[f.p])) * Math.min(1.25, 1 + 0.1 * (ids.length - 1));
     if (f.dep) peso *= (DEPENDEN.find(x => x.id === p.dependen) || DEPENDEN[1]).k;
     if (f.id === 'traslados') peso *= p.lugar === 'casa' ? 0.15 : p.lugar === 'ambos' ? 0.6 : 1;
     if (f.id === 'mensajes' && p.lugar === 'casa') peso *= 1.1;
@@ -214,8 +224,8 @@ function cabecera(enApp) {
       <a class="marca" href="#" data-a="${enApp ? 'tab' : 'nada'}" data-tab="panel">${logo()}<span>Ordena</span></a>
       <div class="top-d">
         ${enApp ? `<nav class="tabs-d">${tabsHTML()}</nav>` : ''}
-        ${enApp && S.perfil ? `<div class="emp-wrap"><button class="emp-btn" data-a="emp-menu" aria-haspopup="menu" aria-expanded="${UI.menu ? 'true' : 'false'}">${icon('semana', 'mini')}<span class="emp-txt"><small>Mi semana</small><span>${esc(tOf(SITUACIONES, S.perfil.situacion))}</span></span><b aria-hidden="true">▾</b></button>${UI.menu ? `<div class="emp-menu" role="menu">
-          <p class="emp-m-lbl">Tu diagnóstico</p><p class="emp-m-act">${esc(tOf(SITUACIONES, S.perfil.situacion))} · para ${esc(tOf(METAS, S.perfil.meta).toLowerCase())}</p><hr>
+        ${enApp && S.perfil ? `<div class="emp-wrap"><button class="emp-btn" data-a="emp-menu" aria-haspopup="menu" aria-expanded="${UI.menu ? 'true' : 'false'}">${icon('semana', 'mini')}<span class="emp-txt"><small>Mi semana</small><span>${esc(sitTxt(S.perfil))}</span></span><b aria-hidden="true">▾</b></button>${UI.menu ? `<div class="emp-menu" role="menu">
+          <p class="emp-m-lbl">Tu diagnóstico</p><p class="emp-m-act">${esc(sitTxt(S.perfil))} · para ${esc(metaTxt(S.perfil).toLowerCase())}</p><hr>
           <button role="menuitem" data-a="perfil">✎ Editar mis datos</button>
           <button role="menuitem" data-a="limpiar">↺ Empezar de nuevo</button>
           <button role="menuitem" data-a="tab" data-tab="informe">▤ Ver mi resumen</button></div>` : ''}</div>` : ''}
@@ -279,8 +289,9 @@ function vOnb() {
     let cuerpo = '';
     if (UI.paso === 1) {
         cuerpo = `<h2>¿Cómo es tu semana?</h2>
-        <div class="opciones grid2">${SITUACIONES.map(n => `<button class="opc ${b.situacion === n.id ? 'on' : ''}" data-a="onb-set" data-k="situacion" data-v="${n.id}"><b>${n.t}</b><span>${n.d}</span></button>`).join('')}</div>
-        ${b.situacion ? `<label class="campo"><span>En una línea, ¿a qué te dedicas? <em>(opcional)</em></span><input id="detalle" maxlength="120" value="${esc(b.detalle || '')}" placeholder="Ej.: enfermera con turnos, estudio ingeniería de noche"></label>` : ''}`;
+        <p class="sub">Elige todas las que apliquen.</p>
+        <div class="opciones grid2">${SITUACIONES.map(n => `<button class="opc ${b.situaciones.includes(n.id) ? 'on' : ''}" data-a="onb-set" data-k="situaciones" data-v="${n.id}" aria-pressed="${b.situaciones.includes(n.id)}"><b>${n.t}</b><span>${n.d}</span></button>`).join('')}</div>
+        ${b.situaciones.length ? `<label class="campo"><span>En una línea, ¿a qué te dedicas? <em>(opcional)</em></span><input id="detalle" maxlength="120" value="${esc(b.detalle || '')}" placeholder="Ej.: enfermera con turnos, estudio ingeniería de noche"></label>` : ''}`;
     } else if (UI.paso === 2) {
         cuerpo = `<h2>¿Quién depende de ti?</h2>
         <p class="sub">Personas que cuidas o atiendes en tu día a día.</p>
@@ -289,10 +300,10 @@ function vOnb() {
         <div class="opciones fila">${LUGARES.map(n => `<button class="opc chip ${b.lugar === n.id ? 'on' : ''}" data-a="onb-set" data-k="lugar" data-v="${n.id}">${n.t}</button>`).join('')}</div>`;
     } else {
         cuerpo = `<h2>Si recuperas tiempo, ¿para qué lo quieres?</h2>
-        <p class="sub">Tu plan va a apuntar a esto.</p>
-        <div class="opciones grid2">${METAS.map(n => `<button class="opc linea ${b.meta === n.id ? 'on' : ''}" data-a="onb-set" data-k="meta" data-v="${n.id}">${n.t}</button>`).join('')}</div>`;
+        <p class="sub">Tu plan va a apuntar a esto. Puedes elegir varias.</p>
+        <div class="opciones grid2">${METAS.map(n => `<button class="opc linea ${b.metas.includes(n.id) ? 'on' : ''}" data-a="onb-set" data-k="metas" data-v="${n.id}" aria-pressed="${b.metas.includes(n.id)}">${n.t}</button>`).join('')}</div>`;
     }
-    const listo = (UI.paso === 1 && b.situacion) || (UI.paso === 2 && b.dependen && b.lugar) || (UI.paso === 3 && b.meta);
+    const listo = (UI.paso === 1 && b.situaciones.length) || (UI.paso === 2 && b.dependen && b.lugar) || (UI.paso === 3 && b.metas.length);
     return `${cabecera(false)}<main class="onb">${prog}${cuerpo}
       <div class="onb-nav">${UI.paso > 1 ? '<button class="btn ghost" data-a="onb-atras">Atrás</button>' : (S.perfil ? '<button class="btn ghost" data-a="onb-cancelar">Cancelar</button>' : '<span></span>')}
       <button class="btn" data-a="onb-sig" ${listo ? '' : 'disabled'}>${UI.paso === 3 ? 'Ver mi diagnóstico' : 'Siguiente'}</button></div></main>`;
@@ -313,7 +324,7 @@ function recuperadoTxt(T) {
 }
 function vPanel() {
     const T = totales(), sig = siguientePregunta(), max = Math.max(...T.l.map(x => x.max), 1);
-    const sit = tOf(SITUACIONES, S.perfil.situacion), meta = tOf(METAS, S.perfil.meta);
+    const sit = sitTxt(S.perfil), meta = metaTxt(S.perfil);
     const ocultos = FRENTES.filter(f => aplica(f) && fr(f.id).oculto);
     return `
     <section class="resumen">
@@ -381,7 +392,7 @@ function calendario() {
 function vInforme() {
     const T = totales(), max = Math.max(...T.l.map(x => x.max), 1), p = S.perfil;
     return `<section class="informe">
-      <div class="inf-h"><div><h2>Tu semana, en horas</h2><p class="sub">${esc(tOf(SITUACIONES, p.situacion))}${p.detalle ? ' · ' + esc(p.detalle) : ''} · depende de ti: ${esc(tOf(DEPENDEN, p.dependen).toLowerCase())} · para: ${esc(tOf(METAS, p.meta).toLowerCase())} · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
+      <div class="inf-h"><div><h2>Tu semana, en horas</h2><p class="sub">${esc(sitTxt(p))}${p.detalle ? ' · ' + esc(p.detalle) : ''} · depende de ti: ${esc(tOf(DEPENDEN, p.dependen).toLowerCase())} · para: ${esc(metaTxt(p).toLowerCase())} · ${new Date().toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
         <button class="btn ghost no-print" data-a="imprimir">Descargar PDF</button></div>
       <div class="kpis"><div><p class="lbl">Se escapan por semana</p><p class="big">${rangoF(T.enc.min, T.enc.max)}</p></div><div><p class="lbl">Al año</p><p class="big">${T.enc.max < 1 / 12 ? '0 h' : `${num(Math.round(T.enc.min * 52))} – ${num(Math.round(T.enc.max * 52))} h`}</p></div><div><p class="lbl">De tu tiempo despierto</p><p class="big">${T.enc.max < 1 / 12 ? '0 %' : rangoPct(T.enc.min, T.enc.max)}</p></div><div><p class="lbl">Recuperado</p><p class="big verde">${recuperadoTxt(T)}</p></div></div>
       <p class="sub">Semana revisada: ${T.resp} de ${T.posibles} preguntas (${T.revisado}%). Los frentes sin revisar aparecen en cero.</p>
@@ -428,7 +439,7 @@ async function interpretar(id, i) {
     try {
         const res = await fetch('/.netlify/functions/ordena-interpretar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
             frente: f.t + ' (' + f.fin + ')', pregunta: f.q[i][0], opciones: f.q[i][1].map(o => ({ t: o[0], f: o[1] })), texto: L.texto,
-            situacion: tOf(SITUACIONES, S.perfil.situacion) + (S.perfil.detalle ? ' · ' + S.perfil.detalle : '') }) });
+            situacion: sitTxt(S.perfil) + (S.perfil.detalle ? ' · ' + S.perfil.detalle : '') }) });
         r = await res.json().catch(() => ({}));
         if (!res.ok || !Number.isFinite(Number(r.factor))) throw new Error(r.error || 'Error');
     } catch (_e) { r = null; }
@@ -452,7 +463,7 @@ function mPorque(id) {
     const x = calc(id), f = FR[id], st = fr(id), p = S.perfil;
     const resp = f.q.map((qq, i) => { const pt = x.partes[i]; const extra = st.r[i] === 'x' && st.libre[i] && st.libre[i].nota ? ` <i>(${esc(st.libre[i].nota)})</i>` : '';
         return pt ? `<li>${esc(qq[0])} <b>${esc(respTexto(f, st, i))}</b>${extra} → ${pt.max < 1 / 12 ? 'no suma tiempo' : `suma ${rango(pt.min, pt.max)}`}</li>` : `<li class="sut">${esc(qq[0])} → ${st.r[i] === 'x' ? 'calculando tu respuesta escrita' : 'sin responder'} (suma 0)</li>`; }).join('');
-    const ajustes = [tOf(SITUACIONES, p.situacion).toLowerCase(), f.dep ? 'quién depende de ti' : '', f.id === 'traslados' || f.id === 'mensajes' ? 'dónde trabajas o estudias' : ''].filter(Boolean).join(', ');
+    const ajustes = [sitTxt(p).toLowerCase(), f.dep ? 'quién depende de ti' : '', f.id === 'traslados' || f.id === 'mensajes' ? 'dónde trabajas o estudias' : ''].filter(Boolean).join(', ');
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>¿De dónde sale este número?</h2>
       <ol class="calc">
         <li>En personas con rutinas parecidas, aquí (${esc(f.fin.toLowerCase())}) se suelen ir entre <b>${num(f.base[0])} y ${num(f.base[1])} horas por semana</b>. Se reparte entre sus ${f.q.length} preguntas.</li>
@@ -615,7 +626,7 @@ async function generarPlan(id) {
     const extra = Object.entries(st.extra || {}).filter(([, v]) => v).map(([q, a]) => ({ q, a }));
     const r = await api('ordena-plan', {
         frente: id,
-        perfil: { situacion: tOf(SITUACIONES, p.situacion), detalle: p.detalle || '', dependen: tOf(DEPENDEN, p.dependen), lugar: tOf(LUGARES, p.lugar), meta: tOf(METAS, p.meta) },
+        perfil: { situacion: sitTxt(p), detalle: p.detalle || '', dependen: tOf(DEPENDEN, p.dependen), lugar: tOf(LUGARES, p.lugar), meta: metaTxt(p) },
         datos: { titulo: f.t + ' (' + f.fin + ') — ' + f.f, rango: rangoF(x.min, x.max) + ' por semana (' + rangoPct(x.min, x.max) + ' de su tiempo despierto)', respuestas: f.q.map((qq, i) => st.r[i] != null ? { q: qq[0], a: respTexto(f, st, i) } : null).filter(Boolean), extra, notas: st.notas || '' }
     });
     if (r.status === 401) { pendiente = { tipo: 'plan', id }; cerrar(); return pedirLogin('signup'); }
@@ -636,7 +647,7 @@ function pedirLogin(modo) {
 //  Eventos
 // =====================================================================================
 function empezarOnb() {
-    UI.borrador = Object.assign({ situacion: null, detalle: '', dependen: null, lugar: null, meta: null }, S.perfil || {});
+    UI.borrador = Object.assign({ detalle: '', dependen: null, lugar: null }, S.perfil || {}, { situaciones: sitsDe(S.perfil).filter(id => id !== 'mixto').concat(sitsDe(S.perfil).includes('mixto') ? ['estudio', 'empleo'] : []), metas: metasDe(S.perfil).slice() });
     UI.paso = 1; UI.vista = 'onb'; cerrar(); render(); window.scrollTo(0, 0);
 }
 document.addEventListener('click', (e) => {
@@ -648,16 +659,21 @@ document.addEventListener('click', (e) => {
     switch (a) {
         case 'emp-menu': UI.menu = !UI.menu; render(); break;
         case 'empezar': case 'perfil': empezarOnb(); track(a === 'empezar' ? 'empezar' : 'editar_perfil'); break;
-        case 'onb-set': { leerOnb(); UI.borrador[b.dataset.k] = b.dataset.v; render(); break; }
+        case 'onb-set': {
+            leerOnb(); const k = b.dataset.k, v = b.dataset.v;
+            if (k === 'situaciones' || k === 'metas') { const l = UI.borrador[k]; const i = l.indexOf(v); if (i >= 0) l.splice(i, 1); else l.push(v); }
+            else UI.borrador[k] = v;
+            render(); break;
+        }
         case 'onb-atras': leerOnb(); UI.paso--; render(); break;
         case 'onb-cancelar': UI.vista = S.perfil ? 'app' : 'inicio'; render(); window.scrollTo(0, 0); break;
         case 'onb-sig': {
             leerOnb();
             if (UI.paso < 3) { UI.paso++; render(); window.scrollTo(0, 0); break; }
             const nuevoPerfil = !S.perfil, B = UI.borrador;
-            S.perfil = { situacion: B.situacion, detalle: B.detalle || '', dependen: B.dependen, lugar: B.lugar, meta: B.meta };
+            S.perfil = { situaciones: B.situaciones.slice(), situacion: B.situaciones[0], detalle: B.detalle || '', dependen: B.dependen, lugar: B.lugar, metas: B.metas.slice(), meta: B.metas[0] };
             guardar(); UI.vista = 'app'; UI.tab = 'panel'; render(); window.scrollTo(0, 0);
-            track(nuevoPerfil ? 'diagnostico_listo' : 'perfil_editado', { situacion: S.perfil.situacion, dependen: S.perfil.dependen, lugar: S.perfil.lugar, meta: S.perfil.meta });
+            track(nuevoPerfil ? 'diagnostico_listo' : 'perfil_editado', { situacion: sitsDe(S.perfil).join('+'), metas: metasDe(S.perfil).join('+'), dependen: S.perfil.dependen, lugar: S.perfil.lugar, meta: S.perfil.meta });
             break;
         }
         case 'tab': UI.tab = b.dataset.tab; if (UI.vista !== 'app' && S.perfil) UI.vista = 'app'; render(); window.scrollTo(0, 0); break;
