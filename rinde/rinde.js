@@ -335,7 +335,7 @@ function vInicio() {
         <p class="eyebrow">Diagnóstico de rentabilidad para pymes</p>
         <h1>Encuentre fugas de dinero en su empresa.<br><em>Y recupérelo.</em></h1>
         <p class="lead">Empezamos en cero. Con cada pregunta de un toque, Rinde destapa cuánto se le está yendo en cobros, compras, inventario, precios y gastos, cuánto le resta a su rentabilidad y qué hacer primero.</p>
-        <div class="cta-row"><button class="btn xl" data-a="empezar">Empezar · 1 minuto</button><span class="nota">Sin tarjeta. Sin registrarse para ver el resultado.</span></div>
+        <div class="cta-row"><button class="btn xl" data-a="empezar">Empezar · 1 minuto</button><span class="nota">Sin tarjeta. Sin registro para ver el resultado.</span></div>
       </section>
       <section class="demo" aria-label="Ejemplo de resultado">
         <div class="demo-top"><span>Ejemplo: tienda con 12 personas, tras 9 respuestas</span><strong>${ej(1610, 3920)} <small>al mes · 2,3 a 5,6 puntos de rentabilidad</small></strong></div>
@@ -357,7 +357,7 @@ function vInicio() {
       ${F.nombre ? `<section class="fundador"><h2>Quién está detrás</h2><p><b>${esc(F.nombre)}</b>${F.rol ? ' · ' + esc(F.rol) : ''}</p>${F.texto ? `<p>${esc(F.texto)}</p>` : ''}${F.contacto ? `<p class="nota">${esc(F.contacto)}</p>` : ''}</section>` : ''}
       <section class="faq">
         <h2>Preguntas frecuentes</h2>
-        <details><summary>¿Cuánto cuesta?</summary><p>El diagnóstico es gratis, y también el plan completo de un frente. Para ver los planes de todos los frentes, con seguimiento, hay planes desde US$19 por un mes. Es un pago único: no se renueva solo.</p></details>
+        <details><summary>¿Cuánto cuesta?</summary><p>El diagnóstico inicial no tiene costo e incluye el plan completo de un frente, para que evalúe la herramienta con sus propios datos. Para ver los planes de todos los frentes, con seguimiento, hay planes desde US$19 por un mes. Es un pago único: no se renueva solo.</p></details>
         <details><summary>¿Necesito saber de finanzas?</summary><p>No. Todo está en lenguaje sencillo, y cada frente indica también su término financiero (margen bruto, días de cobro, rotación de inventario…) para quien lo maneja, o para pasárselo al contador.</p></details>
         <details><summary>¿Sirve para mi tipo de negocio?</summary><p>Rinde ajusta los frentes según el tipo de negocio, su tamaño y si tiene varias sedes. Lo que no aplica a su empresa, no aparece.</p></details>
         <details><summary>¿Y si el número no se parece a mi realidad?</summary><p>Cada cifra sale solo de sus respuestas: puede cambiarlas cuando quiera, ver el cálculo exacto o ocultar un frente que no le aplica.</p></details>
@@ -439,7 +439,7 @@ function tarjeta(x, idx, max) {
         ${x.n > 0 ? `<button class="lnk sut" data-a="porque" data-f="${x.id}">¿De dónde sale?</button>` : ''}</div>
       ${accs.length ? `<p class="avance">${hechas} de ${accs.length} acciones hechas</p>` : ''}
       ${cero ? `<button class="btn ghost full" data-a="afinar" data-f="${x.id}">Revisar este frente · ${x.total} preguntas</button>`
-        : `<button class="btn ${libre || tienePlan ? '' : 'lock'} full" data-a="plan" data-f="${x.id}">${tienePlan ? 'Ver mi plan' : libre ? (!ACCESO.active && !ACCESO.freeFrente ? 'Ver plan gratis' : 'Ver plan para recuperarlo') : '🔒 Ver plan para recuperarlo'}</button>`}
+        : `<button class="btn ${libre || tienePlan ? '' : 'lock'} full" data-a="plan" data-f="${x.id}">${tienePlan ? 'Ver mi plan' : libre ? (!ACCESO.active && !ACCESO.freeFrente ? 'Ver plan de muestra' : 'Ver plan para recuperarlo') : '🔒 Ver plan para recuperarlo'}</button>`}
     </article>`;
 }
 
@@ -606,7 +606,7 @@ function mBloqueado(id) {
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(FR[id].t)} · ${rango(x.min, x.max)} al mes</p>
       <h2>Desbloquee el plan de todos sus frentes</h2>
       <div class="borroso" aria-hidden="true"><p>████████ ██████ ████ ███████ ██ ████████ ███ ████</p><p>██████ ███ ██████████ █████ ██ ███████</p><p>█████ ██████ ███ ███████████ ██████ ██</p></div>
-      <p>Usted ya vio el plan gratuito de <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : 'un frente')}</b>. En total lleva encontrado <b>${rangoF(T.enc.min, T.enc.max)}</b> al mes en fugas.</p>
+      <p>Usted ya vio el plan de muestra de <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : 'un frente')}</b>. En total lleva encontrado <b>${rangoF(T.enc.min, T.enc.max)}</b> al mes en fugas.</p>
       <button class="btn full" data-a="precios">Ver planes</button>`, 'chico');
 }
 
@@ -706,7 +706,7 @@ function mEliminar() {
 
 function mCuenta() {
     abrir(`<h2>Mi cuenta</h2><p class="sub">${esc(USER.email || '')}</p>
-      ${ACCESO.active ? `<p><span class="pill ok">Plan activo</span> ${ACCESO.admin ? '(administrador)' : `hasta el ${new Date(ACCESO.paidUntil).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}`}</p>` : `<p>Plan gratuito${ACCESO.freeFrente ? ` · frente gratis: <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : '')}</b>` : ''}</p><button class="btn full" data-a="precios">Ver planes</button>`}
+      ${ACCESO.active ? `<p><span class="pill ok">Plan activo</span> ${ACCESO.admin ? '(administrador)' : `hasta el ${new Date(ACCESO.paidUntil).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}`}</p>` : `<p>Evaluación${ACCESO.freeFrente ? ` · plan de muestra: <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : '')}</b>` : ''}</p><button class="btn full" data-a="precios">Ver planes</button>`}
       <div class="lista-b"><button class="opc linea" data-a="empresas">Mis empresas (${Object.values(E.empresas).filter(x => x.perfil).length}) · agregar o cambiar</button><button class="opc linea" data-a="perfil">Editar datos de la empresa</button><button class="opc linea" data-a="limpiar">Limpiar proyecto</button><button class="opc linea" data-a="logout">Cerrar sesión</button></div>
       <p class="disc">¿Dudas o soporte? ${esc(CFG.contacto)}${CFG.whatsapp ? ` · <a href="https://wa.me/${CFG.whatsapp}" target="_blank" rel="noopener">Escribir por WhatsApp</a>` : ''}</p>
       <p class="disc">Su diagnóstico se guarda en su cuenta y puede abrirlo desde el teléfono o la computadora.</p>`, 'chico');
@@ -850,7 +850,7 @@ document.addEventListener('click', (e) => {
             track('plan_click', { frente: id });
             const st = fr(id);
             if (st.plan) { mPlan(id); break; }
-            if (!USER) { track('cuenta_pedida', { frente: id }); pendiente = { tipo: 'plan', id }; abrir(`<h2>Su plan está a un paso</h2><p class="sub">Cree su cuenta gratis para ver el plan completo de <b>${esc(FR[id].t)}</b> y guardar su diagnóstico en el teléfono y la computadora.</p><button class="btn full" data-a="login-signup">Crear cuenta gratis</button><button class="btn ghost full" data-a="login">Ya tengo cuenta</button><p class="disc">El plan gratuito incluye un frente completo. Le recomendamos el más grande.</p>`, 'chico'); break; }
+            if (!USER) { track('cuenta_pedida', { frente: id }); pendiente = { tipo: 'plan', id }; abrir(`<h2>Su plan está a un paso</h2><p class="sub">Cree su cuenta para ver el plan completo de <b>${esc(FR[id].t)}</b> y guardar su diagnóstico en el teléfono y la computadora.</p><button class="btn full" data-a="login-signup">Crear cuenta</button><button class="btn ghost full" data-a="login">Ya tengo cuenta</button><p class="disc">La evaluación incluye el plan completo de un frente. Le recomendamos el de mayor impacto.</p>`, 'chico'); break; }
             if (!puedeVer(id)) { mBloqueado(id); break; }
             generarPlan(id); break;
         }

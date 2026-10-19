@@ -54,7 +54,7 @@ exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
     const deadline = Date.now() + 25000;
     const user = core.requireUser(context);
-    if (!user) return core.json(401, { error: 'login', message: 'Cree su cuenta gratis para ver el plan.' });
+    if (!user) return core.json(401, { error: 'login', message: 'Cree su cuenta para ver el plan.' });
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return core.json(400, { error: 'JSON inválido' }); }
     const frente = String(b.frente || '');
     if (!FRENTES.includes(frente)) return core.json(400, { error: 'Frente no válido' });
@@ -66,7 +66,7 @@ exports.handler = async (event, context) => {
             if (access.freeFrente && access.freeFrente !== frente) { await core.evento(user, 'srv_plan_bloqueado', { frente, freeFrente: access.freeFrente }); return core.json(402, { error: 'locked', freeFrente: access.freeFrente }); }
             const row = await core.one('rinde_access', 'user_id', user.id);
             const gens = (row && row.free_gens) || 0;
-            if (gens >= FREE_MAX_GENS) return core.json(402, { error: 'locked', freeFrente: frente, message: 'Llegó al máximo de actualizaciones del plan gratuito.' });
+            if (gens >= FREE_MAX_GENS) return core.json(402, { error: 'locked', freeFrente: frente, message: 'Llegó al máximo de actualizaciones del plan de muestra.' });
             await core.upsert('rinde_access', { user_id: user.id, email: user.email, free_frente: frente, free_gens: gens + 1 });
             usingFree = true;
         }
