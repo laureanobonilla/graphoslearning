@@ -11,7 +11,8 @@
 const CFG = {
     fundador: { nombre: '', rol: '', texto: '', contacto: '' },
     garantia: 'Si en los primeros 7 días sientes que no te sirvió, te devolvemos tu dinero. Solo escríbenos.',
-    contacto: ''   // correo o WhatsApp de soporte (opcional)
+    contacto: 'WhatsApp +506 8777-2993 · bonillapretiz@gmail.com',   // correo o WhatsApp de soporte (se muestra en el pie, en precios y en «Mi cuenta»)
+    whatsapp: '50687772993'
 };
 
 const SEMANA_DESPIERTO = 112;   // horas despiertas en una semana (16 h × 7): base del «% de tu tiempo»
@@ -251,7 +252,7 @@ function vInicio() {
         <ul>
           <li><b>Cada número se puede explicar.</b> Toca "¿De dónde sale?" y mira el cálculo. No es una adivinanza de la inteligencia artificial.</li>
           <li><b>Nada inflado.</b> Todo empieza en cero y solo sumamos horas cuando tus respuestas lo muestran, con rangos prudentes.</li>
-          <li><b>Tus datos son tuyos.</b> No pedimos tu nombre, ni tus contactos, ni acceso a tu celular. Se guardan en tu dispositivo, y en tu cuenta privada si decides crear una.</li>
+          <li><b>Tus datos son tuyos.</b> No pedimos tu nombre, ni tus contactos, ni acceso a tu celular. Se guardan en tu dispositivo, y en tu cuenta privada si decides crear una. <a href="/privacidad/">Así cuidamos tus datos</a>.</li>
         </ul>
       </section>
       ${F.nombre ? `<section class="fundador"><h2>Quién está detrás</h2><p><b>${esc(F.nombre)}</b>${F.rol ? ' · ' + esc(F.rol) : ''}</p>${F.texto ? `<p>${esc(F.texto)}</p>` : ''}${F.contacto ? `<p class="nota">${esc(F.contacto)}</p>` : ''}</section>` : ''}
@@ -263,7 +264,7 @@ function vInicio() {
         <details><summary>¿Y si el número no se parece a mi realidad?</summary><p>Cada cifra sale solo de tus respuestas: puedes cambiarlas cuando quieras, ver el cálculo exacto u ocultar un frente que no te aplica.</p></details>
       </section>
       <section class="cierre"><h2>¿Cuántas horas se te escapan cada semana?</h2><button class="btn xl" data-a="empezar">Averiguarlo ahora</button></section>
-      <footer class="pie">Ordena · ${new Date().getFullYear()}${CFG.contacto ? ' · ' + esc(CFG.contacto) : ''}</footer>
+      <footer class="pie">Ordena · ${new Date().getFullYear()}${CFG.contacto ? ' · ' + esc(CFG.contacto) : ''} · <a href="/privacidad/">Privacidad y condiciones</a></footer>
     </main>`;
 }
 
@@ -509,7 +510,7 @@ async function mPrecios() {
       <p class="sub">${T.enc.max >= 1 / 12 ? `Se te escapan <b>${rango(T.enc.min, T.enc.max)}</b> por semana (${rangoPct(T.enc.min, T.enc.max)} de tu tiempo despierto).` : 'Revisa tus frentes para ver cuántas horas se te escapan.'} Elige por cuánto tiempo quieres acceso completo.</p>
       <div class="planes">${plans.map(p => `<button class="plan-c ${p.id === sel ? 'on' : ''}" data-a="plan-sel" data-p="${p.id}"><b>${esc(p.label)}</b><span class="precio">US$${Number(p.usd) % 1 ? Number(p.usd).toFixed(2) : Number(p.usd).toFixed(0)}</span><small>${esc(p.note || '')}</small></button>`).join('')}</div>
       <ul class="incluye"><li>Plan a tu medida para cada frente, con pasos, fechas y mensajes listos</li><li>Planes que se afinan con tus respuestas, todas las veces que quieras</li><li>Acciones con calendario y registro de las horas recuperadas</li><li>Resumen en PDF</li></ul>
-      <p class="nota">Pago único con PayPal (o tarjeta a través de PayPal). No se renueva solo.${CFG.garantia ? ' ' + esc(CFG.garantia) : ''}</p>
+      <p class="nota">Pago único con PayPal (o tarjeta a través de PayPal). No se renueva solo.${CFG.garantia ? ' ' + esc(CFG.garantia) : ''}${CFG.contacto ? ' ' + esc(CFG.contacto) + '.' : ''} <a href="/privacidad/#pagos" target="_blank" rel="noopener">Condiciones</a></p>
       ${USER ? '<div id="pp"></div>' : '<button class="btn full" data-a="login-pagar">Crear cuenta o entrar para pagar</button>'}`, 'chico');
     if (USER) pintarPaypal();
 }
@@ -561,6 +562,7 @@ function mCuenta() {
     abrir(`<h2>Mi cuenta</h2><p class="sub">${esc(USER.email || '')}</p>
       ${ACCESO.active ? `<p><span class="pill ok">Plan activo</span> ${ACCESO.admin ? '(administrador)' : `hasta el ${new Date(ACCESO.paidUntil).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}`}</p>` : `<p>Plan gratuito${ACCESO.freeFrente ? ` · frente gratis: <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : '')}</b>` : ''}</p><button class="btn full" data-a="precios">Ver planes</button>`}
       <div class="lista-b"><button class="opc linea" data-a="perfil">Editar mis datos</button><button class="opc linea" data-a="limpiar">Empezar de nuevo</button><button class="opc linea" data-a="logout">Cerrar sesión</button></div>
+      <p class="disc">¿Dudas o soporte? ${esc(CFG.contacto)}${CFG.whatsapp ? ` · <a href="https://wa.me/${CFG.whatsapp}" target="_blank" rel="noopener">Escribir por WhatsApp</a>` : ''}</p>
       <p class="disc">Tu diagnóstico se guarda en tu cuenta y puedes abrirlo desde el teléfono o la computadora.</p>`, 'chico');
 }
 function mLimpiar() {

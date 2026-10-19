@@ -10,7 +10,8 @@
 const CFG = {
     fundador: { nombre: '', rol: '', texto: '', contacto: '' },
     garantia: 'Si en los primeros 7 días siente que no le sirvió, le devolvemos su dinero. Solo escríbanos.',
-    contacto: ''   // correo o WhatsApp de soporte (opcional)
+    contacto: 'WhatsApp +506 8777-2993 · bonillapretiz@gmail.com',   // correo o WhatsApp de soporte (se muestra en el pie, en precios y en «Mi cuenta»)
+    whatsapp: '50687772993'
 };
 
 // ---------- Monedas (tipos de cambio APROXIMADOS por US$; solo sirven para armar los rangos de ventas) ----------
@@ -315,7 +316,7 @@ function vInicio() {
         <ul>
           <li><b>Cada número se puede explicar.</b> Toque "¿De dónde sale?" y vea el cálculo. No es una adivinanza de la inteligencia artificial.</li>
           <li><b>Nada inflado.</b> Todo empieza en cero y solo sumamos una fuga cuando sus respuestas la muestran, con rangos de referencia prudentes.</li>
-          <li><b>Sus datos son suyos.</b> No pedimos nombres de clientes, cuentas bancarias ni facturas. Se guardan en su dispositivo, y en su cuenta privada si decide crear una.</li>
+          <li><b>Sus datos son suyos.</b> No pedimos nombres de clientes, cuentas bancarias ni facturas. Se guardan en su dispositivo, y en su cuenta privada si decide crear una. <a href="/privacidad/">Así cuidamos sus datos</a>.</li>
         </ul>
       </section>
       ${F.nombre ? `<section class="fundador"><h2>Quién está detrás</h2><p><b>${esc(F.nombre)}</b>${F.rol ? ' · ' + esc(F.rol) : ''}</p>${F.texto ? `<p>${esc(F.texto)}</p>` : ''}${F.contacto ? `<p class="nota">${esc(F.contacto)}</p>` : ''}</section>` : ''}
@@ -327,7 +328,7 @@ function vInicio() {
         <details><summary>¿Y si el número no se parece a mi realidad?</summary><p>Cada cifra sale solo de sus respuestas: puede cambiarlas cuando quiera, ver el cálculo exacto o ocultar un frente que no le aplica.</p></details>
       </section>
       <section class="cierre"><h2>¿Cuántas fugas de dinero tiene su empresa?</h2><button class="btn xl" data-a="empezar">Averiguarlo ahora</button></section>
-      <footer class="pie">Rinde · ${new Date().getFullYear()}${CFG.contacto ? ' · ' + esc(CFG.contacto) : ''}</footer>
+      <footer class="pie">Rinde · ${new Date().getFullYear()}${CFG.contacto ? ' · ' + esc(CFG.contacto) : ''} · <a href="/privacidad/">Privacidad y condiciones</a></footer>
     </main>`;
 }
 
@@ -583,7 +584,7 @@ async function mPrecios() {
       <p class="sub">${T.enc.max >= 1 ? `Fugas encontradas: <b>${rango(T.enc.min, T.enc.max)}</b> al mes (${rangoPts(T.pts.min, T.pts.max)} puntos de rentabilidad).` : 'Revise sus frentes para ver cuánto se le está yendo.'} Elija por cuánto tiempo quiere acceso completo.</p>
       <div class="planes">${plans.map(p => `<button class="plan-c ${p.id === sel ? 'on' : ''}" data-a="plan-sel" data-p="${p.id}"><b>${esc(p.label)}</b><span class="precio">US$${Number(p.usd).toFixed(0)}</span><small>${esc(p.note || '')}</small></button>`).join('')}</div>
       <ul class="incluye"><li>Plan a la medida de cada frente, con pasos, fechas y mensajes listos</li><li>Planes que se afinan con sus respuestas, todas las veces que quiera</li><li>Acciones con calendario y registro de lo recuperado</li><li>Informe en PDF para socios o contador</li></ul>
-      <p class="nota">Pago único con PayPal (o tarjeta a través de PayPal). No se renueva solo.${CFG.garantia ? ' ' + esc(CFG.garantia) : ''}</p>
+      <p class="nota">Pago único con PayPal (o tarjeta a través de PayPal). No se renueva solo.${CFG.garantia ? ' ' + esc(CFG.garantia) : ''}${CFG.contacto ? ' ' + esc(CFG.contacto) + '.' : ''} <a href="/privacidad/#pagos" target="_blank" rel="noopener">Condiciones</a></p>
       ${USER ? '<div id="pp"></div>' : '<button class="btn full" data-a="login-pagar">Crear cuenta o entrar para pagar</button>'}`, 'chico');
     if (USER) pintarPaypal();
 }
@@ -669,6 +670,7 @@ function mCuenta() {
     abrir(`<h2>Mi cuenta</h2><p class="sub">${esc(USER.email || '')}</p>
       ${ACCESO.active ? `<p><span class="pill ok">Plan activo</span> ${ACCESO.admin ? '(administrador)' : `hasta el ${new Date(ACCESO.paidUntil).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })}`}</p>` : `<p>Plan gratuito${ACCESO.freeFrente ? ` · frente gratis: <b>${esc(FR[ACCESO.freeFrente] ? FR[ACCESO.freeFrente].t : '')}</b>` : ''}</p><button class="btn full" data-a="precios">Ver planes</button>`}
       <div class="lista-b"><button class="opc linea" data-a="empresas">Mis empresas (${Object.values(E.empresas).filter(x => x.perfil).length}) · agregar o cambiar</button><button class="opc linea" data-a="perfil">Editar datos de la empresa</button><button class="opc linea" data-a="limpiar">Limpiar proyecto</button><button class="opc linea" data-a="logout">Cerrar sesión</button></div>
+      <p class="disc">¿Dudas o soporte? ${esc(CFG.contacto)}${CFG.whatsapp ? ` · <a href="https://wa.me/${CFG.whatsapp}" target="_blank" rel="noopener">Escribir por WhatsApp</a>` : ''}</p>
       <p class="disc">Su diagnóstico se guarda en su cuenta y puede abrirlo desde el teléfono o la computadora.</p>`, 'chico');
 }
 
