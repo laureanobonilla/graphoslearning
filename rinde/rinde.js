@@ -27,9 +27,23 @@ const MONEDAS = {
     CLP: { s: 'CLP$', usd: 950, dots: true, nombre: 'Pesos chilenos' },
     ARS: { s: 'AR$', usd: 1300, dots: true, nombre: 'Pesos argentinos' },
     DOP: { s: 'RD$', usd: 62, dots: false, nombre: 'Pesos dominicanos' },
-    EUR: { s: '€', usd: 0.88, dots: true, nombre: 'Euros' }
+    EUR: { s: '€', usd: 0.88, dots: true, nombre: 'Euros' },
+    BOB: { s: 'Bs', usd: 6.9, dots: true, nombre: 'Bolivianos' },
+    PYG: { s: '₲', usd: 7500, dots: true, nombre: 'Guaraníes' },
+    UYU: { s: '$U', usd: 40, dots: true, nombre: 'Pesos uruguayos' }
 };
-const PAIS_MONEDA = { CR: 'CRC', MX: 'MXN', CO: 'COP', GT: 'GTQ', HN: 'HNL', NI: 'NIO', PE: 'PEN', CL: 'CLP', AR: 'ARS', DO: 'DOP', ES: 'EUR' };
+const PAIS_MONEDA = { CR: 'CRC', MX: 'MXN', CO: 'COP', GT: 'GTQ', HN: 'HNL', NI: 'NIO', PE: 'PEN', CL: 'CLP', AR: 'ARS', DO: 'DOP', ES: 'EUR',
+    BO: 'BOB', PY: 'PYG', UY: 'UYU', US: 'USD', PA: 'USD', EC: 'USD', SV: 'USD', PR: 'USD', VE: 'USD' };
+// País del visitante: el que detecta el servidor (rinde-config); mientras llega, se adivina por la zona horaria del equipo.
+const ZONA_PAIS = { Costa_Rica: 'CR', Mexico_City: 'MX', Monterrey: 'MX', Merida: 'MX', Cancun: 'MX', Tijuana: 'MX', Chihuahua: 'MX', Hermosillo: 'MX', Mazatlan: 'MX',
+    Bogota: 'CO', Guatemala: 'GT', Tegucigalpa: 'HN', Managua: 'NI', Lima: 'PE', Santiago: 'CL', Buenos_Aires: 'AR', Cordoba: 'AR', Santo_Domingo: 'DO', Madrid: 'ES',
+    Panama: 'PA', Guayaquil: 'EC', El_Salvador: 'SV', La_Paz: 'BO', Asuncion: 'PY', Montevideo: 'UY', Caracas: 'VE', Puerto_Rico: 'PR' };
+function paisVisitante() {
+    if (CONF && CONF.country) return CONF.country;
+    try { const z = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; return ZONA_PAIS[z.split('/').pop()] || null; } catch (_e) { return null; }
+}
+// Moneda para mostrar a quien no ha llenado su perfil: la de su país; si su país no está en la lista, dólares.
+const monedaVisitante = () => PAIS_MONEDA[paisVisitante() || ''] || 'USD';
 
 // Ventas mensuales en US$: [desde, hasta, valor que se usa para calcular]
 const VENTAS = [[0, 3000, 1800], [3000, 10000, 6000], [10000, 30000, 18000], [30000, 100000, 55000], [100000, 300000, 170000], [300000, 1000000, 550000], [1000000, null, 1500000]];
@@ -161,7 +175,7 @@ function abrirEmpresa(id) {
     if (S.perfil) { UI.vista = 'app'; render(); window.scrollTo(0, 0); } else empezarOnb();
 }
 function empezarOnb() {
-    const pa = PAIS_MONEDA[(CONF && CONF.country) || ''] || 'CRC';
+    const pa = monedaVisitante();
     UI.borrador = Object.assign({ nombre: '', personas: null, sedes: 's1', ventas: null, moneda: pa, exacta: 0, detalle: '' }, S.perfil || {}, { negocios: negsDe(S.perfil).slice() });
     UI.paso = 1; UI.vista = 'onb'; cerrar(); render(); window.scrollTo(0, 0);
 }
@@ -201,7 +215,7 @@ function dinero(n, m = mon()) { return m.s + sep(n, m.dots); }
 function corto(n, m = mon()) {
     const a = Math.abs(n);
     const dec = (x) => { const r = Math.round(x * 10) / 10; return (r % 1 === 0 ? String(r) : String(r).replace('.', m.dots ? ',' : '.')); };
-    if (a >= 1e6) return m.s + dec(n / 1e6) + (a >= 2e6 ? ' millones' : ' millón');
+    if (a >= 1e6) { const t = dec(n / 1e6); return m.s + t + (t === '1' ? ' millón' : ' millones'); }
     if (a >= 1e4) return m.s + sep(Math.round(n / 1000), m.dots) + ' mil';
     return dinero(redondo(n), m);
 }
@@ -312,7 +326,9 @@ function tabsHTML() {
 // ---------- Inicio (página de presentación) ----------
 function vInicio() {
     const F = CFG.fundador;
-    const ejemplo = [['cobros', 'Cobros', '₡420 mil – ₡980 mil', 70], ['precios', 'Precios y ganancia', '₡310 mil – ₡760 mil', 55], ['fijos', 'Gastos fijos', '₡90 mil – ₡260 mil', 22]];
+    // Ejemplo en la moneda del visitante (montos base en US$, convertidos con el tipo de cambio aproximado de MONEDAS).
+    const mv = MONEDAS[monedaVisitante()] || MONEDAS.USD, ej = (a, b) => rango(a * mv.usd, b * mv.usd, mv);
+    const ejemplo = [['cobros', 'Cobros', ej(820, 1920), 70], ['precios', 'Precios y ganancia', ej(610, 1490), 55], ['fijos', 'Gastos fijos', ej(175, 510), 22]];
     return `${cabecera(false)}
     <main class="inicio">
       <section class="hero">
@@ -322,7 +338,7 @@ function vInicio() {
         <div class="cta-row"><button class="btn xl" data-a="empezar">Empezar · 1 minuto</button><span class="nota">Sin tarjeta. Sin registrarse para ver el resultado.</span></div>
       </section>
       <section class="demo" aria-label="Ejemplo de resultado">
-        <div class="demo-top"><span>Ejemplo: tienda con 12 personas, tras 9 respuestas</span><strong>₡820 mil – ₡2 millones <small>al mes · 2,3 a 5,6 puntos de rentabilidad</small></strong></div>
+        <div class="demo-top"><span>Ejemplo: tienda con 12 personas, tras 9 respuestas</span><strong>${ej(1610, 3920)} <small>al mes · 2,3 a 5,6 puntos de rentabilidad</small></strong></div>
         ${ejemplo.map(([id, t, r, w]) => `<div class="demo-row">${icon(id)}<span class="dt">${t}</span><span class="bar"><i style="width:${w}%"></i></span><span class="dr">${r}</span></div>`).join('')}
       </section>
       <section class="tres">
@@ -925,7 +941,7 @@ if (window.netlifyIdentity) {
     netlifyIdentity.on('logout', () => { alEntrar(null); toast('Sesión cerrada. Su diagnóstico sigue en este dispositivo.'); });
     netlifyIdentity.init({ locale: 'es' });
 }
-fetch(conClave('/.netlify/functions/rinde-config')).then(r => r.json()).then(c => { CONF = c; }).catch(() => {});
+fetch(conClave('/.netlify/functions/rinde-config')).then(r => r.json()).then(c => { const antes = monedaVisitante(); CONF = c; if (UI.vista === 'inicio' && monedaVisitante() !== antes) render(); }).catch(() => {});
 track(S.perfil ? 'visita_vuelta' : 'visita_nueva', { ref: document.referrer ? document.referrer.slice(0, 120) : null, utm: (location.search.match(/utm_campaign=([\w.-]{1,40})/) || [])[1] || null, ad: (location.search.match(/utm_content=([\w.-]{1,40})/) || [])[1] || null, fb: /fbclid=/.test(location.search) });
 const inicioPagina = Date.now();
 document.addEventListener('visibilitychange', () => {
