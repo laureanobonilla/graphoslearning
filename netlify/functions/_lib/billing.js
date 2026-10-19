@@ -93,6 +93,16 @@ function json(statusCode, obj, extraHeaders, cookies) {
 const TRIAL_POLICY = process.env.TRIAL_POLICY !== 'off';
 // Fuera de la política: otras apps que comparten este backend.
 const TRIAL_EXEMPT = new Set(['oracle', 'lang_map', 'lang_word', 'esc_questions', 'esc_feedback', 'esc_analyze']);
+// Practicar y Escribir (/escribir/): un invitado solo entra si llegó redirigido (anuncio o desde Graphikosmos: `entry` = 'ad'|'gk');
+// entrando directo debe tener cuenta. Con esa entrada tiene una prueba rápida de CADA modo (Practicar: 1 tanda de preguntas y 3 respuestas
+// evaluadas; Escribir: 6 párrafos analizados). Se cuenta en la tabla events (esc_trial_q / _fb / _an), por invitado.
+const ESC_QUOTA = {
+    esc_questions: { ev: 'esc_trial_q', max: 1 },
+    esc_feedback:  { ev: 'esc_trial_fb', max: 3 },
+    esc_analyze:   { ev: 'esc_trial_an', max: 6 }
+};
+const ESC_EVENTS = Object.values(ESC_QUOTA).map((q) => q.ev);
+const ESC_SINCE = '2020-01-01T00:00:00Z';
 // Crear esquemas nuevos: exige cuenta aunque ya haya usado su prueba.
 const TRIAL_NEW_SCHEMA = new Set(['parse_text', 'analyze_text', 'long_outline', 'onboarding_text', 'm_text']);
 
@@ -168,10 +178,13 @@ function withBilling(raw, overrides = {}) {
         sanitize(body);
         const ticket = typeof body.ticket === 'string' ? body.ticket.slice(0, 40) : '';
         delete body.ticket;
+        const entry = (body.entry === 'ad' || body.entry === 'gk') ? body.entry : '';
+        delete body.entry;
 
         let balance = null;
         let welcomeFree = false;
         let consumeTicket = null;
+        let escTrialEvent = null;
         let oracleFree = false, oracleFreeLeft = 0;
         if ((action === 'welcome_schema' || action === 'm_welcome') && identity.isAdmin) welcomeFree = true;
         if (!identity.isAdmin) {
@@ -208,6 +221,22 @@ function withBilling(raw, overrides = {}) {
                     return json(402, { error: 'guest_limit_reached', reason, registration_required: true, balance }, cookieHeaders);
                 }
                 if (isWelcome) { welcomeFree = true; }
+            }
+
+            // Practicar / Escribir para invitados: solo si llegaron redirigidos y dentro de la prueba rápida de cada modo.
+            if (identity.kind === 'guest' && TRIAL_POLICY && ESC_QUOTA[action]) {
+                const q = ESC_QUOTA[action];
+                let allowed = false, reason = 'direct';
+                try {
+                    const used = await deps.store.countEventsSince(identity.id, q.ev, ESC_SINCE);
+                    let started = entry !== '';
+                    if (!started) {
+                        for (const ev of ESC_EVENTS) { if (await deps.store.countEventsSince(identity.id, ev, ESC_SINCE) > 0) { started = true; break; } }   // ya empezó su prueba antes
+                    }
+                    if (started) { allowed = used < q.max; reason = 'esc_trial_over'; }
+                } catch (err) { console.error('[billing] prueba de Escribir:', err.message); }
+                if (!allowed) return json(402, { error: 'guest_limit_reached', reason, registration_required: true, balance }, cookieHeaders);
+                escTrialEvent = q.ev;
             }
 
             // Esquema de bienvenida GRATIS, una sola vez por persona: solo si no
@@ -265,6 +294,11 @@ function withBilling(raw, overrides = {}) {
             } catch (err) {
                 console.error('[billing] no se pudo descontar:', err.message);
             }
+        }
+
+        if (escTrialEvent && !identity.isAdmin) {
+            try { await deps.store.logEvent(identity.id, 'guest', null, escTrialEvent, { entry }, null, 'escribir'); }
+            catch (err) { console.error('[billing] no se pudo registrar la prueba de Escribir:', err.message); }
         }
 
         if (consumeTicket && !identity.isAdmin) {

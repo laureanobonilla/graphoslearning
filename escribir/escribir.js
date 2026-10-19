@@ -30,15 +30,37 @@
     try { fetch(FN + 'track-event', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: name, app: 'escribir', anonId: anonId(), metadata: md || {} }) }).catch(() => {}); } catch { /* nada */ }
   }
 
+  /* ---------- cómo llegó la persona ----------
+     Redirigida (anuncio, o desde Graphikosmos / otra página del sitio) → prueba rápida sin cuenta.
+     Entrando directo → hay que tener cuenta. El servidor aplica la regla; esto solo declara la entrada y la recuerda 48 h. */
+  const ENTRY_KEY = 'gk_esc_entry';
+  function detectEntry() {
+    let found = '';
+    try {
+      const p = new URLSearchParams(location.search), src = (p.get('utm_source') || '').toLowerCase(), ref = document.referrer || '';
+      let rh = ''; try { rh = new URL(ref).hostname; } catch { /* sin referrer */ }
+      if (['utm_campaign', 'utm_content', 'c', 'ad', 'fbclid'].some((k) => p.get(k)) || p.get('src') === 'fb' || /^(facebook|fb|instagram|ig|meta|messenger)$/.test(src)
+        || /(^|\.)(facebook\.com|instagram\.com|fb\.me|messenger\.com)$/.test(rh) || /FBAN|FBAV|Instagram/.test(navigator.userAgent)) found = 'ad';
+      else if (p.get('practicar') || p.get('from') === 'gk' || (ref && rh === location.hostname && !/\/escribir(\/|$)/.test(new URL(ref).pathname))) found = 'gk';
+    } catch { /* nada */ }
+    const now = Date.now();
+    if (found) { lsSet(ENTRY_KEY, { v: found, t: now }); return found; }
+    const st = ls(ENTRY_KEY, null);
+    return st && st.v && now - st.t < 48 * 3600 * 1000 ? st.v : '';
+  }
+  const ENTRY = detectEntry();
+  let lastReason = '';
+
   /* ---------- cuenta y gemas ---------- */
   function setGems(n) { const b = $('#btnGems'); if (!b || typeof n !== 'number' || !window.GK_GEMS) return; b.hidden = false; $('#gemsVal').textContent = window.GK_GEMS.gemsLabel(n); }
   async function fetchBalance(n) {
     if (typeof n === 'number') { setGems(n); return; }
     try { const r = await fetch(FN + 'balance', { credentials: 'same-origin', headers: await headers() }); const d = await r.json().catch(() => ({})); if (r.ok && d.kind === 'admin') $('#btnGems').hidden = true; else if (r.ok) setGems(d.balance); } catch { /* sin saldo */ }
   }
-  function updateLogin() { const u = user(); $('#loginLabel').textContent = u ? clip((u.email || 'Mi cuenta').split('@')[0], 12) : 'Entrar'; }
+  function updateLogin() { const u = user(); $('#loginLabel').textContent = u ? clip((u.email || 'Mi cuenta').split('@')[0], 12) : 'Entrar'; const g = $('#gate'); if (g) g.hidden = !!u || !!ENTRY; }
   if (window.GK_GEMS) window.GK_GEMS.configure({ from: 'escribir', refresh: fetchBalance });
   $('#btnGems').addEventListener('click', () => window.GK_GEMS && window.GK_GEMS.openShop({ from: 'escribir' }));
+  $('#btnGate').addEventListener('click', () => { track('gate_signup_click', { entry: ENTRY || 'direct' }); try { window.netlifyIdentity ? netlifyIdentity.open('signup') : toast('No se pudo abrir el registro.'); } catch { /* nada */ } });
   $('#btnLogin').addEventListener('click', () => { if (!window.netlifyIdentity) { toast('No se pudo abrir el inicio de sesión.'); return; } netlifyIdentity.open(user() ? undefined : 'login'); });
   try {
     if (window.netlifyIdentity) {
@@ -52,12 +74,12 @@
 
   async function callGemini(body) {
     let res;
-    try { res = await fetch(FN + 'gemini', { method: 'POST', credentials: 'same-origin', headers: await headers(), body: JSON.stringify(Object.assign({ lang: 'es' }, body)) }); }
+    try { res = await fetch(FN + 'gemini', { method: 'POST', credentials: 'same-origin', headers: await headers(), body: JSON.stringify(Object.assign({ lang: 'es' }, ENTRY ? { entry: ENTRY } : {}, body)) }); }
     catch { return { ok: false, kind: 'network' }; }
     let data = {}; try { data = await res.json(); } catch { /* nada */ }
     if (res.ok) { if (typeof data.balance === 'number' && !data.admin) setGems(data.balance); return { ok: true, data }; }
     if (res.status === 402 && typeof data.balance === 'number') setGems(data.balance);
-    if (res.status === 402 && data.error === 'guest_limit_reached') return { ok: false, kind: 'login' };
+    if (res.status === 402 && data.error === 'guest_limit_reached') { lastReason = data.reason || ''; return { ok: false, kind: 'login' }; }
     if (res.status === 402) return { ok: false, kind: user() ? 'nobalance' : 'login' };
     if (res.status === 401) return { ok: false, kind: 'login' };
     if (res.status === 429) return { ok: false, kind: user() ? 'rate' : 'login' };
@@ -65,10 +87,10 @@
   }
   async function callRetry(body) { let r = await callGemini(body); if (!r.ok && r.kind === 'server') r = await callGemini(body); return r; }
   function failText(k) {
-    return ({ login: 'Para seguir, crea tu cuenta gratis o inicia sesión.', nobalance: 'Se acabaron tus gemas. Consigue más para seguir.', rate: 'Hay mucha actividad en tu cuenta. Espera unos minutos e intenta de nuevo.', network: 'Sin conexión. Revisa tu internet e intenta de nuevo.' })[k] || 'No pudimos hacerlo. Intenta de nuevo.';
+    return ({ login: lastReason === 'direct' ? 'Para usar Practicar y Escribir crea tu cuenta gratis o inicia sesión.' : lastReason === 'esc_trial_over' ? 'Terminó tu prueba rápida. Crea tu cuenta gratis para seguir.' : 'Para seguir, crea tu cuenta gratis o inicia sesión.', nobalance: 'Se acabaron tus gemas. Consigue más para seguir.', rate: 'Hay mucha actividad en tu cuenta. Espera unos minutos e intenta de nuevo.', network: 'Sin conexión. Revisa tu internet e intenta de nuevo.' })[k] || 'No pudimos hacerlo. Intenta de nuevo.';
   }
   function afterFail(k) {
-    if (k === 'login' || k === 'nobalance') track('paywall_shown', { kind: k });
+    if (k === 'login' || k === 'nobalance') track('paywall_shown', { kind: k, reason: k === 'login' ? lastReason : undefined, entry: ENTRY || 'direct' });
     if (k === 'login') { try { window.netlifyIdentity && netlifyIdentity.open('signup'); } catch { /* nada */ } }
     if (k === 'nobalance' && window.GK_GEMS) window.GK_GEMS.openShop({ from: 'escribir' });
   }

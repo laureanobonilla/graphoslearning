@@ -133,3 +133,7 @@ main:has(.view.wide:not([hidden])){max-width:none;padding:14px 16px 24px}
 .v-wTitle .mic{right:4px;width:30px;height:30px}.v-wTitle .mic svg{width:17px;height:17px}
 @media (max-width:900px){.v-doc{flex:none}.v-doc #doc{height:auto}}
 @media (prefers-reduced-motion:reduce){.mic.rec{animation:none}}
+
+.gate{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--s1);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 16px}
+.gate p{margin:0;color:var(--mid);font-size:15px;flex:1 1 220px}
+.gate[hidden]{display:none}
