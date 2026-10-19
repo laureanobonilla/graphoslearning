@@ -146,3 +146,58 @@ select o.campana, o.anuncio, count(distinct o.anon_id) as visitas,
        count(distinct e.anon_id) filter (where e.event_name = 'rinde_pago_ok')           as pagaron
 from origen o left join public.events e on e.anon_id = o.anon_id and e.app = 'rinde'
 group by 1, 2 order by visitas desc;
+
+
+-- 9) RINDE: qué hace cada visitante (últimos 7 días). Una fila por persona, la más reciente arriba.
+-- Para ver más días, cambia '7 days'. Las cuentas de administrador no aparecen.
+with ev as (
+  select coalesce(anon_id, actor_id::text) as quien, actor_label, event_name, metadata, created_at,
+         replace(event_name, 'rinde_', '') as e
+  from public.events
+  where app = 'rinde' and created_at >= now() - interval '7 days'
+), pasos as (   -- recorrido sin repetir el mismo paso seguido (10 respuestas seguidas = «respuesta×10»)
+  select quien, e, created_at, metadata,
+         case when e = lag(e) over (partition by quien order by created_at) then 0 else 1 end as nuevo
+  from ev
+), grupos as (
+  select quien, e, min(created_at) as t, count(*) as n,
+         max(coalesce(metadata->>'frente', metadata->>'tab', metadata->>'paso')) as det
+  from (select *, sum(nuevo) over (partition by quien order by created_at) as g from pasos) x
+  group by quien, g, e
+)
+select
+  (min(ev.created_at) at time zone 'America/Costa_Rica')::timestamp(0)                                  as llego,
+  max(ev.actor_label)                                                                                   as correo,
+  coalesce(max(ev.metadata->>'utm') filter (where ev.e like 'visita%'),
+           case when bool_or((ev.metadata->>'fb')::boolean) filter (where ev.e like 'visita%') then 'facebook' end,
+           max(split_part(split_part(ev.metadata->>'ref', '://', 2), '/', 1)) filter (where ev.e like 'visita%'),
+           'directo')                                                                                   as origen,
+  max(ev.metadata->>'negocio') filter (where ev.e = 'diagnostico_listo')                                as negocio,
+  case max(ev.metadata->>'personas') filter (where ev.e = 'diagnostico_listo')
+    when 'p1' then '1-5' when 'p2' then '6-20' when 'p3' then '21-50' when 'p4' then '51-200' when 'p5' then '201-1000' when 'p6' then '+1000' end as personas,
+  case
+    when bool_or(ev.e = 'pago_ok')            then '9 · PAGÓ'
+    when bool_or(ev.e = 'pago_iniciado')      then '8 · abrió PayPal'
+    when bool_or(ev.e = 'precios_visto')      then '7 · vio precios'
+    when bool_or(ev.e = 'plan_ok')            then '6 · recibió un plan'
+    when bool_or(ev.e = 'login_ok')           then '5 · creó cuenta / entró'
+    when bool_or(ev.e = 'plan_click')         then '4 · pidió un plan'
+    when bool_or(ev.e = 'respuesta')          then '3 · respondió preguntas'
+    when bool_or(ev.e = 'diagnostico_listo')  then '2 · terminó el perfil'
+    when bool_or(ev.e = 'empezar')            then '1 · tocó empezar'
+    else '0 · solo miró la portada' end                                                                 as llego_hasta,
+  count(*) filter (where ev.e = 'respuesta')                                                            as respuestas,
+  count(*) filter (where ev.e = 'respuesta_libre')                                                      as resp_escritas,
+  string_agg(distinct ev.metadata->>'frente', ', ') filter (where ev.e in ('respuesta', 'frente_abierto', 'plan_click')) as frentes,
+  string_agg(distinct ev.metadata->>'tab', ', ') filter (where ev.e = 'pestana')                        as pestanas,
+  bool_or(ev.e = 'cifras_guardadas')                                                                    as anoto_cifras,
+  max((ev.metadata->>'seg')::int) filter (where ev.e = 'salida')                                        as segundos,
+  (array_agg(coalesce(ev.metadata->>'vista', '') || coalesce(' · ' || nullif(ev.metadata->>'tab', 'panel'), '') || coalesce(' · paso ' || (ev.metadata->>'paso'), '')
+     order by ev.created_at desc) filter (where ev.e = 'salida'))[1]                                     as salio_desde,
+  count(*) filter (where ev.e in ('error_js', 'plan_error', 'pago_error'))                              as errores,
+  (select string_agg(g.e || case when g.n > 1 then '×' || g.n else '' end || coalesce('(' || g.det || ')', ''), ' → ' order by g.t)
+     from grupos g where g.quien = ev.quien)                                                            as recorrido
+from ev
+group by ev.quien
+order by max(ev.created_at) desc
+limit 200;
