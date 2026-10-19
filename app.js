@@ -1272,12 +1272,14 @@ const depthView = (() => {
         S.on = on; container.classList.toggle('depth-view', on);
         if (sel) sel.value = on ? 'depth' : 'flat';
         if (on) S.k = reduce() ? 1 : 0.0001;
-        try { localStorage.setItem('gk_view_mode', on ? 'depth' : 'flat'); } catch (_e) { /* ok */ }
+        if (byUser) { try { localStorage.setItem('gk_view_mode2', on ? 'depth' : 'flat'); } catch (_e) { /* ok */ } }   // solo se recuerda lo que la persona eligió
         if (byUser) track('view_mode', { mode: on ? 'depth' : 'flat', nodes: nodes.length });
         kick();
     }
     sel?.addEventListener('change', (e) => set(e.target.value, true));
-    let saved = 'depth'; try { saved = localStorage.getItem('gk_view_mode') === 'flat' ? 'flat' : 'depth'; } catch (_e) { /* ok */ }   // por defecto Profundidad; solo queda Plana si la persona la eligió
+    // Por defecto vuelve a ser Plana (Profundidad puede distraer). Clave nueva: la anterior la guardaba sola al cargar,
+    // así que hoy todos la tienen en «depth»; solo queda Profundidad si la persona la elige.
+    let saved = 'flat'; try { saved = localStorage.getItem('gk_view_mode2') === 'depth' ? 'depth' : 'flat'; } catch (_e) { /* ok */ }
     if (saved === 'depth') set('depth', false);
     return { set };
   } catch (_e) { return { set() {} }; }
