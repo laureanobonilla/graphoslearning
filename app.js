@@ -9498,13 +9498,66 @@ const vizUI = (() => {
           <h4>${esc(L('Grupos de ideas', 'Idea groups'))}</h4>
           <div class="vz-rd-g">${A.comms.map((c, i) => `<div class="vz-rd-gi"><button type="button" class="vz-rd-gb" data-grp="${i}"><i style="background:${colorOfComm(i)}"></i>${esc(L('Grupo', 'Group'))} ${i + 1} · ${c.members.length}</button><div>${c.top.slice(0, 5).map(chip).join('')}</div></div>`).join('')}</div>
           ${A.gaps.length ? `<h4>${esc(L('Brechas para explorar', 'Gaps to explore'))}</h4><p class="vz-rd-s">${esc(L('Grupos que casi no se conectan. Responder estas preguntas es donde más se aprende.', 'Groups that barely connect. Answering these questions is where most learning happens.'))}</p>
-          ${A.gaps.map((g, i) => `<div class="vz-rd-gap"><p>${esc(L('¿Cómo se relaciona', 'How does'))} ${chip(g.qa)} ${esc(L('con', 'relate to'))} ${chip(g.qb)}?</p><button type="button" class="vz-ghost" data-gap="${i}">${esc(L('Ver ambos grupos', 'Show both groups'))}</button></div>`).join('')}` : ''}
+          ${A.gaps.map((g, i) => `<div class="vz-rd-gap"><p>${esc(L('¿Cómo se relaciona', 'How does'))} ${chip(g.qa)} ${esc(L('con', 'relate to'))} ${chip(g.qb)}?</p><div class="vz-rd-acts"><button type="button" class="vz-primary sm" data-gexp="${i}">${esc(L('Explicar la conexión · 1 nodo', 'Explain the link · 1 node'))}</button><button type="button" class="vz-ghost" data-gpr="${i}">${esc(L('Practicar', 'Practice'))}</button><button type="button" class="vz-ghost" data-gap="${i}">${esc(L('Ver grupos', 'Show groups'))}</button></div><div class="vz-rd-ai" data-gai="${i}"></div></div>`).join('')}` : ''}
           ${A.surprises.length ? `<h4>${esc(L('Conexiones inesperadas', 'Unexpected connections'))}</h4><p class="vz-rd-s">${esc(L('Conceptos de ramas lejanas que comparten significado.', 'Concepts from distant branches that share meaning.'))}</p>
           ${A.surprises.map(l => `<div class="vz-rd-sp">${chip(l.a)}<span>↔</span>${chip(l.b)}${l.why ? `<small>${esc(l.why)}</small>` : ''}</div>`).join('')}` : ''}`;
         const focus = (list) => { try { rnet.selectNodes(list); if (list.length === 1) rnet.focus(list[0], { scale: 1.1, animation: { duration: 400 } }); else rnet.fit({ nodes: list, animation: { duration: 400 } }); } catch (_e) { /* ok */ } };
         el.querySelectorAll('[data-nid]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.nid, n = byId.get(id); focus([id]); showQuote(n ? (n.def || n.simple || n.path.concat(n.label).join(' › ')) : null, { noFind: true }); try { network.selectNodes([id]); } catch (_e) { /* ok */ } }));
         el.querySelectorAll('[data-grp]').forEach(b => b.addEventListener('click', () => focus(A.comms[Number(b.dataset.grp)].members)));
         el.querySelectorAll('[data-gap]').forEach(b => b.addEventListener('click', () => { const g = A.gaps[Number(b.dataset.gap)]; focus(g.a.members.concat(g.b.members)); track('lectura_brecha', {}); }));
+        // ---- brechas con IA: explicación, concepto puente para el mapa y pregunta para practicar ----
+        const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
+        const gKey = (g) => g.qa + '|' + g.qb;
+        const saved = () => ((m.rootId != null && nodes.get(m.rootId)) || {}).rhizomeBridges || {};
+        const pregDe = (g) => (saved()[gKey(g)] || {}).pregunta || `${L('¿Cómo se relaciona', 'How does')} ${lab(g.qa)} ${L('con', 'relate to')} ${lab(g.qb)}?`;
+        function paintAi(i) {
+            const g = A.gaps[i], r = saved()[gKey(g)], box = el.querySelector(`[data-gai="${i}"]`); if (!box) return;
+            if (!r) { box.innerHTML = ''; return; }
+            const enMapa = r.added && nodes.get(r.added);
+            box.innerHTML = `<p>${esc(r.explicacion)}</p><p class="vz-rd-pt"><b>${esc(L('Concepto puente', 'Bridge concept'))}:</b> ${esc(lab(g.qa))} → <i>${esc(r.puente.relFromA)}</i> → <b>${esc(r.puente.label)}</b> → <i>${esc(r.puente.relToB)}</i> → ${esc(lab(g.qb))}</p>
+              ${enMapa ? `<p class="vz-rd-s">${esc(L('Ya está en el mapa.', 'Already on the map.'))}</p>` : `<button type="button" class="vz-ghost" data-gadd="${i}">${esc(L('Agregar el puente al mapa', 'Add the bridge to the map'))}</button>`}`;
+            const ab = box.querySelector('[data-gadd]'); if (ab) ab.addEventListener('click', () => addBridge(i));
+            const ex = el.querySelector(`[data-gexp="${i}"]`); if (ex) ex.textContent = L('Explicación lista ✓', 'Explanation ready ✓');
+        }
+        function storeBridge(g, r) {
+            if (!rootN || !nodes.get(m.rootId)) return;
+            const all = Object.assign({}, saved()); all[gKey(g)] = r;
+            isApplyingUndo = true; try { nodes.update({ id: m.rootId, rhizomeBridges: all }); } finally { isApplyingUndo = false; }
+        }
+        async function explainGap(i, btn) {
+            const g = A.gaps[i];
+            if (saved()[gKey(g)]) { paintAi(i); return; }
+            if (!checkBalance(1)) return;
+            const old = btn.textContent; btn.disabled = true; btn.textContent = L('Pensando…', 'Thinking…');
+            const names = (c) => c.top.slice(0, 8).map(lab);
+            try {
+                const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'bridge_gap', topic: m.rootLabel, a: lab(g.qa), b: lab(g.qb), groupA: names(g.a), groupB: names(g.b), lang: (typeof I18N !== 'undefined' && I18N.lang) || 'es' }) });
+                if (!ok) { btn.disabled = false; btn.textContent = old; if (!handleBillingError(status, data)) appAlert(data?.error === 'respuesta_invalida' ? L('No salió bien la explicación. Intenta de nuevo.', 'The explanation failed. Try again.') : (data?.error || L('No se pudo explicar ahora.', 'Could not explain right now.'))); return; }
+                applyServerBalance(data);
+                storeBridge(g, { explicacion: data.explicacion, puente: data.puente, pregunta: data.pregunta || '', t: Date.now() });
+                track('lectura_brecha_ia', { nodes: m.nodes.length });
+                btn.disabled = false; paintAi(i);
+            } catch (_e) { btn.disabled = false; btn.textContent = old; appAlert(L('Sin conexión. Intenta de nuevo.', 'No connection. Try again.')); }
+        }
+        function addBridge(i) {
+            const g = A.gaps[i], r = saved()[gKey(g)]; if (!r || !nodes.get(g.qa) || !nodes.get(g.qb)) return;
+            let x = 0, y = 0; try { const ps = network.getPositions([g.qa, g.qb]); x = ((ps[g.qa] || {}).x + (ps[g.qb] || {}).x) / 2 || 0; y = ((ps[g.qa] || {}).y + (ps[g.qb] || {}).y) / 2 || 0; } catch (_e) { /* ok */ }
+            const id = 'puente_' + Date.now().toString(36);
+            nodes.add({ id, label: `*${r.puente.label}*`, baseTitle: r.puente.label, definition: r.explicacion, x, y, fixed: { x: false, y: false }, color: colorForChildOf(g.qa) });
+            edges.add({ from: g.qa, to: id, label: r.puente.relFromA });
+            edges.add({ from: id, to: g.qb, label: r.puente.relToB });
+            storeBridge(g, Object.assign({}, r, { added: id }));
+            track('lectura_puente_agregado', {});
+            try { network.selectNodes([id]); network.focus(id, { scale: 1, animation: { duration: 500 } }); } catch (_e) { /* ok */ }
+            if (typeof appToast === 'function') appToast(L('Puente agregado al mapa.', 'Bridge added to the map.'));
+        }
+        el.querySelectorAll('[data-gexp]').forEach(b => b.addEventListener('click', () => explainGap(Number(b.dataset.gexp), b)));
+        el.querySelectorAll('[data-gpr]').forEach(b => b.addEventListener('click', () => {
+            const g = A.gaps[Number(b.dataset.gpr)];
+            track('lectura_practicar', { ia: !!saved()[gKey(g)] });
+            window.open('/escribir/?from=gk&practicar=' + encodeURIComponent(pregDe(g).slice(0, 160)), '_blank', 'noopener');
+        }));
+        A.gaps.forEach((_g, i) => paintAi(i));
         document.getElementById('vzRdMd').addEventListener('click', () => {
             const blob = new Blob([lecturaMd(m, A, lab)], { type: 'text/markdown;charset=utf-8' }), a = document.createElement('a');
             a.href = URL.createObjectURL(blob); a.download = (m.rootLabel || 'mapa').replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 60) + '-lectura.md'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);

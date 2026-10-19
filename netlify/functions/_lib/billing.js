@@ -14,6 +14,8 @@ const KNOWN = new Set([
     'm_map', 'm_welcome', 'glossary', 'm_text',
     // Escritorio: texto breve de solo lectura que acompaña a un esquema generado desde un tema (gratis).
     'topic_text', 'views', 'rhizome',
+    // Rizoma › Lectura del mapa: explicar cómo se conectan dos grupos de ideas que casi no se tocan (1 nodo).
+    'bridge_gap',
     // Documentos muy largos: resumen por fragmentos (gratis); el esquema final se cobra como parse_text.
     'long_outline',
     // Idiomas (/idiomas/): mapa de bloques con rol gramatical (se cobra por nodo) y palabra suelta en contexto (gratis).
@@ -56,6 +58,7 @@ function computeCost(action, d) {
         case 'examples':          return len(d.examples);
         case 'synergy':           return d.synergy ? 1 + len(d.pathsFromA) + len(d.pathsFromB) : 0;
         case 'connect':           return d.bridge ? 1 : 0;
+        case 'bridge_gap':        return d.explicacion ? 1 : 0;
         case 'custom_prompt':     return len(d.nodes);
         case 'antithesis':        return len(d.critiques);
         case 'socratic_evaluate': return 1;

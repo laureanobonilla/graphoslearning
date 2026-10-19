@@ -629,6 +629,12 @@
             #vizPanel .vz-rd-sp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
             #vizPanel .vz-rd-sp small { flex-basis: 100%; color: var(--p-mute); }
             #vizPanel .vz-rd .vz-chip { max-width: 100%; }
+            #vizPanel .vz-primary.sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+            #vizPanel .vz-primary:disabled { opacity: .6; cursor: wait; }
+            #vizPanel .vz-rd-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+            #vizPanel .vz-rd-ai:not(:empty) { margin-top: 8px; padding: 10px 12px; background: var(--p-bg); border-radius: 10px; font-size: 13px; line-height: 1.55; color: var(--p-ink); }
+            #vizPanel .vz-rd-ai p { margin: 0 0 6px; }
+            #vizPanel .vz-rd-pt i { color: var(--p-mute); }
             @media (max-width: 760px) { #vizPanel .vz-rh-wrap.with-read { grid-template-columns: 1fr; } #vizPanel .vz-rd { height: auto; max-height: 60vh; } }
             #vizPanel .vz-rl-wrap { width: 100%; }
             #vizPanel .vz-rl { display: block; width: 100%; border: 1px solid var(--p-rule); border-radius: 12px; touch-action: none; }
