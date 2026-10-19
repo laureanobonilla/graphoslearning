@@ -46,10 +46,14 @@ async function one(table, col, val) {
 async function getAccess(user) {
     const row = await one('ordena_access', 'user_id', user.id);
     const until = row && row.paid_until ? new Date(row.paid_until) : null;
-    const active = !!(user.isAdmin || (until && until > new Date()));
+    // TEMPORAL (prueba de cobro): estas cuentas de administrador se tratan como clientes normales (sin acceso ilimitado).
+    // Para devolverles el acceso ilimitado, vaciar la lista.
+    const comoCliente = ['bonillapretiz@gmail.com'].includes(String(user.email || '').toLowerCase());
+    const admin = !!user.isAdmin && !comoCliente;
+    const active = !!(admin || (until && until > new Date()));
     return {
         active,
-        admin: !!user.isAdmin,
+        admin,
         plan: row && row.plan || null,
         paidUntil: until ? until.toISOString() : null,
         freeFrente: row && row.free_frente || null
