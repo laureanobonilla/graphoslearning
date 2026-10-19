@@ -8985,7 +8985,10 @@ async function exportReportRtf() {
         const row = e.target.closest('.dv-row[data-id]'); if (!row) return;
         const nd = nodes.get(row.dataset.id) || nodes.get(Number(row.dataset.id)); if (!nd) return;
         revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); flashNewNode(nd.id); flashRow(row);
+        document.dispatchEvent(new CustomEvent('gk:nodepick', { detail: nd.id }));   // el rizoma también lo marca
     });
+    // Desde el rizoma (o la lectura del mapa): llevar las definiciones a la fila de ese concepto.
+    window.gkDefsGoTo = (id) => { if (!isOpen()) return; const row = ensureRow(id); if (!row) return; row.scrollIntoView({ block: 'center', behavior: 'smooth' }); flashRow(row); };
     // Texto elegido en una definición → esquema que parte del nodo de esa definición.
     const selBtn = document.createElement('button'); selBtn.id = 'dvSelBtn'; selBtn.type = 'button';
     selBtn.textContent = en ? '🌱 Make a map from this' : '🌱 Crear esquema con esto'; document.body.appendChild(selBtn);
@@ -9086,7 +9089,7 @@ const vizUI = (() => {
         { k: 'figures', i: '📊', es: 'Cifras', en: 'Figures' }, { k: 'places', i: '📍', es: 'Lugares', en: 'Places' },
         { k: 'cards', i: '🃏', es: 'Tarjetas y quiz', en: 'Cards & quiz' }
     ];
-    const STRIP = 44;
+    const STRIP = 44, VIEWS_ON = false;
     let hostId = null, open = false, tab = 'notes', H = 300, detectToken = 0, partial = false, lastGeo = '';
     const mem = {}; // vistas sin guardar (cuando una de las dos búsquedas falló)
     try { open = localStorage.getItem('gk_viz_open') === '1'; const h = Number(localStorage.getItem('gk_viz_h')); if (h) H = h; } catch (_e) { /* ok */ }
@@ -9117,17 +9120,8 @@ const vizUI = (() => {
         isApplyingUndo = true; try { nodes.update({ id, userNotes: list }); } finally { isApplyingUndo = false; }
     }
     const cardNodes = () => nodes.get().filter(n => !n.isSubscheme && (String(n.definition || '').trim() || String(n.simple || '').trim()));
-    function availability() {
-        const v = currentViews() || {}; const out = [{ k: 'notes', n: getNotes().length }];
-        if (nodes.get().filter(n => !n.isSubscheme && !n.isPointer).length >= 5) { out.push({ k: 'rhizome', n: '' }); }
-        const dh = docHost(); if (dh) { const dp = dh.docParts.parts; out.unshift({ k: 'parts', n: dp.filter(x => x.sub && nodes.get(x.sub)).length + '/' + dp.length }); }
-        ['timeline', 'cause_effect', 'process', 'compare', 'actors', 'figures', 'places'].forEach(k => {
-            if (!v[k]) return;
-            const n = k === 'compare' ? v.compare.items.length : k === 'actors' ? v.actors.actors.length : v[k].length; out.push({ k, n });
-        });
-        if (cardNodes().length >= 3) out.push({ k: 'cards', n: cardNodes().length });
-        return out;
-    }
+    // Al pie solo quedan «Mis notas» (el rizoma tiene su propio panel; las demás vistas se retiraron).
+    function availability() { return [{ k: 'notes', n: getNotes().length }]; }
 
     // ---------- diseño del panel ----------
     const docHost = () => nodes.get().find(n => n.docParts) || null;
@@ -9141,23 +9135,28 @@ const vizUI = (() => {
         const rd = document.getElementById('readerPanel');
         const l = (rd && !rd.classList.contains('hidden')) ? Math.round(rd.getBoundingClientRect().width) : (tp && tp.classList.contains('on') ? Math.round(tp.getBoundingClientRect().width) : 0);
         const r = dv && !dv.classList.contains('hidden') ? Math.round(dv.getBoundingClientRect().width) : 0;
-        const geo = h + '|' + l + '|' + r; if (geo === lastGeo) return; lastGeo = geo;
+        const ron = rhzOn(), maxR = Math.max(140, window.innerHeight - h - 230);
+        const rh = !ron ? 0 : (rOpen ? Math.max(140, Math.min(RH || Math.round(window.innerHeight * 0.42), maxR)) : 40);
+        const geo = h + '|' + l + '|' + r + '|' + rh; if (geo === lastGeo) return; lastGeo = geo;
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
-        container.style.height = h ? 'calc(100% - ' + h + 'px)' : ''; container.style.alignSelf = h ? 'flex-start' : '';
+        if (rPane) { rPane.classList.toggle('on', ron); rPane.classList.toggle('open', ron && rOpen); rPane.style.left = l + 'px'; rPane.style.right = r + 'px'; rPane.style.bottom = h + 'px'; rPane.style.height = rh + 'px'; if (rPane._sync) rPane._sync(); }
+        const tot = h + rh;
+        container.style.height = tot ? 'calc(100% - ' + tot + 'px)' : ''; container.style.alignSelf = tot ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
-        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } if (tab === 'rhizome') fitRhizome(); }, 60);
+        setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } fitRhizome(); }, 60);
     }
     let layoutT = null; const layoutSoon = () => { clearTimeout(layoutT); layoutT = setTimeout(layout, 40); };
     function setOpen(v) { open = v; try { localStorage.setItem('gk_viz_open', v ? '1' : '0'); } catch (_e) { /* ok */ } lastGeo = ''; paint(); if (v) track('viz_open', { tab }); }
-    function pickTab(k) { tab = k; if (k === 'rhizome') { const want = Math.round(window.innerHeight * 0.6); if (H < want) { H = want; lastGeo = ''; } } if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
+    function pickTab(k) { tab = k; if (!open) setOpen(true); else paint(); track('viz_tab', { tab: k }); }
 
     function paint() {
         const av = availability(); if (!av.some(a => a.k === tab)) tab = av[0].k;
         layout();
         tabsEl.innerHTML = av.map(a => { const k = KINDS.find(x => x.k === a.k); return `<button type="button" class="vz-tab${a.k === tab ? ' on' : ''}" role="tab" data-k="${a.k}">${k.i} ${esc(L(k.es, k.en))}${a.k !== 'notes' || a.n ? `<span class="n">${a.n}</span>` : ''}</button>`; }).join('');
         statusEl.textContent = detectToken && detecting ? L('🔎 Buscando más vistas…', '🔎 Looking for more views…') : (partial ? L('Algunas vistas no se pudieron buscar', 'Some views could not be searched') : '');
-        redoBtn.style.display = (hostId != null && nodes.get(hostId) && nodes.get(hostId).schemaText) ? '' : 'none';
+        redoBtn.style.display = VIEWS_ON && hostId != null && nodes.get(hostId) && nodes.get(hostId).schemaText ? '' : 'none';
         if (open) renderBody();
+        rhzPaintSoon();
     }
     let detecting = 0;
 
@@ -9363,7 +9362,7 @@ const vizUI = (() => {
         cand.forEach(c => { if (cnt[c.i] >= 2 || cnt[c.j] >= 2) return; cnt[c.i]++; cnt[c.j]++; out.push({ a: m.nodes[c.i].id, b: m.nodes[c.j].id, why: c.why }); });
         return out;
     }
-    const rSetNote = (t) => { const el = document.getElementById('vzRhNote'); if (el) el.textContent = t; };
+    const rSetNote = (t) => { const el = document.getElementById('rhzNote'); if (el) el.textContent = t; };
     async function askRhizomeAi(m) {
         if (rBusy) return; rBusy = true;
         rSetNote(L('Buscando las conexiones de significado…', 'Looking for meaning connections…'));
@@ -9377,7 +9376,7 @@ const vizUI = (() => {
         if (data && Array.isArray(data.links) && data.links.length && nowM.hash === m.hash && m.rootId != null && nodes.get(m.rootId)) {
             isApplyingUndo = true; try { nodes.update({ id: nodes.get(m.rootId).id, rhizome: { hash: m.hash, links: data.links } }); } finally { isApplyingUndo = false; }
             track('rhizome_ai', { nodes: m.nodes.length, links: data.links.length });
-            if (tab === 'rhizome' && open) renderRhizome();
+            renderRhizome();
         } else rSetNote(L('Conexiones por vocabulario compartido (no se pudieron pedir las de significado).', 'Connections by shared vocabulary (meaning connections could not be fetched).'));
     }
 
@@ -9502,7 +9501,7 @@ const vizUI = (() => {
           ${A.surprises.length ? `<h4>${esc(L('Conexiones inesperadas', 'Unexpected connections'))}</h4><p class="vz-rd-s">${esc(L('Conceptos de ramas lejanas que comparten significado.', 'Concepts from distant branches that share meaning.'))}</p>
           ${A.surprises.map(l => `<div class="vz-rd-sp">${chip(l.a)}<span>↔</span>${chip(l.b)}${l.why ? `<small>${esc(l.why)}</small>` : ''}</div>`).join('')}` : ''}`;
         const focus = (list) => { try { rnet.selectNodes(list); if (list.length === 1) rnet.focus(list[0], { scale: 1.1, animation: { duration: 400 } }); else rnet.fit({ nodes: list, animation: { duration: 400 } }); } catch (_e) { /* ok */ } };
-        el.querySelectorAll('[data-nid]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.nid, n = byId.get(id); focus([id]); showQuote(n ? (n.def || n.simple || n.path.concat(n.label).join(' › ')) : null, { noFind: true }); try { network.selectNodes([id]); } catch (_e) { /* ok */ } }));
+        el.querySelectorAll('[data-nid]').forEach(b => b.addEventListener('click', () => { const id = b.dataset.nid; focus([id]); pickConcept(id, true); }));
         el.querySelectorAll('[data-grp]').forEach(b => b.addEventListener('click', () => focus(A.comms[Number(b.dataset.grp)].members)));
         el.querySelectorAll('[data-gap]').forEach(b => b.addEventListener('click', () => { const g = A.gaps[Number(b.dataset.gap)]; focus(g.a.members.concat(g.b.members)); track('lectura_brecha', {}); }));
         // ---- brechas con IA: explicación, concepto puente para el mapa y pregunta para practicar ----
@@ -9564,9 +9563,55 @@ const vizUI = (() => {
             track('lectura_md', { nodes: m.nodes.length });
         });
     }
+    // ---------- panel del rizoma (mitad baja del lienzo, siempre a la vista en escritorio) ----------
+    const rPane = document.getElementById('rhzPane'), rBody = document.getElementById('rhzBody'), rTipEl = document.getElementById('rhzTip');
+    const RZ_COLORS = ['#4fd1c5', '#8b7cf6', '#f2b366', '#f472b6', '#4ade80', '#fb923c', '#63b3ed', '#f87171'];
+    let rOpen = true, RH = 0, rAskT = null;
+    try { rOpen = localStorage.getItem('gk_rhz_open') !== '0'; RH = Number(localStorage.getItem('gk_rhz_h')) || 0; rRead = localStorage.getItem('gk_rhz_read') !== '0'; } catch (_e) { /* ok */ }
+    const rTip = (t) => { if (!rTipEl) return; rTipEl.textContent = t || ''; rTipEl.classList.toggle('on', !!t); };
+    const rhzCount = () => nodes.get().filter(n => !n.isSubscheme && !n.isPointer && clean(n)).length;
+    const rhzOn = () => !!rPane && isDesktopFolding() && rhzCount() >= 5;
+    // Elegir un concepto desde el rizoma o la lectura: se marca en el mapa mental y en las definiciones.
+    function pickConcept(id, fromRhz) {
+        const n = nodes.get(id); if (!n) return;
+        try { revealNode(id); network.selectNodes([id]); focusNodeAvoidingOverlays(id, { scale: 1.05, duration: 450 }); } catch (_e) { /* ok */ }
+        try { if (window.gkDefsGoTo) window.gkDefsGoTo(id); } catch (_e) { /* ok */ }
+        if (!fromRhz) rhzSelect(id, true);
+        const d = String(n.definition || n.simple || '').replace(/\s+/g, ' ').trim();
+        rTip(clean(n) + (d ? ' — ' + (d.length > 220 ? d.slice(0, 220) + '…' : d) : ''));
+    }
+    function rhzSelect(id, focus) {
+        if (!rnet || id == null) return;
+        try { rnet.selectNodes([String(id)]); if (focus) rnet.focus(String(id), { scale: Math.max(0.8, rnet.getScale()), animation: { duration: 400 } }); } catch (_e) { /* no está en el rizoma */ }
+    }
+    function rhzHeader() {
+        const h = rPane.querySelector('.rhz-h'); if (!h || h.dataset.ok) return; h.dataset.ok = '1';
+        h.innerHTML = `<span class="rhz-t"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="7" r="2.2"/><circle cx="19" cy="6" r="2.2"/><circle cx="12" cy="13" r="2.6"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="18" r="2"/><path d="M6.8 8.2 10 11.4M17.2 7.4l-3.4 4M10.2 14.8 7.4 17.6M14.2 14.6l2.4 2.4M7 7h10"/></svg>${esc(L('Rizoma', 'Rhizome'))}</span>
+          <span class="rhz-cap" id="rhzNote"></span>
+          <div class="rhz-ctl">
+            <label>${esc(L('Color', 'Color'))}<select id="rhzColor"><option value="branch">${esc(L('por rama', 'by branch'))}</option><option value="group">${esc(L('por grupo de ideas', 'by idea group'))}</option></select></label>
+            <label>${esc(L('Tamaño', 'Size'))}<select id="rhzSize"><option value="bridge">${esc(L('concepto puente', 'bridge concept'))}</option><option value="deg">${esc(L('n.º de conexiones', 'no. of connections'))}</option></select></label>
+            <label class="rhz-ck"><input type="checkbox" id="rhzTree"> ${esc(L('Árbol', 'Tree'))}</label>
+            <button type="button" class="rhz-b" id="rhzShake" title="${esc(L('Reacomodar', 'Re-arrange'))}">↻</button>
+            <button type="button" class="rhz-b" id="rhzAi" title="${esc(L('Recalcular las conexiones de significado', 'Recompute meaning connections'))}">✦</button>
+            <button type="button" class="rhz-b txt" id="rhzRead">${esc(L('Lectura del mapa', 'Map reading'))}</button>
+            <button type="button" class="rhz-b" id="rhzToggle" title="${esc(L('Plegar o desplegar el rizoma', 'Collapse or expand the rhizome'))}">▾</button>
+          </div>`;
+        const sync = () => { $id('rhzColor').value = rColor; $id('rhzSize').value = rSize; $id('rhzTree').checked = rShowTree; $id('rhzRead').classList.toggle('on', rRead); $id('rhzToggle').textContent = rOpen ? '▾' : '▴'; };
+        rPane._sync = sync; sync();
+        $id('rhzColor').addEventListener('change', (e) => { rColor = e.target.value; track('rhizome_color', { v: rColor }); renderRhizome(); });
+        $id('rhzSize').addEventListener('change', (e) => { rSize = e.target.value; renderRhizome(); });
+        $id('rhzTree').addEventListener('change', (e) => { rShowTree = e.target.checked; renderRhizome(); });
+        $id('rhzShake').addEventListener('click', () => { rSig = ''; renderRhizome(); });
+        $id('rhzAi').addEventListener('click', () => askRhizomeAi(rhizomeModel()));
+        $id('rhzRead').addEventListener('click', () => { rRead = !rRead; try { localStorage.setItem('gk_rhz_read', rRead ? '1' : '0'); } catch (_e) { /* ok */ } track('lectura_toggle', { open: rRead }); if (!rOpen) { rOpen = true; lastGeo = ''; layout(); } renderRhizome(); });
+        $id('rhzToggle').addEventListener('click', () => { rOpen = !rOpen; try { localStorage.setItem('gk_rhz_open', rOpen ? '1' : '0'); } catch (_e) { /* ok */ } track('rhizome_toggle', { open: rOpen }); lastGeo = ''; layout(); if (rOpen) { rSig = ''; renderRhizome(); } });
+    }
+    const $id = (x) => document.getElementById(x);
     function renderRhizome() {
-        const m = rhizomeModel();
-        if (m.nodes.length < 5) { bodyEl.innerHTML = `<div class="vz-empty">${esc(L('Necesitas al menos 5 conceptos para ver el rizoma.', 'You need at least 5 concepts to see the rhizome.'))}</div>`; return; }
+        if (!rhzOn() || !rOpen) return;
+        rhzHeader(); if (rPane._sync) rPane._sync();
+        const m = rhizomeModel(); if (m.nodes.length < 5) return;
         const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
         const saved = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links : null;
         const links = saved || localRhizomeLinks(m);
@@ -9576,54 +9621,63 @@ const vizUI = (() => {
         const brs = []; m.nodes.forEach(n => { if (!brs.includes(n.branch)) brs.push(n.branch); });
         const byId = new Map(m.nodes.map(n => [n.id, n]));
         const A = analyzeRhizome(m, links); rLast = A;
-        const colorOfComm = (i) => (i < 0 ? '#b9b4a6' : BRANCH_COLORS[i % BRANCH_COLORS.length]);
-        const colorOf = (n) => (rColor === 'group' ? colorOfComm(A.comm.get(n.id)) : BRANCH_COLORS[brs.indexOf(n.branch) % BRANCH_COLORS.length]);
+        const colorOfComm = (i) => (i < 0 ? '#5f6890' : RZ_COLORS[i % RZ_COLORS.length]);
+        const colorOf = (n) => (rColor === 'group' ? colorOfComm(A.comm.get(n.id)) : (n.id === m.rootId ? '#eef1fb' : RZ_COLORS[Math.max(0, brs.indexOf(n.branch) - 1) % RZ_COLORS.length]));
         const legend = rColor === 'group'
-            ? A.comms.map((c, i) => `<span class="vz-lg"><i style="background:${colorOfComm(i)}"></i>${esc(L('Grupo', 'Group'))} ${i + 1}: ${esc((byId.get(c.top[0]) || {}).label || '')}</span>`).join('')
-            : brs.map(b => { const bn = byId.get(b); return `<span class="vz-lg"><i style="background:${BRANCH_COLORS[brs.indexOf(b) % BRANCH_COLORS.length]}"></i>${esc(bn ? bn.label : '')}</span>`; }).join('');
-        const h = Math.max(240, bodyEl.clientHeight - 92);
+            ? A.comms.map((c, i) => `<span class="vz-lg"><i style="background:${colorOfComm(i)}"></i>${esc((byId.get(c.top[0]) || {}).label || '')}</span>`).join('')
+            : brs.filter(b => b !== m.rootId).map(b => { const bn = byId.get(b); return `<span class="vz-lg"><i style="background:${colorOf(bn || { id: b, branch: b })}"></i>${esc(bn ? bn.label : '')}</span>`; }).join('');
         const maxBet = Math.max(...m.nodes.map(n => A.bet.get(n.id) || 0), 1e-9);
-        bodyEl.innerHTML = `<div class="vz-rh-bar"><div class="vz-rh-cap">${esc(L('Cada concepto se acerca a los que comparten significado con él, sin importar de qué rama vengan.', 'Each concept moves toward the ones it shares meaning with, whatever branch they come from.'))} ${esc(rSize === 'bridge' ? L('El tamaño indica cuánto sirve de puente entre ideas;', 'Size shows how much it bridges ideas;') : L('El tamaño indica cuántas conexiones tiene;', 'Size shows how many connections it has;'))} ${esc(rColor === 'group' ? L('el color, su grupo de ideas.', 'color, its idea group.') : L('el color, su rama de origen.', 'color, the branch it comes from.'))}</div><div class="vz-rh-ctl"><label><input type="checkbox" id="vzRhTree"${rShowTree ? ' checked' : ''}> ${esc(L('Mostrar el árbol original', 'Show the original tree'))}</label><button type="button" class="vz-ghost" id="vzRhShake">${esc(L('Reacomodar', 'Re-arrange'))}</button><button type="button" class="vz-ghost" id="vzRhAi">${esc(L('Recalcular conexiones', 'Recompute connections'))}</button><label>${esc(L('Color', 'Color'))} <select id="vzRhColor"><option value="branch"${rColor === 'branch' ? ' selected' : ''}>${esc(L('por rama', 'by branch'))}</option><option value="group"${rColor === 'group' ? ' selected' : ''}>${esc(L('por grupo de ideas', 'by idea group'))}</option></select></label><label>${esc(L('Tamaño', 'Size'))} <select id="vzRhSize"><option value="bridge"${rSize === 'bridge' ? ' selected' : ''}>${esc(L('concepto puente', 'bridge concept'))}</option><option value="deg"${rSize === 'deg' ? ' selected' : ''}>${esc(L('n.º de conexiones', 'no. of connections'))}</option></select></label><button type="button" class="vz-ghost${rRead ? ' on' : ''}" id="vzRhRead">${esc(rRead ? L('Ocultar lectura', 'Hide reading') : L('Lectura del mapa', 'Map reading'))}</button><span class="vz-rh-note" id="vzRhNote">${esc(saved ? L('Conexiones de significado propuestas por la IA. Toca una línea para ver qué las une.', 'Meaning connections proposed by the AI. Tap a line to see what links them.') : L('Mostrando conexiones por vocabulario compartido…', 'Showing connections by shared vocabulary…'))}</span></div><div class="vz-rh-lg">${legend}</div></div><div class="vz-rh-wrap${rRead ? ' with-read' : ''}" style="--rh:${h}px"><div class="vz-rhz" id="vzRhz" style="height:${h}px"></div>${rRead ? '<aside class="vz-rd" id="vzRhPane"></aside>' : ''}</div>`;
+        rBody.innerHTML = `<div class="rhz-main"><div class="rhz-net" id="vzRhz"></div><div class="rhz-lg">${legend}</div></div>${rRead ? '<aside class="vz-rd" id="vzRhPane"></aside>' : ''}`;
+        rBody.classList.toggle('with-read', rRead);
         const deg = new Map(m.nodes.map(n => [n.id, 0])); links.forEach(l => { if (deg.has(l.a) && deg.has(l.b)) { deg.set(l.a, deg.get(l.a) + 1); deg.set(l.b, deg.get(l.b) + 1); } });
         const wrap = (t) => { const w = String(t).split(' '); const out = []; let line = ''; w.forEach(x => { if ((line + ' ' + x).trim().length > 16 && line) { out.push(line); line = x; } else line = (line + ' ' + x).trim(); }); if (line) out.push(line); return out.join('\n'); };
-        const vn = new vis.DataSet(m.nodes.map(n => ({ id: n.id, label: wrap(n.label), shape: 'dot', size: rSize === 'bridge' ? 7 + 26 * Math.sqrt((A.bet.get(n.id) || 0) / maxBet) : (n.id === m.rootId ? 20 : 8) + Math.min(18, (deg.get(n.id) || 0) * 3.5), color: { background: colorOf(n), border: '#ffffff', highlight: { background: colorOf(n), border: '#1d2330' } }, borderWidth: 2, font: { size: 13, face: 'Inter, sans-serif', color: '#1d2330', strokeWidth: 4, strokeColor: '#f7f6f1' } })));
+        const vn = new vis.DataSet(m.nodes.map(n => { const c = colorOf(n); return { id: n.id, label: wrap(n.label), shape: 'dot',
+            size: rSize === 'bridge' ? 6 + 24 * Math.sqrt((A.bet.get(n.id) || 0) / maxBet) : (n.id === m.rootId ? 18 : 7) + Math.min(16, (deg.get(n.id) || 0) * 3.2),
+            color: { background: c, border: '#0a0e1a', highlight: { background: c, border: '#ffffff' }, hover: { background: c, border: '#dfe4f6' } }, borderWidth: 2, borderWidthSelected: 3,
+            shadow: { enabled: true, color: c + '55', size: 16, x: 0, y: 0 },
+            font: { size: 13, face: 'Inter, sans-serif', color: '#dfe4f6', strokeWidth: 4, strokeColor: '#0a0e1a', vadjust: -2 } }; }));
         const ve = new vis.DataSet();
-        if (rShowTree) m.tree.forEach((e, i) => ve.add({ id: 't' + i, from: e.a, to: e.b, width: 1, dashes: [2, 5], color: { color: '#cfcbbd', highlight: '#9aa3b2' }, length: 210, smooth: false, selectionWidth: 0, hoverWidth: 0 }));
-        links.forEach((l, i) => { if (!byId.has(l.a) || !byId.has(l.b)) return; ve.add({ id: 'c' + i, from: l.a, to: l.b, why: l.why, width: 2.2, color: { color: 'rgba(14,133,124,.55)', highlight: '#0e857c' }, length: 95, smooth: { enabled: true, type: 'curvedCW', roundness: 0.18 }, title: l.why }); });
+        if (rShowTree) m.tree.forEach((e, i) => ve.add({ id: 't' + i, from: e.a, to: e.b, width: 1, dashes: [2, 6], color: { color: 'rgba(138,146,178,.28)', highlight: 'rgba(138,146,178,.6)' }, length: 210, smooth: false, selectionWidth: 0, hoverWidth: 0 }));
+        links.forEach((l, i) => { if (!byId.has(l.a) || !byId.has(l.b)) return; ve.add({ id: 'c' + i, from: l.a, to: l.b, why: l.why, width: 1.8, color: { color: 'rgba(79,209,197,.42)', highlight: '#4fd1c5', hover: '#8b7cf6' }, length: 95, smooth: { enabled: true, type: 'curvedCW', roundness: 0.18 }, title: l.why }); });
         rnet = new vis.Network(document.getElementById('vzRhz'), { nodes: vn, edges: ve }, {
             layout: { randomSeed: 11 }, interaction: { hover: true, tooltipDelay: 120, zoomView: true, dragView: true },
             physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -55, centralGravity: 0.01, springLength: 100, springConstant: 0.06, damping: 0.5, avoidOverlap: 0.7 }, stabilization: { iterations: 320, updateInterval: 40 } },
             nodes: { scaling: { label: false } }, edges: { arrows: { to: false } }
         });
         const rn = rnet;
-        rn.once('stabilizationIterationsDone', () => { try { rn.setOptions({ physics: false }); rn.fit({ animation: { duration: 350 } }); } catch (_e) { /* ok */ } });
+        rn.once('stabilizationIterationsDone', () => { try { rn.setOptions({ physics: false }); rn.fit({ animation: { duration: 350 } }); const s = (network.getSelectedNodes() || [])[0]; if (s != null) rn.selectNodes([String(s)]); } catch (_e) { /* ok */ } });
         rn.on('click', (ev) => {
             const nid = ev.nodes && ev.nodes[0], eid = ev.edges && ev.edges[0];
-            if (nid != null) { const n = byId.get(String(nid)); showQuote(n ? (n.def || n.simple || n.path.concat(n.label).join(' › ')) : null, { noFind: true }); try { network.selectNodes([nid]); network.focus(nid, { scale: 1, animation: { duration: 400 } }); } catch (_e) { /* ok */ } }
-            else if (eid != null && String(eid).startsWith('c')) { const l = links[Number(String(eid).slice(1))]; if (l) showQuote(`${(byId.get(l.a) || {}).label} ↔ ${(byId.get(l.b) || {}).label}: ${l.why}`, { noFind: true }); }
-            else showQuote(null);
+            if (nid != null) { pickConcept(String(nid), true); track('rhizome_pick', {}); }
+            else if (eid != null && String(eid).startsWith('c')) { const l = links[Number(String(eid).slice(1))]; if (l) rTip(`${(byId.get(l.a) || {}).label} ↔ ${(byId.get(l.b) || {}).label}: ${l.why}`); }
+            else rTip('');
         });
-        document.getElementById('vzRhTree').addEventListener('change', (e) => { rShowTree = e.target.checked; renderRhizome(); });
-        document.getElementById('vzRhShake').addEventListener('click', () => { rSig = ''; renderRhizome(); });
-        document.getElementById('vzRhAi').addEventListener('click', () => { const r = rhizomeModel(); askRhizomeAi(r); });
-        document.getElementById('vzRhColor').addEventListener('change', (e) => { rColor = e.target.value; track('rhizome_color', { v: rColor }); renderRhizome(); });
-        document.getElementById('vzRhSize').addEventListener('change', (e) => { rSize = e.target.value; renderRhizome(); });
-        document.getElementById('vzRhRead').addEventListener('click', () => { rRead = !rRead; track('lectura_toggle', { open: rRead }); renderRhizome(); });
+        const note = document.getElementById('rhzNote');
+        if (note) note.textContent = saved ? L('Conceptos unidos por su significado, vengan de la rama que vengan.', 'Concepts linked by meaning, whatever branch they come from.') : L('Conexiones por vocabulario compartido…', 'Connections by shared vocabulary…');
         if (rRead) renderLectura(m, A, byId, colorOfComm);
-        if (!saved) askRhizomeAi(m);
+        // las conexiones de significado se piden cuando el mapa deja de cambiar (no en cada nodo que llega)
+        clearTimeout(rAskT); if (!saved) rAskT = setTimeout(() => { const now = rhizomeModel(); if (now.hash === m.hash) askRhizomeAi(now); }, 2500);
         track('rhizome_view', { nodes: m.nodes.length, links: links.length, ai: !!saved, grupos: A.comms.length, tipo: A.kind });
     }
     function fitRhizome() {
         const el = document.getElementById('vzRhz'); if (!el || !rnet) return;
-        el.style.height = Math.max(240, bodyEl.clientHeight - 92) + 'px';
-        const wr = el.parentElement; if (wr && wr.classList.contains('vz-rh-wrap')) wr.style.setProperty('--rh', el.style.height);
-        try { rnet.setSize('100%', el.style.height); rnet.redraw(); } catch (_e) { /* ok */ }
+        try { rnet.setSize('100%', el.clientHeight + 'px'); rnet.redraw(); } catch (_e) { /* ok */ }
     }
+    let rPaintT = null; const rhzPaintSoon = () => { clearTimeout(rPaintT); rPaintT = setTimeout(renderRhizome, 900); };
+    // mapa mental → rizoma
+    network.on('selectNode', (params) => { const id = params.nodes && params.nodes[0]; if (id != null) rhzSelect(id, true); });
+    // definiciones → rizoma (la fila elegida se marca también aquí)
+    document.addEventListener('gk:nodepick', (e) => { if (e.detail != null) rhzSelect(e.detail, true); });
+    if (rPane) document.getElementById('rhzResize').addEventListener('pointerdown', (e) => {
+        const g = e.currentTarget; e.preventDefault(); g.setPointerCapture(e.pointerId);
+        const y0 = e.clientY, h0 = rPane.getBoundingClientRect().height; document.body.classList.add('gk-resizing');
+        const move = (ev) => { RH = Math.round(h0 - (ev.clientY - y0)); lastGeo = ''; layout(); };
+        const up = () => { document.body.classList.remove('gk-resizing'); g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); try { localStorage.setItem('gk_rhz_h', String(RH)); } catch (_e) { /* ok */ } fitRhizome(); };
+        g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+    });
     function renderBody() {
         showQuote(null);
         const v = currentViews() || {};
-        if (tab !== 'rhizome' && rnet) { try { rnet.destroy(); } catch (_e) { /* ok */ } rnet = null; rSig = ''; }
-        if (tab === 'rhizome') return renderRhizome();
         if (tab === 'parts') return renderParts();
         if (tab === 'notes') return renderNotes();
         if (tab === 'timeline' && v.timeline) return renderTimeline(v.timeline);
@@ -9639,6 +9693,7 @@ const vizUI = (() => {
 
     // ---------- búsqueda de vistas ----------
     async function detect(force) {
+        if (!VIEWS_ON) return;   // vistas del texto retiradas (pedido del dueño): no se piden a la IA
         const n = hostId != null ? nodes.get(hostId) : null; if (!n || !n.schemaText) return;
         const text = n.schemaText, h = hashOf(text);
         if (!force && ((n.viewsData && n.viewsData.hash === h) || (mem[hostId] && mem[hostId].hash === h))) return;

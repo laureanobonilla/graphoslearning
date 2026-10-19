@@ -559,6 +559,7 @@
 
         /* --- PANEL INFERIOR (escritorio): notas + vistas del texto --- */
         #vizPanel { display: none; }
+        #rhzPane { display: none; }
         @media (min-width: 781px) {
             #vizPanel { --p-bg: #f7f6f1; --p-bg2: #efede5; --p-head: #fbfaf6; --p-ink: #1d2330; --p-ink2: #3a4254; --p-mute: #5f6879; --p-rule: #dcd9ce; --p-acc: #0e857c; --p-acc-bg: rgba(14,133,124,.12);
                 position: fixed; bottom: 0; left: var(--vz-l, 0px); right: var(--vz-r, 0px); height: var(--vz-h, 44px); z-index: 24; flex-direction: column; background: var(--p-bg); color: var(--p-ink); font-family: 'Inter', sans-serif; border-top: 1px solid var(--p-rule); box-shadow: 0 -8px 24px rgba(0,0,0,.22); }
@@ -589,53 +590,93 @@
             #vizPanel .vz-note-form { display: flex; gap: 10px; align-items: flex-start; max-width: 760px; }
             #vizPanel .vz-note-form textarea { flex: 1; min-height: 54px; resize: vertical; border: 1px solid var(--p-rule); border-radius: 10px; padding: 10px 12px; background: #fff; color: var(--p-ink); font: 400 16px/1.55 Charter, Georgia, serif; }
             #vizPanel .vz-note-form textarea:focus { outline: 2px solid var(--p-acc-bg); border-color: var(--p-acc); }
-            #vizPanel .vz-primary { border: 0; background: var(--p-acc); color: #fff; border-radius: 10px; padding: 9px 14px; font: 700 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
-            #vizPanel .vz-primary:hover { filter: brightness(1.08); }
-            #vizPanel .vz-ghost { border: 1px solid var(--p-rule); background: #fff; color: var(--p-mute); border-radius: 8px; padding: 5px 9px; font: 600 12px 'Inter', sans-serif; cursor: pointer; }
-            #vizPanel .vz-ghost:hover { color: var(--p-acc); border-color: var(--p-acc); }
+            :is(#vizPanel, #rhzPane) .vz-primary { border: 0; background: var(--p-acc); color: #fff; border-radius: 10px; padding: 9px 14px; font: 700 13px 'Inter', sans-serif; cursor: pointer; white-space: nowrap; }
+            :is(#vizPanel, #rhzPane) .vz-primary:hover { filter: brightness(1.08); }
+            :is(#vizPanel, #rhzPane) .vz-ghost { border: 1px solid var(--p-rule); background: #fff; color: var(--p-mute); border-radius: 8px; padding: 5px 9px; font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+            :is(#vizPanel, #rhzPane) .vz-ghost:hover { color: var(--p-acc); border-color: var(--p-acc); }
             #vizPanel .vz-notes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 14px; }
             #vizPanel .vz-note { background: #fff; border: 1px solid var(--p-rule); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
             #vizPanel .vz-note .t { font: 400 15.5px/1.55 Charter, Georgia, serif; white-space: pre-wrap; overflow-wrap: anywhere; outline: none; }
             #vizPanel .vz-note .m { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font: 500 11.5px 'Inter', sans-serif; color: var(--p-mute); }
             #vizPanel .vz-note .m .sp { flex: 1; }
-            #vizPanel .vz-chip { border: 0; background: var(--p-acc-bg); color: var(--p-acc); border-radius: 999px; padding: 3px 9px; font: 600 11.5px 'Inter', sans-serif; cursor: pointer; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            :is(#vizPanel, #rhzPane) .vz-chip { border: 0; background: var(--p-acc-bg); color: var(--p-acc); border-radius: 999px; padding: 3px 9px; font: 600 11.5px 'Inter', sans-serif; cursor: pointer; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
             #vizPanel .vz-rh-bar { display: grid; gap: 6px; margin-bottom: 8px; }
             #vizPanel .vz-rh-cap { font: 400 13px/1.5 'Inter', sans-serif; color: var(--p-ink2); max-width: 880px; }
             #vizPanel .vz-rh-ctl { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font: 500 12.5px 'Inter', sans-serif; color: var(--p-mute); }
             #vizPanel .vz-rh-ctl label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
             #vizPanel .vz-rh-lg { display: flex; flex-wrap: wrap; gap: 4px 14px; font: 500 12px 'Inter', sans-serif; color: var(--p-ink2); }
-            #vizPanel .vz-lg i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+            :is(#vizPanel, #rhzPane) .vz-lg i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
             #vizPanel .vz-rhz { width: 100%; border: 1px solid var(--p-rule); border-radius: 12px; background: #fbfaf6; }
             #vizPanel .vz-rh-ctl select { border: 1px solid var(--p-rule); background: #fff; border-radius: 8px; padding: 4px 6px; font: 600 12px 'Inter', sans-serif; color: var(--p-ink2); }
-            #vizPanel .vz-ghost.on { color: var(--p-acc); border-color: var(--p-acc); background: var(--p-acc-bg); }
+            :is(#vizPanel, #rhzPane) .vz-ghost.on { color: var(--p-acc); border-color: var(--p-acc); background: var(--p-acc-bg); }
             #vizPanel .vz-rh-wrap.with-read { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 12px; }
-            #vizPanel .vz-rd { height: var(--rh); overflow-y: auto; border: 1px solid var(--p-rule); border-radius: 12px; background: #fff; padding: 12px 14px; font: 400 13px/1.5 'Inter', sans-serif; color: var(--p-ink2); }
-            #vizPanel .vz-rd h4 { margin: 14px 0 2px; font: 700 11.5px 'Inter', sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--p-mute); }
-            #vizPanel .vz-rd-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; color: var(--p-ink); }
-            #vizPanel .vz-rd-k p { margin: 6px 0 0; }
-            #vizPanel .vz-rd-kind { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 700 12px 'Inter', sans-serif; background: var(--p-acc-bg); color: var(--p-acc); }
-            #vizPanel .vz-rd-kind.k-disperso, #vizPanel .vz-rd-kind.k-sesgado { background: #fbefd9; color: #a3650f; }
-            #vizPanel .vz-rd-m, #vizPanel .vz-rd-s { color: var(--p-mute); font-size: 12px; margin: 2px 0 6px; }
-            #vizPanel .vz-rd-b { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
-            #vizPanel .vz-rd-b li { display: grid; grid-template-columns: minmax(0, auto) 1fr; gap: 8px; align-items: center; }
-            #vizPanel .vz-rd-bar { height: 6px; background: #efece3; border-radius: 99px; overflow: hidden; }
-            #vizPanel .vz-rd-bar i { display: block; height: 100%; background: var(--p-acc); }
-            #vizPanel .vz-rd-g { display: grid; gap: 8px; }
-            #vizPanel .vz-rd-gi > div { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-            #vizPanel .vz-rd-gb { border: 0; background: none; padding: 0; font: 700 12px 'Inter', sans-serif; color: var(--p-ink); cursor: pointer; }
-            #vizPanel .vz-rd-gb i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
-            #vizPanel .vz-rd-gap, #vizPanel .vz-rd-sp { border-top: 1px solid var(--p-rule); padding: 8px 0; }
-            #vizPanel .vz-rd-gap p { margin: 0 0 6px; line-height: 1.9; }
-            #vizPanel .vz-rd-sp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-            #vizPanel .vz-rd-sp small { flex-basis: 100%; color: var(--p-mute); }
-            #vizPanel .vz-rd .vz-chip { max-width: 100%; }
-            #vizPanel .vz-primary.sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
-            #vizPanel .vz-primary:disabled { opacity: .6; cursor: wait; }
-            #vizPanel .vz-rd-acts { display: flex; flex-wrap: wrap; gap: 6px; }
-            #vizPanel .vz-rd-ai:not(:empty) { margin-top: 8px; padding: 10px 12px; background: var(--p-bg); border-radius: 10px; font-size: 13px; line-height: 1.55; color: var(--p-ink); }
-            #vizPanel .vz-rd-ai p { margin: 0 0 6px; }
-            #vizPanel .vz-rd-pt i { color: var(--p-mute); }
-            @media (max-width: 760px) { #vizPanel .vz-rh-wrap.with-read { grid-template-columns: 1fr; } #vizPanel .vz-rd { height: auto; max-height: 60vh; } }
+            :is(#vizPanel, #rhzPane) .vz-rd { height: var(--rh); overflow-y: auto; border: 1px solid var(--p-rule); border-radius: 12px; background: #fff; padding: 12px 14px; font: 400 13px/1.5 'Inter', sans-serif; color: var(--p-ink2); }
+            :is(#vizPanel, #rhzPane) .vz-rd h4 { margin: 14px 0 2px; font: 700 11.5px 'Inter', sans-serif; letter-spacing: .05em; text-transform: uppercase; color: var(--p-mute); }
+            :is(#vizPanel, #rhzPane) .vz-rd-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 14px; color: var(--p-ink); }
+            :is(#vizPanel, #rhzPane) .vz-rd-k p { margin: 6px 0 0; }
+            :is(#vizPanel, #rhzPane) .vz-rd-kind { display: inline-block; padding: 3px 10px; border-radius: 999px; font: 700 12px 'Inter', sans-serif; background: var(--p-acc-bg); color: var(--p-acc); }
+            :is(#vizPanel, #rhzPane) .vz-rd-kind.k-disperso, :is(#vizPanel, #rhzPane) .vz-rd-kind.k-sesgado { background: #fbefd9; color: #a3650f; }
+            :is(#vizPanel, #rhzPane) .vz-rd-m, :is(#vizPanel, #rhzPane) .vz-rd-s { color: var(--p-mute); font-size: 12px; margin: 2px 0 6px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-b { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-b li { display: grid; grid-template-columns: minmax(0, auto) 1fr; gap: 8px; align-items: center; }
+            :is(#vizPanel, #rhzPane) .vz-rd-bar { height: 6px; background: #efece3; border-radius: 99px; overflow: hidden; }
+            :is(#vizPanel, #rhzPane) .vz-rd-bar i { display: block; height: 100%; background: var(--p-acc); }
+            :is(#vizPanel, #rhzPane) .vz-rd-g { display: grid; gap: 8px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-gi > div { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-gb { border: 0; background: none; padding: 0; font: 700 12px 'Inter', sans-serif; color: var(--p-ink); cursor: pointer; }
+            :is(#vizPanel, #rhzPane) .vz-rd-gb i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-gap, :is(#vizPanel, #rhzPane) .vz-rd-sp { border-top: 1px solid var(--p-rule); padding: 8px 0; }
+            :is(#vizPanel, #rhzPane) .vz-rd-gap p { margin: 0 0 6px; line-height: 1.9; }
+            :is(#vizPanel, #rhzPane) .vz-rd-sp { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-sp small { flex-basis: 100%; color: var(--p-mute); }
+            :is(#vizPanel, #rhzPane) .vz-rd .vz-chip { max-width: 100%; }
+            :is(#vizPanel, #rhzPane) .vz-primary.sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+            :is(#vizPanel, #rhzPane) .vz-primary:disabled { opacity: .6; cursor: wait; }
+            :is(#vizPanel, #rhzPane) .vz-rd-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-ai:not(:empty) { margin-top: 8px; padding: 10px 12px; background: var(--p-bg); border-radius: 10px; font-size: 13px; line-height: 1.55; color: var(--p-ink); }
+            :is(#vizPanel, #rhzPane) .vz-rd-ai p { margin: 0 0 6px; }
+            :is(#vizPanel, #rhzPane) .vz-rd-pt i { color: var(--p-mute); }
+            @media (max-width: 760px) { #vizPanel .vz-rh-wrap.with-read { grid-template-columns: 1fr; } :is(#vizPanel, #rhzPane) .vz-rd { height: auto; max-height: 60vh; } }
+        /* --- RIZOMA (escritorio): mitad baja del lienzo, con la misma estética oscura del mapa mental --- */
+        #rhzPane { display: none; }
+        @media (min-width: 781px) {
+            #rhzPane { --p-bg: #11162b; --p-bg2: #161c35; --p-ink: #eef1fb; --p-ink2: #c7d2e8; --p-mute: #8a92b2; --p-rule: #2c3458; --p-acc: #4fd1c5; --p-acc-bg: rgba(79,209,197,.14);
+                position: fixed; z-index: 23; flex-direction: column; color: var(--p-ink); font-family: 'Inter', sans-serif;
+                background-color: var(--void); background-image: radial-gradient(rgba(148, 163, 255, 0.10) 1px, transparent 1px); background-size: 26px 26px;
+                border-top: 1px solid #2c3458; box-shadow: 0 -12px 32px rgba(0,0,0,.38); }
+            #rhzPane.on { display: flex; }
+            #rhzPane .rhz-rz { position: absolute; left: 0; right: 0; top: -6px; height: 12px; cursor: row-resize; z-index: 5; touch-action: none; }
+            #rhzPane .rhz-rz::after { content: ''; position: absolute; left: 50%; top: 4px; width: 56px; height: 4px; margin-left: -28px; border-radius: 4px; background: #2c3458; transition: background .15s; }
+            #rhzPane .rhz-rz:hover::after, body.gk-resizing #rhzPane .rhz-rz::after { background: #4fd1c5; }
+            #rhzPane:not(.open) .rhz-rz, #rhzPane:not(.open) .rhz-body, #rhzPane:not(.open) .rhz-tip { display: none; }
+            #rhzPane .rhz-h { flex: 0 0 40px; display: flex; align-items: center; gap: 12px; padding: 0 10px 0 14px; background: rgba(17,22,43,.92); backdrop-filter: blur(6px); }
+            #rhzPane.open .rhz-h { border-bottom: 1px solid #2c3458; }
+            #rhzPane .rhz-t { display: inline-flex; align-items: center; gap: 8px; font: 600 13px 'Sora', 'Inter', sans-serif; color: #eef1fb; white-space: nowrap; }
+            #rhzPane .rhz-t svg { width: 17px; height: 17px; fill: none; stroke: #4fd1c5; stroke-width: 1.6; stroke-linecap: round; }
+            #rhzPane .rhz-cap { flex: 1; min-width: 0; font: 400 12px 'Inter', sans-serif; color: #8a92b2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            #rhzPane .rhz-ctl { display: flex; align-items: center; gap: 8px; font: 600 12px 'Inter', sans-serif; color: #8a92b2; }
+            #rhzPane .rhz-ctl label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+            #rhzPane .rhz-ctl select { background: #161c35; border: 1px solid #2c3458; color: #eef1fb; border-radius: 8px; padding: 4px 6px; font: 600 12px 'Inter', sans-serif; }
+            #rhzPane .rhz-ctl input[type=checkbox] { accent-color: #4fd1c5; }
+            #rhzPane .rhz-b { height: 28px; min-width: 28px; padding: 0 7px; border-radius: 8px; border: 1px solid #2c3458; background: #161c35; color: #c7d2e8; font: 600 12px 'Inter', sans-serif; cursor: pointer; }
+            #rhzPane .rhz-b:hover, #rhzPane .rhz-b.on { color: #4fd1c5; border-color: #4fd1c5; }
+            #rhzPane .rhz-b.on { background: rgba(79,209,197,.12); }
+            #rhzPane .rhz-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+            #rhzPane .rhz-body.with-read { grid-template-columns: minmax(0, 1fr) 340px; }
+            #rhzPane .rhz-main { position: relative; min-height: 0; }
+            #rhzPane .rhz-net { position: absolute; inset: 0; }
+            #rhzPane .rhz-lg { position: absolute; left: 14px; bottom: 10px; max-width: 75%; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 500 11.5px 'Inter', sans-serif; color: #c7d2e8; pointer-events: none; text-shadow: 0 1px 3px #0a0e1a; }
+            #rhzPane .vz-rd { height: auto; min-height: 0; border: 0; border-left: 1px solid #2c3458; border-radius: 0; background: rgba(17,22,43,.86); scrollbar-width: thin; scrollbar-color: #2c3458 transparent; }
+            #rhzPane .vz-rd-bar { background: #1d2442; }
+            #rhzPane .vz-rd-kind.k-disperso, #rhzPane .vz-rd-kind.k-sesgado { background: rgba(242,179,102,.14); color: #f2b366; }
+            #rhzPane .vz-rd-ai:not(:empty) { background: #161c35; }
+            #rhzPane .vz-ghost { background: #161c35; color: #c7d2e8; border-color: #2c3458; }
+            #rhzPane .vz-ghost:hover { color: #4fd1c5; border-color: #4fd1c5; }
+            #rhzPane .vz-primary { color: #0a0e1a; }
+            #rhzPane .rhz-tip { flex: 0 0 auto; display: none; padding: 7px 14px; border-top: 1px solid #2c3458; background: rgba(17,22,43,.95); font: 400 13px/1.5 'Inter', sans-serif; color: #c7d2e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            #rhzPane .rhz-tip.on { display: block; }
+        }
+
             #vizPanel .vz-rl-wrap { width: 100%; }
             #vizPanel .vz-rl { display: block; width: 100%; border: 1px solid var(--p-rule); border-radius: 12px; touch-action: none; }
             #vizPanel .vz-nn-wrap { width: 100%; }
@@ -1178,6 +1219,12 @@
         </div>
         <div id="vzBody" class="vz-body"></div>
         <div id="vzQuote" class="vz-quote"></div>
+    </section>
+    <section id="rhzPane" aria-label="Rizoma">
+        <div class="rhz-rz" id="rhzResize" title="Arrastra para repartir la altura entre el mapa y el rizoma"></div>
+        <header class="rhz-h"></header>
+        <div class="rhz-body" id="rhzBody"></div>
+        <div class="rhz-tip" id="rhzTip" aria-live="polite"></div>
     </section>
     <div id="schemeBreadcrumb" class="hidden">
         <button id="btnExitSubscheme" type="button" class="gk-canvas-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg><span>Volver</span></button>
