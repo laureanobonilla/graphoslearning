@@ -56,7 +56,7 @@ async function getAccess(user) {
     const until = row && row.paid_until ? new Date(row.paid_until) : null;
     // TEMPORAL (prueba de cobro): estas cuentas de administrador se tratan como clientes normales (sin acceso ilimitado).
     // Para devolverles el acceso ilimitado, vaciar la lista.
-    const comoCliente = ['bonillapretiz@gmail.com'].includes(String(user.email || '').toLowerCase());
+    const comoCliente = [].includes(String(user.email || '').toLowerCase());
     const admin = !!user.isAdmin && !comoCliente;
     const active = !!(admin || (until && until > new Date()));
     return {
