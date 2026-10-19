@@ -2,6 +2,6 @@
 const core = require('./_lib/ordena-core');
 exports.handler = async (event) => {
     if (event.httpMethod !== 'GET') return { statusCode: 405, body: 'Method Not Allowed' };
-    const plans = Object.entries(core.PLANS).map(([id, p]) => ({ id, label: p.label, months: p.months, usd: p.usd, note: p.note }));
+    const plans = core.planesPara((event.queryStringParameters || {}).k).map(([id, p]) => ({ id, label: p.label, months: p.months, days: p.days || 0, usd: p.usd, note: p.note, hidden: !!p.hidden }));
     return core.json(200, { clientId: process.env.PAYPAL_CLIENT_ID || null, plans, country: core.countryOf(event) || null });
 };

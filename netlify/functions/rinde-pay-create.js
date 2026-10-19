@@ -10,6 +10,7 @@ exports.handler = async (event, context) => {
     const planId = String(b.plan || '');
     const plan = core.PLANS[planId];
     if (!plan) return core.json(400, { error: 'Plan no válido' });
+    if (plan.hidden && !core.testKeyOk(b.k)) return core.json(400, { error: 'Plan no válido' });   // el plan de prueba solo con la clave del dueño
     try {
         const orderID = await createOrder(plan.usd);
         // Se guarda ANTES de devolverla: es lo que impide usar una orden ajena para activar esta cuenta.

@@ -3,6 +3,7 @@
 //   SUPABASE_URL, SUPABASE_SERVICE_KEY, PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_ENV, GEMINI_API_KEY,
 //   y opcionalmente RESEND_API_KEY + FEEDBACK_TO_EMAIL (aviso por correo de cada pago).
 // Tablas: supabase/ordena.sql (correr UNA vez en Supabase → SQL Editor).
+const crypto = require('crypto');
 const { getUser } = require('./auth');
 const { json, scrub, scrubOne, countryOf } = require('./tc-core');
 
@@ -10,7 +11,10 @@ const { json, scrub, scrubOne, countryOf } = require('./tc-core');
 const PLANS = {
     mes:       { label: '1 mes',    months: 1,  usd: '5.00',  note: 'Para probar' },
     trimestre: { label: '3 meses',  months: 3,  usd: '12.00', note: 'El más elegido' },
-    anio:      { label: '12 meses', months: 12, usd: '39.00', note: 'Ahorra 35%' }
+    anio:      { label: '12 meses', months: 12, usd: '39.00', note: 'Ahorra 35%' },
+    // Plan OCULTO para que el dueño pruebe el cobro real por US$1 (un día de acceso). Solo existe con la clave del dueño:
+    // abrir /ordena/?k=CLAVE (se recuerda en ese navegador). La clave se puede cambiar con la variable ORDENA_TEST_KEY de Netlify.
+    prueba:    { label: 'Prueba del dueño', months: 0, days: 1, usd: '1.00', note: '1 día · solo con tu clave', hidden: true }
 };
 
 // ---------- Supabase (REST con la clave de servicio: SOLO en el servidor) ----------
@@ -53,10 +57,15 @@ async function getAccess(user) {
 }
 
 // Extiende el acceso: si todavía tiene días pagados, se suman al final; si no, desde hoy.
-function extendFrom(current, months) {
+const TEST_KEY = process.env.ORDENA_TEST_KEY || 'ordena-fZEeRPX6wxo';
+const testKeyOk = (k) => { const a = Buffer.from(String(k || '')), b = Buffer.from(TEST_KEY); return a.length === b.length && crypto.timingSafeEqual(a, b); };
+// Planes que puede ver/comprar esta persona: los visibles, más los ocultos si trae la clave del dueño.
+const planesPara = (k) => Object.entries(PLANS).filter(([, p]) => !p.hidden || testKeyOk(k));
+
+function extendFrom(current, months, days) {
     const now = new Date();
     const base = current && new Date(current) > now ? new Date(current) : now;
-    const d = new Date(base); d.setMonth(d.getMonth() + months);
+    const d = new Date(base); d.setMonth(d.getMonth() + (months || 0)); if (days) d.setDate(d.getDate() + days);
     return d.toISOString();
 }
 
@@ -66,4 +75,4 @@ function requireUser(context) {
     return user || null;
 }
 
-module.exports = { PLANS, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };
+module.exports = { PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };

@@ -345,3 +345,7 @@ p { margin: 0 0 .8em; }
 /* «No aplica»: opción válida que no suma nada, con un tono más discreto */
 .opc.chip.na { color: var(--suave); border-style: dashed; }
 .opc.chip.na.on { color: var(--tinta); }
+
+/* Plan oculto de prueba (solo con la clave del dueño) */
+.plan-c.oculto { border-style: dashed; }
+.plan-c.oculto b::after { content: ' · prueba'; color: var(--ambar); font-weight: 600; }

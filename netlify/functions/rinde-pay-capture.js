@@ -25,7 +25,7 @@ exports.handler = async (event, context) => {
         }
         const payer = (order.payer && order.payer.email_address) || null;
         const prev = await core.one('rinde_access', 'user_id', user.id);
-        const paidUntil = core.extendFrom(prev && prev.paid_until, plan.months);
+        const paidUntil = core.extendFrom(prev && prev.paid_until, plan.months, plan.days);
         await core.upsert('rinde_orders', { order_id: orderID, user_id: user.id, status: 'paid', paid_at: new Date().toISOString(), paid_amount_usd: Number(cap.amount.value), payer_email: payer });
         await core.upsert('rinde_access', { user_id: user.id, email: user.email, plan: ord.plan, paid_until: paidUntil });
 

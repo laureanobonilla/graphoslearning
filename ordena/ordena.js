@@ -112,6 +112,10 @@ const fr = (id) => { const st = (S.fr[id] = S.fr[id] || { r: {}, oculto: false, 
 const opsDe = (qq) => qq[1].map((o, k) => ({ o, k })).sort((a, b) => (a.o[2] != null ? a.o[2] : a.k) - (b.o[2] != null ? b.o[2] : b.k));
 const respTexto = (f, st, i) => (st.r[i] === 'x' ? '«' + ((st.libre[i] || {}).texto || '') + '»' : (f.q[i][1][st.r[i]] || [''])[0]);
 
+// Clave del dueño (?k=…): muestra el plan oculto de prueba (US$1). Se recuerda en este navegador; ?k=salir la borra.
+const CLAVE = (() => { try { const q = new URLSearchParams(location.search).get('k'); if (q === 'salir') { localStorage.removeItem('ordena.k'); return ''; } if (q) localStorage.setItem('ordena.k', q); return localStorage.getItem('ordena.k') || ''; } catch (_e) { return ''; } })();
+const conClave = (u) => CLAVE ? u + (u.includes('?') ? '&' : '?') + 'k=' + encodeURIComponent(CLAVE) : u;
+
 // ---------- Utilidades ----------
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -502,13 +506,13 @@ function mBloqueado(id) {
 async function mPrecios() {
     track('precios_visto');
     const T = totales();
-    if (!CONF) { try { CONF = await (await fetch('/.netlify/functions/ordena-config')).json(); } catch (_e) { CONF = { plans: [] }; } }
+    if (!CONF) { try { CONF = await (await fetch(conClave('/.netlify/functions/ordena-config'))).json(); } catch (_e) { CONF = { plans: [] }; } }
     const plans = CONF.plans || [];
-    const sel = UI.planSel || (plans[1] && plans[1].id) || (plans[0] && plans[0].id);
+    const visibles = plans.filter(p => !p.hidden), sel = UI.planSel || (visibles[1] && visibles[1].id) || (plans[0] && plans[0].id);
     UI.planSel = sel;
     abrir(`<h2>Recupera tu tiempo</h2>
       <p class="sub">${T.enc.max >= 1 / 12 ? `Se te escapan <b>${rango(T.enc.min, T.enc.max)}</b> por semana (${rangoPct(T.enc.min, T.enc.max)} de tu tiempo despierto).` : 'Revisa tus frentes para ver cuántas horas se te escapan.'} Elige por cuánto tiempo quieres acceso completo.</p>
-      <div class="planes">${plans.map(p => `<button class="plan-c ${p.id === sel ? 'on' : ''}" data-a="plan-sel" data-p="${p.id}"><b>${esc(p.label)}</b><span class="precio">US$${Number(p.usd) % 1 ? Number(p.usd).toFixed(2) : Number(p.usd).toFixed(0)}</span><small>${esc(p.note || '')}</small></button>`).join('')}</div>
+      <div class="planes">${plans.map(p => `<button class="plan-c ${p.id === sel ? 'on' : ''} ${p.hidden ? 'oculto' : ''}" data-a="plan-sel" data-p="${p.id}"><b>${esc(p.label)}</b><span class="precio">US$${Number(p.usd) % 1 ? Number(p.usd).toFixed(2) : Number(p.usd).toFixed(0)}</span><small>${esc(p.note || '')}</small></button>`).join('')}</div>
       <ul class="incluye"><li>Plan a tu medida para cada frente, con pasos, fechas y mensajes listos</li><li>Planes que se afinan con tus respuestas, todas las veces que quieras</li><li>Acciones con calendario y registro de las horas recuperadas</li><li>Resumen en PDF</li></ul>
       <p class="nota">Pago único con PayPal (o tarjeta a través de PayPal). No se renueva solo.${CFG.garantia ? ' ' + esc(CFG.garantia) : ''}${CFG.contacto ? ' ' + esc(CFG.contacto) + '.' : ''} <a href="/privacidad/#pagos" target="_blank" rel="noopener">Condiciones</a></p>
       ${USER ? '<div id="pp"></div>' : '<button class="btn full" data-a="login-pagar">Crear cuenta o entrar para pagar</button>'}`, 'chico');
@@ -535,7 +539,7 @@ async function pintarPaypal() {
         paypal.Buttons({
             style: { layout: 'vertical', shape: 'pill', label: 'pay' },
             createOrder: async () => {
-                const r = await api('ordena-pay-create', { plan: UI.planSel });
+                const r = await api('ordena-pay-create', { plan: UI.planSel, k: CLAVE || undefined });
                 if (!r.orderID) throw new Error(r.error || 'No se pudo iniciar el pago');
                 track('pago_iniciado', { plan: UI.planSel });
                 return r.orderID;
@@ -776,7 +780,7 @@ if (window.netlifyIdentity) {
     netlifyIdentity.on('logout', () => { alEntrar(null); toast('Sesión cerrada. Tu diagnóstico sigue en este dispositivo.'); });
     netlifyIdentity.init({ locale: 'es' });
 }
-fetch('/.netlify/functions/ordena-config').then(r => r.json()).then(c => { CONF = c; }).catch(() => {});
+fetch(conClave('/.netlify/functions/ordena-config')).then(r => r.json()).then(c => { CONF = c; }).catch(() => {});
 track(S.perfil ? 'visita_vuelta' : 'visita_nueva');
 if (S.perfil) Object.entries(S.fr || {}).forEach(([id, st]) => { if (FR[id] && st.libre) Object.keys(st.libre).forEach(i => { if (st.r[i] === 'x' && st.libre[i].estado === 'calc') setTimeout(() => interpretar(id, Number(i)), 300); }); });
 render();
