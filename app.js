@@ -9639,7 +9639,7 @@ const vizUI = (() => {
         const lab = (id) => (byId.get(id) || {}).label || '';
         const chip = (id) => `<button type="button" class="vz-chip" data-nid="${esc(id)}" title="${esc(lab(id))}">${esc(lab(id))}</button>`;
         const k = KIND_TXT[A.kind], maxB = Math.max(...A.bridges.map(id => A.bet.get(id)), 1e-9);
-        el.innerHTML = `<div class="vz-rd-h"><b>${esc(L('Lectura del mapa', 'Map reading'))}</b><button type="button" class="vz-ghost" id="vzRdMd">${esc(L('Descargar (.md)', 'Download (.md)'))}</button></div>
+        el.innerHTML = `<div class="vz-rd-h"><b>${esc(L('Lectura del mapa', 'Map reading'))}</b><span class="vz-rd-ha"><button type="button" class="vz-primary sm" id="vzRdPr" title="${esc(L('Preguntas sobre las conexiones del mapa, en Escribir', 'Questions about the map links, in Escribir'))}">${esc(L('Practicar', 'Practice'))}</button><button type="button" class="vz-ghost" id="vzRdMd">${esc(L('.md', '.md'))}</button></span></div>
           <div class="vz-rd-k"><span class="vz-rd-kind k-${A.kind}">${esc(L(k[0], k[1]))}</span><p>${esc(L(k[2], k[3]))}</p><p class="vz-rd-m">${m.nodes.length} ${esc(L('conceptos', 'concepts'))} · ${A.nLinks} ${esc(L('uniones de significado', 'meaning links'))} · ${A.comms.length} ${esc(L('grupos', 'groups'))} · ${esc(L('modularidad', 'modularity'))} ${A.Q.toFixed(2)}</p></div>
           <h4>${esc(L('Conceptos puente', 'Bridge concepts'))}</h4><p class="vz-rd-s">${esc(L('Por ellos pasan más caminos entre ideas distintas. Si los entiendes bien, entiendes cómo se arma el tema.', 'Most paths between different ideas go through them. Understand these and you understand how the topic fits together.'))}</p>
           ${A.bridges.length ? `<ol class="vz-rd-b">${A.bridges.map(id => `<li>${chip(id)}<span class="vz-rd-bar"><i style="width:${Math.max(6, A.bet.get(id) / maxB * 100)}%"></i></span></li>`).join('')}</ol>` : `<p class="vz-rd-s">${esc(L('Todavía no hay suficientes uniones.', 'Not enough links yet.'))}</p>`}
@@ -9703,9 +9703,11 @@ const vizUI = (() => {
         el.querySelectorAll('[data-gpr]').forEach(b => b.addEventListener('click', () => {
             const g = A.gaps[Number(b.dataset.gpr)];
             track('lectura_practicar', { ia: !!saved()[gKey(g)] });
-            window.open('/escribir/?from=gk&practicar=' + encodeURIComponent(pregDe(g).slice(0, 160)), '_blank', 'noopener');
+            const r = saved()[gKey(g)];
+            practiceInEscribir('brecha', [{ q: pregDe(g), level: 2, topic: m.rootLabel, focus: (r && r.explicacion) || L(`La relación entre ${lab(g.qa)} y ${lab(g.qb)}; debe explicar el mecanismo que los une.`, `The relationship between ${lab(g.qa)} and ${lab(g.qb)}; must explain the mechanism linking them.`) }]);
         }));
         A.gaps.forEach((_g, i) => paintAi(i));
+        document.getElementById('vzRdPr').addEventListener('click', () => practiceInEscribir('lectura', rhzQuestions()));
         document.getElementById('vzRdMd').addEventListener('click', () => {
             const blob = new Blob([lecturaMd(m, A, lab)], { type: 'text/markdown;charset=utf-8' }), a = document.createElement('a');
             a.href = URL.createObjectURL(blob); a.download = (m.rootLabel || 'mapa').replace(/[^\p{L}\p{N}]+/gu, '-').slice(0, 60) + '-lectura.md'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -9757,6 +9759,100 @@ const vizUI = (() => {
         $id('rhzRead').addEventListener('click', () => { rRead = !rRead; try { localStorage.setItem('gk_rhz_read', rRead ? '1' : '0'); } catch (_e) { /* ok */ } track('lectura_toggle', { open: rRead }); if (!rOpen) { rOpen = true; lastGeo = ''; layout(); } renderRhizome(); });
         $id('rhzToggle').addEventListener('click', () => { rOpen = !rOpen; try { localStorage.setItem('gk_rhz_open', rOpen ? '1' : '0'); } catch (_e) { /* ok */ } track('rhizome_toggle', { open: rOpen }); lastGeo = ''; layout(); if (rOpen) { rSig = ''; renderRhizome(); } });
     }
+    // ---------- que el rizoma proponga qué hacer: frase guía, ruta de estudio y práctica en Escribir ----------
+    let rCtx = null, rGuideOff = '', rRoute = null;
+    const lb = (id) => { const n = rCtx && rCtx.byId.get(String(id)); return n ? n.label : ''; };
+    // conceptos puente concretos (sin la raíz ni los nombres de las ramas), para frases y preguntas
+    const concretos = (A) => { const m = rCtx.m, c = A.bridges.filter(id => !(m.parent && m.parent.get(id) === m.rootId)); return c.length ? c : A.bridges; };
+    // Preguntas listas para Escribir, sacadas de las brechas, las conexiones inesperadas y los conceptos puente.
+    function rhzQuestions(only) {
+        if (!rCtx) return [];
+        const { m, A } = rCtx, tema = m.rootLabel || '', out = [];
+        const sv = ((m.rootId != null && nodes.get(m.rootId)) || {}).rhizomeBridges || {};
+        const grp = (c) => c.top.slice(0, 5).map(lb).filter(Boolean).join(', ');
+        if (!only || only === 'gaps') A.gaps.slice(0, only ? 3 : 2).forEach(g => {
+            const r = sv[g.qa + '|' + g.qb];
+            out.push({ q: (r && r.pregunta) || L(`¿Cómo se relaciona «${lb(g.qa)}» con «${lb(g.qb)}» dentro del tema «${tema}»?`, `How does "${lb(g.qa)}" relate to "${lb(g.qb)}" within the topic "${tema}"?`), level: 2,
+                focus: (r && r.explicacion) || L(`Relación entre ${lb(g.qa)} (junto a: ${grp(g.a)}) y ${lb(g.qb)} (junto a: ${grp(g.b)}). Debe explicar el mecanismo que los une.`, `Relationship between ${lb(g.qa)} (with: ${grp(g.a)}) and ${lb(g.qb)} (with: ${grp(g.b)}). Must explain the mechanism linking them.`), topic: tema });
+        });
+        if (!only || only === 'surprises') A.surprises.slice(0, 2).forEach(l => out.push({ q: L(`¿Qué tienen en común «${lb(l.a)}» y «${lb(l.b)}», aunque estén en partes distintas del tema?`, `What do "${lb(l.a)}" and "${lb(l.b)}" have in common, even though they sit in different parts of the topic?`), level: 2,
+            focus: L(`Lo que los une: ${l.why || 'una relación de significado'}.`, `What links them: ${l.why || 'a meaning relationship'}.`), topic: tema }));
+        if (!only || only === 'bridges') { const b = concretos(A).slice(0, 3); if (b.length) out.push({ q: L(`¿Por qué «${lb(b[0])}» es clave para entender el tema «${tema}»? Relaciónalo con ${b.slice(1).map(x => '«' + lb(x) + '»').join(' y ') || 'el resto del tema'}.`, `Why is "${lb(b[0])}" key to understanding the topic "${tema}"? Relate it to ${b.slice(1).map(x => '"' + lb(x) + '"').join(' and ') || 'the rest of the topic'}.`), level: 2,
+            focus: L(`${lb(b[0])} conecta varias partes del tema; debe mostrar qué une y por qué importa.`, `${lb(b[0])} connects several parts of the topic; must show what it links and why it matters.`), topic: tema }); }
+        return out.slice(0, 5);
+    }
+    function practiceInEscribir(kind, qs) {
+        if (!qs || !qs.length) return;
+        const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        try {
+            Object.keys(localStorage).filter(k => k.startsWith('gk_esc_set_')).forEach(k => { try { const v = JSON.parse(localStorage.getItem(k)); if (!v || Date.now() - (v.t || 0) > 86400000) localStorage.removeItem(k); } catch (_e) { localStorage.removeItem(k); } });
+            localStorage.setItem('gk_esc_set_' + id, JSON.stringify({ topic: rCtx ? rCtx.m.rootLabel : '', kind, level: 2, questions: qs, t: Date.now() }));
+        } catch (_e) { /* sin almacenamiento: se manda solo la primera como tema */ window.open('/escribir/?from=gk&practicar=' + encodeURIComponent(qs[0].q.slice(0, 160)), '_blank', 'noopener'); return; }
+        window.open('/escribir/?from=gk&serie=' + id, '_blank', 'noopener');
+        track('rhizome_practice', { kind, n: qs.length });
+    }
+    function rhzGuide() {
+        const host = document.querySelector('#rhzPane .rhz-main'); if (!host || !rCtx) return;
+        let g = host.querySelector('.rhz-guide'); if (!g) { g = document.createElement('div'); g.className = 'rhz-guide'; host.appendChild(g); }
+        const { m, A } = rCtx;
+        if (rGuideOff === m.hash || rRoute) { g.hidden = true; return; }
+        let msg = '', acts = '';
+        if (A.gaps.length) {
+            const x = A.gaps[0];
+            msg = L(`Hay ${A.gaps.length === 1 ? 'una parte' : A.gaps.length + ' partes'} del tema que casi no se conectan. Empieza aquí: <b>¿cómo se relaciona «${esc(lb(x.qa))}» con «${esc(lb(x.qb))}»?</b>`, `${A.gaps.length === 1 ? 'One part' : A.gaps.length + ' parts'} of the topic barely connect. Start here: <b>how does "${esc(lb(x.qa))}" relate to "${esc(lb(x.qb))}"?</b>`);
+            acts = `<button type="button" data-g="explain">${esc(L('Explicar · 1 nodo', 'Explain · 1 node'))}</button><button type="button" data-g="practice">${esc(L('Practicar las conexiones', 'Practice the links'))}</button>`;
+        } else if (A.bridges.length) {
+            msg = L(`Estos conceptos sostienen el tema: ${concretos(A).slice(0, 3).map(id => '<b>' + esc(lb(id)) + '</b>').join(', ')}. Si los entiendes, entiendes cómo se arma.`, `These concepts hold the topic together: ${concretos(A).slice(0, 3).map(id => '<b>' + esc(lb(id)) + '</b>').join(', ')}. Understand them and you understand how it fits.`);
+            acts = `<button type="button" data-g="practice">${esc(L('Practicar', 'Practice'))}</button>`;
+        } else { g.hidden = true; return; }
+        g.hidden = false;
+        g.innerHTML = `<p>${msg}</p><div class="rhz-guide-a"><button type="button" class="pri" data-g="route">${esc(L('Ruta de estudio', 'Study route'))} →</button>${acts}<button type="button" class="x" data-g="close" title="${esc(L('Ocultar', 'Hide'))}">✕</button></div>`;
+        g.querySelectorAll('[data-g]').forEach(b => b.addEventListener('click', () => {
+            const a = b.dataset.g; track('rhizome_guide_click', { a });
+            if (a === 'close') { rGuideOff = m.hash; g.hidden = true; }
+            else if (a === 'route') startRoute();
+            else if (a === 'practice') practiceInEscribir('guia', rhzQuestions());
+            else if (a === 'explain') {
+                if (!rRead) { rRead = true; rSig = ''; renderRhizome(); }
+                setTimeout(() => { const btn = document.querySelector('#vzRhPane [data-gexp="0"]'); if (btn) { btn.scrollIntoView({ block: 'center', behavior: 'smooth' }); btn.click(); } }, 150);
+            }
+        }));
+    }
+    // Ruta de estudio: primero los conceptos puente, luego cada grupo de ideas (de su concepto más central al menos).
+    function startRoute() {
+        if (!rCtx) return;
+        const { m, A } = rCtx, seen = new Set(), steps = [];
+        const add = (id, sec) => { if (id == null || seen.has(id) || id === m.rootId) return; seen.add(id); steps.push({ id, sec }); };
+        A.bridges.slice(0, 4).forEach(id => add(id, L('Conceptos puente', 'Bridge concepts')));
+        A.comms.forEach((c, i) => c.top.forEach(id => add(id, L('Grupo', 'Group') + ' ' + (i + 1) + ' · ' + lb(c.top[0]))));
+        A.sueltos.forEach(id => add(id, L('Sueltos', 'Loose')));
+        if (!steps.length) return;
+        rRoute = { steps, i: 0, hash: m.hash }; track('rhizome_route_start', { n: steps.length }); rhzGuide(); routeStep();
+    }
+    function routeStep() {
+        const host = document.querySelector('#rhzPane .rhz-main'); if (!host || !rRoute || !rCtx) return;
+        let box = host.querySelector('.rhz-route'); if (!box) { box = document.createElement('div'); box.className = 'rhz-route'; host.appendChild(box); }
+        if (rRoute.hash !== rCtx.m.hash) { const keep = rRoute.steps[rRoute.i]; startRoute(); if (keep && rRoute) { const j = rRoute.steps.findIndex(s => s.id === keep.id); if (j >= 0) rRoute.i = j; } }
+        const st = rRoute.steps[rRoute.i], n = nodes.get(st.id); if (!n) { box.remove(); rRoute = null; return; }
+        const def = String(n.definition || n.simple || '').trim();
+        const near = (rCtx.links || []).filter(l => l.a === st.id || l.b === st.id).slice(0, 4).map(l => { const o = l.a === st.id ? l.b : l.a; return `<button type="button" class="rr-n" data-go="${esc(o)}" title="${esc(l.why || '')}">${esc(lb(o))}</button>`; }).join('');
+        const last = rRoute.i === rRoute.steps.length - 1;
+        box.innerHTML = `<div class="rr-h"><span>${esc(L('Ruta de estudio', 'Study route'))} · ${rRoute.i + 1}/${rRoute.steps.length}</span><small>${esc(st.sec)}</small><button type="button" class="x" data-r="close" title="${esc(L('Cerrar la ruta', 'Close the route'))}">✕</button></div>
+          <div class="rr-bar"><i style="width:${Math.round((rRoute.i + 1) / rRoute.steps.length * 100)}%"></i></div>
+          <h4>${esc(lb(st.id))}</h4>${def ? `<p>${esc(def.length > 260 ? def.slice(0, 260) + '…' : def)}</p>` : ''}
+          ${near ? `<p class="rr-near">${esc(L('Se une con', 'Linked to'))}: ${near}</p>` : ''}
+          <div class="rr-a"><button type="button" data-r="prev"${rRoute.i ? '' : ' disabled'}>←</button>${last ? `<button type="button" class="pri" data-r="practice">${esc(L('Practicar estas conexiones', 'Practice these links'))}</button>` : `<button type="button" class="pri" data-r="next">${esc(L('Siguiente', 'Next'))} →</button>`}</div>`;
+        box.querySelectorAll('[data-r]').forEach(b => b.addEventListener('click', () => {
+            const a = b.dataset.r;
+            if (a === 'close') { track('rhizome_route_close', { at: rRoute.i + 1, of: rRoute.steps.length }); rRoute = null; box.remove(); rhzGuide(); return; }
+            if (a === 'prev') rRoute.i = Math.max(0, rRoute.i - 1);
+            if (a === 'next') rRoute.i = Math.min(rRoute.steps.length - 1, rRoute.i + 1);
+            if (a === 'practice') { track('rhizome_route_done', { n: rRoute.steps.length }); practiceInEscribir('ruta', rhzQuestions()); return; }
+            track('rhizome_route_step', { i: rRoute.i + 1 }); routeStep();
+        }));
+        box.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { const j = rRoute.steps.findIndex(s => s.id === b.dataset.go); if (j >= 0) { rRoute.i = j; routeStep(); } else pickConcept(b.dataset.go, false); }));
+        pickConcept(st.id, true); rhzSelect(st.id, true);
+    }
     const $id = (x) => document.getElementById(x);
     function renderRhizome() {
         if (!rhzOn() || !rOpen) return;
@@ -9804,7 +9900,9 @@ const vizUI = (() => {
         });
         const note = document.getElementById('rhzNote');
         if (note) note.textContent = saved ? L('Conceptos unidos por su significado, vengan de la rama que vengan.', 'Concepts linked by meaning, whatever branch they come from.') : L('Conexiones por vocabulario compartido…', 'Connections by shared vocabulary…');
+        rCtx = { m, A, byId, links };
         if (rRead) renderLectura(m, A, byId, colorOfComm);
+        rhzGuide(); if (rRoute) routeStep();
         // las conexiones de significado se piden cuando el mapa deja de cambiar (no en cada nodo que llega)
         clearTimeout(rAskT); if (!saved) rAskT = setTimeout(() => { const now = rhizomeModel(); if (now.hash === m.hash) askRhizomeAi(now); }, 2500);
         track('rhizome_view', { nodes: m.nodes.length, links: links.length, ai: !!saved, grupos: A.comms.length, tipo: A.kind });

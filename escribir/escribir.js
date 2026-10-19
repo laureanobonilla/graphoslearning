@@ -354,9 +354,21 @@
     begin(S.topic, lvl, r.data.questions, false);
   });
 
-  try {   // llegada desde Graphikosmos ("Practicar este tema"): el tema ya viene escrito
-    const qp = new URLSearchParams(location.search), pt = clip(qp.get('practicar') || '', 160);
-    if (pt.length >= 2) { history.replaceState(null, '', location.pathname); track('esc_from_map', {}); setTimeout(() => { show('Setup'); topicIn.value = pt; topicIn.dispatchEvent(new Event('input')); }, 0); }
+  let arrivedWithTask = false;   // llegó con algo que hacer: no se restaura la pantalla anterior
+  try {
+    const qp = new URLSearchParams(location.search), sid = (qp.get('serie') || '').replace(/[^a-z0-9]/gi, '').slice(0, 24), pt = clip(qp.get('practicar') || '', 160);
+    // Desde el rizoma de Graphikosmos: llegan las preguntas YA hechas (sobre las conexiones del mapa); no se generan aquí.
+    const set = sid ? ls('gk_esc_set_' + sid, null) : null;
+    if (sid) { try { localStorage.removeItem('gk_esc_set_' + sid); } catch { /* nada */ } }
+    const qs = set && Array.isArray(set.questions) ? set.questions.slice(0, 8).map((q) => ({ q: clip(q && q.q, 300), level: [1, 2, 3].includes(q && q.level) ? q.level : 2, focus: clip(q && q.focus, 600), topic: clip((q && q.topic) || set.topic, 160) })).filter((q) => q.q.length > 5) : [];
+    if (qs.length) {
+      arrivedWithTask = true; history.replaceState(null, '', location.pathname);
+      track('esc_from_rhizome', { n: qs.length, kind: clip(set.kind, 20) });
+      setTimeout(() => begin(clip(set.topic, 160) || 'Conexiones del mapa', qs[0].level, qs, false), 0);
+    } else if (pt.length >= 2) {   // "Practicar este tema": el tema ya viene escrito
+      arrivedWithTask = true; history.replaceState(null, '', location.pathname); track('esc_from_map', {});
+      setTimeout(() => { show('Setup'); topicIn.value = pt; topicIn.dispatchEvent(new Event('input')); }, 0);
+    }
   } catch { /* nada */ }
 
   /* navegación común: Mapas (Graphikosmos) · Practicar · Escribir */
@@ -416,7 +428,7 @@
   window.ESC = { show, renderHome, callRetry, failText, afterFail, track, toast, esc, clip, ls, lsSet };
   renderHome();
   setTimeout(() => {   // después de que cargue el modo Escribir (escribir-w.js)
-    if (new URLSearchParams(location.search).get('practicar')) return;
+    if (arrivedWithTask) return;
     if (restore()) { track('esc_restored', { view: curView }); if (pend && user()) resumePending(); }
   }, 0);
 })();
