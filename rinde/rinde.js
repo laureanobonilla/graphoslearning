@@ -46,7 +46,7 @@ function paisVisitante() {
 const monedaVisitante = () => PAIS_MONEDA[paisVisitante() || ''] || 'USD';
 
 // Ventas mensuales en US$: [desde, hasta, valor que se usa para calcular]
-const VENTAS = [[0, 3000, 1800], [3000, 10000, 6000], [10000, 30000, 18000], [30000, 100000, 55000], [100000, 300000, 170000], [300000, 1000000, 550000], [1000000, null, 1500000]];
+const VENTAS = [[0, 3000, 1800], [3000, 10000, 6000], [10000, 30000, 18000], [30000, 100000, 55000], [100000, 300000, 170000], [300000, 1000000, 550000], [1000000, 5000000, 2500000], [5000000, null, 10000000]];
 
 const NEGOCIOS = [
     { id: 'comercio', t: 'Tienda o comercio', d: 'Vende productos al público o a otros negocios' },
@@ -66,7 +66,7 @@ const negsDe = (p) => (p && Array.isArray(p.negocios) && p.negocios.length ? p.n
 const negTxt = (p) => negsDe(p).map(id => (NEGOCIOS.find(n => n.id === id) || {}).t).filter(Boolean).join(' + ');
 const negObj = (p) => (negsDe(p).length ? { t: negTxt(p) } : null);
 const pesoBase = (f, p) => Math.max(...(negsDe(p).length ? negsDe(p) : ['otro']).map(id => (PESOS[id] || PESOS.otro)[f.p]));
-const PERSONAS = [{ id: 'p1', t: '1 a 5', k: 0.75 }, { id: 'p2', t: '6 a 20', k: 1 }, { id: 'p3', t: '21 a 50', k: 1.1 }, { id: 'p4', t: 'Más de 50', k: 1.2 }];
+const PERSONAS = [{ id: 'p1', t: '1 a 5', k: 0.75 }, { id: 'p2', t: '6 a 20', k: 1 }, { id: 'p3', t: '21 a 50', k: 1.1 }, { id: 'p4', t: '51 a 200', k: 1.2 }, { id: 'p5', t: '201 a 1.000', k: 1.3 }, { id: 'p6', t: 'Más de 1.000', k: 1.4 }];
 const SEDES = [{ id: 's1', t: 'Una', k: 0 }, { id: 's2', t: '2 o 3', k: 1 }, { id: 's3', t: '4 o más', k: 1.4 }];
 
 // Pesos por tipo de negocio (0 = no aplica). Orden: cobros, compras, inventario, precios, fijos, personal, servicios
@@ -316,12 +316,12 @@ const KPI = { cobros: 'DSO · capital de trabajo', compras: 'Costo de ventas (CO
 const MULTIPLO = [5, 7];   // múltiplo EBITDA ilustrativo para el valor de empresa (pymes y medianas latinoamericanas suelen negociarse en ese rango)
 
 const ventasUSD = (p = S.perfil) => ventasMes(p) / ((MONEDAS[(p && p.moneda) || 'CRC'] || MONEDAS.CRC).usd || 1);
-// pyme (hasta 20 personas y < US$30 mil/mes), mediana, grande (más de 50 personas o ≥ US$300 mil/mes). Define el lenguaje y las capas.
+// pyme (hasta 20 personas y < US$30 mil/mes), mediana (21 a 200 personas o ≥ US$30 mil/mes), grande (más de 200 personas o ≥ US$1 millón/mes). Define el lenguaje y las capas.
 function nivel(p = S.perfil) {
     if (!p) return 'pyme';
     const u = ventasUSD(p);
-    if (p.personas === 'p4' || u >= 300000) return 'grande';
-    if (p.personas === 'p3' || u >= 30000) return 'mediana';
+    if (['p5', 'p6'].includes(p.personas) || u >= 1000000) return 'grande';
+    if (['p3', 'p4'].includes(p.personas) || u >= 30000) return 'mediana';
     return 'pyme';
 }
 const NIVEL_TXT = { pyme: 'Pyme', mediana: 'Mediana empresa', grande: 'Gran empresa' };
