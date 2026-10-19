@@ -83,4 +83,10 @@ function requireUser(context) {
 const faltaTabla = (e) => /PGRST205|42P01|does not exist|Could not find the table|schema cache/i.test(String(e && e.message || e));
 const MSG_FALTA_TABLA = 'Ordena todavía no está lista: falta crear su base de datos (correr supabase/ordena.sql en Supabase).';
 
-module.exports = { faltaTabla, MSG_FALTA_TABLA, PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };
+// Evento del servidor ligado a la cuenta (correo en actor_label). Nunca rompe la respuesta si falla.
+async function evento(user, nombre, meta) {
+    try { await require('./store').logEvent(user.id, 'user', null, 'ordena_' + nombre, meta || {}, user.email || null, 'ordena'); }
+    catch (e) { console.error('[ordena] evento', nombre, e.message); }
+}
+
+module.exports = { evento, faltaTabla, MSG_FALTA_TABLA, PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };

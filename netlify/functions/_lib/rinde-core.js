@@ -79,4 +79,10 @@ function requireUser(context) {
     return user || null;
 }
 
-module.exports = { PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };
+// Evento del servidor ligado a la cuenta (correo en actor_label). Nunca rompe la respuesta si falla.
+async function evento(user, nombre, meta) {
+    try { await require('./store').logEvent(user.id, 'user', null, 'rinde_' + nombre, meta || {}, user.email || null, 'rinde'); }
+    catch (e) { console.error('[rinde] evento', nombre, e.message); }
+}
+
+module.exports = { evento, PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };

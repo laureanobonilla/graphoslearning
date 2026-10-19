@@ -182,8 +182,18 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '
 const icon = (id, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${IC[id] || ''}</svg>`;
 const uid = () => Math.random().toString(36).slice(2, 10);
 const anonId = (() => { try { let a = localStorage.getItem('rinde.anon'); if (!a) { a = 'a' + uid() + uid(); localStorage.setItem('rinde.anon', a); } return a; } catch (_e) { return null; } })();
+// Eventos de uso. Si hay sesión, se mandan con el token: el servidor los guarda con el usuario y su correo, y el
+// anon_id (el mismo antes y después de entrar) permite ver también lo que hizo antes de crear la cuenta.
 function track(ev, meta) {
-    try { fetch('/.netlify/functions/track-event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'rinde_' + ev, anonId, app: 'rinde', metadata: meta || {} }), keepalive: true }).catch(() => {}); } catch (_e) {}
+    (async () => {
+        try {
+            const h = { 'Content-Type': 'application/json' };
+            const t = USER ? await token().catch(() => null) : null;
+            if (t) h.Authorization = 'Bearer ' + t;
+            fetch('/.netlify/functions/track-event', { method: 'POST', headers: h, keepalive: true,
+                body: JSON.stringify({ event: 'rinde_' + ev, anonId, app: 'rinde', displayName: USER ? USER.email : null, metadata: meta || {} }) }).catch(() => {});
+        } catch (_e) {}
+    })();
 }
 function mon() { return MONEDAS[(S.perfil && S.perfil.moneda) || 'CRC'] || MONEDAS.CRC; }
 function sep(n, dots) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, dots ? '.' : ','); }
@@ -519,6 +529,7 @@ async function interpretar(id, i) {
 }
 function refrescarAfinar(id) { const m = $('#modal'); if (!m.hidden && m.dataset.afinar === id) mAfinar(id, true); }
 function mAfinar(id, mantener) {
+    if (!mantener) track('frente_abierto', { frente: id });
     const f = FR[id], st = fr(id);
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(f.t)}</p><h2>Revisar este frente</h2><p class="sub">${esc(f.fin)}. Cada respuesta puede destapar una parte de la fuga; si lo tiene bajo control, no suma nada.</p>
       ${f.q.map((qq, i) => `<div class="pregunta"><p>${esc(qq[0])}</p><div class="opciones fila">${opsDe(qq).map(({ o, k }) => `<button class="opc chip ${o[1] === 0 ? 'na' : ''} ${st.r[i] === k ? 'on' : ''}" data-a="resp" data-f="${id}" data-i="${i}" data-k="${k}" data-m="1">${esc(o[0])}</button>`).join('')}<button class="opc chip otra ${st.r[i] === 'x' ? 'on' : ''}" data-a="libre" data-f="${id}" data-i="${i}" data-m="1">Otra respuesta…</button></div>${st.r[i] === 'x' ? libreLinea(st.libre[i]) : ''}</div>`).join('')}
@@ -574,6 +585,7 @@ function mPlan(id, cargando, error, mantener) {
 }
 
 function mBloqueado(id) {
+    track('bloqueo_visto', { frente: id, freeFrente: ACCESO.freeFrente || null });
     const x = calc(id), T = totales();
     abrir(`<p class="lbl">${icon(id, 'mini')} ${esc(FR[id].t)} · ${rango(x.min, x.max)} al mes</p>
       <h2>Desbloquee el plan de todos sus frentes</h2>
@@ -780,7 +792,7 @@ document.addEventListener('click', (e) => {
         case 'onb-atras': leerOnb(); UI.paso--; render(); break;
         case 'onb-cancelar': { const otra = Object.keys(E.empresas).find(k => k !== E.activa && E.empresas[k].perfil); if (otra) { delete E.empresas[E.activa]; E.activa = otra; S = E.empresas[otra]; guardar(false); } UI.vista = S.perfil ? 'app' : 'inicio'; render(); window.scrollTo(0, 0); break; }
         case 'onb-sig': {
-            leerOnb();
+            leerOnb(); track('paso_listo', { paso: UI.paso });
             if (UI.paso < 3) { UI.paso++; render(); window.scrollTo(0, 0); break; }
             const nuevoPerfil = !S.perfil;
             S.perfil = { nombre: UI.borrador.nombre || '', negocios: UI.borrador.negocios.slice(), negocio: UI.borrador.negocios[0], detalle: UI.borrador.detalle, personas: UI.borrador.personas, sedes: UI.borrador.sedes, ventas: UI.borrador.ventas == null ? 2 : UI.borrador.ventas, exacta: UI.borrador.exacta || 0, moneda: UI.borrador.moneda };
@@ -788,7 +800,7 @@ document.addEventListener('click', (e) => {
             track(nuevoPerfil ? 'diagnostico_listo' : 'perfil_editado', { negocio: negsDe(S.perfil).join('+'), personas: S.perfil.personas, ventas: S.perfil.ventas, empresas: Object.keys(E.empresas).length });
             break;
         }
-        case 'tab': UI.tab = b.dataset.tab; if (UI.vista !== 'app' && S.perfil) UI.vista = 'app'; render(); window.scrollTo(0, 0); break;
+        case 'tab': if (UI.tab !== b.dataset.tab) track('pestana', { tab: b.dataset.tab }); UI.tab = b.dataset.tab; if (UI.vista !== 'app' && S.perfil) UI.vista = 'app'; render(); window.scrollTo(0, 0); break;
         case 'resp': {
             const st = fr(id), i = Number(b.dataset.i), k = Number(b.dataset.k);
             const antes = calc(id);
@@ -815,14 +827,14 @@ document.addEventListener('click', (e) => {
         }
         case 'porque': mPorque(id); track('porque', { frente: id }); break;
         case 'menu': mMenu(id); break;
-        case 'ocultar': fr(id).oculto = true; guardar(); cerrar(); render(); toast('Frente oculto. Puede volver a mostrarlo abajo.'); break;
-        case 'mostrar': fr(id).oculto = false; guardar(); render(); break;
+        case 'ocultar': track('frente_oculto', { frente: id }); fr(id).oculto = true; guardar(); cerrar(); render(); toast('Frente oculto. Puede volver a mostrarlo abajo.'); break;
+        case 'mostrar': track('frente_mostrado', { frente: id }); fr(id).oculto = false; guardar(); render(); break;
         case 'plan': {
             if (calc(id).n === 0) { mAfinar(id); break; }
             track('plan_click', { frente: id });
             const st = fr(id);
             if (st.plan) { mPlan(id); break; }
-            if (!USER) { pendiente = { tipo: 'plan', id }; abrir(`<h2>Su plan está a un paso</h2><p class="sub">Cree su cuenta gratis para ver el plan completo de <b>${esc(FR[id].t)}</b> y guardar su diagnóstico en el teléfono y la computadora.</p><button class="btn full" data-a="login-signup">Crear cuenta gratis</button><button class="btn ghost full" data-a="login">Ya tengo cuenta</button><p class="disc">El plan gratuito incluye un frente completo. Le recomendamos el más grande.</p>`, 'chico'); break; }
+            if (!USER) { track('cuenta_pedida', { frente: id }); pendiente = { tipo: 'plan', id }; abrir(`<h2>Su plan está a un paso</h2><p class="sub">Cree su cuenta gratis para ver el plan completo de <b>${esc(FR[id].t)}</b> y guardar su diagnóstico en el teléfono y la computadora.</p><button class="btn full" data-a="login-signup">Crear cuenta gratis</button><button class="btn ghost full" data-a="login">Ya tengo cuenta</button><p class="disc">El plan gratuito incluye un frente completo. Le recomendamos el más grande.</p>`, 'chico'); break; }
             if (!puedeVer(id)) { mBloqueado(id); break; }
             generarPlan(id); break;
         }
@@ -861,7 +873,7 @@ document.addEventListener('click', (e) => {
         case 'login-signup': cerrar(); pedirLogin('signup'); break;
         case 'login-pagar': pendiente = { tipo: 'precios' }; cerrar(); pedirLogin('signup'); break;
         case 'cuenta': mCuenta(); break;
-        case 'logout': cerrar(); netlifyIdentity.logout(); break;
+        case 'logout': track('logout'); cerrar(); netlifyIdentity.logout(); break;
         case 'cerrar': cerrar(); break;
     }
 });
@@ -914,7 +926,15 @@ if (window.netlifyIdentity) {
     netlifyIdentity.init({ locale: 'es' });
 }
 fetch(conClave('/.netlify/functions/rinde-config')).then(r => r.json()).then(c => { CONF = c; }).catch(() => {});
-track(S.perfil ? 'visita_vuelta' : 'visita_nueva');
+track(S.perfil ? 'visita_vuelta' : 'visita_nueva', { ref: document.referrer ? document.referrer.slice(0, 120) : null, utm: (location.search.match(/utm_campaign=([\w.-]{1,40})/) || [])[1] || null, ad: (location.search.match(/utm_content=([\w.-]{1,40})/) || [])[1] || null, fb: /fbclid=/.test(location.search) });
+const inicioPagina = Date.now();
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') return;
+    let T = null; try { T = S.perfil ? totales() : null; } catch (_e) {}
+    track('salida', { seg: Math.round((Date.now() - inicioPagina) / 1000), vista: UI.vista, tab: UI.tab, paso: UI.vista === 'onb' ? UI.paso : null,
+        resp: T ? T.resp : 0, acciones: S.acciones.length, cuenta: !!USER, plan: !!ACCESO.active });
+});
+window.addEventListener('error', (e) => { track('error_js', { m: String(e.message || '').slice(0, 160), l: e.lineno || null }); });
 if (S.perfil) Object.entries(S.fr || {}).forEach(([id, st]) => { if (FR[id] && st.libre) Object.keys(st.libre).forEach(i => { if (st.r[i] === 'x' && st.libre[i].estado === 'calc') setTimeout(() => interpretar(id, Number(i)), 300); }); });
 render();
 })();

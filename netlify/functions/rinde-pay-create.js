@@ -15,6 +15,7 @@ exports.handler = async (event, context) => {
         const orderID = await createOrder(plan.usd);
         // Se guarda ANTES de devolverla: es lo que impide usar una orden ajena para activar esta cuenta.
         await core.upsert('rinde_orders', { order_id: orderID, user_id: user.id, email: user.email, plan: planId, usd: Number(plan.usd), status: 'created' });
+        await core.evento(user, 'srv_orden_creada', { plan: planId, usd: Number(plan.usd), orderID });
         return core.json(200, { orderID });
     } catch (e) {
         console.error('[rinde-pay-create]', e.message);

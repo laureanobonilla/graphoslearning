@@ -13,6 +13,7 @@ exports.handler = async (event, context) => {
         if (event.httpMethod === 'GET') {
             const row = await core.one('rinde_projects', 'user_id', user.id);
             const access = await core.getAccess(user);
+            await core.evento(user, 'srv_sesion', { tieneDatos: !!row, plan: access.active, freeFrente: access.freeFrente || null });
             return core.json(200, { data: row ? row.data : null, updatedAt: row ? row.updated_at : null, access, email: user.email });
         }
         if (event.httpMethod === 'POST') {

@@ -63,7 +63,7 @@ exports.handler = async (event, context) => {
         const access = await core.getAccess(user);
         let usingFree = false;
         if (!access.active) {
-            if (access.freeFrente && access.freeFrente !== frente) return core.json(402, { error: 'locked', freeFrente: access.freeFrente });
+            if (access.freeFrente && access.freeFrente !== frente) { await core.evento(user, 'srv_plan_bloqueado', { frente, freeFrente: access.freeFrente }); return core.json(402, { error: 'locked', freeFrente: access.freeFrente }); }
             const row = await core.one('rinde_access', 'user_id', user.id);
             const gens = (row && row.free_gens) || 0;
             if (gens >= FREE_MAX_GENS) return core.json(402, { error: 'locked', freeFrente: frente, message: 'Llegó al máximo de actualizaciones del plan gratuito.' });
@@ -104,9 +104,11 @@ ${datos.notas ? 'Notas del dueño: ' + datos.notas : ''}
 Prepare un plan para cerrar esta fuga en particular, a la medida de esta empresa. Si ya hay respuestas a preguntas anteriores, úselas y no vuelva a hacer esas mismas preguntas.`;
 
         const plan = await generateWithRetries(prompt, SCHEMA, valid, { tag: 'rinde-plan', maxOutputTokens: 3000, deadline, attemptMs: 20000 });
+        await core.evento(user, 'srv_plan_listo', { frente, gratis: usingFree, pagado: access.active });
         return core.json(200, { plan, free: usingFree });
     } catch (e) {
         console.error('[rinde-plan]', e.message);
+        await core.evento(user, 'srv_plan_error', { frente, motivo: String(e.message || '').slice(0, 160) });
         return core.json(502, { error: 'No pudimos preparar el plan en este momento. Intente de nuevo en un minuto.' });
     }
 };

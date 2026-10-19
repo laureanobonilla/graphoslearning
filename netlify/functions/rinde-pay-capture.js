@@ -17,10 +17,11 @@ exports.handler = async (event, context) => {
         if (!plan) return core.json(400, { error: 'Plan no válido' });
 
         const order = await captureOrder(orderID);
-        if (order.status !== 'COMPLETED') return core.json(402, { error: `El pago no se completó (estado: ${order.status}).` });
+        if (order.status !== 'COMPLETED') { await core.evento(user, 'srv_pago_fallido', { orderID, estado: order.status }); return core.json(402, { error: `El pago no se completó (estado: ${order.status}).` }); }
         const cap = order.purchase_units?.[0]?.payments?.captures?.[0];
         if (!cap || cap.amount.currency_code !== 'USD' || Number(cap.amount.value) < Number(plan.usd) - 0.01) {
             console.error('[rinde-pay-capture] monto no coincide', orderID, cap && cap.amount);
+            await core.evento(user, 'srv_pago_fallido', { orderID, motivo: 'monto', pagado: cap && cap.amount && cap.amount.value });
             return core.json(402, { error: 'El monto pagado no corresponde al plan.' });
         }
         const payer = (order.payer && order.payer.email_address) || null;
@@ -28,6 +29,7 @@ exports.handler = async (event, context) => {
         const paidUntil = core.extendFrom(prev && prev.paid_until, plan.months, plan.days);
         await core.upsert('rinde_orders', { order_id: orderID, user_id: user.id, status: 'paid', paid_at: new Date().toISOString(), paid_amount_usd: Number(cap.amount.value), payer_email: payer });
         await core.upsert('rinde_access', { user_id: user.id, email: user.email, plan: ord.plan, paid_until: paidUntil });
+        await core.evento(user, 'srv_pago_confirmado', { plan: ord.plan, usd: Number(cap.amount.value), hasta: paidUntil, pagador: payer });
 
         if (process.env.RESEND_API_KEY) {   // aviso para el dueño (no bloquea)
             fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
