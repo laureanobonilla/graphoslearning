@@ -1780,15 +1780,19 @@ const topicUI = (() => {
         revealNode(nd.id); network.selectNodes([nd.id]); focusNodeAvoidingOverlays(nd.id, { scale: 1.1, duration: 500 }); flashNewNode(nd.id);
     });
     // Mapa → texto: al elegir un nodo, el panel pasa al texto de su esquema y marca el concepto.
-    network.on('selectNode', (params) => {
-        const id = params.nodes && params.nodes[0]; if (id == null) return;
+    // Lleva el texto al pasaje de un nodo. Se usa al elegir en el mapa, y también desde el rizoma y las definiciones
+    // (que eligen el nodo por código, sin el evento «selectNode»).
+    function goTo(id) {
+        if (id == null) return;
         const owner = ownerOf(id); if (owner == null) return;
         if (String(owner) !== String(ownerId)) render(owner);
         tab.classList.toggle('on', !open && !!ownerId);
         const m = Array.from(body.querySelectorAll('mark.tp-mark')).find(x => String(x.dataset.node) === String(id));
         body.querySelectorAll('mark.flash').forEach(x => x.classList.remove('flash'));
         if (m && open) { m.classList.add('flash'); m.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
-    });
+    }
+    network.on('selectNode', (params) => goTo(params.nodes && params.nodes[0]));
+    document.addEventListener('gk:nodepick', (e) => goTo(e.detail));
     nodes.on('remove', () => { if (ownerId != null && !nodes.get(ownerId)) { ownerId = null; open = false; paint(); } });
     nodes.on('update', (_ev, p) => { if (ownerId != null && p && p.items && p.items.some((i, k) => String(i) === String(ownerId) && (!p.oldData || !p.oldData[k] || p.oldData[k].schemaText !== (p.data && p.data[k] ? p.data[k].schemaText : undefined))) && nodes.get(ownerId)?.schemaText) render(ownerId); });
     // Al abrir un proyecto guardado: mostrar el texto de su esquema (el que se guardó con él). Los proyectos viejos no lo
@@ -1841,7 +1845,7 @@ const topicUI = (() => {
         const el = a.node.parentElement; if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         return true;
     }
-    return { show, ownerOf, setOpen, onLoaded, setLoading, setFailed, highlightQuote };
+    return { show, ownerOf, setOpen, onLoaded, setLoading, setFailed, highlightQuote, goTo };
 })();
 
 // Esquema hecho a partir de un texto pegado: ese mismo texto queda como el texto del esquema (solo lectura, a la izquierda).
@@ -9576,6 +9580,7 @@ const vizUI = (() => {
         const n = nodes.get(id); if (!n) return;
         try { revealNode(id); network.selectNodes([id]); focusNodeAvoidingOverlays(id, { scale: 1.05, duration: 450 }); } catch (_e) { /* ok */ }
         try { if (window.gkDefsGoTo) window.gkDefsGoTo(id); } catch (_e) { /* ok */ }
+        try { if (topicUI && topicUI.goTo) topicUI.goTo(id); } catch (_e) { /* ok */ }   // y el texto, a su pasaje
         if (!fromRhz) rhzSelect(id, true);
         const d = String(n.definition || n.simple || '').replace(/\s+/g, ' ').trim();
         rTip(clean(n) + (d ? ' — ' + (d.length > 220 ? d.slice(0, 220) + '…' : d) : ''));
