@@ -36,6 +36,7 @@ exports.handler = async (event, context) => {
         return core.json(200, { ok: true, access: await core.getAccess(user) });
     } catch (e) {
         console.error('[ordena-pay-capture]', e.message);
+        if (core.faltaTabla(e)) return core.json(503, { error: core.MSG_FALTA_TABLA, message: core.MSG_FALTA_TABLA });
         return core.json(502, { error: 'No se pudo confirmar el pago con PayPal. Si el cargo sí se hizo, escríbenos y lo resolvemos a mano.' });
     }
 };

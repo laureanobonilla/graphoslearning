@@ -22,7 +22,8 @@ exports.handler = async (event, context) => {
         }
         return { statusCode: 405, body: 'Method Not Allowed' };
     } catch (e) {
-        console.error('[rinde-data]', e.message);
+        console.error('[ordena-data]', e.message);
+        if (core.faltaTabla(e)) return core.json(503, { error: core.MSG_FALTA_TABLA, message: core.MSG_FALTA_TABLA });
         return core.json(502, { error: 'No se pudo conectar con la base de datos. Tus datos siguen guardados en este dispositivo.' });
     }
 };

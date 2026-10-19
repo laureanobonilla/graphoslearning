@@ -75,4 +75,8 @@ function requireUser(context) {
     return user || null;
 }
 
-module.exports = { PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };
+// ¿El error es porque faltan las tablas de Ordena en Supabase (no se corrió supabase/ordena.sql)?
+const faltaTabla = (e) => /PGRST205|42P01|does not exist|Could not find the table|schema cache/i.test(String(e && e.message || e));
+const MSG_FALTA_TABLA = 'Ordena todavía no está lista: falta crear su base de datos (correr supabase/ordena.sql en Supabase).';
+
+module.exports = { faltaTabla, MSG_FALTA_TABLA, PLANS, testKeyOk, planesPara, json, scrub, scrubOne, countryOf, q, upsert, one, getAccess, extendFrom, requireUser, getUser };

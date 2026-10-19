@@ -18,6 +18,7 @@ exports.handler = async (event, context) => {
         return core.json(200, { orderID });
     } catch (e) {
         console.error('[ordena-pay-create]', e.message);
+        if (core.faltaTabla(e)) return core.json(503, { error: core.MSG_FALTA_TABLA, message: core.MSG_FALTA_TABLA });
         return core.json(502, { error: 'No se pudo iniciar el pago. Intenta de nuevo en un momento.' });
     }
 };

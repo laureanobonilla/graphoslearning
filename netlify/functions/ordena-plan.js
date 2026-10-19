@@ -101,6 +101,7 @@ Prepara un plan para recuperar el tiempo de este frente, a la medida de esta per
         return core.json(200, { plan, free: usingFree });
     } catch (e) {
         console.error('[ordena-plan]', e.message);
+        if (core.faltaTabla(e)) return core.json(503, { error: core.MSG_FALTA_TABLA, message: core.MSG_FALTA_TABLA });
         return core.json(502, { error: 'No pudimos preparar tu plan en este momento. Intenta de nuevo en un minuto.' });
     }
 };
