@@ -71,7 +71,7 @@ function computeCost(action, d) {
         case 'm_text':            return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         case 'lang_map':          return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         case 'esc_feedback':      return (d.criteria || d.skipped) ? 1 : 0;
-        case 'lens':              return (d.lens && (d.steps || d.analogies)) ? LENS_COST : 0;
+        case 'lens':              return (d.lens && (d.steps || d.analogies || d.nodes)) ? LENS_COST : 0;
         case 'lens_step':         return d.metaphor ? 1 : 0;   // «otra metáfora» de un paso
         // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
         default:                  return 0;

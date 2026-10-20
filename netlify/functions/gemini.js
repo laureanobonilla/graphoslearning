@@ -683,7 +683,7 @@ async function rawHandler(event, context) {
         if (action === 'lens') {
             const lb = JSON.parse(event.body);
             const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
-            const lens = lb.lens === 'claridad' ? 'claridad' : (lb.lens === 'genio' ? 'genio' : '');
+            const lens = ['genio', 'claridad', 'camino'].includes(lb.lens) ? lb.lens : '';
             const tema = clipS(topic, 200);
             if (!lens || tema.length < 2) return { statusCode: 400, body: JSON.stringify({ error: 'Falta el tema' }) };
             const ctx = clipS(contextPath, 400);
@@ -709,6 +709,21 @@ async function rawHandler(event, context) {
                     caution: S('Una frase si algo es discutido o dudoso; vacío si no.')
                 }, required: ['essence', 'analogies', 'applications', 'counterexamples', 'perspectives', 'expert_questions', 'caution'] };
                 prompt = `${BASE}Quiero entender este tema como si fuera un genio. Desglósalo con analogías avanzadas, aplicaciones del mundo real, contraejemplos y múltiples perspectivas, y termina con preguntas de nivel experto que pongan a prueba mi comprensión.`;
+            } else if (lens === 'camino') {
+                schema = { type: 'OBJECT', properties: {
+                    essence: S('Qué sabe hacer, en concreto, una persona que domina el tema: 1 a 2 oraciones con verbos de acción, sin jerga.'),
+                    nodes: { type: 'ARRAY', description: 'Entre 8 y 12 conceptos o habilidades que hay que dominar, de los fundamentos a la meta. El último, con id «meta», es dominar el tema completo.', items: { type: 'OBJECT', properties: {
+                        id: S('Identificador corto sin espacios: n1, n2, n3… y «meta» para el último.'),
+                        title: S('Nombre del concepto o habilidad (2 a 6 palabras).'),
+                        definition: S('Qué es, en lenguaje claro (2 a 3 oraciones).'),
+                        why: S('Por qué hay que tenerlo antes de lo que sigue (1 oración).'),
+                        check: S('Una prueba concreta para saber que ya lo tienes: algo que puedes hacer o explicar (1 oración).'),
+                        layer: { type: 'INTEGER', description: 'Capa: 0 para los fundamentos (sin prerrequisitos), subiendo hacia la meta, que lleva la capa más alta.' }
+                    }, required: ['id', 'title', 'definition', 'why', 'check', 'layer'] } },
+                    links: { type: 'ARRAY', description: 'Dependencias: cada enlace va de un prerrequisito a lo que lo necesita. Nunca hacia una capa anterior.', items: { type: 'OBJECT', properties: { from: S('id del prerrequisito.'), to: S('id de lo que lo necesita.') }, required: ['from', 'to'] } },
+                    caution: S('Una frase si el orden es discutible o depende de la persona; vacío si no.')
+                }, required: ['essence', 'nodes', 'links', 'caution'] };
+                prompt = `${BASE}Haz ingeniería inversa de este tema. Parte de lo que sabe hacer una persona que lo domina y retrocede paso a paso: ¿qué tuvo que dominar justo antes?, ¿y antes de eso?, hasta los fundamentos. Entrega entre 8 y 12 conceptos o habilidades, ordenados por dependencia y enlazados a lo que los necesita (varios prerrequisitos pueden alimentar un mismo concepto, y uno puede servir a varios). Cada uno con su definición clara, por qué va antes y cómo saber que ya lo tienes. El último, con id "meta", es dominar el tema. Ajusta dónde empieza el camino al nivel de la persona: principiante, desde cero; intermedio, desde lo básico ya sabido; avanzado, solo lo que un buen estudiante suele tener flojo.`;
             } else {
                 schema = { type: 'OBJECT', properties: {
                     essence: S('La idea central del tema en una sola oración de máximo 22 palabras, sin jerga.'),
@@ -741,6 +756,28 @@ async function rawHandler(event, context) {
                 clean.counterexamples = cards(out.counterexamples, 2); clean.perspectives = cards(out.perspectives, 3);
                 clean.expert_questions = (Array.isArray(out.expert_questions) ? out.expert_questions : []).slice(0, 3).map(q => c(q, 260)).filter(Boolean);
                 if (clean.analogies.length + clean.applications.length + clean.counterexamples.length + clean.perspectives.length < 4) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };
+            } else if (lens === 'camino') {
+                const idc = (v) => c(v, 16).replace(/[^A-Za-z0-9_]/g, '');
+                const ns = (Array.isArray(out.nodes) ? out.nodes : []).slice(0, 14).map((x, i) => ({ id: idc(x && x.id) || ('n' + (i + 1)), title: c(x && x.title, 70), definition: c(x && x.definition, 420), why: c(x && x.why, 260), check: c(x && x.check, 260), ml: Number.isFinite(Number(x && x.layer)) ? Number(x.layer) : i })).filter(x => x.title);
+                const used = new Set(); ns.forEach((n, i) => { if (used.has(n.id)) n.id = n.id + '_' + i; used.add(n.id); });
+                if (ns.length < 5) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };
+                let meta = ns.find(n => n.id === 'meta');
+                if (!meta) { meta = { id: 'meta', title: tema.slice(0, 70), definition: clean.essence, why: '', check: '', ml: 1e6 }; ns.push(meta); }
+                const ix = new Map(ns.map((n, i) => [n.id, i])), byId = new Map(ns.map(n => [n.id, n]));
+                // «a va antes que b»: por capa y, a igualdad, por orden de llegada; así los enlaces nunca forman ciclos. La meta va siempre al final.
+                const before = (a, b) => a.id === 'meta' ? false : (b.id === 'meta' || a.ml < b.ml || (a.ml === b.ml && ix.get(a.id) < ix.get(b.id)));
+                const seenL = new Set(), links = [];
+                (Array.isArray(out.links) ? out.links : []).slice(0, 40).forEach(l => {
+                    const a = byId.get(idc(l && l.from)), b = byId.get(idc(l && l.to)); if (!a || !b || a === b || !before(a, b)) return;
+                    const k = a.id + '>' + b.id; if (seenL.has(k)) return; seenL.add(k); links.push({ from: a.id, to: b.id });
+                });
+                ns.forEach(n => { if (n.id !== 'meta' && !links.some(l => l.from === n.id)) links.push({ from: n.id, to: 'meta' }); });   // todo conduce a la meta
+                const order = ns.slice().sort((a, b) => (a.id === 'meta') - (b.id === 'meta') || a.ml - b.ml || ix.get(a.id) - ix.get(b.id)), depth = new Map();
+                order.forEach(n => { if (n.id === 'meta') return; depth.set(n.id, links.filter(l => l.to === n.id).reduce((m, l) => Math.max(m, (depth.get(l.from) || 0) + 1), 0)); });
+                depth.set('meta', Math.max(0, ...[...depth.values()]) + 1);
+                clean.nodes = order.map(n => ({ id: n.id, title: n.title, definition: n.definition || (n.id === 'meta' ? clean.essence : ''), why: n.why, check: n.check, layer: depth.get(n.id) }));
+                clean.links = links;
+                if (clean.nodes.length < 5 || links.length < 4) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };
             } else {
                 clean.steps = (Array.isArray(out.steps) ? out.steps : []).slice(0, 6).map(x => ({ title: c(x && x.title, 80), explanation: c(x && x.explanation, 420), metaphor: c(x && x.metaphor, 300), image: c(x && x.image, 160), example: c(x && x.example, 300), emoji: Array.from(c(x && x.emoji, 12))[0] || '' })).filter(x => x.title && x.explanation);
                 const sc = out.shortcut || {};

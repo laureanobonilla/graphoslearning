@@ -14,6 +14,7 @@ const trk = (e, m) => { try { if (typeof track === 'function') track(e, m || {})
 
 const LENSES = {
   genio: { icon: '🧠', name: () => L('Entender como un genio', 'Understand it like a genius'), desc: () => L('Analogías, aplicaciones, contraejemplos, perspectivas y preguntas de experto', 'Analogies, applications, counterexamples, perspectives and expert questions') },
+  camino: { icon: '🧭', name: () => L('Cómo llegar ahí', 'How to get there'), desc: () => L('Ingeniería inversa: qué dominar antes, en qué orden y por qué, con definiciones', 'Reverse engineering: what to master first, in what order and why, with definitions') },
   claridad: { icon: '💡', name: () => L('De la confusión a la claridad', 'From confusion to clarity'), desc: () => L('Paso a paso, con metáforas, imágenes, ejemplos y un atajo mental', 'Step by step, with metaphors, images, examples and a mental shortcut') }
 };
 const CATS = [
@@ -148,6 +149,24 @@ const CSS = `
 #gkLens .gl-part{display:flex;gap:12px;align-items:center}
 #gkLens .gl-key{flex:none;min-width:44px;max-width:44%;padding:8px 10px;border-radius:10px;background:#8b7cf6;color:#0a0e1a;font:700 16px Sora,Inter,sans-serif;text-align:center}
 #gkLens .gl-meaning{color:#cdd3ea;font-size:14.5px;line-height:1.4}
+#gkLens .gl-prog2{display:flex;align-items:center;gap:10px;margin:0 0 14px;color:#aab2d0;font-size:13px}
+#gkLens .gl-prog2 i{flex:1;height:5px;border-radius:9px;background:#1d2442;overflow:hidden;position:relative}
+#gkLens .gl-prog2 i b{position:absolute;left:0;top:0;bottom:0;background:#4ade80;border-radius:9px;transition:width .35s}
+#gkLens .gl-next{border:1px solid #f5b94a;background:#1d1a0e;border-radius:12px;padding:12px 14px;margin:0 0 16px}
+#gkLens .gl-next small{display:block;color:#e4cf96;font-size:12.5px;margin-bottom:4px}
+#gkLens .gl-next b{display:block;font:700 15px Sora,Inter,sans-serif;margin-bottom:8px}
+#gkLens .gl-route{list-style:none;margin:0 0 6px;padding:0;display:flex;flex-direction:column;gap:4px}
+#gkLens .gl-route button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:9px;padding:7px 8px;color:#cdd3ea;font:500 13.5px Inter,system-ui,sans-serif;cursor:pointer}
+#gkLens .gl-route button:hover{background:#161c35;border-color:#2c3458}
+#gkLens .gl-route i{flex:none;width:18px;height:18px;border-radius:50%;border:2px solid #4a5380;display:flex;align-items:center;justify-content:center;font-size:11px;font-style:normal;color:#0a0e1a}
+#gkLens .gl-route .dn i{background:#4ade80;border-color:#4ade80}
+#gkLens .gl-route .dn span{color:#8a92b2;text-decoration:line-through}
+#gkLens .gl-route .nx i{border-color:#f5b94a}
+#gkLens .gl-sec{margin:0 0 14px}
+#gkLens .gl-sec b{display:block;font:600 13px Inter,system-ui,sans-serif;color:#4fd1c5;margin-bottom:3px}
+#gkLens .gl-sec p{margin:0;color:#cdd3ea;line-height:1.55;font-size:14.5px}
+#gkLens .gl-sec.chk b{color:#f5b94a}
+#gkLens .gl-sec.why b{color:#8b7cf6}
 @media (max-width:860px){
   #gkLens .gl-body.split{flex-direction:column}
   #gkLens .gl-side{width:auto;max-width:none;border-left:0;border-top:1px solid #1d2442;max-height:44vh}
@@ -352,9 +371,78 @@ function renderClaridad() {
   wireActs();
 }
 
+/* ---------- lente 3: camino (ingeniería inversa: red de prerrequisitos con definiciones) ---------- */
+function caminoLayout(d) {
+  const maxL = Math.max(0, ...d.nodes.map((n) => n.layer)), cols = [], GX = 290, GY = 104, y = {};
+  for (let l = 0; l <= maxL; l++) cols[l] = d.nodes.filter((n) => n.layer === l);
+  const place = (col) => col.forEach((n, i) => { y[n.id] = (i - (col.length - 1) / 2) * GY; });
+  place(cols[0]);
+  for (let l = 1; l <= maxL; l++) {
+    const bary = (n) => { const ps = d.links.filter((k) => k.to === n.id && y[k.from] !== undefined).map((k) => y[k.from]); return ps.length ? ps.reduce((a, b) => a + b, 0) / ps.length : 0; };
+    cols[l].sort((a, b) => bary(a) - bary(b)); place(cols[l]);
+  }
+  return { maxL, pos: (n) => ({ x: n.layer * GX, y: y[n.id] || 0 }) };
+}
+const mix = (a, b, t) => { const h = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)); const A = h(a), B = h(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); };
+function renderCamino() {
+  const d = S.data, byId = {}; d.nodes.forEach((n) => { byId[n.id] = n; });
+  const lay = caminoLayout(d), inl = (id) => d.links.filter((k) => k.to === id).map((k) => k.from);
+  const steps = d.nodes.filter((n) => n.id !== 'meta').sort((a, b) => a.layer - b.layer);
+  const isDone = (id) => !!S.done[id];
+  const nextNode = () => steps.find((n) => !isDone(n.id) && inl(n.id).every(isDone)) || null;
+  const nodeStyle = (n, nx) => {
+    const meta = n.id === 'meta', t = lay.maxL ? n.layer / lay.maxL : 0, col = meta ? '#f5b94a' : mix('#4fd1c5', '#8b7cf6', t), dn = isDone(n.id);
+    return { id: n.id, label: (dn ? '✓ ' : meta ? '★ ' : '') + wrapLabel(n.title, 20), shape: 'box', margin: meta ? 14 : 10, shapeProperties: { borderRadius: 11 }, borderWidth: nx ? 4 : 2,
+      color: meta ? { background: '#f5b94a', border: '#ffd27a' } : dn ? { background: '#12302c', border: '#4ade80' } : { background: '#161c35', border: nx ? '#f5b94a' : col, highlight: { background: '#1d2442', border: col } },
+      font: { color: meta ? '#0a0e1a' : '#eef1fb', size: meta ? 16 : 13, face: 'Inter, sans-serif' }, shadow: nx ? { enabled: true, color: 'rgba(245,185,74,.55)', size: 18, x: 0, y: 0 } : { enabled: false }, fixed: true, ...lay.pos(n) };
+  };
+  const nx0 = nextNode();
+  setBody('<div class="gl-map"><div id="glNet"></div></div><aside class="gl-side" id="glSide" aria-live="polite"></aside>', 'split');
+  const side = $('#glSide', root);
+  const dsN = new (typeof vis !== 'undefined' ? vis.DataSet : Array)(d.nodes.map((n) => nodeStyle(n, nx0 && nx0.id === n.id)));
+  const dsE = new (typeof vis !== 'undefined' ? vis.DataSet : Array)(d.links.map((k, i) => ({ id: 'e' + i, from: k.from, to: k.to, arrows: { to: { enabled: true, scaleFactor: 0.7 } }, color: { color: '#4a5380', highlight: '#4fd1c5' }, width: 2, smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.5 } })));
+  let net = null;
+  const restyle = () => { const nx = nextNode(); try { dsN.update(d.nodes.map((n) => nodeStyle(n, nx && nx.id === n.id))); } catch (_e) { /* nada */ } };
+  const select = (id) => { try { net.selectNodes([id]); net.focus(id, { scale: 0.95, animation: { duration: 400 } }); } catch (_e) { /* nada */ } showNode(id); };
+  const prog = () => { const n = steps.filter((x) => isDone(x.id)).length, tot = steps.length; return '<div class="gl-prog2"><span>' + esc(L(n + ' de ' + tot + ' ya los dominas', n + ' of ' + tot + ' already mastered')) + '</span><i><b style="width:' + (tot ? n / tot * 100 : 0) + '%"></b></i></div>'; };
+  function showDefault() {
+    const nx = nextNode();
+    side.innerHTML = '<p class="gl-hint" style="margin-bottom:4px">' + esc(L('Quien domina «' + S.tg.name + '» sabe:', 'Someone who masters “' + S.tg.name + '” can:')) + '</p><p class="gl-ess">' + esc(d.essence) + '</p>' +
+      (d.caution ? '<div class="gl-caut">' + esc(d.caution) + '</div>' : '') + prog() +
+      (nx ? '<div class="gl-next"><small>' + esc(L('Tu siguiente paso', 'Your next step')) + '</small><b>' + esc(nx.title) + '</b><button type="button" class="gl-ghost" data-go="' + esc(nx.id) + '">' + esc(L('Ver qué es y cómo saber que lo tienes', 'See what it is and how to know you have it')) + '</button></div>'
+        : '<div class="gl-next"><small>' + esc(L('¡Ya tienes todo el camino!', 'You have the whole path!')) + '</small><b>' + esc(S.tg.name) + '</b><button type="button" class="gl-ghost" data-go="meta">' + esc(L('Ponerme a prueba en la meta', 'Test myself on the goal')) + '</button></div>') +
+      '<p class="gl-h">' + esc(L('El camino, en orden', 'The path, in order')) + '</p><ul class="gl-route">' + steps.map((n) => '<li><button type="button" data-go="' + esc(n.id) + '" class="' + (isDone(n.id) ? 'dn' : (nx && nx.id === n.id ? 'nx' : '')) + '"><i>' + (isDone(n.id) ? '✓' : '') + '</i><span>' + esc(n.title) + '</span></button></li>').join('') + '</ul>';
+    side.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => select(b.dataset.go)));
+  }
+  function showNode(id) {
+    const n = byId[id]; if (!n) { showDefault(); return; }
+    const meta = id === 'meta', ps = inl(id).map((x) => byId[x]).filter(Boolean);
+    side.innerHTML = '<button type="button" class="gl-ghost" id="glAll" style="margin-bottom:12px">‹ ' + esc(L('Ver todo el camino', 'See the whole path')) + '</button>' +
+      '<span class="gl-chip" style="background:' + (meta ? '#f5b94a' : mix('#4fd1c5', '#8b7cf6', lay.maxL ? n.layer / lay.maxL : 0)) + '">' + esc(meta ? L('La meta', 'The goal') : n.layer === 0 ? L('Fundamento', 'Foundation') : L('Nivel ' + (n.layer + 1), 'Level ' + (n.layer + 1))) + '</span>' +
+      '<p class="gl-h" style="font-size:17px">' + esc(n.title) + '</p>' +
+      '<div class="gl-sec"><b>' + esc(L('Qué es', 'What it is')) + '</b><p>' + esc(n.definition) + '</p></div>' +
+      (n.why ? '<div class="gl-sec why"><b>' + esc(L('Por qué va antes', 'Why it comes first')) + '</b><p>' + esc(n.why) + '</p></div>' : '') +
+      (n.check ? '<div class="gl-sec chk"><b>' + esc(L('Cómo sabes que ya lo tienes', 'How you know you have it')) + '</b><p>' + esc(n.check) + '</p></div>' : '') +
+      (ps.length ? '<div class="gl-sec"><b>' + esc(L('Antes necesitas', 'You first need')) + '</b><p>' + ps.map((x) => '<button type="button" class="gl-ghost" style="margin:2px 4px 2px 0" data-go="' + esc(x.id) + '">' + esc(x.title) + '</button>').join('') + '</p></div>' : '') +
+      '<div class="gl-acts">' + (meta ? '' : '<button type="button" class="' + (isDone(id) ? 'gl-ghost' : 'gl-prim') + '" id="glKnow">' + esc(isDone(id) ? L('✓ Ya lo domino (quitar)', '✓ Mastered (undo)') : L('Ya lo domino', 'I have mastered this')) + '</button>') +
+      '<button type="button" class="' + (meta ? 'gl-prim' : 'gl-ghost') + '" id="glPractice">' + esc(meta ? L('Practicar el tema', 'Practise the topic') : L('Practicar esto', 'Practise this')) + '</button></div>';
+    $('#glAll', side).addEventListener('click', () => { try { net.unselectAll(); } catch (_e) { /* nada */ } showDefault(); });
+    side.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => select(b.dataset.go)));
+    const kn = $('#glKnow', side); if (kn) kn.addEventListener('click', () => { S.done[id] = !S.done[id]; saveDone(); trk('lens_path_known', { on: !!S.done[id] }); restyle(); showNode(id); });
+    $('#glPractice', side).addEventListener('click', () => { trk('lens_practice_click', { lens: 'camino' }); window.open('/escribir/?from=gk&practicar=' + encodeURIComponent((meta ? S.tg.name : n.title + ' — ' + S.tg.name).slice(0, 160)) + '&nivel=' + nivelNum(), '_blank', 'noopener'); });
+    trk('lens_path_node', { layer: n.layer });
+  }
+  showDefault();
+  if (typeof vis === 'undefined' || !vis.Network) { $('#glNet', root).innerHTML = '<div class="gl-state">' + esc(L('No se pudo cargar el mapa. Revisa tu conexión.', 'The map could not load. Check your connection.')) + '</div>'; return; }
+  net = new vis.Network($('#glNet', root), { nodes: dsN, edges: dsE }, { physics: false, interaction: { hover: true, zoomView: true, dragView: true, selectConnectedEdges: false }, nodes: { borderWidth: 2 }, edges: { arrows: { to: true } } });
+  S.network = net;
+  requestAnimationFrame(() => { try { net.fit({ animation: false }); } catch (_e) { /* nada */ } });
+  net.on('click', (p) => { const id = p.nodes && p.nodes[0]; if (id && byId[id]) showNode(id); else showDefault(); });
+}
+
 function render() {
   if (!S || !S.data) return;
-  if (S.lens === 'genio') renderGenio(); else renderClaridad();
+  if (S.lens === 'genio') renderGenio(); else if (S.lens === 'camino') renderCamino(); else renderClaridad();
   const b = $('#glBack', root); if (b) b.focus({ preventScroll: true });
 }
 
@@ -439,6 +527,14 @@ function installHeader() {
   window.addEventListener('resize', closeMenu);
 }
 function installNodeMenu() {
+  const c = document.getElementById('btnMenuLensPath');
+  if (c) {
+    c.textContent = L('🧭 ¿Qué necesito saber antes?', '🧭 What do I need to know first?');
+    c.addEventListener('click', () => {
+      try { const m = document.getElementById('actionMenu'); if (m) { m.style.visibility = 'hidden'; m.classList.add('hidden'); } } catch (_e) { /* nada */ }
+      openLens('camino', { from: 'node_menu' });
+    });
+  }
   const b = document.getElementById('btnMenuLensClarity'); if (!b) return;
   b.textContent = L('💡 Explícamelo paso a paso', '💡 Explain it step by step');
   b.addEventListener('click', () => {
