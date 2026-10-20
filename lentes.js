@@ -79,6 +79,33 @@ const CSS = `
 #gkLensBtn small{font:600 10.5px Inter,system-ui,sans-serif;opacity:.72;margin-left:7px}
 #gkLensBtn:hover,#gkLensBtn[aria-expanded="true"]{transform:translateY(-1px);box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,0 6px 24px rgba(79,209,197,.55)}
 #gkLensBtn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#gkCards{position:fixed;inset:0;z-index:139;background:radial-gradient(1200px 600px at 50% -10%,#141b3a 0%,#0a0e1a 60%);color:#eef1fb;font-family:Inter,system-ui,sans-serif;overflow-y:auto;padding:28px 20px 40px}
+#gkCards[hidden]{display:none}
+#gkCards .gc-w{max-width:980px;margin:0 auto}
+#gkCards .gc-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+#gkCards .gc-x{background:none;border:1px solid #2c3458;color:#aab2d0;border-radius:999px;padding:6px 13px;font:600 12.5px Inter,system-ui,sans-serif;cursor:pointer}
+#gkCards .gc-x:hover{color:#eef1fb;border-color:#4fd1c5}
+#gkCards h2{font:700 clamp(22px,3.4vw,32px)/1.2 Sora,Inter,sans-serif;margin:14px 0 4px}
+#gkCards .gc-sub{color:#8a92b2;font-size:14px;margin:0 0 20px}
+#gkCards .gc-lv{display:inline-flex;gap:3px;background:#0a0e1a;border:1px solid #2c3458;border-radius:10px;padding:3px;margin-left:auto}
+#gkCards .gc-lv button{border:0;background:none;color:#8a92b2;border-radius:8px;padding:5px 10px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
+#gkCards .gc-lv button.on{background:#1d2442;color:#4fd1c5}
+#gkCards .gc-h{font:600 12.5px Inter,system-ui,sans-serif;color:#8a92b2;margin:22px 0 10px}
+#gkCards .gc-h b{color:#eef1fb;font-weight:700}
+#gkCards .gc-g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+#gkCards .gc-c{display:flex;flex-direction:column;gap:6px;text-align:left;background:#11162b;border:1px solid #2c3458;border-radius:16px;padding:16px 16px 14px;color:inherit;cursor:pointer;font-family:inherit;transition:transform .15s,border-color .15s,box-shadow .2s}
+#gkCards .gc-c:hover,#gkCards .gc-c:focus-visible{transform:translateY(-2px);border-color:#4fd1c5;box-shadow:0 10px 30px rgba(79,209,197,.16);outline:none}
+#gkCards .gc-i{font-size:26px;line-height:1}
+#gkCards .gc-n{font:700 16px Sora,Inter,sans-serif}
+#gkCards .gc-d{font-size:13px;line-height:1.45;color:#aab2d0;flex:1}
+#gkCards .gc-m{font-size:11.5px;color:#8a92b2}
+#gkCards .gc-m i{font-style:normal;color:#4ade80}
+#gkCards .gc-len .gc-c{background:linear-gradient(#11162b,#11162b) padding-box,linear-gradient(130deg,#4fd1c5,#8b7cf6) border-box;border:1.5px solid transparent;padding:20px 18px 16px}
+#gkCards .gc-len .gc-n{font-size:17px}
+#gkCards .gc-len .gc-c:hover{box-shadow:0 10px 34px rgba(139,124,246,.28)}
+#gkCards .gc-rec{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;color:#071018;background:linear-gradient(120deg,#4fd1c5,#a78bfa);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+#gkCardsBtn{background:#0f1428;border:1px solid #2c3458;border-radius:999px;padding:6px 11px;font:600 12px Inter,system-ui,sans-serif;color:#c7d2e8;cursor:pointer;white-space:nowrap;margin-left:6px}
+#gkCardsBtn:hover{border-color:#4fd1c5;color:#4fd1c5}
 #gkLensTip{position:fixed;z-index:136;width:min(300px,calc(100vw - 20px));background:#11162b;border:1px solid #4fd1c5;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.6);padding:14px 15px 12px;font:400 13px/1.5 Inter,system-ui,sans-serif;color:#c7d2e8}
 #gkLensTip::before{content:"";position:absolute;top:-7px;left:var(--ax,40px);width:12px;height:12px;background:#11162b;border-left:1px solid #4fd1c5;border-top:1px solid #4fd1c5;transform:rotate(45deg)}
 #gkLensTip b{display:block;font:700 14px Sora,Inter,sans-serif;color:#eef1fb;margin-bottom:4px}
@@ -216,12 +243,13 @@ function onKey(e) { if (e.key === 'Escape' && root && !root.hidden) { e.stopProp
 
 function barHtml(extra) {
   const l = LENSES[S.lens];
-  return '<div class="gl-bar"><button type="button" class="gl-back" id="glBack">‹ ' + esc(L('Volver al mapa', 'Back to the map')) + '</button>' +
+  return '<div class="gl-bar"><button type="button" class="gl-back" id="glBack">‹ ' + esc(S.tg.topicOnly ? L('Tarjetas', 'Cards') : L('Volver al mapa', 'Back to the map')) + '</button>' +
     '<span class="gl-ttl">' + l.icon + ' ' + esc(l.name()) + '</span><span class="gl-sub">' + esc(S.tg.name) + '</span><span class="gl-sp"></span><select class="gl-ghost" id="glLevel" aria-label="' + esc(L('Nivel de la explicación', 'Explanation level')) + '" title="' + esc(L('Cambiar el nivel arma otra versión (cuesta ' + COST + ' nodos si aún no la tienes guardada)', 'Changing the level builds another version (' + COST + ' nodes if you do not have it saved)')) + '">' + LEVELS.map((v) => '<option value="' + v + '"' + (v === S.level ? ' selected' : '') + '>' + esc(LVNAME[v]()) + '</option>').join('') + '</select>' + (extra || '') + '</div>';
 }
 function setBody(html, cls) {
   root.innerHTML = barHtml(S.data ? '<button type="button" class="gl-ghost" id="glRegen">' + esc(L('Generar de nuevo', 'Regenerate')) + ' · ' + COST + '</button>' : '') + '<div class="gl-body ' + (cls || '') + '" id="glBody">' + html + '</div>';
-  $('#glBack', root).addEventListener('click', close);
+  $('#glBack', root).addEventListener('click', () => { const tg = S.tg; close(); if (tg.topicOnly) openCards(tg.name, { fromMap: false }); });
+  if (cardsOn()) { const gb = document.createElement('button'); gb.type = 'button'; gb.className = 'gl-ghost'; gb.id = 'glCards'; gb.textContent = '🃏 ' + L('Otras tarjetas', 'Other cards'); const sp = $('.gl-sp', root); if (sp) sp.insertAdjacentElement('beforebegin', gb); gb.addEventListener('click', () => { const tg = S.tg; close(); openCards(tg.name, { fromMap: !tg.topicOnly }); }); }
   $('#glLevel', root).addEventListener('change', (e) => { const v = e.target.value, tg = S.tg, lens = S.lens; setLevel(v); close(); openLens(lens, { target: tg, level: v, from: 'level_switch' }); });
   const rg = $('#glRegen', root); if (rg) rg.addEventListener('click', regenerate);
 }
@@ -515,6 +543,68 @@ function openLens(lens, opts) {
   if (c) render(); else generate();
 }
 
+
+/* ---------- tarjetas del tema: elegir cómo explorarlo antes de armar nada ---------- */
+function cardsOn() { try { if (/[?&]tarjetas=0/.test(location.search)) return false; return localStorage.getItem('gk_cards') !== '0'; } catch (_e) { return true; } }
+let cardsEl = null, cardsSt = null;
+function onCardsKey(e) { if (e.key === 'Escape' && cardsEl && !cardsEl.hidden) { e.stopPropagation(); closeCards(true); } }
+function closeCards(restore) {
+  const st = cardsSt; cardsSt = null;
+  if (cardsEl) { cardsEl.hidden = true; cardsEl.innerHTML = ''; }
+  document.removeEventListener('keydown', onCardsKey, true);
+  if (restore && st && !st.fromMap) { const i = document.getElementById('startTopic'); if (i && !i.value) i.value = st.topic; }   // si no elige nada, el tema vuelve al campo
+}
+async function runMap(topic) {
+  try { if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen(); } catch (_e) { /* nada */ }
+  await generateFullSchemaFromTopic(topic, {});
+  try { return nodes.length > 0; } catch (_e) { return false; }
+}
+function cardsHtml() {
+  const st = cardsSt, lvBtns = LEVELS.map((v) => '<button type="button" data-lv="' + v + '" class="' + (v === level ? 'on' : '') + '">' + esc(LVNAME[v]()) + '</button>').join('');
+  const lensCard = (k) => { const x = LENSES[k], cached = !!cacheAll()[cacheKey(k, st.topic, level)];
+    return '<button type="button" class="gc-c" data-k="' + k + '"><span class="gc-i">' + x.icon + '</span><span class="gc-n">' + esc(x.name()) + '</span><span class="gc-d">' + esc(x.desc()) + '</span><span class="gc-m">' + (cached ? '<i>✓ ' + esc(L('guardada, se abre al instante', 'saved, opens instantly')) + '</i>' : esc(COST + ' ' + L('nodos · sin armar el mapa', 'nodes · no map needed'))) + '</span></button>'; };
+  const m = st.fromMap;
+  return '<div class="gc-w"><div class="gc-top"><button type="button" class="gc-x" id="gcClose">' + esc(m ? L('‹ Volver al mapa', '‹ Back to the map') : L('‹ Cambiar el tema', '‹ Change the topic')) + '</button><div class="gc-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + lvBtns + '</div></div>' +
+    '<h2>' + esc(st.topic) + '</h2><p class="gc-sub">' + esc(L('¿Cómo quieres explorarlo? Puedes cambiar de tarjeta cuando quieras.', 'How do you want to explore it? You can switch cards any time.')) + '</p>' +
+    '<p class="gc-h"><b>' + esc(L('Ver la estructura', 'See the structure')) + '</b></p><div class="gc-g">' +
+    '<button type="button" class="gc-c" data-k="mapa"><span class="gc-i">🗺️</span><span class="gc-n">' + esc(L('Mapa mental', 'Mind map')) + '</span><span class="gc-d">' + esc(L('El esquema del tema con sus ramas y subtemas. El rizoma queda plegado abajo.', 'The topic as branches and sub-topics. The rhizome stays folded below.')) + '</span><span class="gc-m">' + esc(m ? L('Seguir en el mapa', 'Stay on the map') : '1 ' + L('nodo', 'node')) + '</span></button>' +
+    '<button type="button" class="gc-c" data-k="rizoma"><span class="gc-i">🕸️</span><span class="gc-n">' + esc(L('Rizoma', 'Rhizome')) + '</span><span class="gc-d">' + esc(L('Cómo se conectan las ideas por su significado, no solo por jerarquía. El mapa mental queda en el resto de la pantalla.', 'How ideas connect by meaning, not just hierarchy. The mind map stays on the rest of the screen.')) + '</span><span class="gc-m">' + esc(m ? L('Abrir el rizoma', 'Open the rhizome') : '1 ' + L('nodo (arma el mapa primero)', 'node (builds the map first)')) + '</span></button></div>' +
+    '<p class="gc-h"><b>' + esc(L('Entender a fondo', 'Understand in depth')) + '</b> · ' + esc(L('lentes', 'lenses')) + '<span class="gc-rec">' + esc(L('recomendado', 'recommended')) + '</span></p><div class="gc-g gc-len">' + Object.keys(LENSES).map(lensCard).join('') + '</div></div>';
+}
+function openCards(topic, opts) {
+  topic = String(topic || '').trim().slice(0, 200); if (topic.length < 2) return;
+  if (!cardsEl) { injectCss(); cardsEl = document.createElement('div'); cardsEl.id = 'gkCards'; cardsEl.hidden = true; cardsEl.setAttribute('role', 'dialog'); cardsEl.setAttribute('aria-modal', 'true'); document.body.appendChild(cardsEl); }
+  const fromMap = !!(opts && opts.fromMap), tgm = fromMap ? target() : null;
+  cardsSt = { topic, fromMap, tg: tgm };
+  cardsEl.hidden = false; document.addEventListener('keydown', onCardsKey, true);
+  trk('cards_open', { fromMap });
+  const draw = () => {
+    cardsEl.innerHTML = cardsHtml();
+    cardsEl.querySelector('#gcClose').addEventListener('click', () => closeCards(true));
+    cardsEl.querySelectorAll('[data-lv]').forEach((b) => b.addEventListener('click', () => { setLevel(b.dataset.lv); draw(); const f = cardsEl.querySelector('.gc-lv .on'); if (f) f.focus({ preventScroll: true }); }));
+    cardsEl.querySelectorAll('[data-k]').forEach((b) => b.addEventListener('click', () => pickCard(b.dataset.k)));
+    const f = cardsEl.querySelector('.gc-len [data-k]'); if (f) f.focus({ preventScroll: true });
+  };
+  draw();
+}
+async function pickCard(k) {
+  const st = cardsSt; if (!st) return;
+  trk('cards_pick', { card: k, fromMap: st.fromMap });
+  if (LENSES[k]) {
+    const tg = st.fromMap && st.tg ? st.tg : { id: null, name: st.topic, sel: false, ctx: '', map: '', topicOnly: true };
+    closeCards(false);
+    openLens(k, { target: tg, level, from: 'cards' });
+    return;
+  }
+  closeCards(false);
+  if (k === 'mapa') { if (!st.fromMap) await runMap(st.topic); return; }
+  if (k === 'rizoma') {
+    if (!st.fromMap && !(await runMap(st.topic))) return;
+    setTimeout(() => { try { if (window.__gkRhizomeOpen) window.__gkRhizomeOpen(); } catch (_e) { /* nada */ } }, 250);
+  }
+}
+window.GK_CARDS = { enabled: cardsOn, open: (t, o) => openCards(t, o) };
+
 /* ---------- menú «Lentes» de la cabecera ---------- */
 let menu = null, btn = null;
 function closeMenu() { if (menu) menu.hidden = true; if (btn) btn.setAttribute('aria-expanded', 'false'); }
@@ -543,6 +633,7 @@ function installHeader() {
   wrap.innerHTML = '<button type="button" id="gkLensBtn" aria-haspopup="true" aria-expanded="false" title="' + esc(L('Estudia el tema a fondo: ruta de prerrequisitos, mapa del genio, paso a paso', 'Study the topic in depth: prerequisite path, genius map, step by step')) + '">🔭 ' + esc(L('Lentes', 'Lenses')) + '<small>' + esc(L('estudio a fondo', 'deep study')) + '</small></button>';
   const host = vm.closest('div'); (host && host.parentNode ? host : vm).insertAdjacentElement('afterend', wrap);
   btn = $('#gkLensBtn', wrap);
+  if (cardsOn()) { const cb = document.createElement('button'); cb.type = 'button'; cb.id = 'gkCardsBtn'; cb.textContent = '🃏 ' + L('Tarjetas', 'Cards'); cb.title = L('Elegir cómo explorar este tema: mapa, rizoma o lentes', 'Choose how to explore this topic: map, rhizome or lenses'); cb.addEventListener('click', () => { const tg = target(); if (!tg) { try { appAlert(L('Escribe un tema arriba para ver las tarjetas.', 'Type a topic above to see the cards.')); } catch (_e) { /* nada */ } return; } openCards(tg.name, { fromMap: true }); }); wrap.appendChild(cb); }
   menu = document.createElement('div'); menu.id = 'gkLensMenu'; menu.hidden = true; menu.setAttribute('role', 'menu'); document.body.appendChild(menu);
   btn.addEventListener('click', (e) => { e.stopPropagation(); if (menu.hidden) openMenu(); else closeMenu(); });
   document.addEventListener('click', (e) => { if (!menu || menu.hidden) return; const path = e.composedPath ? e.composedPath() : []; if (path.includes(menu) || path.includes(btn)) return; closeMenu(); });   // composedPath: al cambiar el nivel el menú se redibuja y el botón pulsado ya no está dentro

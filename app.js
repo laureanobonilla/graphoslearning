@@ -9766,6 +9766,7 @@ const vizUI = (() => {
     }
     // ---------- que el rizoma proponga qué hacer: frase guía, ruta de estudio y práctica en Escribir ----------
     let rCtx = null, rGuideOff = '', rRoute = null;
+    window.__gkRhizomeOpen = () => { if (!rhzOn()) return false; rOpen = true; try { localStorage.setItem('gk_rhz_open', '1'); } catch (_e) { /* ok */ } lastGeo = ''; layout(); rSig = ''; renderRhizome(); return true; };   // lo usan las tarjetas del tema
     const lb = (id) => { const n = rCtx && rCtx.byId.get(String(id)); return n ? n.label : ''; };
     // conceptos puente concretos (sin la raíz ni los nombres de las ramas), para frases y preguntas
     const concretos = (A) => { const m = rCtx.m, c = A.bridges.filter(id => !(m.parent && m.parent.get(id) === m.rootId)); return c.length ? c : A.bridges; };
@@ -10140,8 +10141,10 @@ wireGenGate(document.getElementById('readerPanel'));
     const go = async () => {
         const topic = (inp.value || '').trim();
         if (topic.length < 2) { inp.focus(); return; }
-        if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
         track('start_topic_submit', { length: topic.length });
+        // Tarjetas del tema: primero se elige cómo explorarlo (mapa, rizoma o lentes). Se apagan con ?tarjetas=0 o localStorage gk_cards=0.
+        if (window.GK_CARDS && window.GK_CARDS.enabled() && topic.split(/\s+/).length < 25) { inp.value = ''; if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen(); window.GK_CARDS.open(topic, { fromMap: false }); return; }
+        if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
         inp.value = '';
         await generateFullSchemaFromTopic(topic, {});
     };
