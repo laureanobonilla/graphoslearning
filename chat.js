@@ -112,7 +112,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     tabs.innerHTML =
       '<button type="button" class="all" role="tab" data-tab="todas" aria-selected="false" title="' + esc(L('Ver todas las tarjetas', 'See all cards')) + '">⊞</button>' +
       '<span class="sep"></span>' + t('mapa', '🗺️', L('Mapa mental', 'Mind map')) + t('rizoma', '🕸️', L('Rizoma', 'Rhizome')) + '<span class="sep"></span>' +
-      '<span class="len">' + t('genio', '🧠', L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('camino', '🧭', L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('claridad', '💡', L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + '</span>';
+      '<span class="len">' + t('camino', '🧭', L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', '🧠', L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', '💡', L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + '</span>';
     anchor.parentNode.insertBefore(tabs, anchor);
     tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; trk('chat_tab', { tab: b.dataset.tab }); window.GK_NAV.go(b.dataset.tab); });
     return true;

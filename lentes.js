@@ -13,8 +13,8 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':
 const trk = (e, m) => { try { if (typeof track === 'function') track(e, m || {}); } catch (_e) { /* nunca debe notarse */ } };
 
 const LENSES = {
-  genio: { icon: '🧠', name: () => L('Entender como un genio', 'Understand it like a genius'), desc: () => L('Analogías, aplicaciones, contraejemplos, perspectivas y preguntas de experto', 'Analogies, applications, counterexamples, perspectives and expert questions') },
   camino: { icon: '🧭', name: () => L('Cómo llegar ahí', 'How to get there'), desc: () => L('Ingeniería inversa: qué dominar antes, en qué orden y por qué, con definiciones', 'Reverse engineering: what to master first, in what order and why, with definitions') },
+  genio: { icon: '🧠', name: () => L('Entender como un genio', 'Understand it like a genius'), desc: () => L('Analogías, aplicaciones, contraejemplos, perspectivas y preguntas de experto', 'Analogies, applications, counterexamples, perspectives and expert questions') },
   claridad: { icon: '💡', name: () => L('De la confusión a la claridad', 'From confusion to clarity'), desc: () => L('Paso a paso, con metáforas, imágenes, ejemplos y un atajo mental', 'Step by step, with metaphors, images, examples and a mental shortcut') }
 };
 const CATS = [
@@ -168,6 +168,12 @@ const CSS = `
 #gkCards .gc-len .gc-n{font-size:17px}
 #gkCards .gc-len .gc-c:hover{box-shadow:0 10px 34px rgba(139,124,246,.28)}
 #gkCards .gc-rec{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;color:#071018;background:linear-gradient(120deg,#4fd1c5,#a78bfa);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+#gkCards .gc-len{grid-template-columns:1.5fr 1fr 1fr}
+#gkCards .gc-len .gc-main{background:linear-gradient(#141a36,#141a36) padding-box,linear-gradient(130deg,#4fd1c5,#8b7cf6) border-box;border-width:2px;box-shadow:0 8px 30px rgba(79,209,197,.14)}
+#gkCards .gc-len .gc-main .gc-n{font-size:19px}
+#gkCards .gc-len .gc-main .gc-i{font-size:32px}
+#gkCards .gc-len .gc-main .gc-d{font-size:13.5px;color:#c7d2e8}
+@media (max-width:820px){#gkCards .gc-len{grid-template-columns:1fr}}
 #gkCardsBtn{background:#0f1428;border:1px solid #2c3458;border-radius:999px;padding:6px 11px;font:600 12px Inter,system-ui,sans-serif;color:#c7d2e8;cursor:pointer;white-space:nowrap;margin-left:6px}
 #gkCardsBtn:hover{border-color:#4fd1c5;color:#4fd1c5}
 #gkResume{position:fixed;left:16px;bottom:16px;z-index:60;display:flex;align-items:center;gap:12px;max-width:min(420px,calc(100vw - 32px));background:#11162b;border:1px solid #2c3458;border-left:3px solid #4fd1c5;border-radius:14px;padding:11px 12px 11px 14px;box-shadow:0 14px 40px rgba(0,0,0,.5);font-family:Inter,system-ui,sans-serif;color:#eef1fb}
@@ -637,7 +643,7 @@ async function runMap(topic) {
 function cardsHtml() {
   const st = cardsSt, lvBtns = LEVELS.map((v) => '<button type="button" data-lv="' + v + '" class="' + (v === level ? 'on' : '') + '">' + esc(LVNAME[v]()) + '</button>').join('');
   const lensCard = (k) => { const x = LENSES[k], cached = !!cacheAll()[cacheKey(k, st.topic, level)];
-    return '<button type="button" class="gc-c" data-k="' + k + '"><span class="gc-i">' + x.icon + '</span><span class="gc-n">' + esc(x.name()) + '</span><span class="gc-d">' + esc(x.desc()) + '</span><span class="gc-m">' + (cached ? '<i>✓ ' + esc(L('guardada, se abre al instante', 'saved, opens instantly')) + '</i>' : esc(COST + ' ' + L('nodos · sin armar el mapa', 'nodes · no map needed'))) + '</span></button>'; };
+    return '<button type="button" class="gc-c' + (k === 'camino' ? ' gc-main' : '') + '" data-k="' + k + '"><span class="gc-i">' + x.icon + '</span><span class="gc-n">' + esc(x.name()) + (k === 'camino' ? '<span class="gc-rec">' + esc(L('empieza por aquí', 'start here')) + '</span>' : '') + '</span><span class="gc-d">' + esc(x.desc()) + '</span><span class="gc-m">' + (cached ? '<i>✓ ' + esc(L('guardada, se abre al instante', 'saved, opens instantly')) + '</i>' : esc(COST + ' ' + L('nodos · sin armar el mapa', 'nodes · no map needed'))) + '</span></button>'; };
   const m = st.fromMap;
   return '<div class="gc-w"><div class="gc-top"><button type="button" class="gc-x" id="gcClose">' + esc(m ? L('‹ Volver al mapa', '‹ Back to the map') : L('‹ Cambiar el tema', '‹ Change the topic')) + '</button><div class="gc-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + lvBtns + '</div></div>' +
     '<h2>' + esc(st.topic) + '</h2><p class="gc-sub">' + esc(L('¿Cómo quieres explorarlo? Puedes cambiar de tarjeta cuando quieras.', 'How do you want to explore it? You can switch cards any time.')) + '</p>' +
