@@ -24,7 +24,7 @@ body.gk-chat #gkLens .gl-body > :not(.gl-side):not(.gl-grip){margin-bottom:calc(
 body.gk-cover #gkComposer{z-index:150;background:none;pointer-events:none}
 body.gk-cover #gkComposer .gc-in{pointer-events:auto}
 body.gk-cover #gkCtl{z-index:151}
-body.gk-cover #vizPanel{z-index:150;right:var(--gk-side-w,0px) !important;--p-bg:#0d1226;--p-bg2:#161c35;--p-head:#0d1226;--p-ink:#eef1fb;--p-ink2:#c7d2e8;--p-mute:#8a92b2;--p-rule:#2c3458;--p-acc:#4fd1c5;--p-acc-bg:rgba(79,209,197,.14);box-shadow:none;scrollbar-color:#2c3458 transparent}
+body.gk-cover #vizPanel{z-index:150;left:0 !important;right:var(--gk-side-w,0px) !important;--p-bg:#0d1226;--p-bg2:#161c35;--p-head:#0d1226;--p-ink:#eef1fb;--p-ink2:#c7d2e8;--p-mute:#8a92b2;--p-rule:#2c3458;--p-acc:#4fd1c5;--p-acc-bg:rgba(79,209,197,.14);box-shadow:none;scrollbar-color:#2c3458 transparent}
 body.gk-cover #vizPanel .vz-btn, body.gk-cover #vizPanel .vz-quote button, body.gk-cover #vizPanel .vz-ghost, body.gk-cover #vizPanel .vz-note, body.gk-cover #vizPanel .vz-note-form textarea, body.gk-cover #vizPanel .vz-rh-ctl select{background:#161c35;color:#eef1fb}
 body.gk-cover #vizPanel .vz-primary{color:#071018}
 body.gk-chat #rhzToggle{display:none !important}
