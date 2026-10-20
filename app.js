@@ -10143,7 +10143,7 @@ wireGenGate(document.getElementById('readerPanel'));
         if (topic.length < 2) { inp.focus(); return; }
         track('start_topic_submit', { length: topic.length });
         // Tarjetas del tema: primero se elige cómo explorarlo (mapa, rizoma o lentes). Se apagan con ?tarjetas=0 o localStorage gk_cards=0.
-        if (window.GK_CARDS && window.GK_CARDS.enabled() && topic.split(/\s+/).length < 25) { inp.value = ''; if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen(); window.GK_CARDS.open(topic, { fromMap: false }); return; }
+        if (window.GK_CARDS && window.GK_CARDS.enabled() && topic.split(/\s+/).length < 25 && !/https?:\/\/|www\./i.test(topic)) { inp.value = ''; if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen(); window.GK_CARDS.open(topic, { fromMap: false }); return; }
         if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen();
         inp.value = '';
         await generateFullSchemaFromTopic(topic, {});
