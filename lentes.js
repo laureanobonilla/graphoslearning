@@ -119,10 +119,10 @@ function mapContext(id, clean) {
     return (kids.length ? 'subtemas: ' + kids.join(', ') + '. ' : '') + (sibs.length ? 'temas vecinos: ' + sibs.join(', ') + '.' : '');
   } catch (_e) { return ''; }
 }
-function target() {
+function target(forceRoot) {
   try {
     if (typeof nodes === 'undefined' || !nodes.length) return null;
-    let id = (typeof selectedNodeId !== 'undefined' && selectedNodeId && nodes.get(selectedNodeId)) ? selectedNodeId : null;
+    let id = (!forceRoot && typeof selectedNodeId !== 'undefined' && selectedNodeId && nodes.get(selectedNodeId)) ? selectedNodeId : null;
     const sel = !!id;
     if (!id) { const r = getCanvasRootIds(); id = r && r[0]; }
     const nd = id && nodes.get(id); if (!nd) return null;
@@ -310,6 +310,7 @@ function close() {
   if (root) { root.hidden = true; root.innerHTML = ''; }
   document.removeEventListener('keydown', onKey, true);
   S = null; busy = false;
+  setActive(typeof hasMap === 'function' && hasMap() ? 'mapa' : '');
 }
 function onKey(e) { if (e.key === 'Escape' && root && !root.hidden) { e.stopPropagation(); close(); } }
 
@@ -611,6 +612,7 @@ function openLens(lens, opts) {
   ensureRoot(); root.hidden = false;
   S = { lens, tg, key, level: lv, data: c ? c.data : null, done: (c && c.done) || {}, network: null };
   document.addEventListener('keydown', onKey, true);
+  setActive(lens);
   trk('lens_open', { lens, cached: !!c, from: (opts && opts.from) || 'menu' });
   if (c) render(); else generate();
 }
@@ -624,6 +626,7 @@ function closeCards(restore) {
   const st = cardsSt; cardsSt = null;
   if (cardsEl) { cardsEl.hidden = true; cardsEl.innerHTML = ''; }
   document.removeEventListener('keydown', onCardsKey, true);
+  if (activeTab === 'todas') setActive(hasMap() ? 'mapa' : '');
   if (restore && st && !st.fromMap) { const i = document.getElementById('startTopic'); if (i && !i.value) i.value = st.topic; }   // si no elige nada, el tema vuelve al campo
 }
 async function runMap(topic) {
@@ -649,6 +652,7 @@ function openCards(topic, opts) {
   const fromMap = !!(opts && opts.fromMap), tgm = fromMap ? target() : null;
   cardsSt = { topic, fromMap, tg: tgm };
   cardsEl.hidden = false; document.addEventListener('keydown', onCardsKey, true);
+  setActive('todas');
   trk('cards_open', { fromMap });
   const draw = () => {
     cardsEl.innerHTML = cardsHtml();
@@ -669,9 +673,11 @@ async function pickCard(k) {
     return;
   }
   closeCards(false);
-  if (k === 'mapa') { if (!st.fromMap) await runMap(st.topic); return; }
+  setTopic(st.topic);
+  if (k === 'mapa') { if (!st.fromMap) await runMap(st.topic); setActive('mapa'); return; }
   if (k === 'rizoma') {
     if (!st.fromMap && !(await runMap(st.topic))) return;
+    setActive('rizoma');
     setTimeout(() => { try { if (window.__gkRhizomeOpen) window.__gkRhizomeOpen(); } catch (_e) { /* nada */ } }, 250);
   }
 }
@@ -695,6 +701,40 @@ function tryPending() {
     openLens(p.lens, { target: { id: null, name: p.name, sel: false, ctx: p.ctx, map: p.map, topicOnly: true }, level: p.level, from: 'pending' });
   } catch (_e) { /* nunca debe notarse */ }
 }
+
+
+/* ---------- navegación por pestañas (modo chat): el tema actual y la vista activa ---------- */
+let curTopic = '', activeTab = '';
+const navHooks = [];
+function hasMap() { try { return nodes.length > 0; } catch (_e) { return false; } }
+function topicNow() {
+  if (S && S.tg && S.tg.name) return S.tg.name;
+  if (cardsSt && cardsSt.topic) return cardsSt.topic;
+  if (hasMap()) { const t = target(true); if (t && t.name) return t.name; }
+  return curTopic;
+}
+function setActive(k) { activeTab = k || ''; navHooks.forEach((f) => { try { f(activeTab); } catch (_e) { /* nada */ } }); }
+function setTopic(t) { curTopic = String(t || '').trim().slice(0, 200); setActive(activeTab); }
+async function goTab(k) {
+  const topic = topicNow();
+  if (!topic) { const c = document.getElementById('gkComposerInput'); if (c) c.focus(); return; }
+  curTopic = topic;
+  if (S) close();
+  if (cardsEl && !cardsEl.hidden) closeCards(false);
+  const mapNow = hasMap(), rt = mapNow ? target(true) : null;
+  if (k === 'todas') { openCards(topic, { fromMap: mapNow }); return; }
+  if (LENSES[k]) {
+    openLens(k, { target: rt || { id: null, name: topic, sel: false, ctx: '', map: '', topicOnly: true }, level, from: 'tab' });
+    return;
+  }
+  if (k === 'mapa') { if (!mapNow) await runMap(topic); setActive('mapa'); return; }
+  if (k === 'rizoma') {
+    if (!mapNow && !(await runMap(topic))) return;
+    setActive('rizoma');
+    setTimeout(() => { try { if (window.__gkRhizomeOpen) window.__gkRhizomeOpen(); } catch (_e) { /* nada */ } }, 250);
+  }
+}
+window.GK_NAV = { go: goTab, topic: topicNow, setTopic, hasMap, active: () => activeTab, onChange: (f) => navHooks.push(f), setActive, cards: (t, o) => openCards(t, o) };
 
 /* ---------- menú «Lentes» de la cabecera ---------- */
 let menu = null, btn = null;

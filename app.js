@@ -6072,7 +6072,8 @@ async function resolveTextOrWebLink(raw, { targetTextEl = null, onTitle = null }
     }
 }
 
-document.getElementById('btnParseReaderText')?.addEventListener('click', async () => {
+// «Generar esquema» del Modo Lector. La barra de abajo (chat.js) también la usa con un texto o enlace pegado.
+async function generateFromReaderText() {
     let textContent = readerTextMode.innerText.trim();
     if (!textContent || textContent.length < 3) return appAlert(tr("js.escribe_un_tema_pega_un"));
 
@@ -6092,7 +6093,8 @@ document.getElementById('btnParseReaderText')?.addEventListener('click', async (
     if (textContent.length > 60000) { await generateSchemaFromLongText(textContent); return; }
     currentDocumentText = textContent;
     await generateFullSchemaFromTopic(textContent, { originPanelId: 'main' });
-});
+}
+document.getElementById('btnParseReaderText')?.addEventListener('click', generateFromReaderText);
 
 // ==========================================
 // MODO MÓVIL — pantalla simplificada para celulares (ver el CSS y el HTML de
@@ -7728,6 +7730,27 @@ document.getElementById('btnClear')?.addEventListener('click', async () => {
 });
 
 
+// Empezar un tema nuevo desde la barra de abajo (modo chat): guarda el mapa actual como proyecto y deja el lienzo limpio.
+// Es el mismo procedimiento de «Limpiar», sin preguntar (la barra ya preguntó).
+async function startFreshCanvas() {
+    if (nodes.length) { try { await saveCurrentProjectToBin(); } catch (_e) { /* si no se pudo guardar, la barra ya avisó */ } }
+    isClearingCanvas = true;
+    clearTimeout(window._binSaveTimer);
+    currentProjectId = null;
+    try { localStorage.removeItem('gk_current_project_id'); } catch (_e) { /* ok */ }
+    nodes.clear();
+    edges.clear();
+    currentDocumentText = readerTextMode ? readerTextMode.innerText.trim() : "";
+    Array.from(openFloatingPanels.keys()).forEach(closeFloatingPanel);
+    actionMenu.classList.add('hidden');
+    if (typeof connectionBanner !== 'undefined' && connectionBanner) connectionBanner.classList.add('hidden');
+    sourceNodeForConnection = null;
+    selectedNodeId = null;
+    schemeStack = [];
+    updateSchemeBreadcrumb();
+    isClearingCanvas = false;
+}
+
 // 2. Limpiar SOLO el panel del Lector (Botón nuevo a la par de Generar Esquema)
 document.getElementById('btnClearReader')?.addEventListener('click', async () => {
     const hasText = !!(readerTextMode && readerTextMode.innerText.trim() !== "");
@@ -9288,11 +9311,15 @@ const vizUI = (() => {
         const rd = document.getElementById('readerPanel');
         const l = (rd && !rd.classList.contains('hidden')) ? Math.round(rd.getBoundingClientRect().width) : (tp && tp.classList.contains('on') ? Math.round(tp.getBoundingClientRect().width) : 0);
         const r = dv && !dv.classList.contains('hidden') ? Math.round(dv.getBoundingClientRect().width) : 0;
-        const ron = rhzOn(), maxR = Math.max(140, window.innerHeight - h - 96);
-        const rh = !ron ? 0 : (rOpen ? Math.max(140, Math.min(RH || Math.round(window.innerHeight * 0.8), maxR)) : 40);
+        const ron = rhzOn();
+        // Espacio realmente libre: desde el borde inferior de la cabecera hasta el panel de notas y la barra de abajo (modo chat).
+        const hb = (document.getElementById('mainHeader') || { getBoundingClientRect: () => ({ bottom: 0 }) }).getBoundingClientRect().bottom;
+        const compH = parseInt(getComputedStyle(document.body).getPropertyValue('--gk-comp-h'), 10) || 0;
+        const avail = window.innerHeight - h - hb - compH - 12, maxR = Math.max(140, avail);
+        const rh = !ron ? 0 : (rOpen ? Math.max(140, Math.min(RH || Math.round(avail * 0.85), maxR)) : 40);
         const geo = h + '|' + l + '|' + r + '|' + rh; if (geo === lastGeo) return; lastGeo = geo;
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
-        if (rPane) { rPane.classList.toggle('on', ron); rPane.classList.toggle('open', ron && rOpen); rPane.style.left = l + 'px'; rPane.style.right = r + 'px'; rPane.style.bottom = h + 'px'; rPane.style.height = rh + 'px'; if (ron) rhzHeader(); if (rPane._sync) rPane._sync(); }   // el encabezado se arma de una vez, aunque el rizoma esté plegado
+        if (rPane) { rPane.classList.toggle('on', ron); rPane.classList.toggle('open', ron && rOpen); rPane.style.left = l + 'px'; rPane.style.right = r + 'px'; rPane.style.bottom = 'calc(' + h + 'px + var(--gk-comp-h, 0px))'; rPane.style.height = rh + 'px'; if (ron) rhzHeader(); if (rPane._sync) rPane._sync(); }   // el encabezado se arma de una vez, aunque el rizoma esté plegado
         const tot = h + rh;
         container.style.height = tot ? 'calc(100% - ' + tot + 'px)' : ''; container.style.alignSelf = tot ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
