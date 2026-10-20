@@ -84,7 +84,7 @@ exports.handler = async (event, context) => {
 
     try {
         // La versión móvil (/m/) guarda sus eventos aparte (app = 'graphikosmos-mobile') para hacer su propio informe.
-        const appName = body.app === 'graphikosmos-mobile' ? 'graphikosmos-mobile' : (body.app === 'escribir' ? 'escribir' : (body.app === 'rinde' ? 'rinde' : (body.app === 'ordena' ? 'ordena' : undefined)));
+        const appName = body.app === 'graphikosmos-mobile' ? 'graphikosmos-mobile' : (body.app === 'escribir' ? 'escribir' : (body.app === 'rinde' ? 'rinde' : (body.app === 'ordena' ? 'ordena' : (body.app === 'pulpe' ? 'pulpe' : undefined))));
         await store.logEvent(actorId, actorKind, anonId, eventName, metadata, displayName, appName);
     } catch (err) {
         // No dejamos que un problema de base de datos se note en la app: solo

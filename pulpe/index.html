@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>La Pulpe — el juego de la pulpería tica</title>
+<meta name="description" content="Administre su propia pulpería tica: pida al camión, ponga precios, decida a quién fiarle, aguante aguaceros, apagones y partidos de la Sele. Récords por semana y temporada.">
+<meta name="theme-color" content="#1e272e">
+<meta property="og:title" content="La Pulpe — el juego de la pulpería tica">
+<meta property="og:description" content="¿Usted fiaría? Administre su pulpe y compita por el mejor patrimonio de Costa Rica.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%23f1c40f'/><text x='32' y='44' font-size='34' text-anchor='middle'>🏪</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="pulpe.css?v=1">
+<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+</head>
+<body>
+<div id="app">
+  <header class="hud" id="hud" hidden>
+    <div class="hud-l">
+      <span class="chip dia" id="hDia">Día 1</span>
+      <span class="chip hora" id="hHora">6:00</span>
+      <span class="chip plata" id="hPlata">₡0</span>
+      <span class="chip rep" id="hRep" title="Reputación">⭐ 50</span>
+      <span class="chip limp" id="hLimp" title="Limpieza">🧹 85</span>
+    </div>
+    <div class="hud-r">
+      <div class="vel" id="hVel" role="group" aria-label="Velocidad">
+        <button data-v="0" title="Pausa">⏸</button><button data-v="1" class="on">1×</button><button data-v="2">2×</button><button data-v="4">4×</button>
+      </div>
+      <button class="ic" id="hUrg" title="Pedido urgente (30 % más caro, llega en una hora)">🚚</button>
+      <button class="ic" id="hSon" title="Sonido">🔊</button>
+      <button class="ic" id="hMenu" title="Menú">☰</button>
+    </div>
+  </header>
+  <main class="escena-wrap" id="escenaWrap">
+    <canvas id="escena" aria-label="La pulpería"></canvas>
+    <div class="aviso" id="aviso" hidden></div>
+    <div class="decision" id="decision" hidden></div>
+    <div class="tip" id="tip" hidden>Toque la pantalla (o la barra espaciadora) para atender al cliente marcado</div>
+    <div class="girar">📱↻ Gire el teléfono para jugar más cómodo</div>
+  </main>
+  <section class="panel" id="panel" hidden></section>
+  <section class="portada" id="portada"></section>
+</div>
+<div class="modal" id="modal" hidden><div class="caja" id="modalCaja"></div></div>
+<div class="toast" id="toast" hidden></div>
+<script src="datos.js?v=1"></script>
+<script src="motor.js?v=1"></script>
+<script src="escena.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>
