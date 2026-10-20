@@ -72,8 +72,23 @@ function target() {
 /* ---------- estilos ---------- */
 const CSS = `
 #gkLensBtnWrap{position:relative;display:flex;align-items:center}
-#gkLensBtn{background:#0f1428;border:1px solid #2c3458;border-radius:6px;padding:4px 9px;font:600 12px Inter,system-ui,sans-serif;color:#eef1fb;cursor:pointer;white-space:nowrap}
-#gkLensBtn:hover,#gkLensBtn[aria-expanded="true"]{border-color:#4fd1c5;color:#4fd1c5}
+#gkLensBtn{position:relative;overflow:hidden;background:linear-gradient(120deg,#4fd1c5 0%,#7c8cf8 62%,#a78bfa 100%);border:0;border-radius:999px;padding:7px 15px 7px 13px;font:700 13px Sora,Inter,system-ui,sans-serif;letter-spacing:.01em;color:#071018;cursor:pointer;white-space:nowrap;box-shadow:0 0 0 1px rgba(255,255,255,.18) inset,0 4px 18px rgba(124,140,248,.45);transition:transform .15s,box-shadow .2s}
+#gkLensBtn::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);transform:skewX(-20deg);animation:gkSheen 6s 2s infinite}
+@keyframes gkSheen{0%,70%{left:-60%}100%{left:130%}}
+@media (prefers-reduced-motion:reduce){#gkLensBtn::after{animation:none}}
+#gkLensBtn small{font:600 10.5px Inter,system-ui,sans-serif;opacity:.72;margin-left:7px}
+#gkLensBtn:hover,#gkLensBtn[aria-expanded="true"]{transform:translateY(-1px);box-shadow:0 0 0 1px rgba(255,255,255,.3) inset,0 6px 24px rgba(79,209,197,.55)}
+#gkLensBtn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#gkLensTip{position:fixed;z-index:136;width:min(300px,calc(100vw - 20px));background:#11162b;border:1px solid #4fd1c5;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.6);padding:14px 15px 12px;font:400 13px/1.5 Inter,system-ui,sans-serif;color:#c7d2e8}
+#gkLensTip::before{content:"";position:absolute;top:-7px;left:var(--ax,40px);width:12px;height:12px;background:#11162b;border-left:1px solid #4fd1c5;border-top:1px solid #4fd1c5;transform:rotate(45deg)}
+#gkLensTip b{display:block;font:700 14px Sora,Inter,sans-serif;color:#eef1fb;margin-bottom:4px}
+#gkLensTip .tp-a{display:flex;gap:8px;margin-top:10px}
+#gkLensTip button{border:0;border-radius:9px;padding:7px 12px;font:600 12.5px Inter,system-ui,sans-serif;cursor:pointer}
+#gkLensTip .go{background:#4fd1c5;color:#071018}
+#gkLensTip .no{background:none;color:#8a92b2}
+#gkLensMenu .lm-hero{padding:10px 10px 8px;border-bottom:1px solid #1d2442;margin-bottom:4px}
+#gkLensMenu .lm-hero b{display:block;font:700 14.5px Sora,Inter,sans-serif;background:linear-gradient(100deg,#4fd1c5,#a78bfa);-webkit-background-clip:text;background-clip:text;color:transparent}
+#gkLensMenu .lm-hero span{display:block;font-size:12px;color:#8a92b2;line-height:1.4;margin-top:3px}
 #gkLensMenu{position:fixed;z-index:135;width:min(330px,calc(100vw - 20px));background:#11162b;border:1px solid #2c3458;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.55);padding:6px;font-family:Inter,system-ui,sans-serif;color:#eef1fb}
 #gkLensMenu[hidden]{display:none}
 #gkLensMenu .lm-t{padding:8px 10px 6px;font-size:12px;color:#8a92b2;line-height:1.35}
@@ -496,7 +511,7 @@ function openLens(lens, opts) {
 let menu = null, btn = null;
 function closeMenu() { if (menu) menu.hidden = true; if (btn) btn.setAttribute('aria-expanded', 'false'); }
 function renderMenu(tg) {
-  menu.innerHTML = '<div class="lm-t">' + (tg ? esc(L(tg.sel ? 'Sobre el nodo seleccionado:' : 'Sobre el tema del mapa:', tg.sel ? 'On the selected node:' : 'On the map topic:')) + ' <b>' + esc(tg.name) + '</b>' : esc(L('Crea un esquema para usar las lentes.', 'Create a map to use the lenses.'))) + '</div>' +
+  menu.innerHTML = '<div class="lm-hero"><b>' + esc(L('Aquí Graphikosmos deja de ordenar y empieza a enseñar', 'Here Graphikosmos stops organizing and starts teaching')) + '</b><span>' + esc(L('El mapa muestra la estructura; las lentes explican, ordenan lo que debes dominar y te guían a entenderlo de verdad.', 'The map shows structure; lenses explain, sequence what to master, and guide real understanding.')) + '</span></div><div class="lm-t">' + (tg ? esc(L(tg.sel ? 'Sobre el nodo seleccionado:' : 'Sobre el tema del mapa:', tg.sel ? 'On the selected node:' : 'On the map topic:')) + ' <b>' + esc(tg.name) + '</b>' : esc(L('Crea un esquema para usar las lentes.', 'Create a map to use the lenses.'))) + '</div>' +
     '<div class="lm-n2">' + esc(L('¿Para qué nivel lo explicamos?', 'What level should it be explained at?')) + '</div>' +
     '<div class="lm-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + LEVELS.map((v) => '<button type="button" role="radio" aria-checked="' + (v === level) + '" data-lv="' + v + '" class="' + (v === level ? 'on' : '') + '">' + esc(LVNAME[v]()) + '</button>').join('') + '</div>' +
     Object.keys(LENSES).map((k) => { const l = LENSES[k], cached = tg && cacheAll()[cacheKey(k, tg.name, level)]; return '<button type="button" data-lens="' + k + '"><span class="lm-i">' + l.icon + '</span><span><div class="lm-n">' + esc(l.name()) + '</div><div class="lm-d">' + esc(l.desc()) + '</div></span><span class="lm-c">' + esc(cached ? L('guardada', 'saved') : COST + ' ' + L('nodos', 'nodes')) + '</span></button>'; }).join('');
@@ -504,11 +519,11 @@ function renderMenu(tg) {
   menu.querySelectorAll('[data-lens]').forEach((b) => b.addEventListener('click', () => openLens(b.dataset.lens, { target: tg, from: 'header', level })));
 }
 function openMenu() {
-  const tg = target();
+  const tg = target(); const tip = document.getElementById('gkLensTip'); if (tip) { tip.remove(); try { localStorage.setItem('gk_lens_tip', '1'); } catch (_e) { /* nada */ } }
   menu.hidden = false;
   renderMenu(tg);
   const r = btn.getBoundingClientRect();
-  menu.style.top = Math.round(r.bottom + 6) + 'px';
+  menu.style.top = Math.round(r.bottom + 6) + 'px'; menu.style.maxHeight = Math.max(240, innerHeight - Math.round(r.bottom) - 16) + 'px'; menu.style.overflowY = 'auto';
   menu.style.left = Math.max(10, Math.min(innerWidth - menu.offsetWidth - 10, r.left)) + 'px';
   btn.setAttribute('aria-expanded', 'true');
   const f = menu.querySelector('[data-lens]'); if (f) f.focus({ preventScroll: true });
@@ -517,7 +532,7 @@ function installHeader() {
   const vm = document.getElementById('viewMode'); if (!vm || document.getElementById('gkLensBtn')) return;
   injectCss();
   const wrap = document.createElement('div'); wrap.id = 'gkLensBtnWrap';
-  wrap.innerHTML = '<button type="button" id="gkLensBtn" aria-haspopup="true" aria-expanded="false" title="' + esc(L('Ver el tema con otras lentes: genio, claridad…', 'View the topic through other lenses')) + '">🔭 ' + esc(L('Lentes', 'Lenses')) + ' ▾</button>';
+  wrap.innerHTML = '<button type="button" id="gkLensBtn" aria-haspopup="true" aria-expanded="false" title="' + esc(L('Estudia el tema a fondo: ruta de prerrequisitos, mapa del genio, paso a paso', 'Study the topic in depth: prerequisite path, genius map, step by step')) + '">🔭 ' + esc(L('Lentes', 'Lenses')) + '<small>' + esc(L('estudio a fondo', 'deep study')) + '</small></button>';
   const host = vm.closest('div'); (host && host.parentNode ? host : vm).insertAdjacentElement('afterend', wrap);
   btn = $('#gkLensBtn', wrap);
   menu = document.createElement('div'); menu.id = 'gkLensMenu'; menu.hidden = true; menu.setAttribute('role', 'menu'); document.body.appendChild(menu);
@@ -525,6 +540,19 @@ function installHeader() {
   document.addEventListener('click', (e) => { if (!menu || menu.hidden) return; const path = e.composedPath ? e.composedPath() : []; if (path.includes(menu) || path.includes(btn)) return; closeMenu(); });   // composedPath: al cambiar el nivel el menú se redibuja y el botón pulsado ya no está dentro
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
   window.addEventListener('resize', closeMenu);
+  setTimeout(showTip, 4000);
+}
+function showTip() {
+  try { if (localStorage.getItem('gk_lens_tip')) return; } catch (_e) { /* sigue */ }
+  if (!btn || !target() || !btn.offsetParent) return;
+  const done = () => { try { localStorage.setItem('gk_lens_tip', '1'); } catch (_e) { /* nada */ } t.remove(); };
+  const t = document.createElement('div'); t.id = 'gkLensTip'; t.setAttribute('role', 'dialog');
+  t.innerHTML = '<b>' + esc(L('Usa tu mapa con Lentes', 'Use your map with Lenses')) + '</b>' + esc(L('El mapa ordena las ideas. Las lentes te enseñan el tema: qué dominar antes, en qué orden y cómo saber que ya lo entiendes. Es la forma completa de usar Graphikosmos.', 'The map organizes ideas. Lenses teach the topic: what to master first, in what order, and how to know you got it. It is the full way to use Graphikosmos.')) + '<div class="tp-a"><button type="button" class="go">' + esc(L('Probar ahora', 'Try it now')) + '</button><button type="button" class="no">' + esc(L('Luego', 'Later')) + '</button></div>';
+  document.body.appendChild(t);
+  const r = btn.getBoundingClientRect(), left = Math.max(10, Math.min(innerWidth - t.offsetWidth - 10, r.left));
+  t.style.top = Math.round(r.bottom + 12) + 'px'; t.style.left = left + 'px'; t.style.setProperty('--ax', Math.max(14, Math.round(r.left + r.width / 2 - left - 6)) + 'px');
+  t.querySelector('.go').addEventListener('click', (e) => { e.stopPropagation(); done(); openMenu(); });
+  t.querySelector('.no').addEventListener('click', done);
 }
 function installNodeMenu() {
   const c = document.getElementById('btnMenuLensPath');
