@@ -12,6 +12,7 @@ const FALLBACK_MODELS = [
 
 // opts (solo para las lentes): { attemptMs, budgetMs, lite } — corta los intentos colgados, respeta un presupuesto total de tiempo
 // y, como último recurso, prueba un modelo más ligero. Sin opts el comportamiento es el de siempre.
+let lensThinkOk = true;
 const LITE_MODEL = process.env.GEMINI_LITE_MODEL || 'gemini-3.8-flash-lite';
 async function generateWithFallbackBase(payload, opts) {
     let lastError = null;
@@ -26,10 +27,14 @@ async function generateWithFallbackBase(payload, opts) {
             let p = { ...payload, model: modelName };
             if (opts && opts.attemptMs) {
                 const left = (opts.budgetMs || 24000) - (Date.now() - t0);
-                if (left < 3000) break;   // ya no hay tiempo para otro intento útil
+                if (left < (isLite ? 6000 : 3000)) break;   // ya no hay tiempo para otro intento útil
                 const ac = new AbortController();
                 timer = setTimeout(() => ac.abort(), Math.min(opts.attemptMs, left - 500));
                 p = { ...p, config: { ...(p.config || {}), abortSignal: ac.signal } };
+            }
+            if (opts && opts.thinking && lensThinkOk) {   // razonamiento acotado (cuenta como tiempo); si el modelo lo rechaza (400), se recuerda y se sigue sin él
+                try { return await ai.models.generateContent({ ...p, config: { ...p.config, thinkingConfig: opts.thinking } }); }
+                catch (te) { const tm = (te && te.message) || ''; if (/thinking|budget|level/i.test(tm) && /(400|invalid|not supported|unsupported)/i.test(tm)) { lensThinkOk = false; console.error('[lens] thinkingConfig rechazado:', tm); } else throw te; }
             }
             return await ai.models.generateContent(p);
         } catch (err) {
@@ -86,7 +91,7 @@ async function rawHandler(event, context) {
         const lang = normalizeLang(rawLang);
         // Todas las llamadas de abajo pasan por aquí: añade la instrucción de idioma.
         const generateWithFallback = (payload, opts) => generateWithFallbackBase(localizePayload(payload, lang), opts);
-        const LENS_OPTS = { attemptMs: 16000, budgetMs: 25000, lite: true };
+        const LENS_OPTS = { attemptMs: 19000, budgetMs: 25000, lite: true, thinking: { thinkingLevel: 'low' } };
 
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
@@ -730,18 +735,18 @@ async function rawHandler(event, context) {
             } else if (lens === 'camino') {
                 schema = { type: 'OBJECT', properties: {
                     essence: S('Qué sabe hacer, en concreto, una persona que domina el tema: 1 a 2 oraciones con verbos de acción, sin jerga.'),
-                    nodes: { type: 'ARRAY', description: 'Entre 8 y 12 conceptos o habilidades que hay que dominar, de los fundamentos a la meta. El último, con id «meta», es dominar el tema completo.', items: { type: 'OBJECT', properties: {
+                    nodes: { type: 'ARRAY', description: 'Entre 8 y 10 conceptos o habilidades que hay que dominar, de los fundamentos a la meta. El último, con id «meta», es dominar el tema completo.', items: { type: 'OBJECT', properties: {
                         id: S('Identificador corto sin espacios: n1, n2, n3… y «meta» para el último.'),
                         title: S('Nombre del concepto o habilidad (2 a 6 palabras).'),
-                        definition: S('Qué es, en lenguaje claro (2 a 3 oraciones).'),
-                        why: S('Por qué hay que tenerlo antes de lo que sigue (1 oración).'),
+                        definition: S('Qué es, en lenguaje claro (2 oraciones cortas).'),
+                        why: S('Por qué hay que tenerlo antes de lo que sigue (1 oración corta).'),
                         check: S('Una prueba concreta para saber que ya lo tienes: algo que puedes hacer o explicar (1 oración).'),
                         layer: { type: 'INTEGER', description: 'Capa: 0 para los fundamentos (sin prerrequisitos), subiendo hacia la meta, que lleva la capa más alta.' }
                     }, required: ['id', 'title', 'definition', 'why', 'check', 'layer'] } },
                     links: { type: 'ARRAY', description: 'Dependencias: cada enlace va de un prerrequisito a lo que lo necesita. Nunca hacia una capa anterior.', items: { type: 'OBJECT', properties: { from: S('id del prerrequisito.'), to: S('id de lo que lo necesita.') }, required: ['from', 'to'] } },
                     caution: S('Una frase si el orden es discutible o depende de la persona; vacío si no.')
                 }, required: ['essence', 'nodes', 'links', 'caution'] };
-                prompt = `${BASE}Haz ingeniería inversa de este tema. Parte de lo que sabe hacer una persona que lo domina y retrocede paso a paso: ¿qué tuvo que dominar justo antes?, ¿y antes de eso?, hasta los fundamentos. Entrega entre 8 y 12 conceptos o habilidades, ordenados por dependencia y enlazados a lo que los necesita (varios prerrequisitos pueden alimentar un mismo concepto, y uno puede servir a varios). Cada uno con su definición clara, por qué va antes y cómo saber que ya lo tienes. El último, con id "meta", es dominar el tema. Ajusta dónde empieza el camino al nivel de la persona: principiante, desde cero; intermedio, desde lo básico ya sabido; avanzado, solo lo que un buen estudiante suele tener flojo.`;
+                prompt = `${BASE}Haz ingeniería inversa de este tema. Parte de lo que sabe hacer una persona que lo domina y retrocede paso a paso: ¿qué tuvo que dominar justo antes?, ¿y antes de eso?, hasta los fundamentos. Entrega entre 8 y 10 conceptos o habilidades (agrupa si el tema es muy amplio), ordenados por dependencia y enlazados a lo que los necesita (varios prerrequisitos pueden alimentar un mismo concepto, y uno puede servir a varios). Cada uno con su definición clara, por qué va antes y cómo saber que ya lo tienes. El último, con id "meta", es dominar el tema. Ajusta dónde empieza el camino al nivel de la persona: principiante, desde cero; intermedio, desde lo básico ya sabido; avanzado, solo lo que un buen estudiante suele tener flojo.`;
             } else {
                 schema = { type: 'OBJECT', properties: {
                     essence: S('La idea central del tema en una sola oración de máximo 22 palabras, sin jerga.'),
@@ -763,7 +768,9 @@ async function rawHandler(event, context) {
                 }, required: ['essence', 'steps', 'shortcut', 'caution'] };
                 prompt = `${BASE}No entiendo este tema. Explícamelo paso a paso con metáforas, imágenes visuales y ejemplos del mundo real. Luego crea un atajo mental o un marco que pueda usar para recordarlo para siempre.`;
             }
-            const response = await generateWithFallback({ contents: prompt, config: { responseMimeType: 'application/json', responseSchema: schema } }, LENS_OPTS);
+            let response;
+            try { response = await generateWithFallback({ contents: prompt, config: { responseMimeType: 'application/json', responseSchema: schema } }, LENS_OPTS); }
+            catch (e) { const m = String((e && e.message) || ''); console.error('[lens] falló:', m); if (/abort|timeout/i.test(m)) return { statusCode: 504, body: JSON.stringify({ error: 'El modelo tardó demasiado. Inténtalo de nuevo; no se cobró nada.' }) }; throw e; }
             let out;
             try { out = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta inválida' }) }; }
             const c = (v, n) => clipS(v, n);
