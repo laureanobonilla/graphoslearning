@@ -605,7 +605,7 @@ function openLens(lens, opts) {
   closeMenu();
   const lv = (opts && opts.level) || level, key = (opts && opts.key) || cacheKey(lens, tg.name, lv), c = cacheAll()[key];
   if (!c) {
-    if (typeof requireAuth === 'function' && !requireAuth(L('ver este tema con una lente', 'view this topic through a lens'))) return;
+    if (typeof requireAuth === 'function' && !requireAuth(L('ver este tema con una lente', 'view this topic through a lens'))) { savePending(lens, tg, lv); return; }
     if (typeof checkBalance === 'function' && !checkBalance(COST)) return;
   }
   ensureRoot(); root.hidden = false;
@@ -677,6 +677,25 @@ async function pickCard(k) {
 }
 window.GK_CARDS = { enabled: cardsOn, open: (t, o) => openCards(t, o) };
 
+
+/* ---------- lente pendiente: si el muro de registro la interrumpe, se retoma al iniciar sesión ---------- */
+const PK = 'gk_lens_pending';
+function savePending(lens, tg, lv) {
+  try { localStorage.setItem(PK, JSON.stringify({ lens, name: tg.name, ctx: tg.ctx || '', map: tg.map || '', level: lv, t: Date.now() })); } catch (_e) { /* nada */ }
+}
+function tryPending() {
+  try {
+    if (!signedIn()) return;
+    const raw = localStorage.getItem(PK); if (!raw) return;
+    if ((root && !root.hidden)) return;
+    localStorage.removeItem(PK);
+    const p = JSON.parse(raw);
+    if (!p || !LENSES[p.lens] || !p.name || Date.now() - (p.t || 0) > 30 * 60 * 1000) return;   // más de 30 min: ya no es lo que estaba haciendo
+    trk('lens_pending_resume', { lens: p.lens });
+    openLens(p.lens, { target: { id: null, name: p.name, sel: false, ctx: p.ctx, map: p.map, topicOnly: true }, level: p.level, from: 'pending' });
+  } catch (_e) { /* nunca debe notarse */ }
+}
+
 /* ---------- menú «Lentes» de la cabecera ---------- */
 let menu = null, btn = null;
 function closeMenu() { if (menu) menu.hidden = true; if (btn) btn.setAttribute('aria-expanded', 'false'); }
@@ -712,8 +731,8 @@ function installHeader() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
   window.addEventListener('resize', closeMenu);
   setTimeout(showTip, 4000);
-  [2500, 6000, 12000].forEach((ms) => setTimeout(pullProgress, ms));   // la sesión tarda un poco en estar lista
-  try { if (window.netlifyIdentity) { netlifyIdentity.on('init', () => setTimeout(pullProgress, 800)); netlifyIdentity.on('login', () => { pulled = false; setTimeout(pullProgress, 800); }); netlifyIdentity.on('logout', () => { pulled = false; const r = document.getElementById('gkResume'); if (r) r.remove(); }); } } catch (_e) { /* nada */ }
+  [2500, 6000, 12000].forEach((ms) => setTimeout(() => { tryPending(); pullProgress(); }, ms));   // la sesión tarda un poco en estar lista
+  try { if (window.netlifyIdentity) { netlifyIdentity.on('init', () => setTimeout(() => { tryPending(); pullProgress(); }, 800)); netlifyIdentity.on('login', () => { pulled = false; setTimeout(() => { tryPending(); pullProgress(); }, 800); }); netlifyIdentity.on('logout', () => { pulled = false; const r = document.getElementById('gkResume'); if (r) r.remove(); }); } } catch (_e) { /* nada */ }
 }
 function showTip() {
   try { if (localStorage.getItem('gk_lens_tip')) return; } catch (_e) { /* sigue */ }
@@ -745,5 +764,5 @@ function installNodeMenu() {
 }
 function init() { installHeader(); installNodeMenu(); }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
-window.GK_LENSES = { open: openLens };
+window.GK_LENSES = { open: openLens, resumePending: tryPending };
 })();
