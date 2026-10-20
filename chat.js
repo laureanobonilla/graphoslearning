@@ -28,8 +28,9 @@ body.gk-cover #vizPanel{z-index:150;left:0 !important;right:var(--gk-side-w,0px)
 body.gk-cover #vizPanel .vz-btn, body.gk-cover #vizPanel .vz-quote button, body.gk-cover #vizPanel .vz-ghost, body.gk-cover #vizPanel .vz-note, body.gk-cover #vizPanel .vz-note-form textarea, body.gk-cover #vizPanel .vz-rh-ctl select{background:#161c35;color:#eef1fb}
 body.gk-cover #vizPanel .vz-primary{color:#071018}
 body.gk-chat #rhzToggle{display:none !important}
-body.gk-chat #mainHeader #topicTab.on{display:inline-flex;position:static;flex:0 0 auto;margin-left:10px;align-items:center;gap:6px;padding:7px 16px;border-radius:999px;border:0;background:linear-gradient(120deg,#4fd1c5,#8b7cf6);color:#071018;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(79,209,197,.35)}
-body.gk-chat #mainHeader #topicTab.on:hover{filter:brightness(1.1);background:linear-gradient(120deg,#4fd1c5,#8b7cf6)}
+body.gk-chat #topicTab.on{display:inline-flex;position:fixed;left:14px;top:var(--gk-tt-top,80px);z-index:26;align-items:center;gap:6px;padding:7px 16px;border-radius:999px;border:0;background:linear-gradient(120deg,#4fd1c5,#8b7cf6);color:#071018;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(79,209,197,.35)}
+body.gk-chat.gk-rz #topicTab.on{top:auto;bottom:calc(var(--gk-comp-h,0px) + var(--gk-notes-h,0px) + 44px)}   /* en el rizoma va abajo, sobre la leyenda, para no tapar su cabecera ni la guía */
+body.gk-chat #topicTab.on:hover{filter:brightness(1.1);background:linear-gradient(120deg,#4fd1c5,#8b7cf6)}
 body.gk-cover #topicTab{display:none !important}
 body.gk-chat #mainHeader{gap:0}
 body.gk-chat #mainHeader > div:nth-child(2){display:none !important}   /* la segunda barra ya no existe: las pestañas suben a la primera */
@@ -147,7 +148,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     if (slot) { slot.classList.add('gk-tabslot'); slot.appendChild(tabs); } else anchor.parentNode.insertBefore(tabs, anchor);
     buildCtl();
     const tt = document.getElementById('topicTab');   // «Ver texto» (texto del tema, a la izquierda): empieza cerrado
-    if (tt && slot) { slot.appendChild(tt); tt.title = L('Abre el texto de este tema', 'Open the text of this topic'); }
+    if (tt) { document.body.appendChild(tt); tt.title = L('Abre el texto de este tema', 'Open the text of this topic'); }
     tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; trk('chat_tab', { tab: b.dataset.tab }); window.GK_NAV.go(b.dataset.tab); });
     return true;
   }
@@ -166,6 +167,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
   function paintTabs(active) {
     if (!tabs) return;
     tabs.querySelectorAll('[data-tab]').forEach((b) => { const on = b.dataset.tab === active; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+    document.body.classList.toggle('gk-rz', active === 'rizoma');
+    document.body.style.setProperty('--gk-tt-top', (parseInt(getComputedStyle(document.body).getPropertyValue('--gk-head-h'), 10) || 64) + (active === 'rizoma' ? 54 : 14) + 'px');   // en el rizoma baja un poco para no tapar su cabecera
     tabs.classList.toggle('idle', !window.GK_NAV.topic());
     // Modo (Cerebro/Árbol) y Vista son del mapa: solo se ven mientras se mira el mapa.
     const mapView = active === 'mapa' || (!active && window.GK_NAV.hasMap() && window.GK_NAV.lastView() === 'mapa');
