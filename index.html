@@ -663,6 +663,10 @@
                 background-color: var(--void); background-image: radial-gradient(rgba(148, 163, 255, 0.10) 1px, transparent 1px); background-size: 26px 26px;
                 border-top: 1px solid #2c3458; box-shadow: 0 -12px 32px rgba(0,0,0,.38); }
             #rhzPane.on { display: flex; }
+            /* Plegado (por defecto): solo el encabezado, bien visible y clicable; los controles del rizoma aparecen al abrirlo. */
+            #rhzPane:not(.open) .rhz-h { cursor: pointer; background: rgba(22,28,53,.96); border-top: 1px solid rgba(79,209,197,.35); }
+            #rhzPane:not(.open) .rhz-h:hover .rhz-t { color: #4fd1c5; }
+            #rhzPane:not(.open) .rhz-ctl > :not(#rhzRead):not(#rhzToggle) { display: none; }
             #rhzPane .rhz-rz { position: absolute; left: 0; right: 0; top: -6px; height: 12px; cursor: row-resize; z-index: 5; touch-action: none; }
             #rhzPane .rhz-rz::after { content: ''; position: absolute; left: 50%; top: 4px; width: 56px; height: 4px; margin-left: -28px; border-radius: 4px; background: #2c3458; transition: background .15s; }
             #rhzPane .rhz-rz:hover::after, body.gk-resizing #rhzPane .rhz-rz::after { background: #4fd1c5; }

@@ -1485,6 +1485,9 @@ async function renderThreeLevelTree(data, opts = {}) {
     const branchYTree = rootY + 150;
     const subBranchBaseYTree = branchYTree + 140;
 
+    // Escritorio: la primera rama con sub-ramas arranca DESPLEGADA (las demás, plegadas con su burbuja "+N"), para que el mapa
+    // inicial ya muestre cómo se abre una rama sin que la persona tenga que descubrirlo.
+    const openBranchIdx = isDesktopFolding() ? branches.findIndex(b => (childrenByBranch[b.id] || []).length > 0) : -1;
     branches.forEach((branch, idx) => {
         let branchX, branchY, branchAngle = null;
         if (isSolarMode) {
@@ -1520,8 +1523,9 @@ async function renderThreeLevelTree(data, opts = {}) {
         const subs = childrenByBranch[branch.id];
         // Escritorio: el mapa muestra un solo nivel; las sub-ramas ya vienen preparadas pero plegadas dentro de su rama
         // (se despliegan con la burbuja "+N"). En móvil todo sigue como siempre.
-        const foldSubs = isDesktopFolding() && subs.length > 0;
-        if (foldSubs) nodes.update({ id: branch.id, foldable: true });
+        const foldable = isDesktopFolding() && subs.length > 0;
+        const foldSubs = foldable && idx !== openBranchIdx;
+        if (foldable) nodes.update({ id: branch.id, foldable: true });
         const subSpread = isSolarMode && subs.length > 1 ? Math.min(maxSubSpread, (subs.length - 1) * 0.55) : 0;
         const subCols = !isSolarMode ? (subs.length <= 1 ? 1 : 2) : null;
 
@@ -9288,7 +9292,7 @@ const vizUI = (() => {
         const rh = !ron ? 0 : (rOpen ? Math.max(140, Math.min(RH || Math.round(window.innerHeight * 0.42), maxR)) : 40);
         const geo = h + '|' + l + '|' + r + '|' + rh; if (geo === lastGeo) return; lastGeo = geo;
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
-        if (rPane) { rPane.classList.toggle('on', ron); rPane.classList.toggle('open', ron && rOpen); rPane.style.left = l + 'px'; rPane.style.right = r + 'px'; rPane.style.bottom = h + 'px'; rPane.style.height = rh + 'px'; if (rPane._sync) rPane._sync(); }
+        if (rPane) { rPane.classList.toggle('on', ron); rPane.classList.toggle('open', ron && rOpen); rPane.style.left = l + 'px'; rPane.style.right = r + 'px'; rPane.style.bottom = h + 'px'; rPane.style.height = rh + 'px'; if (ron) rhzHeader(); if (rPane._sync) rPane._sync(); }   // el encabezado se arma de una vez, aunque el rizoma esté plegado
         const tot = h + rh;
         container.style.height = tot ? 'calc(100% - ' + tot + 'px)' : ''; container.style.alignSelf = tot ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
@@ -9717,8 +9721,8 @@ const vizUI = (() => {
     // ---------- panel del rizoma (mitad baja del lienzo, siempre a la vista en escritorio) ----------
     const rPane = document.getElementById('rhzPane'), rBody = document.getElementById('rhzBody'), rTipEl = document.getElementById('rhzTip');
     const RZ_COLORS = ['#4fd1c5', '#8b7cf6', '#f2b366', '#f472b6', '#4ade80', '#fb923c', '#63b3ed', '#f87171'];
-    let rOpen = true, RH = 0, rAskT = null;
-    try { rOpen = localStorage.getItem('gk_rhz_open') !== '0'; RH = Number(localStorage.getItem('gk_rhz_h')) || 0; rRead = localStorage.getItem('gk_rhz_read') !== '0'; } catch (_e) { /* ok */ }
+    let rOpen = false, RH = 0, rAskT = null;   // plegado por defecto: solo se ve su encabezado, encima de «Mis notas»
+    try { rOpen = localStorage.getItem('gk_rhz_open') === '1'; RH = Number(localStorage.getItem('gk_rhz_h')) || 0; rRead = localStorage.getItem('gk_rhz_read') !== '0'; } catch (_e) { /* ok */ }
     const rTip = (t) => { if (!rTipEl) return; rTipEl.textContent = t || ''; rTipEl.classList.toggle('on', !!t); };
     const rhzCount = () => nodes.get().filter(n => !n.isSubscheme && !n.isPointer && clean(n)).length;
     const rhzOn = () => !!rPane && isDesktopFolding() && rhzCount() >= 5;
@@ -9749,8 +9753,9 @@ const vizUI = (() => {
             <button type="button" class="rhz-b txt" id="rhzRead">${esc(L('Lectura del mapa', 'Map reading'))}</button>
             <button type="button" class="rhz-b" id="rhzToggle" title="${esc(L('Plegar o desplegar el rizoma', 'Collapse or expand the rhizome'))}">▾</button>
           </div>`;
-        const sync = () => { $id('rhzColor').value = rColor; $id('rhzSize').value = rSize; $id('rhzTree').checked = rShowTree; $id('rhzRead').classList.toggle('on', rRead); $id('rhzToggle').textContent = rOpen ? '▾' : '▴'; };
+        const sync = () => { $id('rhzColor').value = rColor; $id('rhzSize').value = rSize; $id('rhzTree').checked = rShowTree; $id('rhzRead').classList.toggle('on', rRead); $id('rhzToggle').textContent = rOpen ? '▾' : '▴'; if (!rOpen) { const nt = $id('rhzNote'); if (nt) nt.textContent = L('Cómo se conectan las ideas de tu mapa · toca para abrir', 'How the ideas in your map connect · tap to open'); } };
         rPane._sync = sync; sync();
+        h.addEventListener('click', (e) => { if (rOpen || e.target.closest('select, input, label, .rhz-b')) return; $id('rhzToggle').click(); });
         $id('rhzColor').addEventListener('change', (e) => { rColor = e.target.value; track('rhizome_color', { v: rColor }); renderRhizome(); });
         $id('rhzSize').addEventListener('change', (e) => { rSize = e.target.value; renderRhizome(); });
         $id('rhzTree').addEventListener('change', (e) => { rShowTree = e.target.checked; renderRhizome(); });
@@ -9855,8 +9860,9 @@ const vizUI = (() => {
     }
     const $id = (x) => document.getElementById(x);
     function renderRhizome() {
-        if (!rhzOn() || !rOpen) return;
+        if (!rhzOn()) return;
         rhzHeader(); if (rPane._sync) rPane._sync();
+        if (!rOpen) return;
         const m = rhizomeModel(); if (m.nodes.length < 5) return;
         const rootN = m.rootId != null ? nodes.get(m.rootId) : null;
         const saved = rootN && rootN.rhizome && rootN.rhizome.hash === m.hash && Array.isArray(rootN.rhizome.links) ? rootN.rhizome.links : null;
