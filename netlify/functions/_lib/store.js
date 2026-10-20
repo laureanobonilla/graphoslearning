@@ -69,6 +69,24 @@ module.exports = {
     logEvent: (actorId, actorKind, anonId, eventName, metadata, actorLabel, app) =>
         rpc('log_event', { p_actor: actorId, p_kind: actorKind, p_anon: anonId || null, p_event: eventName, p_metadata: metadata || {}, p_label: actorLabel || null, p_app: app || 'graphikosmos' }),
 
+    // --- Progreso de lentes (tabla lens_progress; ver supabase/2026-10-20-lens-progress.sql). Siempre filtrado por owner. ---
+    async listLensProgress(ownerId, limit) {
+        const rows = await table(`lens_progress?owner=eq.${encodeURIComponent(ownerId)}&select=key,lens,topic,level,t,data,done&order=t.desc&limit=${Number(limit) || 40}`);
+        return Array.isArray(rows) ? rows : [];
+    },
+    async upsertLensProgress(ownerId, row) {
+        await table('lens_progress?on_conflict=owner,key', {
+            method: 'POST',
+            headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+            body: JSON.stringify({ owner: ownerId, ...row, updated_at: new Date().toISOString() })
+        });
+    },
+    // Deja como máximo `max` filas por persona: borra las de menor t (las más viejas).
+    async pruneLensProgress(ownerId, max) {
+        const rows = await table(`lens_progress?owner=eq.${encodeURIComponent(ownerId)}&select=key&order=t.desc&offset=${Number(max)}&limit=200`);
+        for (const r of (Array.isArray(rows) ? rows : [])) await table(`lens_progress?owner=eq.${encodeURIComponent(ownerId)}&key=eq.${encodeURIComponent(r.key)}`, { method: 'DELETE' });
+    },
+
     // --- Proyectos (siempre filtrados por owner=ownerId; nunca por el id que manda el cliente solo) ---
     async getProject(id, ownerId) {
         const rows = await table(`projects?id=eq.${id}&owner=eq.${encodeURIComponent(ownerId)}&select=*`);

@@ -34,13 +34,77 @@ let level = 'intermedio';
 try { const v = localStorage.getItem('gk_lens_level'); if (LEVELS.includes(v)) level = v; } catch (_e) { /* nada */ }
 const setLevel = (v) => { level = v; try { localStorage.setItem('gk_lens_level', v); } catch (_e) { /* nada */ } };
 const cacheKey = (lens, name, lv) => lens + '|' + (lv || level) + '|' + (EN() ? 'en' : 'es') + '|' + String(name).toLowerCase().replace(/\s+/g, ' ').slice(0, 100);
-function cachePut(k, v) {
+function cachePutLocal(k, v) {
   try {
     const all = cacheAll(); all[k] = v;
     const ks = Object.keys(all);
     if (ks.length > 30) ks.sort((a, b) => (all[a].t || 0) - (all[b].t || 0)).slice(0, ks.length - 30).forEach((x) => delete all[x]);
     localStorage.setItem(CK, JSON.stringify(all));
   } catch (_e) { /* sin almacenamiento: se muestra igual */ }
+}
+function cachePut(k, v) { cachePutLocal(k, v); pushSoon(k); }
+
+/* ---------- progreso en la cuenta (entre dispositivos) ---------- */
+// Si la tabla no existe todavía o hay un fallo, se apaga en silencio y todo sigue funcionando solo con el navegador.
+const SYNC_URL = '/.netlify/functions/lens-progress';
+let syncOff = false, pushTimer = null; const pushQ = new Set();
+const signedIn = () => { try { return typeof currentUser !== 'undefined' && !!currentUser; } catch (_e) { return false; } };
+function pushSoon(k) {
+  if (syncOff || !signedIn()) return;
+  pushQ.add(k); clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    const keys = [...pushQ]; pushQ.clear();
+    for (const key of keys) {
+      const v = cacheAll()[key]; if (!v || !v.data) continue;
+      const [lens, lv] = key.split('|');
+      try {
+        const r = await apiFetch(SYNC_URL, { method: 'POST', body: JSON.stringify({ key, lens, level: lv, topic: v.data.topic || '', t: v.t || Date.now(), data: v.data, done: v.done || {} }) });
+        if (!r.ok && (r.status === 503 || r.status === 404)) { syncOff = true; return; }
+      } catch (_e) { /* sin red: queda en el navegador y se reintenta en el próximo cambio */ }
+    }
+  }, 1500);
+}
+let pulled = false;
+async function pullProgress() {
+  if (pulled || syncOff || !signedIn()) return;
+  pulled = true;
+  try {
+    const r = await apiFetch(SYNC_URL, { method: 'GET' });
+    if (!r.ok) { if (r.status === 503 || r.status === 404) syncOff = true; return; }
+    const local = cacheAll();
+    (r.data.items || []).forEach((it) => { if (it && it.key && it.data && (!local[it.key] || (it.t || 0) > (local[it.key].t || 0))) cachePutLocal(it.key, { t: it.t || Date.now(), data: it.data, done: it.done || {} }); });
+    // lo que solo existía en este navegador se sube (por ejemplo, lentes armadas antes de iniciar sesión)
+    const have = new Set((r.data.items || []).map((x) => x.key)); Object.keys(local).forEach((k) => { if (!have.has(k)) pushSoon(k); });
+  } catch (_e) { /* nada */ }
+  showResume();
+}
+
+/* ---------- «tu siguiente paso» al volver ---------- */
+function nextOf(data, done) {
+  const nodes = (data && data.nodes) || [], links = (data && data.links) || [];
+  const dn = (id) => !!(done && done[id]), inl = (id) => links.filter((k) => k.to === id).map((k) => k.from);
+  const steps = nodes.filter((n) => n.id !== 'meta').sort((a, b) => a.layer - b.layer);
+  return { next: steps.find((n) => !dn(n.id) && inl(n.id).every(dn)) || null, done: steps.filter((n) => dn(n.id)).length, total: steps.length };
+}
+function showResume() {
+  try {
+    if (document.getElementById('gkResume') || (root && !root.hidden) || (cardsEl && !cardsEl.hidden)) return;
+    const all = cacheAll(), dismissed = (() => { try { return localStorage.getItem('gk_resume_x') || ''; } catch (_e) { return ''; } })();
+    let best = null;
+    Object.keys(all).forEach((k) => {
+      const v = all[k]; if (!v || !v.data || v.data.lens !== 'camino') return;
+      const n = nextOf(v.data, v.done); if (!n.next || n.done < 1) return;   // solo caminos ya empezados
+      if (!best || (v.t || 0) > (best.t || 0)) best = { key: k, t: v.t || 0, topic: v.data.topic || '', level: k.split('|')[1], n };
+    });
+    if (!best || dismissed === best.key + '|' + best.t) return;
+    const el = document.createElement('div'); el.id = 'gkResume'; el.setAttribute('role', 'status');
+    el.innerHTML = '<span class="rs-i">🧭</span><div><small>' + esc(L('Tu siguiente paso en «' + best.topic + '»', 'Your next step in “' + best.topic + '”')) + '</small><b>' + esc(best.n.next.title) + '</b><i>' + esc(best.n.done + ' / ' + best.n.total) + '</i></div><button type="button" class="rs-go">' + esc(L('Continuar', 'Continue')) + '</button><button type="button" class="rs-x" aria-label="' + esc(L('Ocultar', 'Hide')) + '">✕</button>';
+    injectCss(); document.body.appendChild(el);
+    trk('lens_resume_shown', { done: best.n.done, total: best.n.total });
+    const hide = () => { try { localStorage.setItem('gk_resume_x', best.key + '|' + best.t); } catch (_e) { /* nada */ } el.remove(); };
+    el.querySelector('.rs-x').addEventListener('click', hide);
+    el.querySelector('.rs-go').addEventListener('click', () => { trk('lens_resume_click', {}); el.remove(); openLens('camino', { key: best.key, level: best.level, target: { id: null, name: best.topic, sel: false, ctx: '', map: '', topicOnly: true }, from: 'resume' }); });
+  } catch (_e) { /* nunca debe notarse */ }
 }
 
 /* ---------- qué tema se mira ---------- */
@@ -106,6 +170,14 @@ const CSS = `
 #gkCards .gc-rec{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;color:#071018;background:linear-gradient(120deg,#4fd1c5,#a78bfa);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
 #gkCardsBtn{background:#0f1428;border:1px solid #2c3458;border-radius:999px;padding:6px 11px;font:600 12px Inter,system-ui,sans-serif;color:#c7d2e8;cursor:pointer;white-space:nowrap;margin-left:6px}
 #gkCardsBtn:hover{border-color:#4fd1c5;color:#4fd1c5}
+#gkResume{position:fixed;left:16px;bottom:16px;z-index:60;display:flex;align-items:center;gap:12px;max-width:min(420px,calc(100vw - 32px));background:#11162b;border:1px solid #2c3458;border-left:3px solid #4fd1c5;border-radius:14px;padding:11px 12px 11px 14px;box-shadow:0 14px 40px rgba(0,0,0,.5);font-family:Inter,system-ui,sans-serif;color:#eef1fb}
+#gkResume .rs-i{font-size:22px}
+#gkResume div{min-width:0;display:flex;flex-direction:column;gap:1px}
+#gkResume small{font-size:11.5px;color:#8a92b2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#gkResume b{font:700 14px Sora,Inter,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#gkResume i{font-style:normal;font-size:11px;color:#4fd1c5}
+#gkResume .rs-go{border:0;border-radius:9px;background:#4fd1c5;color:#071018;padding:8px 12px;font:700 12.5px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+#gkResume .rs-x{border:0;background:none;color:#8a92b2;cursor:pointer;font-size:14px;padding:4px}
 #gkLensTip{position:fixed;z-index:136;width:min(300px,calc(100vw - 20px));background:#11162b;border:1px solid #4fd1c5;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.6);padding:14px 15px 12px;font:400 13px/1.5 Inter,system-ui,sans-serif;color:#c7d2e8}
 #gkLensTip::before{content:"";position:absolute;top:-7px;left:var(--ax,40px);width:12px;height:12px;background:#11162b;border-left:1px solid #4fd1c5;border-top:1px solid #4fd1c5;transform:rotate(45deg)}
 #gkLensTip b{display:block;font:700 14px Sora,Inter,sans-serif;color:#eef1fb;margin-bottom:4px}
@@ -531,7 +603,7 @@ function openLens(lens, opts) {
   const tg = (opts && opts.target) || target();
   if (!tg) { try { appAlert(L('Primero crea un esquema para verlo con una lente.', 'Create a map first to view it through a lens.')); } catch (_e) { /* nada */ } return; }
   closeMenu();
-  const lv = (opts && opts.level) || level, key = cacheKey(lens, tg.name, lv), c = cacheAll()[key];
+  const lv = (opts && opts.level) || level, key = (opts && opts.key) || cacheKey(lens, tg.name, lv), c = cacheAll()[key];
   if (!c) {
     if (typeof requireAuth === 'function' && !requireAuth(L('ver este tema con una lente', 'view this topic through a lens'))) return;
     if (typeof checkBalance === 'function' && !checkBalance(COST)) return;
@@ -640,6 +712,8 @@ function installHeader() {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
   window.addEventListener('resize', closeMenu);
   setTimeout(showTip, 4000);
+  [2500, 6000, 12000].forEach((ms) => setTimeout(pullProgress, ms));   // la sesión tarda un poco en estar lista
+  try { if (window.netlifyIdentity) { netlifyIdentity.on('init', () => setTimeout(pullProgress, 800)); netlifyIdentity.on('login', () => { pulled = false; setTimeout(pullProgress, 800); }); netlifyIdentity.on('logout', () => { pulled = false; const r = document.getElementById('gkResume'); if (r) r.remove(); }); } } catch (_e) { /* nada */ }
 }
 function showTip() {
   try { if (localStorage.getItem('gk_lens_tip')) return; } catch (_e) { /* sigue */ }
