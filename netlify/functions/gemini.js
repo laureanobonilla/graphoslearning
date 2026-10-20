@@ -10,20 +10,34 @@ const FALLBACK_MODELS = [
     'gemini-3.6-flash'
 ];
 
-async function generateWithFallbackBase(payload) {
+// opts (solo para las lentes): { attemptMs, budgetMs, lite } — corta los intentos colgados, respeta un presupuesto total de tiempo
+// y, como último recurso, prueba un modelo más ligero. Sin opts el comportamiento es el de siempre.
+const LITE_MODEL = process.env.GEMINI_LITE_MODEL || 'gemini-3.8-flash-lite';
+async function generateWithFallbackBase(payload, opts) {
     let lastError = null;
+    const t0 = Date.now();
+    const models = opts && opts.lite ? [FALLBACK_MODELS[0], FALLBACK_MODELS[1], LITE_MODEL] : FALLBACK_MODELS;
 
-    for (let i = 0; i < FALLBACK_MODELS.length; i++) {
-        const modelName = FALLBACK_MODELS[i];
+    for (let i = 0; i < models.length; i++) {
+        const modelName = models[i];
+        const isLite = opts && opts.lite && modelName === LITE_MODEL;
+        let timer = null;
         try {
-            return await ai.models.generateContent({
-                ...payload,
-                model: modelName
-            });
+            let p = { ...payload, model: modelName };
+            if (opts && opts.attemptMs) {
+                const left = (opts.budgetMs || 24000) - (Date.now() - t0);
+                if (left < 3000) break;   // ya no hay tiempo para otro intento útil
+                const ac = new AbortController();
+                timer = setTimeout(() => ac.abort(), Math.min(opts.attemptMs, left - 500));
+                p = { ...p, config: { ...(p.config || {}), abortSignal: ac.signal } };
+            }
+            return await ai.models.generateContent(p);
         } catch (err) {
-            lastError = err;
+            if (!isLite) lastError = err;
+            if (isLite) { console.warn(`[lite] ${modelName} falló:`, err && err.message); break; }   // el respaldo ligero nunca oculta el error original
             const errMsg = (err.message || JSON.stringify(err)).toLowerCase();
-            const isRetryable = 
+            const timedOut = !!timer && (err.name === 'AbortError' || errMsg.includes('abort'));
+            const isRetryable = timedOut ||
                 errMsg.includes('503') || 
                 errMsg.includes('unavailable') || 
                 errMsg.includes('429') || 
@@ -31,19 +45,22 @@ async function generateWithFallbackBase(payload) {
                 errMsg.includes('overloaded') ||
                 errMsg.includes('internal');
 
-            console.warn(`[Intento ${i + 1}/${FALLBACK_MODELS.length}] Modelo ${modelName} ocupado (${err.status || '503'}). Reintentando...`);
+            console.warn(`[Intento ${i + 1}/${models.length}] Modelo ${modelName} ${timedOut ? 'tardó demasiado' : 'ocupado'} (${err.status || '503'}). Reintentando...`);
 
             if (!isRetryable) {
                 throw err;
             }
 
-            // Pausa de 800ms antes del siguiente intento para dejar pasar el pico de demanda
-            if (i < FALLBACK_MODELS.length - 1) {
+            // Pausa de 800ms antes del siguiente intento para dejar pasar el pico de demanda (no tras un timeout: ya se perdió el tiempo)
+            if (timedOut && opts && opts.lite && i < models.length - 2) { i = models.length - 2; continue; }   // si se colgó, el siguiente Flash probablemente también: salta al ligero
+            if (i < models.length - 1 && !timedOut) {
                 await new Promise(resolve => setTimeout(resolve, 800));
             }
+        } finally {
+            if (timer) clearTimeout(timer);
         }
     }
-    throw lastError;
+    throw lastError || new Error('timeout');
 }
 
 
@@ -68,7 +85,8 @@ async function rawHandler(event, context) {
         const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, lang: rawLang } = JSON.parse(event.body);
         const lang = normalizeLang(rawLang);
         // Todas las llamadas de abajo pasan por aquí: añade la instrucción de idioma.
-        const generateWithFallback = (payload) => generateWithFallbackBase(localizePayload(payload, lang));
+        const generateWithFallback = (payload, opts) => generateWithFallbackBase(localizePayload(payload, lang), opts);
+        const LENS_OPTS = { attemptMs: 16000, budgetMs: 25000, lite: true };
 
         // ==========================================
         // 1. EXPANDIR RAMAS (CONCEPTOS)
@@ -745,7 +763,7 @@ async function rawHandler(event, context) {
                 }, required: ['essence', 'steps', 'shortcut', 'caution'] };
                 prompt = `${BASE}No entiendo este tema. Explícamelo paso a paso con metáforas, imágenes visuales y ejemplos del mundo real. Luego crea un atajo mental o un marco que pueda usar para recordarlo para siempre.`;
             }
-            const response = await generateWithFallback({ contents: prompt, config: { responseMimeType: 'application/json', responseSchema: schema } });
+            const response = await generateWithFallback({ contents: prompt, config: { responseMimeType: 'application/json', responseSchema: schema } }, LENS_OPTS);
             let out;
             try { out = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta inválida' }) }; }
             const c = (v, n) => clipS(v, n);
@@ -804,7 +822,7 @@ async function rawHandler(event, context) {
             const response = await generateWithFallback({
                 contents: `Tema: "${tema}". Paso: "${title}" — ${expl}\\nNivel de la persona: ${lvl}.\\nLa metáfora anterior no le ayudó a entenderlo. ${prev.length ? 'Ya se usaron estas, NO las repitas ni uses el mismo ámbito: ' + prev.map(x => '«' + x + '»').join(' ') + '\\n' : ''}Explícalo de otra forma: una metáfora distinta (de otro ámbito cotidiano), una imagen visual distinta y un ejemplo real distinto. Español claro, tuteando, sin inventar datos ni cifras.`,
                 config: { responseMimeType: 'application/json', responseSchema: schema }
-            });
+            }, LENS_OPTS);
             let out; try { out = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta inválida' }) }; }
             const m = clipS(out.metaphor, 300);
             if (!m) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };

@@ -468,7 +468,15 @@ async function generate() {
   showLoading();
   trk('lens_generate', { lens: S.lens });
   try {
-    const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'lens', lens: S.lens, topic: S.tg.name, contextPath: S.tg.ctx, level: S.level, mapContext: S.tg.map || '' }) });
+    const body = JSON.stringify({ action: 'lens', lens: S.lens, topic: S.tg.name, contextPath: S.tg.ctx, level: S.level, mapContext: S.tg.map || '' });
+    const call = () => apiFetch('/.netlify/functions/gemini', { method: 'POST', body });
+    let r;
+    try { r = await call(); } catch (e) { if (e && e.message === 'billing_blocked') throw e; r = { ok: false, status: 0 }; }
+    if (!r.ok && (r.status === 0 || r.status >= 500) && S === mine) {   // un solo reintento automático; los fallos no cobran, así que no hay doble cobro
+      trk('lens_autoretry', { status: r.status });
+      r = await call();
+    }
+    const { ok, status, data } = r;
     if (S !== mine) return;
     if (!ok) { busy = false; trk('lens_error', { status }); showError(status >= 500 ? null : (data && data.error) || null); return; }
     if (typeof applyServerBalance === 'function') applyServerBalance(data);
