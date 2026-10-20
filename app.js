@@ -9184,7 +9184,7 @@ async function exportReportRtf() {
     function open(auto) {
         if (nodes.length === 0) return;
         track('defs_view_opened', { nodes: nodes.length, in_subscheme: schemeStack.length > 0, auto: auto === true });
-        try { localStorage.removeItem('gk_defs_closed'); } catch (_e) { /* ok */ }
+        try { if (auto !== true && (!/[?&]chat=0/.test(location.search) && window.innerWidth >= 781 && (() => { try { return localStorage.getItem('gk_chat') !== '0'; } catch (_e) { return true; } })())) localStorage.setItem('gk_defs_closed', '0'); else localStorage.removeItem('gk_defs_closed'); } catch (_e) { /* ok */ }   // en la pantalla tipo chat el texto empieza cerrado; '0' = lo abrió el usuario
         pendingRows = 0; openMore.clear();
         view.classList.remove('hidden'); layout();
         const list = render();
@@ -9207,6 +9207,7 @@ async function exportReportRtf() {
         if (window.innerWidth <= 780) return;
         clearTimeout(syncTimer);
         syncTimer = setTimeout(() => {
+            refreshBtn();
             if (isOpen()) {
                 const sc = view.querySelector('.dv-scroll'); const keep = sc.scrollTop;
                 // Lo que se acaba de desplegar en el mapa también se despliega aquí (y lo que se plegó, se pliega).
@@ -9223,7 +9224,7 @@ async function exportReportRtf() {
                 unfolded.clear(); folded.clear();
                 loadAll(l); return;
             }
-            let closed = false; try { closed = localStorage.getItem('gk_defs_closed') === '1'; } catch (_e) { /* ok */ }
+            let closed = false; try { const dc = localStorage.getItem('gk_defs_closed'); closed = dc === '1' || ((!/[?&]chat=0/.test(location.search) && window.innerWidth >= 781 && (() => { try { return localStorage.getItem('gk_chat') !== '0'; } catch (_e) { return true; } })()) && dc !== '0'); } catch (_e) { /* ok */ }
             if (!closed && nodes.length > 1) open(true);
         }, 700);
     };
@@ -9752,7 +9753,7 @@ const vizUI = (() => {
     const RZ_COLORS = ['#4fd1c5', '#8b7cf6', '#f2b366', '#f472b6', '#4ade80', '#fb923c', '#63b3ed', '#f87171'];
     let rView = false;   // modo chat: ¿se está mirando la vista Rizoma?
     let rOpen = false, RH = 0, rAskT = null;   // plegado por defecto: solo se ve su encabezado, encima de «Mis notas»
-    try { rOpen = localStorage.getItem('gk_rhz_open') === '1'; RH = Number(localStorage.getItem('gk_rhz_h2')) || 0; rRead = localStorage.getItem('gk_rhz_read') !== '0'; } catch (_e) { /* ok */ }
+    try { rOpen = localStorage.getItem('gk_rhz_open') === '1'; RH = Number(localStorage.getItem('gk_rhz_h2')) || 0; rRead = (!/[?&]chat=0/.test(location.search) && window.innerWidth >= 781 && (() => { try { return localStorage.getItem('gk_chat') !== '0'; } catch (_e) { return true; } })()) ? localStorage.getItem('gk_rhz_read') === '1' : localStorage.getItem('gk_rhz_read') !== '0'; } catch (_e) { /* ok */ }
     const rTip = (t) => { if (!rTipEl) return; rTipEl.textContent = t || ''; rTipEl.classList.toggle('on', !!t); };
     const rhzCount = () => nodes.get().filter(n => !n.isSubscheme && !n.isPointer && clean(n)).length;
     const rhzOn = () => !!rPane && isDesktopFolding() && rhzCount() >= 5;

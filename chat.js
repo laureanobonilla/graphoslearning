@@ -20,6 +20,10 @@ body.gk-chat #startTopic, body.gk-chat #btnStartTopic, body.gk-chat #btnToggleRe
 body.gk-chat #btnSearchNodes, body.gk-chat #btnPresentationMode, body.gk-chat #gkLensBtnWrap, body.gk-chat #welcomeScreen{display:none !important}
 body.gk-chat #gkLens, body.gk-chat #gkCards{top:var(--gk-head-h,0px);bottom:calc(var(--gk-comp-h,0px) + var(--gk-notes-h,0px))}
 body.gk-chat #rhzToggle{display:none !important}
+body.gk-chat #btnDefsView{position:static;flex:0 0 auto;margin-left:10px;padding:7px 16px;background:linear-gradient(120deg,#4fd1c5,#8b7cf6);color:#071018;border:0;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 4px 18px rgba(79,209,197,.35)}
+body.gk-chat #btnDefsView:hover{color:#071018;filter:brightness(1.1)}
+body.gk-chat #btnDefsView svg{display:none}
+body.gk-cover #btnDefsView{display:none !important}
 body.gk-chat #mainHeader{gap:0}
 body.gk-chat #mainHeader > div:nth-child(2){display:none !important}   /* la segunda barra ya no existe: las pestañas suben a la primera */
 body.gk-chat #mainHeader [class*="xl:inline"]{display:none}
@@ -135,6 +139,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     const slot = document.querySelector('#mainHeader .flex.gap-2.flex-1.min-w-0');   // hueco que antes ocupaba el buscador
     if (slot) { slot.classList.add('gk-tabslot'); slot.appendChild(tabs); } else anchor.parentNode.insertBefore(tabs, anchor);
     buildCtl();
+    const dv = document.getElementById('btnDefsView');   // «Ver texto»: abre las definiciones (y la lectura del rizoma); empiezan cerradas
+    if (dv && slot) { slot.appendChild(dv); const sp = dv.querySelector('span'); if (sp) sp.textContent = '📖 ' + L('Ver texto', 'Read text'); dv.title = L('Abre el texto y las definiciones del tema', 'Open the text and definitions'); dv.addEventListener('click', () => { trk('ver_texto', {}); if (window.GK_NAV.active() === 'rizoma' && !document.querySelector('#rhzBody.with-read')) { const rr = document.getElementById('rhzRead'); if (rr) rr.click(); } }); }
     tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; trk('chat_tab', { tab: b.dataset.tab }); window.GK_NAV.go(b.dataset.tab); });
     return true;
   }
