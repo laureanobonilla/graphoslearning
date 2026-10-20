@@ -685,9 +685,9 @@
             #rhzPane .rhz-b.on { background: rgba(79,209,197,.12); }
             #rhzPane .rhz-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
             #rhzPane .rhz-body.with-read { grid-template-columns: minmax(0, 1fr) 340px; }
-            #rhzPane .rhz-main { position: relative; min-height: 0; }
-            #rhzPane .rhz-net { position: absolute; inset: 0; }
-            #rhzPane .rhz-lg { position: absolute; left: 14px; bottom: 10px; max-width: 75%; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 500 11.5px 'Inter', sans-serif; color: #c7d2e8; pointer-events: none; text-shadow: 0 1px 3px #0a0e1a; }
+            #rhzPane .rhz-main { position: relative; min-height: 0; display: flex; flex-direction: column; }
+            #rhzPane .rhz-net { position: relative; flex: 1 1 auto; min-height: 0; }
+            #rhzPane .rhz-lg { position: relative; flex: 0 0 auto; max-height: 58px; overflow-y: auto; padding: 6px 14px 8px; display: flex; flex-wrap: wrap; gap: 4px 14px; font: 500 11.5px 'Inter', sans-serif; color: #c7d2e8; pointer-events: none; text-shadow: 0 1px 3px #0a0e1a; }
             #rhzPane .vz-rd { height: auto; min-height: 0; border: 0; border-left: 1px solid #2c3458; border-radius: 0; background: rgba(17,22,43,.86); scrollbar-width: thin; scrollbar-color: #2c3458 transparent; }
             #rhzPane .vz-rd-bar { background: #1d2442; }
             #rhzPane .vz-rd-kind.k-disperso, #rhzPane .vz-rd-kind.k-sesgado { background: rgba(242,179,102,.14); color: #f2b366; }
@@ -1950,6 +1950,6 @@
     <script src="/app.js"></script>
     <script src="/coach.js?v=3"></script>
     <script src="/lentes.js?v=9"></script>
-    <script src="/chat.js?v=8"></script>
+    <script src="/chat.js?v=12"></script>
 </body>
 </html>

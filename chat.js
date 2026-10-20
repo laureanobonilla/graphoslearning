@@ -25,20 +25,21 @@ body.gk-chat #mainHeader > div:nth-child(2){display:none !important}   /* la seg
 body.gk-chat #mainHeader [class*="xl:inline"]{display:none}
 @media (min-width:1700px){body.gk-chat #mainHeader [class*="xl:inline"]{display:inline}}
 body.gk-chat #mainHeader .gk-tabslot{display:flex;align-items:center;justify-content:center;flex:1;min-width:0}
-#gkCtl{position:fixed;left:14px;bottom:12px;z-index:33;display:flex;flex-direction:column;align-items:flex-start;gap:5px;font-family:Inter,system-ui,sans-serif}
+#gkCtl{position:fixed;left:12px;bottom:24px;z-index:33;display:flex;flex-direction:row;align-items:center;gap:6px;font-family:Inter,system-ui,sans-serif;max-width:calc(100vw - 24px)}
 #gkCtl > div{display:flex;align-items:center;gap:6px}
-#gkCtl select{width:122px}
+#gkCtl select{width:auto;max-width:104px;font-size:11px;padding:3px 4px;height:24px}
+#gkCtl button{padding:3px 7px;font-size:11px;height:24px}
 #gkCtl [class*="text-[10px]"]{display:none !important}
+#gkComposer .gc-h{display:none !important}   /* sin renglón de ayuda: el espacio es del lienzo */
 body.gk-chat #mainHeader h1{display:none !important}
 @media (min-width:1500px){body.gk-chat #mainHeader h1{display:block !important}}
 body.gk-chat #gkTabs button{padding:6px 10px}
 body.gk-chat #gkTabs .len button{padding:4px 9px}
 body.gk-chat #gkTabs{gap:3px}
-#gkCtl .gk-ctl-row{gap:2px}
 body.gk-cover #defsView, body.gk-cover #topicPanel, body.gk-cover #readerPanel{visibility:hidden !important}   /* con una lente o las tarjetas a pantalla completa, los paneles laterales no asoman por debajo */
 body.gk-chat #vizPanel{bottom:var(--gk-comp-h,0px)}
 body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
-#gkComposer{flex:0 0 auto;position:relative;z-index:31;padding:6px 16px 12px;background:linear-gradient(rgba(10,14,26,0),#0a0e1a 35%);font-family:Inter,system-ui,sans-serif}
+#gkComposer{flex:0 0 auto;position:relative;z-index:31;padding:6px 16px 10px;background:linear-gradient(rgba(10,14,26,0),#0a0e1a 35%);font-family:Inter,system-ui,sans-serif}
 #gkComposer .gc-in{max-width:880px;margin:0 auto;display:flex;align-items:flex-end;gap:10px;background:#11162b;border:1px solid #2c3458;border-radius:22px;padding:8px 8px 8px 18px;box-shadow:0 10px 40px rgba(0,0,0,.45);transition:border-color .15s,box-shadow .15s}
 #gkComposer .gc-in:focus-within{border-color:#4fd1c5;box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 3px rgba(79,209,197,.16)}
 #gkComposer textarea{flex:1;min-width:0;background:transparent;border:0;outline:0;resize:none;color:#eef1fb;font:400 15px/1.5 Inter,system-ui,sans-serif;padding:8px 0;max-height:168px;overflow-y:auto}
@@ -76,7 +77,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
   /* ---------- barra de abajo ---------- */
   function buildComposer() {
     comp = document.createElement('div'); comp.id = 'gkComposer';
-    comp.innerHTML = '<div class="gc-in"><textarea id="gkComposerInput" rows="1" autocomplete="off" spellcheck="false" aria-label="' + esc(L('Tema, texto o enlace', 'Topic, text or link')) + '" placeholder="' + esc(L('Escribe un tema, pega un texto o un enlace…', 'Type a topic, paste a text or a link…')) + '"></textarea><button type="button" id="gkComposerBtn">' + esc(L('Estudiar', 'Study')) + '</button></div>' +
+    comp.innerHTML = '<div class="gc-in"><textarea id="gkComposerInput" rows="1" autocomplete="off" spellcheck="false" aria-label="' + esc(L('Tema, texto o enlace', 'Topic, text or link')) + '" placeholder="' + esc(L('Un tema, texto o enlace…', 'A topic, text or link…')) + '"></textarea><button type="button" id="gkComposerBtn">' + esc(L('Estudiar', 'Study')) + '</button></div>' +
       '<p class="gc-h">' + esc(L('Enter para estudiar · Mayús + Enter para otra línea', 'Enter to study · Shift + Enter for a new line')) + '</p>';
     document.body.appendChild(comp);
     input = $('#gkComposerInput', comp); btn = $('#gkComposerBtn', comp);
@@ -182,7 +183,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
       const r = dv ? dv.getBoundingClientRect().width : 0;
       const cover = !!(document.querySelector('#gkLens:not([hidden])') || document.querySelector('#gkCards:not([hidden])'));
       document.body.classList.toggle('gk-cover', cover);
-      comp.style.paddingLeft = Math.max(150, 16 + (cover ? 0 : Math.round(l))) + 'px'; comp.style.paddingRight = (16 + (cover ? 0 : Math.round(r))) + 'px';
+      const ctl = document.getElementById('gkCtl'); const cw = ctl ? Math.round(ctl.getBoundingClientRect().width) + 28 : 16;
+      comp.style.paddingLeft = Math.max(cw, 16 + (cover ? 0 : Math.round(l))) + 'px'; comp.style.paddingRight = (16 + (cover ? 0 : Math.round(r))) + 'px';
     }
   }
   function sync() {

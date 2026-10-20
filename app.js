@@ -9929,7 +9929,7 @@ const vizUI = (() => {
             nodes: { scaling: { label: false } }, edges: { arrows: { to: false } }
         });
         const rn = rnet;
-        rn.once('stabilizationIterationsDone', () => { try { rn.setOptions({ physics: false }); rn.fit({ animation: { duration: 350 } }); const s = (network.getSelectedNodes() || [])[0]; if (s != null) rn.selectNodes([String(s)]); } catch (_e) { /* ok */ } });
+        rn.once('stabilizationIterationsDone', () => { try { rn.setOptions({ physics: false }); rn.fit({ animation: false }); rn.moveTo({ scale: rn.getScale() * 0.88, animation: { duration: 350 } });   /* un poco más lejos: los nombres de los bordes no quedan pegados a los paneles */ const s = (network.getSelectedNodes() || [])[0]; if (s != null) rn.selectNodes([String(s)]); } catch (_e) { /* ok */ } });
         rn.on('click', (ev) => {
             const nid = ev.nodes && ev.nodes[0], eid = ev.edges && ev.edges[0];
             if (nid != null) { pickConcept(String(nid), true); track('rhizome_pick', {}); }
