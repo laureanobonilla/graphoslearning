@@ -20,6 +20,21 @@ body.gk-chat #startTopic, body.gk-chat #btnStartTopic, body.gk-chat #btnToggleRe
 body.gk-chat #btnSearchNodes, body.gk-chat #btnPresentationMode, body.gk-chat #gkLensBtnWrap, body.gk-chat #welcomeScreen{display:none !important}
 body.gk-chat #gkLens, body.gk-chat #gkCards{top:var(--gk-head-h,0px);bottom:calc(var(--gk-comp-h,0px) + var(--gk-notes-h,0px))}
 body.gk-chat #rhzToggle{display:none !important}
+body.gk-chat #mainHeader{gap:0}
+body.gk-chat #mainHeader > div:nth-child(2){display:none !important}   /* la segunda barra ya no existe: las pestañas suben a la primera */
+body.gk-chat #mainHeader [class*="xl:inline"]{display:none}
+@media (min-width:1700px){body.gk-chat #mainHeader [class*="xl:inline"]{display:inline}}
+body.gk-chat #mainHeader .gk-tabslot{display:flex;align-items:center;justify-content:center;flex:1;min-width:0}
+#gkCtl{position:fixed;left:14px;bottom:12px;z-index:33;display:flex;flex-direction:column;align-items:flex-start;gap:5px;font-family:Inter,system-ui,sans-serif}
+#gkCtl > div{display:flex;align-items:center;gap:6px}
+#gkCtl select{width:122px}
+#gkCtl [class*="text-[10px]"]{display:none !important}
+body.gk-chat #mainHeader h1{display:none !important}
+@media (min-width:1500px){body.gk-chat #mainHeader h1{display:block !important}}
+body.gk-chat #gkTabs button{padding:6px 10px}
+body.gk-chat #gkTabs .len button{padding:4px 9px}
+body.gk-chat #gkTabs{gap:3px}
+#gkCtl .gk-ctl-row{gap:2px}
 body.gk-cover #defsView, body.gk-cover #topicPanel, body.gk-cover #readerPanel{visibility:hidden !important}   /* con una lente o las tarjetas a pantalla completa, los paneles laterales no asoman por debajo */
 body.gk-chat #vizPanel{bottom:var(--gk-comp-h,0px)}
 body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
@@ -116,9 +131,23 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
       '<button type="button" class="all" role="tab" data-tab="todas" aria-selected="false" title="' + esc(L('Ver todas las tarjetas', 'See all cards')) + '">⊞</button>' +
       '<span class="sep"></span>' + t('mapa', '🗺️', L('Mapa mental', 'Mind map')) + t('rizoma', '🕸️', L('Rizoma', 'Rhizome')) + '<span class="sep"></span>' +
       '<span class="len">' + t('camino', '🧭', L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', '🧠', L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', '💡', L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + '</span>';
-    anchor.parentNode.insertBefore(tabs, anchor);
+    const slot = document.querySelector('#mainHeader .flex.gap-2.flex-1.min-w-0');   // hueco que antes ocupaba el buscador
+    if (slot) { slot.classList.add('gk-tabslot'); slot.appendChild(tabs); } else anchor.parentNode.insertBefore(tabs, anchor);
+    buildCtl();
     tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; trk('chat_tab', { tab: b.dataset.tab }); window.GK_NAV.go(b.dataset.tab); });
     return true;
+  }
+  /* Modo, Vista, sonido y Limpiar viven en la esquina de abajo a la izquierda (se mueven los mismos botones, con sus eventos). */
+  function buildCtl() {
+    const mode = $('#schemaLayoutMode'), view = $('#viewMode'), snd = $('#btnSoundToggle'), clr = $('#btnClear');
+    const box = document.createElement('div'); box.id = 'gkCtl';
+    const row = (el) => { const d = document.createElement('div'); if (el) d.appendChild(el); box.appendChild(d); return d; };
+    if (mode && mode.parentElement) row(mode.parentElement);
+    if (view && view.parentElement) row(view.parentElement);
+    const last = row(); last.classList.add('gk-ctl-row');
+    if (clr) last.appendChild(clr);
+    if (snd) last.appendChild(snd);
+    document.body.appendChild(box);
   }
   function paintTabs(active) {
     if (!tabs) return;
@@ -153,7 +182,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
       const r = dv ? dv.getBoundingClientRect().width : 0;
       const cover = !!(document.querySelector('#gkLens:not([hidden])') || document.querySelector('#gkCards:not([hidden])'));
       document.body.classList.toggle('gk-cover', cover);
-      comp.style.paddingLeft = (16 + (cover ? 0 : Math.round(l))) + 'px'; comp.style.paddingRight = (16 + (cover ? 0 : Math.round(r))) + 'px';
+      comp.style.paddingLeft = Math.max(150, 16 + (cover ? 0 : Math.round(l))) + 'px'; comp.style.paddingRight = (16 + (cover ? 0 : Math.round(r))) + 'px';
     }
   }
   function sync() {
