@@ -28,10 +28,9 @@ body.gk-cover #vizPanel{z-index:150;right:var(--gk-side-w,0px) !important;--p-bg
 body.gk-cover #vizPanel .vz-btn, body.gk-cover #vizPanel .vz-quote button, body.gk-cover #vizPanel .vz-ghost, body.gk-cover #vizPanel .vz-note, body.gk-cover #vizPanel .vz-note-form textarea, body.gk-cover #vizPanel .vz-rh-ctl select{background:#161c35;color:#eef1fb}
 body.gk-cover #vizPanel .vz-primary{color:#071018}
 body.gk-chat #rhzToggle{display:none !important}
-body.gk-chat #btnDefsView{position:static;flex:0 0 auto;margin-left:10px;padding:7px 16px;background:linear-gradient(120deg,#4fd1c5,#8b7cf6);color:#071018;border:0;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 4px 18px rgba(79,209,197,.35)}
-body.gk-chat #btnDefsView:hover{color:#071018;filter:brightness(1.1)}
-body.gk-chat #btnDefsView svg{display:none}
-body.gk-cover #btnDefsView{display:none !important}
+body.gk-chat #mainHeader #topicTab.on{display:inline-flex;position:static;flex:0 0 auto;margin-left:10px;align-items:center;gap:6px;padding:7px 16px;border-radius:999px;border:0;background:linear-gradient(120deg,#4fd1c5,#8b7cf6);color:#071018;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(79,209,197,.35)}
+body.gk-chat #mainHeader #topicTab.on:hover{filter:brightness(1.1);background:linear-gradient(120deg,#4fd1c5,#8b7cf6)}
+body.gk-cover #topicTab{display:none !important}
 body.gk-chat #mainHeader{gap:0}
 body.gk-chat #mainHeader > div:nth-child(2){display:none !important}   /* la segunda barra ya no existe: las pestañas suben a la primera */
 body.gk-chat #mainHeader [class*="xl:inline"]{display:none}
@@ -147,8 +146,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     const slot = document.querySelector('#mainHeader .flex.gap-2.flex-1.min-w-0');   // hueco que antes ocupaba el buscador
     if (slot) { slot.classList.add('gk-tabslot'); slot.appendChild(tabs); } else anchor.parentNode.insertBefore(tabs, anchor);
     buildCtl();
-    const dv = document.getElementById('btnDefsView');   // «Ver texto»: abre las definiciones (y la lectura del rizoma); empiezan cerradas
-    if (dv && slot) { slot.appendChild(dv); const sp = dv.querySelector('span'); if (sp) sp.textContent = '📖 ' + L('Ver texto', 'Read text'); dv.title = L('Abre el texto y las definiciones del tema', 'Open the text and definitions'); dv.addEventListener('click', () => { trk('ver_texto', {}); if (window.GK_NAV.active() === 'rizoma' && !document.querySelector('#rhzBody.with-read')) { const rr = document.getElementById('rhzRead'); if (rr) rr.click(); } }); }
+    const tt = document.getElementById('topicTab');   // «Ver texto» (texto del tema, a la izquierda): empieza cerrado
+    if (tt && slot) { slot.appendChild(tt); tt.title = L('Abre el texto de este tema', 'Open the text of this topic'); }
     tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (!b) return; trk('chat_tab', { tab: b.dataset.tab }); window.GK_NAV.go(b.dataset.tab); });
     return true;
   }
