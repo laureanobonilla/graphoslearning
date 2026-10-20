@@ -25,7 +25,7 @@ const KNOWN = new Set([
     // Oráculo del Caos (/oraculo/): 5 señales gratis al día con tono al azar; elegir el tono o pasar de 5 cuesta 1 nodo.
     'oracle',
     // Escribir (/escribir/): preguntas de desarrollo (gratis) y retroalimentación de una respuesta (1 nodo).
-    'esc_questions', 'esc_feedback', 'esc_analyze', 'lens'
+    'esc_questions', 'esc_feedback', 'esc_analyze', 'lens', 'lens_step'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
@@ -72,6 +72,7 @@ function computeCost(action, d) {
         case 'lang_map':          return d.root ? 1 + len(d.branches) + len(d.subBranches) : 0;
         case 'esc_feedback':      return (d.criteria || d.skipped) ? 1 : 0;
         case 'lens':              return (d.lens && (d.steps || d.analogies)) ? LENS_COST : 0;
+        case 'lens_step':         return d.metaphor ? 1 : 0;   // «otra metáfora» de un paso
         // 'welcome_schema' y 'onboarding_text' caen en default: 0 (gratis).
         default:                  return 0;
     }
@@ -111,7 +112,7 @@ const ESC_QUOTA = {
 const ESC_EVENTS = Object.values(ESC_QUOTA).map((q) => q.ev);
 const ESC_SINCE = '2020-01-01T00:00:00Z';
 // Crear esquemas nuevos: exige cuenta aunque ya haya usado su prueba.
-const TRIAL_NEW_SCHEMA = new Set(['parse_text', 'analyze_text', 'long_outline', 'onboarding_text', 'm_text', 'lens']);
+const TRIAL_NEW_SCHEMA = new Set(['parse_text', 'analyze_text', 'long_outline', 'onboarding_text', 'm_text', 'lens', 'lens_step']);
 
 const WELCOME_COOKIE = 'gk_welcome';
 function hasWelcomeCookie(event) {

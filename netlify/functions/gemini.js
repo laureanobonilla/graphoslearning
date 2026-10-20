@@ -687,9 +687,16 @@ async function rawHandler(event, context) {
             const tema = clipS(topic, 200);
             if (!lens || tema.length < 2) return { statusCode: 400, body: JSON.stringify({ error: 'Falta el tema' }) };
             const ctx = clipS(contextPath, 400);
+            const lvl = ['principiante', 'intermedio', 'avanzado'].includes(lb.level) ? lb.level : 'intermedio';
+            const LVTXT = {
+                principiante: 'NIVEL: principiante. Supón que la persona no sabe nada del tema: cero jerga (si usas un término técnico, explícalo en la misma frase), ejemplos de la vida diaria, oraciones cortas.',
+                intermedio: 'NIVEL: intermedio. Supón que la persona conoce lo básico del tema: puedes usar los términos principales, sin dar por sabidos los detalles.',
+                avanzado: 'NIVEL: avanzado. Supón que la persona domina lo básico: usa terminología técnica precisa, incluye matices, límites del modelo y debates abiertos; evita explicar lo elemental.'
+            };
+            const mapCtx = clipS(lb.mapContext, 700);
             const S = (d) => ({ type: 'STRING', description: d });
             const card = (d, tl, tx) => ({ type: 'ARRAY', description: d, items: { type: 'OBJECT', properties: { title: S(tl), text: S(tx) }, required: ['title', 'text'] } });
-            const BASE = `Tema: "${tema}"${ctx ? ` (contexto en el que aparece: "${ctx}")` : ''}.\nReglas: español claro y directo, tuteando, sin relleno ni frases motivacionales. No inventes datos, fechas, cifras, nombres ni citas; si algo es discutido o no estás seguro, dilo en "caution" (una frase) y, si todo es seguro, deja "caution" vacío.\n`;
+            const BASE = `Tema: "${tema}"${ctx ? ` (contexto en el que aparece: "${ctx}")` : ''}.\n${LVTXT[lvl]}\n${mapCtx ? `La persona ya tiene este mapa del tema: ${mapCtx}. Apóyate en ese vocabulario y en esos subtemas, no los contradigas y no los repitas como lista; aporta lo que el mapa no dice.\n` : ''}Reglas: español claro y directo, tuteando, sin relleno ni frases motivacionales. No inventes datos, fechas, cifras, nombres ni citas; si algo es discutido o no estás seguro, dilo en "caution" (una frase) y, si todo es seguro, deja "caution" vacío.\n`;
             let schema, prompt;
             if (lens === 'genio') {
                 schema = { type: 'OBJECT', properties: {
@@ -728,7 +735,7 @@ async function rawHandler(event, context) {
             try { out = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta inválida' }) }; }
             const c = (v, n) => clipS(v, n);
             const cards = (a, n) => (Array.isArray(a) ? a : []).slice(0, n).map(x => ({ title: c(x && x.title, 80), text: c(x && x.text, 420) })).filter(x => x.title && x.text);
-            const clean = { lens, topic: tema, essence: c(out.essence, 260), caution: c(out.caution, 260) };
+            const clean = { lens, level: lvl, topic: tema, essence: c(out.essence, 260), caution: c(out.caution, 260) };
             if (lens === 'genio') {
                 clean.analogies = cards(out.analogies, 3); clean.applications = cards(out.applications, 3);
                 clean.counterexamples = cards(out.counterexamples, 2); clean.perspectives = cards(out.perspectives, 3);
@@ -741,6 +748,30 @@ async function rawHandler(event, context) {
                 if (clean.steps.length < 3) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };
             }
             return { statusCode: 200, body: JSON.stringify(clean) };
+        }
+
+        // Otra metáfora / imagen / ejemplo para UN paso de la lente «claridad» (cuando la primera no le sirvió a la persona).
+        if (action === 'lens_step') {
+            const sb = JSON.parse(event.body);
+            const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+            const tema = clipS(topic, 200), title = clipS(sb.stepTitle, 120), expl = clipS(sb.explanation, 500);
+            const prev = (Array.isArray(sb.previous) ? sb.previous : []).slice(0, 6).map(x => clipS(x, 200)).filter(Boolean);
+            if (tema.length < 2 || title.length < 2 || expl.length < 5) return { statusCode: 400, body: JSON.stringify({ error: 'Falta el paso' }) };
+            const lvl = ['principiante', 'intermedio', 'avanzado'].includes(sb.level) ? sb.level : 'intermedio';
+            const T = (d) => ({ type: 'STRING', description: d });
+            const schema = { type: 'OBJECT', properties: {
+                metaphor: T('Una metáfora cotidiana NUEVA para este paso (1 a 2 oraciones), tomada de un ámbito distinto a las anteriores.'),
+                image: T('Una imagen visual NUEVA que ayude a recordarlo, en una frase (máx. 16 palabras).'),
+                example: T('Un ejemplo del mundo real NUEVO y concreto (1 a 2 oraciones).')
+            }, required: ['metaphor', 'image', 'example'] };
+            const response = await generateWithFallback({
+                contents: `Tema: "${tema}". Paso: "${title}" — ${expl}\\nNivel de la persona: ${lvl}.\\nLa metáfora anterior no le ayudó a entenderlo. ${prev.length ? 'Ya se usaron estas, NO las repitas ni uses el mismo ámbito: ' + prev.map(x => '«' + x + '»').join(' ') + '\\n' : ''}Explícalo de otra forma: una metáfora distinta (de otro ámbito cotidiano), una imagen visual distinta y un ejemplo real distinto. Español claro, tuteando, sin inventar datos ni cifras.`,
+                config: { responseMimeType: 'application/json', responseSchema: schema }
+            });
+            let out; try { out = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta inválida' }) }; }
+            const m = clipS(out.metaphor, 300);
+            if (!m) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };
+            return { statusCode: 200, body: JSON.stringify({ metaphor: m, image: clipS(out.image, 160), example: clipS(out.example, 300) }) };
         }
 
         // ==========================================

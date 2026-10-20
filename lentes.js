@@ -27,7 +27,12 @@ const CATS = [
 /* ---------- guardado local (no se cobra dos veces el mismo tema) ---------- */
 const CK = 'gk_lens_v1';
 const cacheAll = () => { try { return JSON.parse(localStorage.getItem(CK) || '{}') || {}; } catch (_e) { return {}; } };
-const cacheKey = (lens, name) => lens + '|' + (EN() ? 'en' : 'es') + '|' + String(name).toLowerCase().replace(/\s+/g, ' ').slice(0, 100);
+const LEVELS = ['principiante', 'intermedio', 'avanzado'];
+const LVNAME = { principiante: () => L('Principiante', 'Beginner'), intermedio: () => L('Intermedio', 'Intermediate'), avanzado: () => L('Avanzado', 'Advanced') };
+let level = 'intermedio';
+try { const v = localStorage.getItem('gk_lens_level'); if (LEVELS.includes(v)) level = v; } catch (_e) { /* nada */ }
+const setLevel = (v) => { level = v; try { localStorage.setItem('gk_lens_level', v); } catch (_e) { /* nada */ } };
+const cacheKey = (lens, name, lv) => lens + '|' + (lv || level) + '|' + (EN() ? 'en' : 'es') + '|' + String(name).toLowerCase().replace(/\s+/g, ' ').slice(0, 100);
 function cachePut(k, v) {
   try {
     const all = cacheAll(); all[k] = v;
@@ -38,6 +43,17 @@ function cachePut(k, v) {
 }
 
 /* ---------- qué tema se mira ---------- */
+// Lo que el mapa ya dice alrededor del nodo (subtemas y vecinos), para que la lente use el mismo vocabulario y no lo repita.
+function mapContext(id, clean) {
+  try {
+    if (typeof edges === 'undefined') return '';
+    const lab = (i) => { const n = nodes.get(i); return n && !n.isSubscheme ? clean(n.baseTitle || n.label).slice(0, 60) : ''; };
+    const kids = edges.get({ filter: (e) => e.from === id }).map((e) => lab(e.to)).filter(Boolean).slice(0, 8);
+    const par = edges.get({ filter: (e) => e.to === id }).map((e) => e.from)[0];
+    const sibs = par ? edges.get({ filter: (e) => e.from === par && e.to !== id }).map((e) => lab(e.to)).filter(Boolean).slice(0, 6) : [];
+    return (kids.length ? 'subtemas: ' + kids.join(', ') + '. ' : '') + (sibs.length ? 'temas vecinos: ' + sibs.join(', ') + '.' : '');
+  } catch (_e) { return ''; }
+}
 function target() {
   try {
     if (typeof nodes === 'undefined' || !nodes.length) return null;
@@ -48,7 +64,7 @@ function target() {
     const clean = (t) => String(t || '').replace(/[*_`#]/g, '').replace(/^[^\p{L}\p{N}]+/u, '').replace(/\s+/g, ' ').trim();
     const name = clean(nd.baseTitle || nd.label).slice(0, 120); if (!name) return null;
     let ctx = ''; try { ctx = getContextPath(id) || ''; } catch (_e) { /* sin contexto */ }
-    return { id, name, sel, ctx: String(ctx).slice(0, 400) };
+    return { id, name, sel, ctx: String(ctx).slice(0, 400), map: mapContext(id, clean) };
   } catch (_e) { return null; }
 }
 
@@ -61,6 +77,10 @@ const CSS = `
 #gkLensMenu[hidden]{display:none}
 #gkLensMenu .lm-t{padding:8px 10px 6px;font-size:12px;color:#8a92b2;line-height:1.35}
 #gkLensMenu .lm-t b{color:#eef1fb;font-weight:600}
+#gkLensMenu .lm-lv{display:flex;gap:4px;margin:2px 4px 8px;background:#0a0e1a;border:1px solid #2c3458;border-radius:10px;padding:3px}
+#gkLensMenu .lm-lv button{flex:1;display:block;text-align:center;padding:6px 4px;border-radius:8px;font:600 12.5px Inter,system-ui,sans-serif;color:#8a92b2}
+#gkLensMenu .lm-lv button.on{background:#1d2442;color:#4fd1c5}
+#gkLensMenu .lm-n2{font-size:11.5px;color:#8a92b2;padding:0 10px 2px}
 #gkLensMenu button{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;background:none;border:0;border-radius:10px;padding:9px 10px;color:inherit;cursor:pointer}
 #gkLensMenu button:hover,#gkLensMenu button:focus-visible{background:#1d2442;outline:none}
 #gkLensMenu .lm-i{font-size:20px;line-height:1.2}
@@ -116,9 +136,10 @@ const CSS = `
 #gkLens .gl-row b{flex:none;font-weight:600;color:#4fd1c5;min-width:84px}
 #gkLens .gl-row.img b{color:#8b7cf6}
 #gkLens .gl-row.ex b{color:#f5b94a}
-#gkLens .gl-ok{margin-top:6px;background:none;border:1px solid #2c3458;color:#aab2d0;border-radius:9px;padding:6px 12px;font:500 12.5px Inter,system-ui,sans-serif;cursor:pointer}
+#gkLens .gl-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+#gkLens .gl-ok{margin-top:0;background:none;border:1px solid #2c3458;color:#aab2d0;border-radius:9px;padding:6px 12px;font:500 12.5px Inter,system-ui,sans-serif;cursor:pointer}
 #gkLens .gl-ok:hover{border-color:#4fd1c5;color:#4fd1c5}
-#gkLens .gl-step.done .gl-ok{background:#12302c;border-color:#4fd1c5;color:#4fd1c5}
+#gkLens .gl-step.done [data-ok]{background:#12302c;border-color:#4fd1c5;color:#4fd1c5}
 #gkLens .gl-short{border:2px solid #8b7cf6;background:#14122b;border-radius:18px;padding:20px 20px 18px;margin-top:10px}
 #gkLens .gl-short.glow{animation:glGlow 1.6s ease-out 1}
 @keyframes glGlow{0%{box-shadow:0 0 0 0 rgba(139,124,246,.7)}100%{box-shadow:0 0 0 22px rgba(139,124,246,0)}}
@@ -162,11 +183,12 @@ function onKey(e) { if (e.key === 'Escape' && root && !root.hidden) { e.stopProp
 function barHtml(extra) {
   const l = LENSES[S.lens];
   return '<div class="gl-bar"><button type="button" class="gl-back" id="glBack">‹ ' + esc(L('Volver al mapa', 'Back to the map')) + '</button>' +
-    '<span class="gl-ttl">' + l.icon + ' ' + esc(l.name()) + '</span><span class="gl-sub">' + esc(S.tg.name) + '</span><span class="gl-sp"></span>' + (extra || '') + '</div>';
+    '<span class="gl-ttl">' + l.icon + ' ' + esc(l.name()) + '</span><span class="gl-sub">' + esc(S.tg.name) + '</span><span class="gl-sp"></span><select class="gl-ghost" id="glLevel" aria-label="' + esc(L('Nivel de la explicación', 'Explanation level')) + '" title="' + esc(L('Cambiar el nivel arma otra versión (cuesta ' + COST + ' nodos si aún no la tienes guardada)', 'Changing the level builds another version (' + COST + ' nodes if you do not have it saved)')) + '">' + LEVELS.map((v) => '<option value="' + v + '"' + (v === S.level ? ' selected' : '') + '>' + esc(LVNAME[v]()) + '</option>').join('') + '</select>' + (extra || '') + '</div>';
 }
 function setBody(html, cls) {
   root.innerHTML = barHtml(S.data ? '<button type="button" class="gl-ghost" id="glRegen">' + esc(L('Generar de nuevo', 'Regenerate')) + ' · ' + COST + '</button>' : '') + '<div class="gl-body ' + (cls || '') + '" id="glBody">' + html + '</div>';
   $('#glBack', root).addEventListener('click', close);
+  $('#glLevel', root).addEventListener('change', (e) => { const v = e.target.value, tg = S.tg, lens = S.lens; setLevel(v); close(); openLens(lens, { target: tg, level: v, from: 'level_switch' }); });
   const rg = $('#glRegen', root); if (rg) rg.addEventListener('click', regenerate);
 }
 function showLoading() {
@@ -202,7 +224,7 @@ function buildGenio() {
       const a = ang + ((j - (n - 1) / 2) * gap) * Math.PI / 180, r = R2 + (j % 2 ? 70 : 0), lid = 'l_' + c.k + '_' + j;
       const short = isQ ? (title.length > 46 ? title.slice(0, 44).trim() + '…' : title) : title;
       ns.push({ id: lid, label: wrapLabel(short, 20), x: Math.cos(a) * r, y: Math.sin(a) * r, shape: 'box', color: { background: '#161c35', border: c.col, highlight: { background: '#1d2442', border: c.col } }, borderWidth: 2, font: { color: '#eef1fb', size: 13, face: 'Inter, sans-serif' }, margin: 9, shapeProperties: { borderRadius: 9 }, fixed: true });
-      meta[lid] = { cat: c, title, text, q: isQ };
+      meta[lid] = { cat: c, title, text, q: isQ, qi: j };
       es.push({ from: bid, to: lid, color: { color: c.col, opacity: 0.5 }, width: 2 });
     });
   });
@@ -215,13 +237,32 @@ function sideDefault(active) {
     '<p class="gl-hint">' + esc(L('Toca una rama o una tarjeta del mapa para leerla aquí. Arrastra para moverte y usa la rueda para acercar.', 'Tap a branch or card on the map to read it here. Drag to move and scroll to zoom.')) + '</p>' +
     '<ul class="gl-legend">' + active.map((c) => '<li><i style="background:' + c.col + '"></i>' + esc(c.name()) + ' (' + (d[c.k] || []).length + ')</li>').join('') + '</ul>' + actsHtml();
 }
-function actsHtml() {
-  return '<div class="gl-acts"><button type="button" class="gl-prim" id="glPractice">' + esc(L('Practicar este tema en nivel avanzado', 'Practise this topic at an advanced level')) + '</button>' +
+const nivelNum = () => Math.max(1, LEVELS.indexOf(S.level) + 1);
+function actsHtml(qi) {
+  const qn = S.lens === 'genio' ? (S.data.expert_questions || []).length : 0;
+  return '<div class="gl-acts">' +
+    (qn ? '<button type="button" class="gl-prim" id="glAnswer">' + esc(L('Responder las ' + qn + ' preguntas de experto', 'Answer the ' + qn + ' expert questions')) + '</button>' : '') +
+    (typeof qi === 'number' ? '<button type="button" class="gl-ghost" id="glAnswerOne" data-q="' + qi + '">' + esc(L('Responder solo esta pregunta', 'Answer only this question')) + '</button>' : '') +
+    '<button type="button" class="' + (qn ? 'gl-ghost' : 'gl-prim') + '" id="glPractice">' + esc(L('Practicar el tema con preguntas nuevas', 'Practise the topic with new questions')) + '</button>' +
     (S.lens === 'genio' ? '<button type="button" class="gl-ghost" id="glClarity">' + esc(L('No lo termino de entender: verlo paso a paso', 'Still unclear: see it step by step')) + '</button>' : '') + '</div>';
 }
+// Las preguntas de la lente pasan a Practicar YA HECHAS (misma entrega que el rizoma: gk_esc_set_<id>), con retroalimentación y «No lo sé».
+function practiceQuestions(list) {
+  const t = S.tg.name, id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const qs = list.filter(Boolean).slice(0, 8).map((q) => ({ q, level: 3, focus: 'Pregunta de nivel experto sobre «' + t + '». Valora si la persona razona y justifica, no solo si recuerda datos.', topic: t }));
+  if (!qs.length) return;
+  trk('lens_questions_practice', { n: qs.length });
+  try {
+    Object.keys(localStorage).filter((k) => k.startsWith('gk_esc_set_')).forEach((k) => { try { const v = JSON.parse(localStorage.getItem(k)); if (!v || Date.now() - (v.t || 0) > 86400000) localStorage.removeItem(k); } catch (_e) { localStorage.removeItem(k); } });
+    localStorage.setItem('gk_esc_set_' + id, JSON.stringify({ topic: t, kind: 'lens', level: 3, questions: qs, t: Date.now() }));
+  } catch (_e) { window.open('/escribir/?from=gk&practicar=' + encodeURIComponent(qs[0].q.slice(0, 160)) + '&nivel=3', '_blank', 'noopener'); return; }
+  window.open('/escribir/?from=gk&serie=' + id, '_blank', 'noopener');
+}
 function wireActs() {
-  const p = $('#glPractice', root); if (p) p.addEventListener('click', () => { trk('lens_practice_click', { lens: S.lens }); window.open('/escribir/?practicar=' + encodeURIComponent(S.tg.name.slice(0, 160)) + '&nivel=3', '_blank', 'noopener'); });
-  const c = $('#glClarity', root); if (c) c.addEventListener('click', () => { const tg = S.tg; close(); openLens('claridad', { target: tg }); });
+  const p = $('#glPractice', root); if (p) p.addEventListener('click', () => { trk('lens_practice_click', { lens: S.lens }); window.open('/escribir/?from=gk&practicar=' + encodeURIComponent(S.tg.name.slice(0, 160)) + '&nivel=' + nivelNum(), '_blank', 'noopener'); });
+  const a = $('#glAnswer', root); if (a) a.addEventListener('click', () => practiceQuestions(S.data.expert_questions || []));
+  const o = $('#glAnswerOne', root); if (o) o.addEventListener('click', () => practiceQuestions([(S.data.expert_questions || [])[Number(o.dataset.q)]]));
+  const c = $('#glClarity', root); if (c) c.addEventListener('click', () => { const tg = S.tg, lv = S.level; close(); openLens('claridad', { target: tg, level: lv }); });
 }
 function renderGenio() {
   const g = buildGenio();
@@ -240,13 +281,41 @@ function renderGenio() {
     const id = p.nodes && p.nodes[0], m = id && g.meta[id];
     if (!m || m.root) { showDef(); return; }
     if (m.branch) { const items = S.data[m.cat.k] || []; side.innerHTML = '<span class="gl-chip" style="background:' + m.cat.col + '">' + esc(m.cat.name()) + '</span>' + items.map((it) => '<div style="margin-bottom:14px"><p class="gl-h">' + esc(typeof it === 'string' ? it : it.title) + '</p>' + (typeof it === 'string' ? '' : '<p class="gl-p">' + esc(it.text) + '</p>') + '</div>').join('') + actsHtml(); wireActs(); trk('lens_branch_open', { cat: m.cat.k }); return; }
-    side.innerHTML = '<span class="gl-chip" style="background:' + m.cat.col + '">' + esc(m.cat.name()) + '</span><p class="gl-h">' + esc(m.title) + '</p>' + (m.text ? '<p class="gl-p">' + esc(m.text) + '</p>' : '<p class="gl-hint">' + esc(L('Intenta responderla con tus palabras antes de buscar. En Practicar puedes escribir tu respuesta y recibir retroalimentación.', 'Try answering it in your own words first. In Practice you can write your answer and get feedback.')) + '</p>') + actsHtml();
+    side.innerHTML = '<span class="gl-chip" style="background:' + m.cat.col + '">' + esc(m.cat.name()) + '</span><p class="gl-h">' + esc(m.title) + '</p>' + (m.text ? '<p class="gl-p">' + esc(m.text) + '</p>' : '<p class="gl-hint">' + esc(L('Intenta responderla con tus palabras antes de buscar. En Practicar puedes escribir tu respuesta y recibir retroalimentación.', 'Try answering it in your own words first. In Practice you can write your answer and get feedback.')) + '</p>') + actsHtml(m.q ? m.qi : undefined);
     wireActs(); trk('lens_card_open', { cat: m.cat.k });
   });
 }
 
 /* ---------- lente 2: claridad (escalera + atajo) ---------- */
 function saveDone() { if (S && S.key) cachePut(S.key, { t: Date.now(), data: S.data, done: S.done }); }
+function stepCard(s, i) {
+  return '<h3>' + (i + 1) + '. ' + esc(s.title) + '</h3><p>' + esc(s.explanation) + '</p>' +
+    (s.metaphor ? '<div class="gl-row"><b>' + esc(L('Metáfora', 'Metaphor')) + '</b><span>' + esc(s.metaphor) + '</span></div>' : '') +
+    (s.image ? '<div class="gl-row img"><b>' + esc(L('Imagínalo', 'Picture it')) + '</b><span>' + esc(s.image) + '</span></div>' : '') +
+    (s.example ? '<div class="gl-row ex"><b>' + esc(L('En la vida real', 'In real life')) + '</b><span>' + esc(s.example) + '</span></div>' : '') +
+    '<div class="gl-btns"><button type="button" class="gl-ok" data-ok="' + i + '"></button><button type="button" class="gl-ok" data-alt="' + i + '" title="' + esc(L('Si esta metáfora no te ayudó: otra metáfora, imagen y ejemplo', 'If this metaphor did not help: another metaphor, image and example')) + '">' + esc(L('Otra metáfora · 1', 'Another metaphor · 1')) + '</button></div>';
+}
+let altBusy = false;
+async function altStep(i) {
+  if (!S || altBusy) return;
+  const st = S.data.steps[i], el = root.querySelector('.gl-step[data-i="' + i + '"]'); if (!st || !el) return;
+  if (typeof checkBalance === 'function' && !checkBalance(1)) return;
+  const mine = S, btn = el.querySelector('[data-alt]'); altBusy = true; btn.disabled = true; btn.textContent = L('Buscando otra forma…', 'Finding another way…');
+  const prev = (st.prev || []).concat([st.metaphor]).filter(Boolean).slice(-5);
+  trk('lens_alt_metaphor', { i });
+  try {
+    const { ok, data } = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'lens_step', topic: S.tg.name, stepTitle: st.title, explanation: st.explanation, previous: prev, level: S.level }) });
+    if (S !== mine) return;
+    if (!ok || !data || !data.metaphor) { btn.disabled = false; btn.textContent = L('No se pudo. Reintentar · 1', 'Could not. Retry · 1'); return; }
+    if (typeof applyServerBalance === 'function') applyServerBalance(data);
+    st.prev = prev; st.metaphor = data.metaphor; if (data.image) st.image = data.image; if (data.example) st.example = data.example;
+    saveDone();
+    el.querySelector('.gl-card').innerHTML = stepCard(st, i); refreshSteps();
+  } catch (e) {
+    if (S === mine) { btn.disabled = false; btn.textContent = (e && e.message === 'billing_blocked') ? L('Otra metáfora · 1', 'Another metaphor · 1') : L('Sin conexión. Reintentar · 1', 'No connection. Retry · 1'); }
+  } finally { altBusy = false; }
+}
+let refreshSteps = () => {};
 function renderClaridad() {
   const d = S.data, steps = d.steps || [], sc = d.shortcut || {};
   const doneN = () => Object.keys(S.done || {}).filter((k) => S.done[k]).length;
@@ -255,11 +324,7 @@ function renderClaridad() {
     (d.caution ? '<div class="gl-caut" style="margin-top:0">' + esc(d.caution) + '</div>' : '') +
     '<div class="gl-prog"><span id="glProgTxt"></span><i><b id="glProgBar"></b></i></div>' +
     steps.map((s, i) => '<div class="gl-step" data-i="' + i + '" style="margin-left:' + Math.min(i, 4) * 10 + 'px"><div class="gl-rail"><div class="gl-num">' + esc(s.emoji || String(i + 1)) + '</div><div class="gl-line"></div></div>' +
-      '<div class="gl-card"><h3>' + (i + 1) + '. ' + esc(s.title) + '</h3><p>' + esc(s.explanation) + '</p>' +
-      (s.metaphor ? '<div class="gl-row"><b>' + esc(L('Metáfora', 'Metaphor')) + '</b><span>' + esc(s.metaphor) + '</span></div>' : '') +
-      (s.image ? '<div class="gl-row img"><b>' + esc(L('Imagínalo', 'Picture it')) + '</b><span>' + esc(s.image) + '</span></div>' : '') +
-      (s.example ? '<div class="gl-row ex"><b>' + esc(L('En la vida real', 'In real life')) + '</b><span>' + esc(s.example) + '</span></div>' : '') +
-      '<button type="button" class="gl-ok" data-ok="' + i + '"></button></div></div>').join('') +
+      '<div class="gl-card">' + stepCard(s, i) + '</div></div>').join('') +
     '<div class="gl-short" id="glShort"><h2>' + esc(sc.name || L('Tu atajo mental', 'Your mental shortcut')) + '</h2><small style="color:#8a92b2">' + esc(L('Para recordarlo siempre', 'To remember it for good')) + '</small>' +
     '<div class="gl-parts">' + (sc.parts || []).map((p) => '<div class="gl-part"><span class="gl-key">' + esc(p.key) + '</span><span class="gl-meaning">' + esc(p.meaning) + '</span></div>').join('') + '</div>' +
     (sc.how_to_use ? '<p class="gl-p" style="margin:0">' + esc(sc.how_to_use) + '</p>' : '') +
@@ -267,14 +332,18 @@ function renderClaridad() {
     '</div></div>';
   setBody(html);
   const refresh = (glow) => {
-    root.querySelectorAll('.gl-step').forEach((el) => { const i = el.dataset.i, on = !!S.done[i]; el.classList.toggle('done', on); const b = el.querySelector('.gl-ok'); b.textContent = on ? L('✓ Entendido', '✓ Got it') : L('Lo entendí', 'Got it'); b.setAttribute('aria-pressed', on); });
+    root.querySelectorAll('.gl-step').forEach((el) => { const i = el.dataset.i, on = !!S.done[i]; el.classList.toggle('done', on); const b = el.querySelector('[data-ok]'); b.textContent = on ? L('✓ Entendido', '✓ Got it') : L('Lo entendí', 'Got it'); b.setAttribute('aria-pressed', on); });
     const n = doneN(), tot = steps.length;
     $('#glProgTxt', root).textContent = L(n + ' de ' + tot + ' pasos entendidos', n + ' of ' + tot + ' steps understood');
     $('#glProgBar', root).style.width = (tot ? n / tot * 100 : 0) + '%';
     if (glow && n === tot && tot) { const sh = $('#glShort', root); sh.classList.remove('glow'); void sh.offsetWidth; sh.classList.add('glow'); sh.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' }); }
   };
-  refresh(false);
-  root.querySelectorAll('[data-ok]').forEach((b) => b.addEventListener('click', () => { const i = b.dataset.ok; S.done[i] = !S.done[i]; saveDone(); trk('lens_step_done', { i: Number(i), on: !!S.done[i] }); refresh(true); }));
+  refresh(false); refreshSteps = () => refresh(false);
+  $('.gl-col', root).addEventListener('click', (e) => {
+    const ok = e.target.closest('[data-ok]'), alt = e.target.closest('[data-alt]');
+    if (ok) { const i = ok.dataset.ok; S.done[i] = !S.done[i]; saveDone(); trk('lens_step_done', { i: Number(i), on: !!S.done[i] }); refresh(true); }
+    else if (alt) altStep(Number(alt.dataset.alt));
+  });
   $('#glCopy', root).addEventListener('click', () => {
     const t = (sc.name || '') + '\n' + (sc.parts || []).map((p) => p.key + ' — ' + p.meaning).join('\n') + (sc.how_to_use ? '\n' + sc.how_to_use : '');
     try { navigator.clipboard.writeText(t).then(() => { $('#glCopy', root).textContent = L('Copiado', 'Copied'); }, () => {}); } catch (_e) { /* nada */ }
@@ -296,7 +365,7 @@ async function generate() {
   showLoading();
   trk('lens_generate', { lens: S.lens });
   try {
-    const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'lens', lens: S.lens, topic: S.tg.name, contextPath: S.tg.ctx }) });
+    const { ok, status, data } = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'lens', lens: S.lens, topic: S.tg.name, contextPath: S.tg.ctx, level: S.level, mapContext: S.tg.map || '' }) });
     if (S !== mine) return;
     if (!ok) { busy = false; trk('lens_error', { status }); showError(status >= 500 ? null : (data && data.error) || null); return; }
     if (typeof applyServerBalance === 'function') applyServerBalance(data);
@@ -323,13 +392,13 @@ function openLens(lens, opts) {
   const tg = (opts && opts.target) || target();
   if (!tg) { try { appAlert(L('Primero crea un esquema para verlo con una lente.', 'Create a map first to view it through a lens.')); } catch (_e) { /* nada */ } return; }
   closeMenu();
-  const key = cacheKey(lens, tg.name), c = cacheAll()[key];
+  const lv = (opts && opts.level) || level, key = cacheKey(lens, tg.name, lv), c = cacheAll()[key];
   if (!c) {
     if (typeof requireAuth === 'function' && !requireAuth(L('ver este tema con una lente', 'view this topic through a lens'))) return;
     if (typeof checkBalance === 'function' && !checkBalance(COST)) return;
   }
   ensureRoot(); root.hidden = false;
-  S = { lens, tg, key, data: c ? c.data : null, done: (c && c.done) || {}, network: null };
+  S = { lens, tg, key, level: lv, data: c ? c.data : null, done: (c && c.done) || {}, network: null };
   document.addEventListener('keydown', onKey, true);
   trk('lens_open', { lens, cached: !!c, from: (opts && opts.from) || 'menu' });
   if (c) render(); else generate();
@@ -338,16 +407,22 @@ function openLens(lens, opts) {
 /* ---------- menú «Lentes» de la cabecera ---------- */
 let menu = null, btn = null;
 function closeMenu() { if (menu) menu.hidden = true; if (btn) btn.setAttribute('aria-expanded', 'false'); }
+function renderMenu(tg) {
+  menu.innerHTML = '<div class="lm-t">' + (tg ? esc(L(tg.sel ? 'Sobre el nodo seleccionado:' : 'Sobre el tema del mapa:', tg.sel ? 'On the selected node:' : 'On the map topic:')) + ' <b>' + esc(tg.name) + '</b>' : esc(L('Crea un esquema para usar las lentes.', 'Create a map to use the lenses.'))) + '</div>' +
+    '<div class="lm-n2">' + esc(L('¿Para qué nivel lo explicamos?', 'What level should it be explained at?')) + '</div>' +
+    '<div class="lm-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + LEVELS.map((v) => '<button type="button" role="radio" aria-checked="' + (v === level) + '" data-lv="' + v + '" class="' + (v === level ? 'on' : '') + '">' + esc(LVNAME[v]()) + '</button>').join('') + '</div>' +
+    Object.keys(LENSES).map((k) => { const l = LENSES[k], cached = tg && cacheAll()[cacheKey(k, tg.name, level)]; return '<button type="button" data-lens="' + k + '"><span class="lm-i">' + l.icon + '</span><span><div class="lm-n">' + esc(l.name()) + '</div><div class="lm-d">' + esc(l.desc()) + '</div></span><span class="lm-c">' + esc(cached ? L('guardada', 'saved') : COST + ' ' + L('nodos', 'nodes')) + '</span></button>'; }).join('');
+  menu.querySelectorAll('[data-lv]').forEach((b) => b.addEventListener('click', () => { setLevel(b.dataset.lv); trk('lens_level', { level }); renderMenu(tg); const f = menu.querySelector('.lm-lv .on'); if (f) f.focus({ preventScroll: true }); }));
+  menu.querySelectorAll('[data-lens]').forEach((b) => b.addEventListener('click', () => openLens(b.dataset.lens, { target: tg, from: 'header', level })));
+}
 function openMenu() {
   const tg = target();
-  menu.innerHTML = '<div class="lm-t">' + (tg ? esc(L(tg.sel ? 'Sobre el nodo seleccionado:' : 'Sobre el tema del mapa:', tg.sel ? 'On the selected node:' : 'On the map topic:')) + ' <b>' + esc(tg.name) + '</b>' : esc(L('Crea un esquema para usar las lentes.', 'Create a map to use the lenses.'))) + '</div>' +
-    Object.keys(LENSES).map((k) => { const l = LENSES[k], cached = tg && cacheAll()[cacheKey(k, tg.name)]; return '<button type="button" data-lens="' + k + '"><span class="lm-i">' + l.icon + '</span><span><div class="lm-n">' + esc(l.name()) + '</div><div class="lm-d">' + esc(l.desc()) + '</div></span><span class="lm-c">' + esc(cached ? L('guardada', 'saved') : COST + ' ' + L('nodos', 'nodes')) + '</span></button>'; }).join('');
-  const r = btn.getBoundingClientRect();
   menu.hidden = false;
+  renderMenu(tg);
+  const r = btn.getBoundingClientRect();
   menu.style.top = Math.round(r.bottom + 6) + 'px';
   menu.style.left = Math.max(10, Math.min(innerWidth - menu.offsetWidth - 10, r.left)) + 'px';
   btn.setAttribute('aria-expanded', 'true');
-  menu.querySelectorAll('[data-lens]').forEach((b) => b.addEventListener('click', () => openLens(b.dataset.lens, { target: tg, from: 'header' })));
   const f = menu.querySelector('[data-lens]'); if (f) f.focus({ preventScroll: true });
 }
 function installHeader() {
@@ -359,7 +434,7 @@ function installHeader() {
   btn = $('#gkLensBtn', wrap);
   menu = document.createElement('div'); menu.id = 'gkLensMenu'; menu.hidden = true; menu.setAttribute('role', 'menu'); document.body.appendChild(menu);
   btn.addEventListener('click', (e) => { e.stopPropagation(); if (menu.hidden) openMenu(); else closeMenu(); });
-  document.addEventListener('click', (e) => { if (menu && !menu.hidden && !menu.contains(e.target) && e.target !== btn) closeMenu(); });
+  document.addEventListener('click', (e) => { if (!menu || menu.hidden) return; const path = e.composedPath ? e.composedPath() : []; if (path.includes(menu) || path.includes(btn)) return; closeMenu(); });   // composedPath: al cambiar el nivel el menú se redibuja y el botón pulsado ya no está dentro
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
   window.addEventListener('resize', closeMenu);
 }
