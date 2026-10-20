@@ -367,7 +367,7 @@
       setTimeout(() => begin(clip(set.topic, 160) || 'Conexiones del mapa', qs[0].level, qs, false), 0);
     } else if (pt.length >= 2) {   // "Practicar este tema": el tema ya viene escrito
       arrivedWithTask = true; history.replaceState(null, '', location.pathname); track('esc_from_map', {});
-      setTimeout(() => { show('Setup'); topicIn.value = pt; topicIn.dispatchEvent(new Event('input')); }, 0);
+      setTimeout(() => { show('Setup'); topicIn.value = pt; topicIn.dispatchEvent(new Event('input')); const lv = Number(qp.get('nivel')); if (lv >= 1 && lv <= 3) { pickLv = lv; document.querySelectorAll('#levelPick button').forEach((x) => { const on = Number(x.dataset.lv) === lv; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); }); } }, 0);
     }
   } catch { /* nada */ }
 

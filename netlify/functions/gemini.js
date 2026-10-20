@@ -677,6 +677,73 @@ async function rawHandler(event, context) {
         }
 
         // ==========================================
+        // LENTES: un mismo tema visto de formas distintas (genio / claridad). Devuelve datos estructurados que el cliente dibuja
+        // (lentes.js). Nunca inventa citas ni cifras: si no está seguro, lo dice en "caution".
+        // ==========================================
+        if (action === 'lens') {
+            const lb = JSON.parse(event.body);
+            const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
+            const lens = lb.lens === 'claridad' ? 'claridad' : (lb.lens === 'genio' ? 'genio' : '');
+            const tema = clipS(topic, 200);
+            if (!lens || tema.length < 2) return { statusCode: 400, body: JSON.stringify({ error: 'Falta el tema' }) };
+            const ctx = clipS(contextPath, 400);
+            const S = (d) => ({ type: 'STRING', description: d });
+            const card = (d, tl, tx) => ({ type: 'ARRAY', description: d, items: { type: 'OBJECT', properties: { title: S(tl), text: S(tx) }, required: ['title', 'text'] } });
+            const BASE = `Tema: "${tema}"${ctx ? ` (contexto en el que aparece: "${ctx}")` : ''}.\nReglas: español claro y directo, tuteando, sin relleno ni frases motivacionales. No inventes datos, fechas, cifras, nombres ni citas; si algo es discutido o no estás seguro, dilo en "caution" (una frase) y, si todo es seguro, deja "caution" vacío.\n`;
+            let schema, prompt;
+            if (lens === 'genio') {
+                schema = { type: 'OBJECT', properties: {
+                    essence: S('Qué es el tema, en una sola oración de máximo 22 palabras, sin jerga.'),
+                    analogies: card('Exactamente 3 analogías avanzadas que expliquen el tema desde ámbitos distintos entre sí.', 'Nombre corto de la analogía (2 a 5 palabras).', 'Cómo funciona la analogía y dónde deja de valer (2 a 3 oraciones).'),
+                    applications: card('Exactamente 3 aplicaciones del mundo real, concretas y distintas.', 'Nombre corto de la aplicación (2 a 5 palabras).', 'Cómo se usa o aparece en la práctica (1 a 2 oraciones).'),
+                    counterexamples: card('Exactamente 2 contraejemplos o casos donde la idea común sobre el tema falla o se rompe.', 'Nombre corto del caso (2 a 6 palabras).', 'Por qué es un contraejemplo y qué enseña (1 a 2 oraciones).'),
+                    perspectives: card('Exactamente 3 perspectivas de disciplinas o posturas distintas sobre el tema.', 'La perspectiva (ej. «Desde la economía», «Desde la ingeniería»).', 'Qué ve esa perspectiva que otras no ven (1 a 2 oraciones).'),
+                    expert_questions: { type: 'ARRAY', description: 'Exactamente 3 preguntas de nivel experto para poner a prueba la comprensión, de respuesta abierta, que exijan razonar y no solo recordar.', items: S('La pregunta (máximo 30 palabras).') },
+                    caution: S('Una frase si algo es discutido o dudoso; vacío si no.')
+                }, required: ['essence', 'analogies', 'applications', 'counterexamples', 'perspectives', 'expert_questions', 'caution'] };
+                prompt = `${BASE}Quiero entender este tema como si fuera un genio. Desglósalo con analogías avanzadas, aplicaciones del mundo real, contraejemplos y múltiples perspectivas, y termina con preguntas de nivel experto que pongan a prueba mi comprensión.`;
+            } else {
+                schema = { type: 'OBJECT', properties: {
+                    essence: S('La idea central del tema en una sola oración de máximo 22 palabras, sin jerga.'),
+                    steps: { type: 'ARRAY', description: 'Entre 4 y 6 pasos en orden, de lo más básico a lo más complejo; cada paso apoya al siguiente.', items: { type: 'OBJECT', properties: {
+                        title: S('Nombre del paso (2 a 6 palabras).'),
+                        explanation: S('Qué hay que entender en este paso, en lenguaje simple (2 a 3 oraciones).'),
+                        metaphor: S('Una metáfora cotidiana para este paso (1 a 2 oraciones).'),
+                        image: S('Una imagen visual que ayude a recordarlo, descrita en una frase (máx. 16 palabras).'),
+                        example: S('Un ejemplo del mundo real, concreto (1 a 2 oraciones).'),
+                        emoji: S('Un solo emoji que represente el paso.')
+                    }, required: ['title', 'explanation', 'metaphor', 'image', 'example', 'emoji'] } },
+                    shortcut: { type: 'OBJECT', description: 'Un atajo mental o marco para recordar todo el tema para siempre.', properties: {
+                        name: S('Nombre del atajo (una palabra, un acrónimo o una frase corta).'),
+                        kind: S('Uno de: acronimo, marco, regla, imagen.'),
+                        parts: { type: 'ARRAY', description: 'Entre 3 y 5 partes del atajo.', items: { type: 'OBJECT', properties: { key: S('La letra, palabra o elemento (máx. 4 palabras).'), meaning: S('Qué significa o qué recuerda (máx. 14 palabras).') }, required: ['key', 'meaning'] } },
+                        how_to_use: S('Cómo usarlo para recordar o para decidir (1 a 2 oraciones).')
+                    }, required: ['name', 'kind', 'parts', 'how_to_use'] },
+                    caution: S('Una frase si algo es discutido o dudoso; vacío si no.')
+                }, required: ['essence', 'steps', 'shortcut', 'caution'] };
+                prompt = `${BASE}No entiendo este tema. Explícamelo paso a paso con metáforas, imágenes visuales y ejemplos del mundo real. Luego crea un atajo mental o un marco que pueda usar para recordarlo para siempre.`;
+            }
+            const response = await generateWithFallback({ contents: prompt, config: { responseMimeType: 'application/json', responseSchema: schema } });
+            let out;
+            try { out = JSON.parse(response.text); } catch { return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta inválida' }) }; }
+            const c = (v, n) => clipS(v, n);
+            const cards = (a, n) => (Array.isArray(a) ? a : []).slice(0, n).map(x => ({ title: c(x && x.title, 80), text: c(x && x.text, 420) })).filter(x => x.title && x.text);
+            const clean = { lens, topic: tema, essence: c(out.essence, 260), caution: c(out.caution, 260) };
+            if (lens === 'genio') {
+                clean.analogies = cards(out.analogies, 3); clean.applications = cards(out.applications, 3);
+                clean.counterexamples = cards(out.counterexamples, 2); clean.perspectives = cards(out.perspectives, 3);
+                clean.expert_questions = (Array.isArray(out.expert_questions) ? out.expert_questions : []).slice(0, 3).map(q => c(q, 260)).filter(Boolean);
+                if (clean.analogies.length + clean.applications.length + clean.counterexamples.length + clean.perspectives.length < 4) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };
+            } else {
+                clean.steps = (Array.isArray(out.steps) ? out.steps : []).slice(0, 6).map(x => ({ title: c(x && x.title, 80), explanation: c(x && x.explanation, 420), metaphor: c(x && x.metaphor, 300), image: c(x && x.image, 160), example: c(x && x.example, 300), emoji: Array.from(c(x && x.emoji, 12))[0] || '' })).filter(x => x.title && x.explanation);
+                const sc = out.shortcut || {};
+                clean.shortcut = { name: c(sc.name, 60), kind: ['acronimo', 'marco', 'regla', 'imagen'].includes(sc.kind) ? sc.kind : 'marco', parts: (Array.isArray(sc.parts) ? sc.parts : []).slice(0, 5).map(x => ({ key: c(x && x.key, 40), meaning: c(x && x.meaning, 120) })).filter(x => x.key && x.meaning), how_to_use: c(sc.how_to_use, 320) };
+                if (clean.steps.length < 3) return { statusCode: 502, body: JSON.stringify({ error: 'Respuesta incompleta' }) };
+            }
+            return { statusCode: 200, body: JSON.stringify(clean) };
+        }
+
+        // ==========================================
         // 8. RETO SOCRÁTICO (GENERAR Y EVALUAR)
         // ==========================================
         if (action === 'socratic_question') {
