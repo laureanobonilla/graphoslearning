@@ -316,7 +316,7 @@ function close() {
   if (root) { root.hidden = true; root.innerHTML = ''; }
   document.removeEventListener('keydown', onKey, true);
   S = null; busy = false;
-  setActive(typeof hasMap === 'function' && hasMap() ? 'mapa' : '');
+  setActive(typeof hasMap === 'function' && hasMap() ? lastView : '');
 }
 function onKey(e) { if (e.key === 'Escape' && root && !root.hidden) { e.stopPropagation(); close(); } }
 
@@ -632,7 +632,7 @@ function closeCards(restore) {
   const st = cardsSt; cardsSt = null;
   if (cardsEl) { cardsEl.hidden = true; cardsEl.innerHTML = ''; }
   document.removeEventListener('keydown', onCardsKey, true);
-  if (activeTab === 'todas') setActive(hasMap() ? 'mapa' : '');
+  if (activeTab === 'todas') setActive(hasMap() ? lastView : '');
   if (restore && st && !st.fromMap) { const i = document.getElementById('startTopic'); if (i && !i.value) i.value = st.topic; }   // si no elige nada, el tema vuelve al campo
 }
 async function runMap(topic) {
@@ -680,12 +680,7 @@ async function pickCard(k) {
   }
   closeCards(false);
   setTopic(st.topic);
-  if (k === 'mapa') { if (!st.fromMap) await runMap(st.topic); setActive('mapa'); return; }
-  if (k === 'rizoma') {
-    if (!st.fromMap && !(await runMap(st.topic))) return;
-    setActive('rizoma');
-    setTimeout(() => { try { if (window.__gkRhizomeOpen) window.__gkRhizomeOpen(); } catch (_e) { /* nada */ } }, 250);
-  }
+  await goTab(k);
 }
 window.GK_CARDS = { enabled: cardsOn, open: (t, o) => openCards(t, o) };
 
@@ -710,7 +705,7 @@ function tryPending() {
 
 
 /* ---------- navegación por pestañas (modo chat): el tema actual y la vista activa ---------- */
-let curTopic = '', activeTab = '';
+let curTopic = '', activeTab = '', lastView = 'mapa';
 const navHooks = [];
 function hasMap() { try { return nodes.length > 0; } catch (_e) { return false; } }
 function topicNow() {
@@ -719,7 +714,7 @@ function topicNow() {
   if (hasMap()) { const t = target(true); if (t && t.name) return t.name; }
   return curTopic;
 }
-function setActive(k) { activeTab = k || ''; navHooks.forEach((f) => { try { f(activeTab); } catch (_e) { /* nada */ } }); }
+function setActive(k) { activeTab = k || ''; if (k === 'mapa' || k === 'rizoma') lastView = k; navHooks.forEach((f) => { try { f(activeTab); } catch (_e) { /* nada */ } }); }
 function setTopic(t) { curTopic = String(t || '').trim().slice(0, 200); setActive(activeTab); }
 async function goTab(k) {
   const topic = topicNow();
@@ -733,14 +728,16 @@ async function goTab(k) {
     openLens(k, { target: rt || { id: null, name: topic, sel: false, ctx: '', map: '', topicOnly: true }, level, from: 'tab' });
     return;
   }
-  if (k === 'mapa') { if (!mapNow) await runMap(topic); setActive('mapa'); return; }
+  const view = (on) => { try { return window.__gkRhizomeView ? window.__gkRhizomeView(on) : false; } catch (_e) { return false; } };
+  if (k === 'mapa') { if (!mapNow && !(await runMap(topic))) return; view(false); setActive('mapa'); return; }
   if (k === 'rizoma') {
     if (!mapNow && !(await runMap(topic))) return;
+    await new Promise((r) => setTimeout(r, 150));   // deja que el mapa recién armado quede contado
+    if (!view(true)) { try { appAlert(L('El rizoma necesita al menos 5 ideas en el mapa para mostrar conexiones.', 'The rhizome needs at least 5 ideas on the map to show connections.')); } catch (_e) { /* nada */ } view(false); setActive('mapa'); return; }
     setActive('rizoma');
-    setTimeout(() => { try { if (window.__gkRhizomeOpen) window.__gkRhizomeOpen(); } catch (_e) { /* nada */ } }, 250);
   }
 }
-window.GK_NAV = { go: goTab, topic: topicNow, setTopic, hasMap, active: () => activeTab, onChange: (f) => navHooks.push(f), setActive, cards: (t, o) => openCards(t, o) };
+window.GK_NAV = { lastView: () => lastView, go: goTab, topic: topicNow, setTopic, hasMap, active: () => activeTab, onChange: (f) => navHooks.push(f), setActive, cards: (t, o) => openCards(t, o) };
 
 /* ---------- menú «Lentes» de la cabecera ---------- */
 let menu = null, btn = null;

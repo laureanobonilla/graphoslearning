@@ -18,7 +18,9 @@
   const CSS = `
 body.gk-chat #startTopic, body.gk-chat #btnStartTopic, body.gk-chat #btnToggleReader, body.gk-chat #btnUndo, body.gk-chat #btnReorganize,
 body.gk-chat #btnSearchNodes, body.gk-chat #btnPresentationMode, body.gk-chat #gkLensBtnWrap, body.gk-chat #welcomeScreen{display:none !important}
-body.gk-chat #gkLens, body.gk-chat #gkCards{top:var(--gk-head-h,0px);bottom:var(--gk-comp-h,0px)}
+body.gk-chat #gkLens, body.gk-chat #gkCards{top:var(--gk-head-h,0px);bottom:calc(var(--gk-comp-h,0px) + var(--gk-notes-h,0px))}
+body.gk-chat #rhzToggle{display:none !important}
+body.gk-cover #defsView, body.gk-cover #topicPanel, body.gk-cover #readerPanel{visibility:hidden !important}   /* con una lente o las tarjetas a pantalla completa, los paneles laterales no asoman por debajo */
 body.gk-chat #vizPanel{bottom:var(--gk-comp-h,0px)}
 body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
 #gkComposer{flex:0 0 auto;position:relative;z-index:31;padding:6px 16px 12px;background:linear-gradient(rgba(10,14,26,0),#0a0e1a 35%);font-family:Inter,system-ui,sans-serif}
@@ -84,6 +86,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
         const ok = await appConfirm(L('Empezar un tema nuevo cierra el mapa actual. Queda guardado en Mis Proyectos si tienes sesión iniciada. ¿Seguimos?', 'Starting a new topic closes the current map. It stays saved in My Projects if you are signed in. Continue?'), { title: L('Tema nuevo', 'New topic'), okText: L('Sí, tema nuevo', 'Yes, new topic'), cancelText: L('Cancelar', 'Cancel') });
         if (!ok) return;
         await startFreshCanvas();
+        try { if (window.__gkRhizomeView) window.__gkRhizomeView(false); } catch (_e) { /* nada */ }
         nav.setActive('');
       }
       input.value = ''; input.style.height = 'auto'; measure();
@@ -122,7 +125,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     tabs.querySelectorAll('[data-tab]').forEach((b) => { const on = b.dataset.tab === active; b.classList.toggle('on', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
     tabs.classList.toggle('idle', !window.GK_NAV.topic());
     // Modo (Cerebro/Árbol) y Vista son del mapa: solo se ven mientras se mira el mapa.
-    const mapView = active === 'mapa' || active === 'rizoma' || (!active && window.GK_NAV.hasMap());
+    const mapView = active === 'mapa' || (!active && window.GK_NAV.hasMap() && window.GK_NAV.lastView() === 'mapa');
     ['schemaLayoutMode', 'viewMode'].forEach((id) => { const el = document.getElementById(id); const w = el && el.parentElement; if (w) w.style.display = mapView ? '' : 'none'; });
   }
 
@@ -140,20 +143,24 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     const hd = document.getElementById('mainHeader');
     if (hd) document.body.style.setProperty('--gk-head-h', Math.round(hd.getBoundingClientRect().bottom) + 'px');
     if (comp) document.body.style.setProperty('--gk-comp-h', Math.round(comp.offsetHeight) + 'px');
+    const vp = document.getElementById('vizPanel');   // «Mis notas» queda siempre abajo: las vistas a pantalla completa le dejan su espacio
+    document.body.style.setProperty('--gk-notes-h', (vp && vp.classList.contains('on') ? Math.round(vp.getBoundingClientRect().height) : 0) + 'px');
     // La barra se queda entre los paneles laterales (texto a la izquierda, definiciones a la derecha), igual que «Mis notas».
     if (comp) {
       const vis = (id) => { const e = document.getElementById(id); return e && !e.classList.contains('hidden') && e.offsetWidth > 0 ? e : null; };
       const rd = vis('readerPanel'), tp = document.getElementById('topicPanel'), dv = vis('defsView');
       const l = rd ? rd.getBoundingClientRect().width : (tp && tp.classList.contains('on') ? tp.getBoundingClientRect().width : 0);
       const r = dv ? dv.getBoundingClientRect().width : 0;
-      comp.style.paddingLeft = (16 + Math.round(l)) + 'px'; comp.style.paddingRight = (16 + Math.round(r)) + 'px';
+      const cover = !!(document.querySelector('#gkLens:not([hidden])') || document.querySelector('#gkCards:not([hidden])'));
+      document.body.classList.toggle('gk-cover', cover);
+      comp.style.paddingLeft = (16 + (cover ? 0 : Math.round(l))) + 'px'; comp.style.paddingRight = (16 + (cover ? 0 : Math.round(r))) + 'px';
     }
   }
   function sync() {
     const nav = window.GK_NAV; if (!nav) return;
     measure();
     const overlay = !!(document.querySelector('#gkLens:not([hidden])') || document.querySelector('#gkCards:not([hidden])'));
-    if (nav.hasMap() && !nav.active()) nav.setActive('mapa');
+    if (nav.hasMap() && !nav.active()) nav.setActive(nav.lastView());
     if (!nav.hasMap() && nav.active() === 'mapa') nav.setActive('');
     if (hero) hero.classList.toggle('on', !nav.hasMap() && !overlay);
     paintTabs(nav.active());

@@ -9311,16 +9311,18 @@ const vizUI = (() => {
         const rd = document.getElementById('readerPanel');
         const l = (rd && !rd.classList.contains('hidden')) ? Math.round(rd.getBoundingClientRect().width) : (tp && tp.classList.contains('on') ? Math.round(tp.getBoundingClientRect().width) : 0);
         const r = dv && !dv.classList.contains('hidden') ? Math.round(dv.getBoundingClientRect().width) : 0;
-        const ron = rhzOn();
+        const chat = document.body.classList.contains('gk-chat');   // modo chat: el rizoma es una vista aparte (ocupa el centro) y no un panel plegable
+        const ron = chat ? (rhzOn() && rView) : rhzOn();
         // Espacio realmente libre: desde el borde inferior de la cabecera hasta el panel de notas y la barra de abajo (modo chat).
         const hb = (document.getElementById('mainHeader') || { getBoundingClientRect: () => ({ bottom: 0 }) }).getBoundingClientRect().bottom;
         const compH = parseInt(getComputedStyle(document.body).getPropertyValue('--gk-comp-h'), 10) || 0;
-        const avail = window.innerHeight - h - hb - compH - 12, maxR = Math.max(140, avail);
-        const rh = !ron ? 0 : (rOpen ? Math.max(140, Math.min(RH || Math.round(avail * 0.85), maxR)) : 40);
+        const avail = window.innerHeight - h - hb - compH - (chat ? 0 : 12), maxR = Math.max(140, avail);
+        const rh = !ron ? 0 : (chat ? Math.max(140, avail) : (rOpen ? Math.max(140, Math.min(RH || Math.round(avail * 0.85), maxR)) : 40));
         const geo = h + '|' + l + '|' + r + '|' + rh; if (geo === lastGeo) return; lastGeo = geo;
         panel.style.setProperty('--vz-h', h + 'px'); panel.style.setProperty('--vz-l', l + 'px'); panel.style.setProperty('--vz-r', r + 'px');
-        if (rPane) { rPane.classList.toggle('on', ron); rPane.classList.toggle('open', ron && rOpen); rPane.style.left = l + 'px'; rPane.style.right = r + 'px'; rPane.style.bottom = 'calc(' + h + 'px + var(--gk-comp-h, 0px))'; rPane.style.height = rh + 'px'; if (ron) rhzHeader(); if (rPane._sync) rPane._sync(); }   // el encabezado se arma de una vez, aunque el rizoma esté plegado
+        if (rPane) { rPane.classList.toggle('on', ron); rPane.classList.toggle('open', ron && (chat || rOpen)); rPane.style.left = l + 'px'; rPane.style.right = r + 'px'; rPane.style.bottom = 'calc(' + h + 'px + var(--gk-comp-h, 0px))'; rPane.style.height = rh + 'px'; if (ron) rhzHeader(); if (rPane._sync) rPane._sync(); }   // el encabezado se arma de una vez, aunque el rizoma esté plegado
         const tot = h + rh;
+        container.style.visibility = (chat && ron) ? 'hidden' : '';   // con el rizoma a la vista, el mapa mental se esconde (vive en su propia pestaña)
         container.style.height = tot ? 'calc(100% - ' + tot + 'px)' : ''; container.style.alignSelf = tot ? 'flex-start' : '';
         toggleBtn.textContent = open ? '▾' : '▴';
         setTimeout(() => { window.dispatchEvent(new Event('resize')); try { network.redraw(); } catch (_e) { /* ok */ } fitRhizome(); }, 60);
@@ -9748,6 +9750,7 @@ const vizUI = (() => {
     // ---------- panel del rizoma (mitad baja del lienzo, siempre a la vista en escritorio) ----------
     const rPane = document.getElementById('rhzPane'), rBody = document.getElementById('rhzBody'), rTipEl = document.getElementById('rhzTip');
     const RZ_COLORS = ['#4fd1c5', '#8b7cf6', '#f2b366', '#f472b6', '#4ade80', '#fb923c', '#63b3ed', '#f87171'];
+    let rView = false;   // modo chat: ¿se está mirando la vista Rizoma?
     let rOpen = false, RH = 0, rAskT = null;   // plegado por defecto: solo se ve su encabezado, encima de «Mis notas»
     try { rOpen = localStorage.getItem('gk_rhz_open') === '1'; RH = Number(localStorage.getItem('gk_rhz_h2')) || 0; rRead = localStorage.getItem('gk_rhz_read') !== '0'; } catch (_e) { /* ok */ }
     const rTip = (t) => { if (!rTipEl) return; rTipEl.textContent = t || ''; rTipEl.classList.toggle('on', !!t); };
@@ -9793,6 +9796,7 @@ const vizUI = (() => {
     }
     // ---------- que el rizoma proponga qué hacer: frase guía, ruta de estudio y práctica en Escribir ----------
     let rCtx = null, rGuideOff = '', rRoute = null;
+    window.__gkRhizomeView = (on) => { if (!document.body.classList.contains('gk-chat')) return false; if (on && !rhzOn()) return false; rView = !!on; rOpen = rView; lastGeo = ''; layout(); if (rView) { rSig = ''; renderRhizome(); } return true; };   // pestañas Mapa mental / Rizoma (chat.js)
     window.__gkRhizomeOpen = () => { if (!rhzOn()) return false; rOpen = true; try { localStorage.setItem('gk_rhz_open', '1'); } catch (_e) { /* ok */ } lastGeo = ''; layout(); rSig = ''; renderRhizome(); return true; };   // lo usan las tarjetas del tema
     const lb = (id) => { const n = rCtx && rCtx.byId.get(String(id)); return n ? n.label : ''; };
     // conceptos puente concretos (sin la raíz ni los nombres de las ramas), para frases y preguntas
