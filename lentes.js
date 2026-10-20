@@ -227,7 +227,11 @@ const CSS = `
 #gkLens .gl-prim:hover{background:#6fe0d6}
 #gkLens .gl-map{flex:1;min-width:0;position:relative}
 #gkLens .gl-map>div{position:absolute;inset:0}
-#gkLens .gl-side{width:360px;max-width:42vw;border-left:1px solid #1d2442;overflow:auto;padding:18px 18px 28px;background:#0d1226}
+#gkLens .gl-body{position:relative}
+#gkLens .gl-grip{position:absolute;top:0;bottom:0;right:calc(var(--gl-side-w,360px) - 4px);width:9px;cursor:col-resize;z-index:3;touch-action:none}
+#gkLens .gl-grip::after{content:'';position:absolute;left:3px;top:50%;height:46px;margin-top:-23px;width:3px;border-radius:3px;background:#2c3458;transition:background .15s}
+#gkLens .gl-grip:hover::after,body.gk-resizing #gkLens .gl-grip::after{background:#4fd1c5}
+#gkLens .gl-side{width:var(--gl-side-w,360px);max-width:70vw;border-left:1px solid #1d2442;overflow:auto;padding:18px 18px 28px;background:#0d1226}
 #gkLens .gl-ess{font:600 18px/1.4 Sora,Inter,sans-serif;margin:0 0 14px}
 #gkLens .gl-chip{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:#0a0e1a;margin-bottom:10px}
 #gkLens .gl-h{font:700 15px Sora,Inter,sans-serif;margin:0 0 8px}
@@ -289,6 +293,7 @@ const CSS = `
 #gkLens .gl-sec.why b{color:#8b7cf6}
 @media (max-width:860px){
   #gkLens .gl-body.split{flex-direction:column}
+  #gkLens .gl-grip{display:none}
   #gkLens .gl-side{width:auto;max-width:none;border-left:0;border-top:1px solid #1d2442;max-height:44vh}
   #gkLens .gl-sub{max-width:100%;order:5;flex-basis:100%}
   #gkLens .gl-rail{width:34px}#gkLens .gl-num{width:34px;height:34px;font-size:17px}
@@ -331,6 +336,20 @@ function setBody(html, cls) {
   if (cardsOn()) { const gb = document.createElement('button'); gb.type = 'button'; gb.className = 'gl-ghost'; gb.id = 'glCards'; gb.textContent = '🃏 ' + L('Otras tarjetas', 'Other cards'); const sp = $('.gl-sp', root); if (sp) sp.insertAdjacentElement('beforebegin', gb); gb.addEventListener('click', () => { const tg = S.tg; close(); openCards(tg.name, { fromMap: !tg.topicOnly }); }); }
   $('#glLevel', root).addEventListener('change', (e) => { const v = e.target.value, tg = S.tg, lens = S.lens; setLevel(v); close(); openLens(lens, { target: tg, level: v, from: 'level_switch' }); });
   const rg = $('#glRegen', root); if (rg) rg.addEventListener('click', regenerate);
+  addGrip();
+}
+/* El panel de la derecha se puede ensanchar o angostar arrastrando su borde; el ancho se recuerda. */
+function addGrip() {
+  const body = $('#glBody', root); if (!body || !$('.gl-side', body)) return;
+  try { const w = Number(localStorage.getItem('gk_gl_w')); if (w >= 280) root.style.setProperty('--gl-side-w', w + 'px'); } catch (_e) { /* nada */ }
+  const g = document.createElement('div'); g.className = 'gl-grip'; g.id = 'glGrip'; g.title = L('Arrastra para ensanchar el panel', 'Drag to resize the panel'); body.appendChild(g);
+  g.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); try { g.setPointerCapture(e.pointerId); } catch (_e) { /* nada */ }
+    document.body.classList.add('gk-resizing');
+    const move = (ev) => { const w = Math.round(Math.max(280, Math.min(window.innerWidth * 0.7, window.innerWidth - ev.clientX))); root.style.setProperty('--gl-side-w', w + 'px'); window.dispatchEvent(new Event('resize')); };
+    const up = () => { g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); g.removeEventListener('pointercancel', up); document.body.classList.remove('gk-resizing'); try { localStorage.setItem('gk_gl_w', String(parseInt(root.style.getPropertyValue('--gl-side-w'), 10) || 360)); } catch (_e) { /* nada */ } };
+    g.addEventListener('pointermove', move); g.addEventListener('pointerup', up); g.addEventListener('pointercancel', up);
+  });
 }
 function showLoading() {
   destroyNetwork();

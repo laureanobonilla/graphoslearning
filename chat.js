@@ -19,6 +19,14 @@
 body.gk-chat #startTopic, body.gk-chat #btnStartTopic, body.gk-chat #btnToggleReader, body.gk-chat #btnUndo, body.gk-chat #btnReorganize,
 body.gk-chat #btnSearchNodes, body.gk-chat #btnPresentationMode, body.gk-chat #gkLensBtnWrap, body.gk-chat #welcomeScreen{display:none !important}
 body.gk-chat #gkLens, body.gk-chat #gkCards{top:var(--gk-head-h,0px);bottom:calc(var(--gk-comp-h,0px) + var(--gk-notes-h,0px))}
+body.gk-chat #gkLens{bottom:0}   /* el panel de la derecha llega hasta abajo; lo demás deja su espacio a «Mis notas» y a la barra */
+body.gk-chat #gkLens .gl-body > :not(.gl-side):not(.gl-grip){margin-bottom:calc(var(--gk-comp-h,0px) + var(--gk-notes-h,0px))}
+body.gk-cover #gkComposer{z-index:150;background:none;pointer-events:none}
+body.gk-cover #gkComposer .gc-in{pointer-events:auto}
+body.gk-cover #gkCtl{z-index:151}
+body.gk-cover #vizPanel{z-index:150;right:var(--gk-side-w,0px) !important;--p-bg:#0d1226;--p-bg2:#161c35;--p-head:#0d1226;--p-ink:#eef1fb;--p-ink2:#c7d2e8;--p-mute:#8a92b2;--p-rule:#2c3458;--p-acc:#4fd1c5;--p-acc-bg:rgba(79,209,197,.14);box-shadow:none;scrollbar-color:#2c3458 transparent}
+body.gk-cover #vizPanel .vz-btn, body.gk-cover #vizPanel .vz-quote button, body.gk-cover #vizPanel .vz-ghost, body.gk-cover #vizPanel .vz-note, body.gk-cover #vizPanel .vz-note-form textarea, body.gk-cover #vizPanel .vz-rh-ctl select{background:#161c35;color:#eef1fb}
+body.gk-cover #vizPanel .vz-primary{color:#071018}
 body.gk-chat #rhzToggle{display:none !important}
 body.gk-chat #btnDefsView{position:static;flex:0 0 auto;margin-left:10px;padding:7px 16px;background:linear-gradient(120deg,#4fd1c5,#8b7cf6);color:#071018;border:0;font:700 13px Inter,system-ui,sans-serif;box-shadow:0 4px 18px rgba(79,209,197,.35)}
 body.gk-chat #btnDefsView:hover{color:#071018;filter:brightness(1.1)}
@@ -189,8 +197,10 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
       const r = dv ? dv.getBoundingClientRect().width : 0;
       const cover = !!(document.querySelector('#gkLens:not([hidden])') || document.querySelector('#gkCards:not([hidden])'));
       document.body.classList.toggle('gk-cover', cover);
+      const gs = document.querySelector('#gkLens:not([hidden]) #glSide'); const sideW = gs && window.innerWidth > 860 ? Math.round(gs.getBoundingClientRect().width) : 0;
+      document.body.style.setProperty('--gk-side-w', sideW + 'px');
       const ctl = document.getElementById('gkCtl'); const cw = ctl ? Math.round(ctl.getBoundingClientRect().width) + 28 : 16;
-      comp.style.paddingLeft = Math.max(cw, 16 + (cover ? 0 : Math.round(l))) + 'px'; comp.style.paddingRight = (16 + (cover ? 0 : Math.round(r))) + 'px';
+      comp.style.paddingLeft = Math.max(cw, 16 + (cover ? 0 : Math.round(l))) + 'px'; comp.style.paddingRight = (16 + (cover ? sideW : Math.round(r))) + 'px';
     }
   }
   function sync() {
