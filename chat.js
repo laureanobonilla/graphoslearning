@@ -93,6 +93,9 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
       '<p class="gc-h">' + esc(L('Enter para estudiar · Mayús + Enter para otra línea', 'Enter to study · Shift + Enter for a new line')) + '</p>';
     document.body.appendChild(comp);
     input = $('#gkComposerInput', comp); btn = $('#gkComposerBtn', comp);
+    let seenFocus = false, seenTyped = false;   // ¿llegó a tocar la barra? ¿llegó a escribir? (para ver dónde se cae la gente)
+    input.addEventListener('focus', () => { if (!seenFocus) { seenFocus = true; trk('composer_focus', {}); } });
+    input.addEventListener('input', () => { if (!seenTyped && input.value.trim()) { seenTyped = true; trk('composer_typed', { len: Math.min(input.value.length, 500) }); } });
     const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(168, input.scrollHeight) + 'px'; measure(); };
     input.addEventListener('input', grow);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });

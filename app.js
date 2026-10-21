@@ -693,6 +693,16 @@ function getDisplayName() {
     return getGuestDisplayName();
 }
 
+// De dónde llegó y con qué aparato: sirve para separar campañas (?utm_campaign=...) y ver si vienen del navegador de Facebook.
+function visitInfo() {
+    try {
+        const q = new URLSearchParams(location.search); const ua = navigator.userAgent || '';
+        let ref = ''; try { ref = document.referrer ? new URL(document.referrer).hostname : ''; } catch (_e) { ref = ''; }
+        const info = { ref: ref.slice(0, 60), w: window.innerWidth, inapp: /FBAN|FBAV|Instagram/i.test(ua) ? 'facebook' : '', mobile: /Mobi|Android|iPhone/i.test(ua) };
+        ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'fbclid'].forEach((k) => { const v = q.get(k); if (v) info[k === 'fbclid' ? 'fb_click' : k] = k === 'fbclid' ? true : v.slice(0, 60); });
+        return info;
+    } catch (_e) { return {}; }
+}
 function track(eventName, metadata = {}) {
     (async () => {
         try {
@@ -6203,9 +6213,9 @@ if (isFirstTimeUser && welcomeScreen) {
     welcomeScreen.classList.remove('hidden');
     welcomeScreen.classList.add('flex');
     localStorage.setItem('gk_has_visited', 'true');
-    track('first_visit');
+    track('first_visit', visitInfo());
 } else {
-    track('return_visit');
+    track('return_visit', visitInfo());
 }
 
 function dismissWelcomeScreen() {
