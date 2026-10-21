@@ -638,7 +638,7 @@ function openLens(lens, opts) {
   S = { lens, tg, key, level: lv, data: c ? c.data : null, done: (c && c.done) || {}, network: null };
   document.addEventListener('keydown', onKey, true);
   setActive(lens);
-  trk('lens_open', { lens, cached: !!c, from: (opts && opts.from) || 'menu' });
+  trk('lens_open', { lens, cached: !!c, from: (opts && opts.from) || 'menu', topic: String((S.tg && S.tg.name) || '').slice(0, 80) });
   if (c) render(); else generate();
 }
 
@@ -678,7 +678,7 @@ function openCards(topic, opts) {
   cardsSt = { topic, fromMap, tg: tgm };
   cardsEl.hidden = false; document.addEventListener('keydown', onCardsKey, true);
   setActive('todas');
-  trk('cards_open', { fromMap });
+  trk('cards_open', { fromMap, topic: String(topic || '').slice(0, 80) });
   const draw = () => {
     cardsEl.innerHTML = cardsHtml();
     cardsEl.querySelector('#gcClose').addEventListener('click', () => closeCards(true));

@@ -125,7 +125,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
         readerTextMode.innerText = src; readerTextMode.dispatchEvent(new Event('input', { bubbles: true }));
         await generateFromReaderText();   // mismo camino que «Generar esquema» del Modo Lector: lee el enlace, estructura el texto y arma el mapa
       } else {
-        trk('chat_submit', { kind: 'topic' });
+        trk('chat_submit', { kind: 'topic', topic: raw.slice(0, 80) });
         nav.setTopic(raw);
         if (window.GK_CARDS && window.GK_CARDS.enabled()) nav.cards(raw, { fromMap: false });
         else nav.go('mapa');
