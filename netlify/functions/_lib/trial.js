@@ -40,4 +40,15 @@ async function guestHasTrial(guestId) {
     return Array.isArray(rows) && rows.length > 0;
 }
 
-module.exports = { UUID_RE, adRow, ticketValid, guestHasTrial };
+// ¿Este invitado (cookie) llegó desde Facebook? Se mira en SUS eventos de visita (first_visit / return_visit de los últimos 7 días):
+// clic de Facebook (fbclid), origen facebook/instagram o utm_source de Facebook. No se confía en nada que mande el cliente en la llamada.
+async function guestFromFacebook(guestId) {
+    if (!guestId) return false;
+    const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
+    const actor = encodeURIComponent('guest:' + guestId);
+    const rows = await get(`events?actor_id=eq.${actor}&event_name=in.(first_visit,return_visit)&created_at=gte.${since}` +
+        `&or=(metadata->>fb_click.eq.true,metadata->>ref.ilike.*facebook*,metadata->>ref.ilike.*instagram*,metadata->>utm_source.ilike.*facebook*,metadata->>utm_source.eq.fb,metadata->>utm_source.eq.ig)&select=id&limit=1`);
+    return Array.isArray(rows) && rows.length > 0;
+}
+
+module.exports = { UUID_RE, adRow, ticketValid, guestHasTrial, guestFromFacebook };

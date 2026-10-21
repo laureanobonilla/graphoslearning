@@ -145,6 +145,16 @@ const CSS = `
 #gkLensBtn:focus-visible{outline:2px solid #fff;outline-offset:2px}
 #gkCards{position:fixed;inset:0;z-index:139;background:radial-gradient(1200px 600px at 50% -10%,#141b3a 0%,#0a0e1a 60%);color:#eef1fb;font-family:Inter,system-ui,sans-serif;overflow-y:auto;padding:28px 20px 40px}
 #gkCards[hidden]{display:none}
+#gkCards .gc-brand{font:700 15px Sora,Inter,sans-serif;color:#4fd1c5}
+#gkCards .gc-ent{display:flex;gap:10px;margin:6px 0 4px;max-width:720px}
+#gkCards .gc-ent input{flex:1;min-width:0;background:#11162b;border:1px solid #2c3458;border-radius:14px;color:#eef1fb;font:400 16px Inter,system-ui,sans-serif;padding:13px 16px;outline:0}
+#gkCards .gc-ent input:focus{border-color:#4fd1c5;box-shadow:0 0 0 3px rgba(79,209,197,.16)}
+#gkCards .gc-ent button{border:0;border-radius:14px;background:#4fd1c5;color:#071018;font:700 15px Inter,system-ui,sans-serif;padding:0 26px;cursor:pointer}
+#gkCards .gc-ent button:disabled{opacity:.35;cursor:not-allowed}
+#gkCards .gc-hint{min-height:20px;margin:6px 2px 0;font-size:12.5px;color:#8a92b2}
+#gkCards .gc-entry .gc-c.sel{border-color:#4fd1c5;box-shadow:0 0 0 2px rgba(79,209,197,.35);background:#141b34}
+body.gk-entry #gkComposer, body.gk-entry #gkCtl{display:none !important}
+
 #gkCards .gc-w{max-width:980px;margin:0 auto}
 #gkCards .gc-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
 #gkCards .gc-x{background:none;border:1px solid #2c3458;color:#aab2d0;border-radius:999px;padding:6px 13px;font:600 12.5px Inter,system-ui,sans-serif;cursor:pointer}
@@ -631,8 +641,10 @@ function openLens(lens, opts) {
   closeMenu();
   const lv = (opts && opts.level) || level, key = (opts && opts.key) || cacheKey(lens, tg.name, lv), c = cacheAll()[key];
   if (!c) {
-    if (typeof requireAuth === 'function' && !requireAuth(L('ver este tema con una lente', 'view this topic through a lens'))) { savePending(lens, tg, lv); return; }
-    if (typeof checkBalance === 'function' && !checkBalance(COST)) return;
+    if (!fbTrialOk()) {   // quien llega de Facebook prueba una vez sin registrarse; el servidor lo confirma
+      if (typeof requireAuth === 'function' && !requireAuth(L('ver este tema con una lente', 'view this topic through a lens'))) { savePending(lens, tg, lv); return; }
+      if (typeof checkBalance === 'function' && !checkBalance(COST)) return;
+    }
   }
   ensureRoot(); root.hidden = false;
   S = { lens, tg, key, level: lv, data: c ? c.data : null, done: (c && c.done) || {}, network: null };
@@ -643,12 +655,31 @@ function openLens(lens, opts) {
 }
 
 
+/* ---------- visitantes de Facebook: ejemplo gratis de lo que elijan + pantalla de tarjetas con campo de tema ---------- */
+function fbNow() {
+  try {
+    const q = new URLSearchParams(location.search), src = String(q.get('utm_source') || '').toLowerCase();
+    let host = ''; try { host = document.referrer ? new URL(document.referrer).hostname : ''; } catch (_e) { host = ''; }
+    const now = q.has('fbclid') || /^(fb|facebook|ig|instagram)$/.test(src) || /(^|\.)(facebook\.com|fb\.com|fb\.me|instagram\.com)$/.test(host);
+    if (now) { try { sessionStorage.setItem('gk_fb_s', '1'); } catch (_e) { /* nada */ } return true; }
+    return sessionStorage.getItem('gk_fb_s') === '1';   // recargar o moverse dentro de la misma visita no lo pierde
+  } catch (_e) { return false; }
+}
+function isGuestNow() { try { return !(typeof currentUser !== 'undefined' && currentUser) && !(typeof isAdmin !== 'undefined' && isAdmin) && !(window.netlifyIdentity && netlifyIdentity.currentUser && netlifyIdentity.currentUser()); } catch (_e) { return true; } }
+// ¿Le toca saltarse el muro de registro y el aviso de saldo? El servidor decide de verdad (solo deja UN ejemplo por invitado que llegó de Facebook).
+function fbTrialOk() { return isGuestNow() && fbNow(); }
+function fbEntryWanted() {
+  try { return cardsOn() && fbTrialOk() && !hasMap() && localStorage.getItem('gk_fb_trial_used') !== '1' && !localStorage.getItem('gk_lens_pending'); } catch (_e) { return false; }
+}
+window.GK_FB = { now: fbNow, ok: fbTrialOk, entry: fbEntryWanted };
+
 /* ---------- tarjetas del tema: elegir cómo explorarlo antes de armar nada ---------- */
 function cardsOn() { try { if (/[?&]tarjetas=0/.test(location.search)) return false; return localStorage.getItem('gk_cards') !== '0'; } catch (_e) { return true; } }
 let cardsEl = null, cardsSt = null;
-function onCardsKey(e) { if (e.key === 'Escape' && cardsEl && !cardsEl.hidden) { e.stopPropagation(); closeCards(true); } }
+function onCardsKey(e) { if (e.key === 'Escape' && cardsEl && !cardsEl.hidden && !(cardsSt && cardsSt.entry)) { e.stopPropagation(); closeCards(true); } }
 function closeCards(restore) {
   const st = cardsSt; cardsSt = null;
+  document.body.classList.remove('gk-entry');
   if (cardsEl) { cardsEl.hidden = true; cardsEl.innerHTML = ''; }
   document.removeEventListener('keydown', onCardsKey, true);
   if (activeTab === 'todas') setActive(hasMap() ? lastView : '');
@@ -656,7 +687,7 @@ function closeCards(restore) {
 }
 async function runMap(topic) {
   try { if (typeof dismissWelcomeScreen === 'function') dismissWelcomeScreen(); } catch (_e) { /* nada */ }
-  await generateFullSchemaFromTopic(topic, {});
+  await generateFullSchemaFromTopic(topic, { fbTrial: fbTrialOk() });
   try { return nodes.length > 0; } catch (_e) { return false; }
 }
 function cardsHtml() {
@@ -664,25 +695,51 @@ function cardsHtml() {
   const lensCard = (k) => { const x = LENSES[k], cached = !!cacheAll()[cacheKey(k, st.topic, level)];
     return '<button type="button" class="gc-c' + (k === 'camino' ? ' gc-main' : '') + '" data-k="' + k + '"><span class="gc-i">' + x.icon + '</span><span class="gc-n">' + esc(x.name()) + (k === 'camino' ? '<span class="gc-rec">' + esc(L('empieza por aquí', 'start here')) + '</span>' : '') + '</span><span class="gc-d">' + esc(x.desc()) + '</span><span class="gc-m">' + (cached ? '<i>✓ ' + esc(L('guardada, se abre al instante', 'saved, opens instantly')) + '</i>' : esc(COST + ' ' + L('nodos · sin armar el mapa', 'nodes · no map needed'))) + '</span></button>'; };
   const m = st.fromMap;
-  return '<div class="gc-w"><div class="gc-top"><button type="button" class="gc-x" id="gcClose">' + esc(m ? L('‹ Volver al mapa', '‹ Back to the map') : L('‹ Cambiar el tema', '‹ Change the topic')) + '</button><div class="gc-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + lvBtns + '</div></div>' +
+  const entryHtml = (normal) => {   // entrada de Facebook: las mismas tarjetas con un campo para elegir el tema; «Generar» solo se activa con tema y tarjeta
+    const head = '<div class="gc-w gc-entry"><div class="gc-top"><span class="gc-brand">Γ Graphikosmos</span><div class="gc-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + lvBtns + '</div></div>' +
+      '<h2>' + esc(L('¿Qué quieres estudiar?', 'What do you want to study?')) + '</h2><p class="gc-sub">' + esc(L('Escribe un tema, elige cómo quieres verlo y pulsa Generar. Te mostramos un ejemplo gratis, sin registrarte.', 'Type a topic, pick how you want to see it and press Generate. We show you a free example, no sign-up.')) + '</p>' +
+      '<div class="gc-ent"><input type="text" id="gcTopic" maxlength="200" autocomplete="off" placeholder="' + esc(L('Escribe un tema, por ejemplo: La Revolución Francesa', 'Type a topic, e.g. The French Revolution')) + '" value="' + esc(st.topic) + '"><button type="button" id="gcGo" disabled>' + esc(L('Generar', 'Generate')) + '</button></div><p class="gc-hint" id="gcHint"></p>';
+    const at = normal.indexOf('<p class="gc-h">');
+    const free = esc(L('ejemplo gratis', 'free example'));
+    return head + normal.slice(at).replace(/\d+ (?:nodos?|nodes?)(?: · [^<]*| \([^)]*\))?/g, free);   // en esta pantalla el primer ejemplo no cuesta nada
+  };
+  const normal = '<div class="gc-w"><div class="gc-top"><button type="button" class="gc-x" id="gcClose">' + esc(m ? L('‹ Volver al mapa', '‹ Back to the map') : L('‹ Cambiar el tema', '‹ Change the topic')) + '</button><div class="gc-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + lvBtns + '</div></div>' +
     '<h2>' + esc(st.topic) + '</h2><p class="gc-sub">' + esc(L('¿Cómo quieres explorarlo? Puedes cambiar de tarjeta cuando quieras.', 'How do you want to explore it? You can switch cards any time.')) + '</p>' +
     '<p class="gc-h"><b>' + esc(L('Ver la estructura', 'See the structure')) + '</b></p><div class="gc-g">' +
     '<button type="button" class="gc-c" data-k="mapa"><span class="gc-i">🗺️</span><span class="gc-n">' + esc(L('Mapa mental', 'Mind map')) + '</span><span class="gc-d">' + esc(L('El esquema del tema con sus ramas y subtemas. El rizoma queda plegado abajo.', 'The topic as branches and sub-topics. The rhizome stays folded below.')) + '</span><span class="gc-m">' + esc(m ? L('Seguir en el mapa', 'Stay on the map') : '1 ' + L('nodo', 'node')) + '</span></button>' +
     '<button type="button" class="gc-c" data-k="rizoma"><span class="gc-i">🕸️</span><span class="gc-n">' + esc(L('Rizoma', 'Rhizome')) + '</span><span class="gc-d">' + esc(L('Cómo se conectan las ideas por su significado, no solo por jerarquía. El mapa mental queda en el resto de la pantalla.', 'How ideas connect by meaning, not just hierarchy. The mind map stays on the rest of the screen.')) + '</span><span class="gc-m">' + esc(m ? L('Abrir el rizoma', 'Open the rhizome') : '1 ' + L('nodo (arma el mapa primero)', 'node (builds the map first)')) + '</span></button></div>' +
     '<p class="gc-h"><b>' + esc(L('Entender a fondo', 'Understand in depth')) + '</b> · ' + esc(L('lentes', 'lenses')) + '<span class="gc-rec">' + esc(L('recomendado', 'recommended')) + '</span></p><div class="gc-g gc-len">' + Object.keys(LENSES).map(lensCard).join('') + '</div></div>';
+  return st.entry ? entryHtml(normal) : normal;
 }
 function openCards(topic, opts) {
-  topic = String(topic || '').trim().slice(0, 200); if (topic.length < 2) return;
+  const entry = !!(opts && opts.entry);
+  topic = String(topic || '').trim().slice(0, 200); if (topic.length < 2 && !entry) return;
   if (!cardsEl) { injectCss(); cardsEl = document.createElement('div'); cardsEl.id = 'gkCards'; cardsEl.hidden = true; cardsEl.setAttribute('role', 'dialog'); cardsEl.setAttribute('aria-modal', 'true'); document.body.appendChild(cardsEl); }
   const fromMap = !!(opts && opts.fromMap), tgm = fromMap ? target() : null;
-  cardsSt = { topic, fromMap, tg: tgm };
+  cardsSt = { topic, fromMap, tg: tgm, entry, sel: '' };
+  document.body.classList.toggle('gk-entry', entry);
   cardsEl.hidden = false; document.addEventListener('keydown', onCardsKey, true);
   setActive('todas');
-  trk('cards_open', { fromMap, topic: String(topic || '').slice(0, 80) });
+  trk(entry ? 'fb_entry_shown' : 'cards_open', { fromMap, topic: String(topic || '').slice(0, 80) });
   const draw = () => {
     cardsEl.innerHTML = cardsHtml();
-    cardsEl.querySelector('#gcClose').addEventListener('click', () => closeCards(true));
+    const cx = cardsEl.querySelector('#gcClose'); if (cx) cx.addEventListener('click', () => closeCards(true));
     cardsEl.querySelectorAll('[data-lv]').forEach((b) => b.addEventListener('click', () => { setLevel(b.dataset.lv); draw(); const f = cardsEl.querySelector('.gc-lv .on'); if (f) f.focus({ preventScroll: true }); }));
+    if (cardsSt.entry) {
+      const inp = cardsEl.querySelector('#gcTopic'), go = cardsEl.querySelector('#gcGo'), hint = cardsEl.querySelector('#gcHint');
+      const upd = () => {
+        const ok = cardsSt.topic.trim().length >= 2 && !!cardsSt.sel; go.disabled = !ok;
+        hint.textContent = ok ? '' : (cardsSt.topic.trim().length < 2 ? L('Escribe un tema para empezar.', 'Type a topic to start.') : L('Ahora elige una tarjeta.', 'Now pick a card.'));
+        cardsEl.querySelectorAll('[data-k]').forEach((b) => b.classList.toggle('sel', b.dataset.k === cardsSt.sel));
+      };
+      const run = () => { if (go.disabled) return; const t = cardsSt.topic.trim().slice(0, 200), k = cardsSt.sel; cardsSt.topic = t; try { localStorage.setItem('gk_fb_trial_used', '1'); } catch (_e) { /* nada */ } trk('fb_entry_generate', { card: k, topic: t.slice(0, 80) }); setTopic(t); pickCard(k); };
+      inp.addEventListener('input', () => { cardsSt.topic = inp.value; upd(); });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } });
+      go.addEventListener('click', run);
+      cardsEl.querySelectorAll('[data-k]').forEach((b) => b.addEventListener('click', () => { cardsSt.sel = b.dataset.k; trk('fb_entry_card', { card: b.dataset.k }); upd(); if (cardsSt.topic.trim().length < 2) inp.focus({ preventScroll: true }); }));
+      upd(); if (!cardsSt.topic) inp.focus({ preventScroll: true });
+      return;
+    }
     cardsEl.querySelectorAll('[data-k]').forEach((b) => b.addEventListener('click', () => pickCard(b.dataset.k)));
     const f = cardsEl.querySelector('.gc-len [data-k]'); if (f) f.focus({ preventScroll: true });
   };
@@ -737,7 +794,7 @@ function setActive(k) { activeTab = k || ''; if (k === 'mapa' || k === 'rizoma')
 function setTopic(t) { curTopic = String(t || '').trim().slice(0, 200); setActive(activeTab); }
 async function goTab(k) {
   const topic = topicNow();
-  if (!topic) { const c = document.getElementById('gkComposerInput'); if (c) c.focus(); return; }
+  if (!topic) { const c = document.getElementById('gcTopic') || document.getElementById('gkComposerInput'); if (c) c.focus(); return; }
   curTopic = topic;
   if (S) close();
   if (cardsEl && !cardsEl.hidden) closeCards(false);

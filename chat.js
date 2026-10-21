@@ -248,6 +248,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     try { if (window.ResizeObserver) { const ro = new ResizeObserver(measure); ro.observe(document.getElementById('mainHeader')); ro.observe(comp); } } catch (_e) { /* nada */ }
     setInterval(sync, 500); sync();
     trk('chat_mode_on', {});
+    // Visitantes de Facebook: de entrada ven las tarjetas con un campo para escribir el tema (lentes.js: GK_FB).
+    setTimeout(() => { try { if (window.GK_FB && window.GK_FB.entry() && window.GK_CARDS && !window.GK_NAV.hasMap()) window.GK_CARDS.open('', { entry: true }); } catch (_e) { /* nada */ } }, 700);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

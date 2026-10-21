@@ -114,6 +114,11 @@ const ESC_SINCE = '2020-01-01T00:00:00Z';
 // Crear esquemas nuevos: exige cuenta aunque ya haya usado su prueba.
 const TRIAL_NEW_SCHEMA = new Set(['parse_text', 'analyze_text', 'long_outline', 'onboarding_text', 'm_text', 'lens', 'lens_step']);
 
+// Ejemplo gratis para quien llega desde Facebook (2026-10-21): UNA vez por invitado, de cualquier tarjeta (mapa o lente), sin registrarse
+// y sin gastar saldo. Después sigue la regla de siempre (lo demás exige cuenta). TRIAL_FB=off lo apaga sin tocar código.
+const TRIAL_FB = process.env.TRIAL_FB !== 'off';
+const FB_TRIAL_ACTIONS = new Set(['parse_text', 'lens']);
+
 const WELCOME_COOKIE = 'gk_welcome';
 function hasWelcomeCookie(event) {
     const raw = (event.headers && (event.headers.cookie || event.headers.Cookie)) || '';
@@ -192,6 +197,7 @@ function withBilling(raw, overrides = {}) {
         let balance = null;
         let welcomeFree = false;
         let consumeTicket = null;
+        let fbTrial = false;
         let escTrialEvent = null;
         let oracleFree = false, oracleFreeLeft = 0;
         if ((action === 'welcome_schema' || action === 'm_welcome') && identity.isAdmin) welcomeFree = true;
@@ -223,6 +229,7 @@ function withBilling(raw, overrides = {}) {
                     if (!hasTrial && hasWelcomeCookie(event) && !identity.isNew) hasTrial = true;   // quien ya tenía su esquema antes de esta regla puede seguir con él
                     if (isWelcome && !hasTrial && ticket && await deps.trial.ticketValid(ticket)) { allowed = true; consumeTicket = ticket; }
                     else if (!isWelcome && hasTrial && !TRIAL_NEW_SCHEMA.has(action)) allowed = true;
+                    else if (TRIAL_FB && !isWelcome && !hasTrial && FB_TRIAL_ACTIONS.has(action) && deps.trial.guestFromFacebook && await deps.trial.guestFromFacebook(identity.guestId)) { allowed = true; fbTrial = true; }
                 } catch (err) { console.error('[billing] verificación de prueba:', err.message); }
                 if (!allowed) {
                     const reason = isWelcome ? (hasTrial ? 'trial_used' : 'no_ticket') : (TRIAL_NEW_SCHEMA.has(action) ? 'new_schema' : 'no_trial');
@@ -270,7 +277,7 @@ function withBilling(raw, overrides = {}) {
                 oracleFree = ORACLE_UNLIMITED || (!wantsTone && usedToday < ORACLE_FREE_PER_DAY);
                 oracleFreeLeft = ORACLE_UNLIMITED ? ORACLE_FREE_PER_DAY : Math.max(0, ORACLE_FREE_PER_DAY - usedToday);
             }
-            const min = (action === 'oracle' && oracleFree) ? 0 : (FREE.has(action) ? 0 : (MIN_BALANCE[action] || 1));
+            const min = (fbTrial || (action === 'oracle' && oracleFree)) ? 0 : (FREE.has(action) ? 0 : (MIN_BALANCE[action] || 1));
             if (balance < min) {
                 // Para invitados sin saldo, el cliente debe mostrar el muro de login,
                 // no la tienda (los invitados no pueden comprar sin cuenta).
@@ -285,7 +292,7 @@ function withBilling(raw, overrides = {}) {
         let data;
         try { data = JSON.parse(result.body); } catch { return result; }
 
-        let cost = computeCost(action, data);
+        let cost = fbTrial ? 0 : computeCost(action, data);
         if (action === 'oracle') {
             cost = (data.care || oracleFree || identity.isAdmin) ? 0 : 1;
             if (!data.care && !identity.isAdmin) {
@@ -312,6 +319,11 @@ function withBilling(raw, overrides = {}) {
         if (consumeTicket && !identity.isAdmin) {
             try { await deps.store.logEvent(consumeTicket, 'anon', null, 'trial_used', { guest: identity.guestId, action }, null, 'graphikosmos'); }
             catch (err) { console.error('[billing] no se pudo registrar la prueba:', err.message); }
+        }
+
+        if (fbTrial && !identity.isAdmin && data && !data.error && computeCost(action, data) > 0) {   // solo se gasta la prueba si de verdad se generó algo
+            try { await deps.store.logEvent(identity.id, 'guest', null, 'trial_used', { guest: identity.guestId, action, via: 'facebook' }, null, 'graphikosmos'); }
+            catch (err) { console.error('[billing] no se pudo registrar la prueba de Facebook:', err.message); }
         }
 
         const outCookies = [identity.setCookie, (welcomeFree && !identity.isAdmin) ? buildWelcomeCookie() : null].filter(Boolean);

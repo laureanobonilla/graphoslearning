@@ -1908,7 +1908,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
     // esquema del asistente de bienvenida es gratis ("welcome_schema" en
     // billing.js): si por lo que sea el servidor no lo puede dejar gratis, lo
     // cobra como uno normal y responde igual — por eso aquí no se bloquea.
-    if (!welcome && !checkBalance(1)) return;
+    if (!welcome && !opts.fbTrial && !checkBalance(1)) return;
 
     const isLong = topicText.trim().split(/\s+/).length >= 25;
     // "topicPreview": para "topic" (un tema corto escrito a mano, como
