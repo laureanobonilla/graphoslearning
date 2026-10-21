@@ -42,7 +42,12 @@ body.gk-chat #mainHeader .gk-tabslot{display:flex;align-items:center;justify-con
 #gkCtl select{width:auto;max-width:104px;font-size:11px;padding:3px 4px;height:24px}
 #gkCtl button{padding:3px 7px;font-size:11px;height:24px}
 #gkCtl [class*="text-[10px]"]{display:none !important}
-#gkComposer .gc-h{display:none !important}   /* sin renglón de ayuda: el espacio es del lienzo */
+#gkComposer .gc-h{display:none !important}
+@keyframes gcNudge{0%,100%{box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 0 rgba(79,209,197,.0);border-color:#2c3458}50%{box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 7px rgba(79,209,197,.22);border-color:#4fd1c5}}
+@keyframes gcBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+#gkComposer.nudge .gc-in{animation:gcNudge 2.2s ease-in-out infinite}
+#gkHero .gh-arrow{display:block;margin:18px auto 0;font-size:26px;color:#4fd1c5;animation:gcBob 1.3s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){#gkComposer.nudge .gc-in,#gkHero .gh-arrow{animation:none}}   /* sin renglón de ayuda: el espacio es del lienzo */
 body.gk-chat #mainHeader h1{display:none !important}
 @media (min-width:1500px){body.gk-chat #mainHeader h1{display:block !important}}
 body.gk-chat #gkTabs button{padding:6px 10px}
@@ -96,6 +101,20 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     let seenFocus = false, seenTyped = false;   // ¿llegó a tocar la barra? ¿llegó a escribir? (para ver dónde se cae la gente)
     input.addEventListener('focus', () => { if (!seenFocus) { seenFocus = true; trk('composer_focus', {}); } });
     input.addEventListener('input', () => { if (!seenTyped && input.value.trim()) { seenTyped = true; trk('composer_typed', { len: Math.min(input.value.length, 500) }); } });
+    // Invitación a escribir: mientras no hay mapa y la persona no ha tocado la barra, la barra «late» y su texto de ejemplo se va escribiendo solo.
+    let touched = false; const stopNudge = () => { touched = true; comp.classList.remove('nudge'); input.placeholder = L('Un tema, texto o enlace…', 'A topic, text or link…'); };
+    input.addEventListener('focus', stopNudge); input.addEventListener('input', stopNudge);
+    const ideas = EN() ? ['The Fermi Paradox', 'How inflation works', 'Plato’s Cave', 'a link or a long text…'] : ['La Revolución Francesa', 'Cómo funciona la inflación', 'El Mito de la Caverna', 'un enlace o un texto largo…'];
+    let ii = 0, cc = 0, hold = 0;
+    setInterval(() => {
+      const idle = !touched && hero && hero.classList.contains('on') && document.activeElement !== input && !input.value;
+      comp.classList.toggle('nudge', !!idle);
+      if (!idle) { if (!touched && !input.value) input.placeholder = L('Un tema, texto o enlace…', 'A topic, text or link…'); return; }
+      const w = ideas[ii];
+      if (hold > 0) { hold--; return; }
+      cc++; input.placeholder = L('Escribe: ', 'Type: ') + w.slice(0, cc) + (cc % 2 ? '▍' : ' ');
+      if (cc >= w.length) { cc = 0; ii = (ii + 1) % ideas.length; hold = 10; }
+    }, 110);
     const grow = () => { input.style.height = 'auto'; input.style.height = Math.min(168, input.scrollHeight) + 'px'; measure(); };
     input.addEventListener('input', grow);
     input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
@@ -183,6 +202,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     hero = document.createElement('div'); hero.id = 'gkHero';
     const chips = EN() ? ['The Fermi Paradox', 'String Theory', 'Plato’s Cave', 'How inflation works'] : ['La Paradoja de Fermi', 'La Teoría de Cuerdas', 'El Mito de la Caverna', 'Cómo funciona la inflación'];
     hero.innerHTML = '<div class="gh-logo">Γ</div><h1>' + esc(L('¿Qué quieres estudiar hoy?', 'What do you want to study today?')) + '</h1><p>' + esc(L('Escribe un tema, pega un texto o un enlace. Después eliges cómo explorarlo: mapa mental, rizoma o una de las lentes que te lo explican a fondo.', 'Type a topic, paste a text or a link. Then pick how to explore it: mind map, rhizome, or one of the lenses that explain it in depth.')) + '</p><div class="gh-c">' + chips.map((c) => '<button type="button">' + esc(c) + '</button>').join('') + '</div>';
+    hero.insertAdjacentHTML('beforeend', '<span class="gh-arrow" aria-hidden="true">↓</span>');
     document.body.appendChild(hero);
     hero.querySelectorAll('.gh-c button').forEach((b) => b.addEventListener('click', () => submit(b.textContent)));
   }
