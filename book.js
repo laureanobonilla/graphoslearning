@@ -98,6 +98,44 @@
     if (txt.length > 11800) txt = txt.slice(0, 11800);
     return txt;
   }
+  // Texto de la izquierda con libro: pasajes del libro que respaldan cada nodo (sin IA). También deja en cada nodo una cita literal corta.
+  function enrich(data) {
+    const all = [data.root, ...(data.branches || []), ...(data.subBranches || [])].filter(Boolean);
+    const used = new Set(), missing = [];
+    const sentences = (t) => t.split(/(?<=[.!?])\s+/).filter((x) => x.length > 25);
+    function pick(n) {
+      if (!n.page || !verify(n.label, n.page)) { n.page = undefined; missing.push(n.label); return null; }
+      const lt = [...new Set(toks(n.label))]; let best = -1, bs = 0;
+      S.chunks.forEach((c, i) => {
+        if (c.p < n.page - 1 || c.p > n.page + 1 || used.has(i)) return;
+        const m = S.tf[i].m; let sc = 0; lt.forEach((w) => { if (m.get(w)) sc += 1 + Math.min(3, m.get(w)) * 0.2; });
+        if (c.p === n.page) sc += 0.5;
+        if (sc > bs) { bs = sc; best = i; }
+      });
+      if (best < 0) { missing.push(n.label); return null; }
+      used.add(best);
+      let t = tidy(S.chunks[best].t);
+      if (t.length > 900) { const cut = t.slice(0, 900), k = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('; ')); t = k > 400 ? cut.slice(0, k + 1) : cut; }
+      const ss = sentences(t); let q = ss[0] || t, qs = -1;
+      ss.forEach((x) => { const nx = norm(x); const sc = lt.filter((w) => nx.indexOf(w.slice(0, 6)) >= 0).length; if (sc > qs) { qs = sc; q = x; } });
+      n.sourceQuote = q.split(' ').slice(0, 15).join(' ').replace(/[.,;:]+$/, '');
+      return { p: S.chunks[best].p, t };
+    }
+    const OL = outline();
+    function tidy(t) {
+      t = t.replace(/\s+/g, ' ');
+      OL.forEach((c) => { const ti = c.t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'); t = t.replace(new RegExp('(?:\\d{1,4}\\s+)?C\\s*AP[ÍI]?\\s*T\\s*U\\s*L\\s*O\\s*' + c.n + '\\s+' + ti + '\\s*', 'ig'), ''); });
+      return t.replace(/^\s*\d{1,4}\s+(?=\D)/, '').trim();
+    }
+    const out = [], ex = new Map();
+    all.forEach((n) => ex.set(n, pick(n)));
+    const block = (n, ind) => { const e = ex.get(n); if (!e) return; out.push(ind + n.label + ' — ' + L('libro p. ', 'book p. ') + e.p + '\n' + ind + e.t + '\n'); };
+    const r = data.root; block(r, '');
+    (data.branches || []).forEach((b) => { block(b, ''); (data.subBranches || []).filter((x) => x.parentId === b.id).forEach((x) => block(x, '    ')); });
+    let txt = L('Pasajes de «', 'Passages from "') + S.name + L('» que respaldan este mapa. Cada uno indica la página del PDF.', '" that support this map. Each shows the PDF page.') + '\n\n' + out.join('\n');
+    if (missing.length) txt += '\n' + L('Sin pasaje en el libro (aportados por la IA): ', 'No passage in the book (added by the AI): ') + missing.join(', ') + '.';
+    return txt.slice(0, 29000);
+  }
   // ¿El concepto realmente aparece en la página que la IA dice?
   function verify(label, page) {
     page = Number(page); if (!page) return false;
@@ -112,6 +150,16 @@
   function patchBody(raw) {
     try {
       const b = JSON.parse(raw);
+      if (S.ready && b && b.action === 'glossary' && Array.isArray(b.terms) && b.terms.length) {
+        const seen = new Set(); let txt = '';
+        b.terms.forEach((t) => {
+          const hits = search(t.label + ' ' + t.label, t.label, 2); let part = '';
+          hits.forEach((h) => { const c = S.chunks[h.i]; if (seen.has(h.i)) return; seen.add(h.i); part += '[p. ' + c.p + '] ' + c.t.slice(0, 700) + '\n'; });
+          txt += 'TÉRMINO «' + t.label + '» (id ' + t.id + '):\n' + (part || '(sin fragmentos en el libro)\n') + '\n';
+        });
+        b.documentContext = txt.slice(0, 11800); b.bookMode = true; b.bookName = S.name;
+        return JSON.stringify(b);
+      }
       if (S.ready && b && b.action === 'parse_text' && typeof b.text === 'string' && b.text.trim().split(/\s+/).length < 60) {
         const t = schemaContext(b.text);
         if (t) { b.documentContext = t; b.bookMode = true; b.bookName = S.name; return JSON.stringify(b); }
@@ -129,7 +177,15 @@
   function report(raw, ok, status, data) {
     try {
       const b = JSON.parse(raw || '{}'); if (!b.bookMode) return;
-      if (ok) { S.fails = 0; S.lastErr = ''; return; }
+      if (ok) {
+        S.fails = 0; S.lastErr = '';
+        // Definición hecha con libro que no cita ninguna página: no sale del libro, y se dice.
+        if (b.action === 'define' && data && typeof data.definition === 'string' && !/\(p\.\s*\d+/i.test(data.definition)) {
+          data.definition = data.definition.replace(/\s+$/, '') + '\n\n' + L('Nota: esto no está detallado en el libro; la explicación es de la IA, no del libro.', 'Note: this is not detailed in the book; the explanation comes from the AI, not the book.');
+          data.notInBook = true;
+        }
+        return;
+      }
       S.fails++; S.lastErr = status + (data && data.error ? ' · ' + String(data.error).slice(0, 80) : '');
       if (window.track) track('book_api_error', { action: b.action, status, err: String(data && data.error || '').slice(0, 120), ctx: (b.documentContext || '').length, fails: S.fails });
     } catch (_e) { /* nada */ }
@@ -222,5 +278,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 
-  window.GK_BOOK = { report, outline, on: () => S.ready, load, patchBody, verify, context, search, state: S, wipe };
+  window.GK_BOOK = { enrich, report, outline, on: () => S.ready, load, patchBody, verify, context, search, state: S, wipe };
 })();

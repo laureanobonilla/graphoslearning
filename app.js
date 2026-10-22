@@ -2007,13 +2007,16 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         // crea un nodo nuevo para ella), así que no se vuelve a cobrar.
         const totalNodes = (attachToNodeId ? 0 : 1) + (data.branches?.length || 0) + (data.subBranches?.length || 0);
 
+        let bookText = null;   // con libro: el texto de la izquierda son pasajes del libro, no algo generado
+        if (window.GK_BOOK && GK_BOOK.on() && !attachToNodeId && topicText.trim().split(/\s+/).length < 60 && data.root && (data.branches || []).some(b => b.page)) { try { bookText = GK_BOOK.enrich(data); } catch (e) { console.error('[libro] texto fuente:', e); } }
         await renderThreeLevelTree(data, { originPanelId, attachToNodeId });
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview });
         scheduleSaveBanner();
         // Escritorio: el esquema nace con su propio texto de solo lectura (panel izquierdo), sin bloquear al usuario.
         if (isDesktopFolding() && (!welcome || opts.topicText)) {
-            if (!isLong && (!originPanelId || opts.topicText)) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
+            if (bookText) setSourceTextAsSchemaText(attachToNodeId || data.root.id, bookText);
+            else if (!isLong && (!originPanelId || opts.topicText)) attachTopicText(attachToNodeId || data.root.id, topicText.trim().slice(0, 160), data);
             else if (isLong) setSourceTextAsSchemaText(attachToNodeId || data.root.id, topicText);
         }
     } catch (err) {
@@ -8913,9 +8916,18 @@ async function exportReportRtf() {
         const c = row._cells[i]; c.textContent = '';
         c.appendChild(document.createTextNode(t)); kcMark(c); return true;
     }
+    function srcBadge(row, n) {
+        const t = row.querySelector('.dv-term'); if (!t) return;
+        let b = t.querySelector('.dv-src'); if (b) b.remove();
+        if (typeof n.bookDef !== 'number') return;
+        b = document.createElement('div'); b.className = 'dv-src'; b.style.cssText = 'font:600 11px system-ui,sans-serif;margin-top:4px;color:' + (n.bookDef ? '#7aa7d9' : '#9aa3b2');
+        b.textContent = n.bookDef ? (LL('Del libro, p. ', 'From the book, p. ') + n.bookDef) : LL('No está en el libro: la explicación es de la IA', 'Not in the book: the explanation is from the AI');
+        t.appendChild(b);
+    }
     function fillRow(row, n) {
         const vals = [n.definition, n.simple, n.example];
         vals.forEach((v, i) => putCell(row, i, v));
+        srcBadge(row, n);
     }
     let rowOf = new Map();
     const openMore = new Set(); // filas con «Ver más» abierto: se conservan aunque la lista se reconstruya
@@ -8937,6 +8949,7 @@ async function exportReportRtf() {
         row.appendChild(term);
         row._cells = [T.def, T.simple, T.ex].map((lbl) => { const c = document.createElement('div'); c.className = 'dv-cell'; c.dataset.l = lbl; row.appendChild(c); return c; });
         const vals = [n.definition, n.simple, n.example]; row._rel = relOf.get(String(n.id)) || '';
+        srcBadge(row, n);
         row._cells.forEach((c, i) => { if (!putCell(row, i, vals[i])) c.innerHTML = '<div class="dv-wr"><i></i>' + T.writing + '</div><div class="dv-skel" style="width:92%"></div><div class="dv-skel" style="width:70%"></div>'; });
         // Nodos de más abajo: citados junto al término, con "Ver más".
         const childIds = [...(depth >= MAX_LEVELS - 1 ? (kids.get(String(n.id)) || []) : []), ...(hiddenKids.get(String(n.id)) || [])];
@@ -9010,7 +9023,7 @@ async function exportReportRtf() {
                     // Hasta 3 intentos por bloque (con pausa): un fallo suelto del servidor ya no deja la lista en error.
                     let res = null, data = null;
                     for (let at = 0; at < 3; at++) {
-                        try { res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) }) }); data = await res.json(); }
+                        try { res = await fetch('/.netlify/functions/gemini', { method: 'POST', body: (window.GK_BOOK && GK_BOOK.on()) ? GK_BOOK.patchBody(JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) })) : JSON.stringify({ action: 'glossary', topic, terms: chunk.map(({ n }) => ({ id: String(n.id), label: cleanLabel(n) })) }) }); data = await res.json(); }
                         catch (_e) { res = null; data = null; }
                         if (res && res.ok && data && Array.isArray(data.items)) break;
                         loadMissing.lastErr = res ? (res.status + ':' + String((data && data.error) || '').slice(0, 40)) : 'red';
@@ -9026,6 +9039,7 @@ async function exportReportRtf() {
                             if (!String(n.definition || '').trim() && it.definition) upd.definition = it.definition;
                             if (!String(n.simple || '').trim() && it.simple) upd.simple = it.simple;
                             if (!String(n.example || '').trim() && it.example) upd.example = it.example;
+                            if (window.GK_BOOK && GK_BOOK.on() && n.bookDef === undefined) upd.bookDef = (it.page && !it.notInBook && GK_BOOK.verify(cleanLabel(n), it.page)) ? Number(it.page) : 0;
                             nodes.update(upd);
                         });
                     } finally { isApplyingUndo = false; }

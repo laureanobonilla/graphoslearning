@@ -195,10 +195,10 @@ body.gk-entry #gkComposer, body.gk-entry #gkCtl{display:none !important}
 #gkCards .gc-len .gc-c:hover{box-shadow:0 10px 34px rgba(154,148,201,.28)}
 #gkCards .gc-rec{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;color:#0b1118;background:linear-gradient(0deg,#7aa7d9,#7aa7d9);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
 #gkCards .gc-len{grid-template-columns:1.5fr 1fr 1fr}
-#gkCards .gc-len .gc-main{background:linear-gradient(#151c27,#151c27) padding-box,linear-gradient(0deg,#7aa7d9,#7aa7d9) border-box;border-width:2px;box-shadow:0 8px 30px rgba(122,167,217,.14)}
-#gkCards .gc-len .gc-main .gc-n{font-size:19px}
-#gkCards .gc-len .gc-main .gc-i{font-size:32px}
-#gkCards .gc-len .gc-main .gc-d{font-size:13.5px;color:#c3cad6}
+#gkCards .gc-main{background:linear-gradient(#151c27,#151c27) padding-box,linear-gradient(0deg,#7aa7d9,#7aa7d9) border-box;border-width:2px;box-shadow:0 8px 30px rgba(122,167,217,.14)}
+#gkCards .gc-main .gc-n{font-size:19px}
+#gkCards .gc-main .gc-i{font-size:32px}
+#gkCards .gc-main .gc-d{font-size:13.5px;color:#c3cad6}
 @media (max-width:820px){#gkCards .gc-len{grid-template-columns:1fr}}
 #gkCardsBtn{background:#0f1319;border:1px solid #2a3342;border-radius:999px;padding:6px 11px;font:600 12px Inter,system-ui,sans-serif;color:#c3cad6;cursor:pointer;white-space:nowrap;margin-left:6px}
 #gkCardsBtn:hover{border-color:#7aa7d9;color:#7aa7d9}
@@ -709,7 +709,7 @@ async function runMap(topic) {
 function cardsHtml() {
   const st = cardsSt, lvBtns = LEVELS.map((v) => '<button type="button" data-lv="' + v + '" class="' + (v === level ? 'on' : '') + '">' + esc(LVNAME[v]()) + '</button>').join('');
   const lensCard = (k) => { const x = LENSES[k], cached = !!cacheAll()[cacheKey(k, st.topic, level)];
-    return '<button type="button" class="gc-c' + (k === 'camino' ? ' gc-main' : '') + '" data-k="' + k + '"><span class="gc-i">' + x.icon + '</span><span class="gc-n">' + esc(x.name()) + (k === 'camino' ? '<span class="gc-rec">' + esc(L('empieza por aquí', 'start here')) + '</span>' : '') + '</span><span class="gc-d">' + esc(x.desc()) + '</span><span class="gc-m">' + (cached ? '<i>✓ ' + esc(L('guardada, se abre al instante', 'saved, opens instantly')) + '</i>' : esc(COST + ' ' + L('nodos · sin armar el mapa', 'nodes · no map needed'))) + '</span></button>'; };
+    return '<button type="button" class="gc-c" data-k="' + k + '"><span class="gc-i">' + x.icon + '</span><span class="gc-n">' + esc(x.name()) + '</span><span class="gc-d">' + esc(x.desc()) + '</span><span class="gc-m">' + (cached ? '<i>✓ ' + esc(L('guardada, se abre al instante', 'saved, opens instantly')) + '</i>' : esc(COST + ' ' + L('nodos · sin armar el mapa', 'nodes · no map needed'))) + '</span></button>'; };
   const m = st.fromMap;
   const entryHtml = (normal) => {   // entrada de Facebook: las mismas tarjetas con un campo para elegir el tema; «Generar» solo se activa con tema y tarjeta
     const head = '<div class="gc-w gc-entry"><div class="gc-top"><span class="gc-brand">Γ Graphikosmos</span><div class="gc-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + lvBtns + '</div></div>' +
@@ -722,9 +722,9 @@ function cardsHtml() {
   const normal = '<div class="gc-w"><div class="gc-top"><button type="button" class="gc-x" id="gcClose">' + esc(m ? L('‹ Volver al mapa', '‹ Back to the map') : L('‹ Cambiar el tema', '‹ Change the topic')) + '</button><div class="gc-lv" role="radiogroup" aria-label="' + esc(L('Nivel', 'Level')) + '">' + lvBtns + '</div></div>' +
     '<h2>' + esc(st.topic) + '</h2><p class="gc-sub">' + esc(L('¿Cómo quieres explorarlo? Puedes cambiar de tarjeta cuando quieras.', 'How do you want to explore it? You can switch cards any time.')) + '</p>' +
     '<p class="gc-h"><b>' + esc(L('Ver la estructura', 'See the structure')) + '</b></p><div class="gc-g">' +
-    '<button type="button" class="gc-c" data-k="mapa"><span class="gc-i">' + ic('mapa') + '</span><span class="gc-n">' + esc(L('Mapa mental', 'Mind map')) + '</span><span class="gc-d">' + esc(L('El esquema del tema con sus ramas y subtemas. El rizoma queda plegado abajo.', 'The topic as branches and sub-topics. The rhizome stays folded below.')) + '</span><span class="gc-m">' + esc(m ? L('Seguir en el mapa', 'Stay on the map') : '1 ' + L('nodo', 'node')) + '</span></button>' +
+    '<button type="button" class="gc-c gc-main" data-k="mapa"><span class="gc-i">' + ic('mapa') + '</span><span class="gc-n">' + esc(L('Mapa mental', 'Mind map')) + '<span class="gc-rec">' + esc(L('empieza por aquí', 'start here')) + '</span></span><span class="gc-d">' + esc(L('El esquema del tema con sus ramas y subtemas. El rizoma queda plegado abajo.', 'The topic as branches and sub-topics. The rhizome stays folded below.')) + '</span><span class="gc-m">' + esc(m ? L('Seguir en el mapa', 'Stay on the map') : '1 ' + L('nodo', 'node')) + '</span></button>' +
     '<button type="button" class="gc-c" data-k="rizoma"><span class="gc-i">' + ic('rizoma') + '</span><span class="gc-n">' + esc(L('Rizoma', 'Rhizome')) + '</span><span class="gc-d">' + esc(L('Cómo se conectan las ideas por su significado, no solo por jerarquía. El mapa mental queda en el resto de la pantalla.', 'How ideas connect by meaning, not just hierarchy. The mind map stays on the rest of the screen.')) + '</span><span class="gc-m">' + esc(m ? L('Abrir el rizoma', 'Open the rhizome') : '1 ' + L('nodo (arma el mapa primero)', 'node (builds the map first)')) + '</span></button></div>' +
-    '<p class="gc-h"><b>' + esc(L('Entender a fondo', 'Understand in depth')) + '</b> · ' + esc(L('lentes', 'lenses')) + '<span class="gc-rec">' + esc(L('recomendado', 'recommended')) + '</span></p><div class="gc-g gc-len">' + Object.keys(LENSES).map(lensCard).join('') + '</div></div>';
+    '<p class="gc-h"><b>' + esc(L('Entender a fondo', 'Understand in depth')) + '</b> · ' + esc(L('lentes', 'lenses')) + '</p><div class="gc-g gc-len">' + Object.keys(LENSES).map(lensCard).join('') + '</div></div>';
   return st.entry ? entryHtml(normal) : normal;
 }
 function openCards(topic, opts) {
@@ -732,7 +732,7 @@ function openCards(topic, opts) {
   topic = String(topic || '').trim().slice(0, 200); if (topic.length < 2 && !entry) return;
   if (!cardsEl) { injectCss(); cardsEl = document.createElement('div'); cardsEl.id = 'gkCards'; cardsEl.hidden = true; cardsEl.setAttribute('role', 'dialog'); cardsEl.setAttribute('aria-modal', 'true'); document.body.appendChild(cardsEl); }
   const fromMap = !!(opts && opts.fromMap), tgm = fromMap ? target() : null;
-  cardsSt = { topic, fromMap, tg: tgm, entry, sel: '' };
+  cardsSt = { topic, fromMap, tg: tgm, entry, sel: entry ? 'mapa' : '' };
   document.body.classList.toggle('gk-entry', entry);
   cardsEl.hidden = false; document.addEventListener('keydown', onCardsKey, true);
   setActive('todas');
