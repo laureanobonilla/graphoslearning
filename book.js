@@ -12,7 +12,7 @@
   const STOP = new Set('de la el los las un una unos unas y o en del al que se por con para como su sus es son lo le les mas pero sin sobre entre desde hasta este esta estos estas ese esa eso muy a e the of and to in is are for on with as by an or that this from'.split(' '));
   const MAXCTX = 10800;
 
-  const S = { name: '', pages: [], chunks: [], tf: [], df: null, avg: 1, N: 0, ready: false, busy: false, last: [] };
+  const S = { name: '', title: '', pages: [], chunks: [], tf: [], df: null, avg: 1, N: 0, ready: false, busy: false, last: [] };
 
   const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const stem = (w) => (w.length > 5 ? w.replace(/(es|s)$/, '') : w);
@@ -147,11 +147,24 @@
       if (chars < doc.numPages * 200) { S.busy = false; ui(); alert(L('Este PDF parece escaneado (no tiene texto seleccionable), así que no puedo usarlo como fuente.', 'This PDF looks scanned (no selectable text), so I cannot use it as a source.')); return; }
       build(file.name.replace(/\.pdf$/i, ''), pages.map((p) => ({ p: p.p, text: p.text, toc: p.toc, chars: p.chars })));
       await save();
+      let ttl = ''; try { const md = await doc.getMetadata(); ttl = String(md && md.info && md.info.Title || '').trim(); } catch (_e) { /* sin metadatos */ }
+      if (!/[a-záéíóúñ]{4,}/i.test(ttl) || ttl.length > 80) ttl = /[a-záéíóúñ]{4,}/i.test(S.name) ? S.name.replace(/[_-]+/g, ' ') : '';
+      S.title = ttl;
       if (window.track) track('book_loaded', { pages: doc.numPages, chunks: S.N, sec: Math.round((Date.now() - t0) / 1000), kb: Math.round(file.size / 1024) });
     } catch (e) {
       console.error(e); alert(L('No pude leer ese PDF.', 'I could not read that PDF.'));
       if (window.track) track('book_error', { message: String(e && e.message || '').slice(0, 100) });
     } finally { S.busy = false; ui(); }
+    autoMap();
+  }
+  // Al subir el libro, el mapa se arma solo con el libro (sin pulsar "Estudiar"), si no hay uno abierto.
+  async function autoMap() {
+    try {
+      if (!S.ready || typeof nodes === 'undefined' || nodes.length > 0 || !window.GK_NAV) return;
+      GK_NAV.setTopic(S.title || L('Contenido del libro', 'Book contents'));
+      await GK_NAV.go('mapa');
+      if (window.track) track('book_automap', { ok: nodes.length > 0 });
+    } catch (e) { console.error('[libro] mapa automático:', e); }
   }
 
   // ---------- interfaz ----------
