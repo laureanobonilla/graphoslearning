@@ -24,13 +24,13 @@ body.gk-chat #gkLens .gl-body > :not(.gl-side):not(.gl-grip){margin-bottom:calc(
 body.gk-cover #gkComposer{z-index:150;background:none;pointer-events:none}
 body.gk-cover #gkComposer .gc-in{pointer-events:auto}
 body.gk-cover #gkCtl{z-index:151}
-body.gk-cover #vizPanel{z-index:150;left:0 !important;right:var(--gk-side-w,0px) !important;--p-bg:#0d1226;--p-bg2:#161c35;--p-head:#0d1226;--p-ink:#eef1fb;--p-ink2:#c7d2e8;--p-mute:#8a92b2;--p-rule:#2c3458;--p-acc:#4fd1c5;--p-acc-bg:rgba(79,209,197,.14);box-shadow:none;scrollbar-color:#2c3458 transparent}
-body.gk-cover #vizPanel .vz-btn, body.gk-cover #vizPanel .vz-quote button, body.gk-cover #vizPanel .vz-ghost, body.gk-cover #vizPanel .vz-note, body.gk-cover #vizPanel .vz-note-form textarea, body.gk-cover #vizPanel .vz-rh-ctl select{background:#161c35;color:#eef1fb}
-body.gk-cover #vizPanel .vz-primary{color:#071018}
+body.gk-cover #vizPanel{z-index:150;left:0 !important;right:var(--gk-side-w,0px) !important;--p-bg:#0e131a;--p-bg2:#171e29;--p-head:#0e131a;--p-ink:#e8ebf0;--p-ink2:#c3cad6;--p-mute:#8b94a5;--p-rule:#2a3342;--p-acc:#7aa7d9;--p-acc-bg:rgba(122,167,217,.14);box-shadow:none;scrollbar-color:#2a3342 transparent}
+body.gk-cover #vizPanel .vz-btn, body.gk-cover #vizPanel .vz-quote button, body.gk-cover #vizPanel .vz-ghost, body.gk-cover #vizPanel .vz-note, body.gk-cover #vizPanel .vz-note-form textarea, body.gk-cover #vizPanel .vz-rh-ctl select{background:#171e29;color:#e8ebf0}
+body.gk-cover #vizPanel .vz-primary{color:#0b1118}
 body.gk-chat #rhzToggle{display:none !important}
-body.gk-chat #topicTab.on{display:inline-flex;position:fixed;left:14px;top:var(--gk-tt-top,80px);z-index:26;align-items:center;gap:6px;padding:7px 16px;border-radius:999px;border:0;background:linear-gradient(120deg,#4fd1c5,#8b7cf6);color:#071018;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(79,209,197,.35)}
+body.gk-chat #topicTab.on{display:inline-flex;position:fixed;left:14px;top:var(--gk-tt-top,80px);z-index:26;align-items:center;gap:6px;padding:7px 16px;border-radius:999px;border:0;background:linear-gradient(0deg,#7aa7d9,#7aa7d9);color:#0b1118;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;box-shadow:0 4px 18px rgba(122,167,217,.35)}
 body.gk-chat.gk-rz #topicTab.on{top:auto;bottom:calc(var(--gk-comp-h,0px) + var(--gk-notes-h,0px) + 44px)}   /* en el rizoma va abajo, sobre la leyenda, para no tapar su cabecera ni la guía */
-body.gk-chat #topicTab.on:hover{filter:brightness(1.1);background:linear-gradient(120deg,#4fd1c5,#8b7cf6)}
+body.gk-chat #topicTab.on:hover{filter:brightness(1.1);background:linear-gradient(0deg,#7aa7d9,#7aa7d9)}
 body.gk-cover #topicTab{display:none !important}
 body.gk-chat #mainHeader{gap:0}
 body.gk-chat #mainHeader > div:nth-child(2){display:none !important}   /* la segunda barra ya no existe: las pestañas suben a la primera */
@@ -43,10 +43,10 @@ body.gk-chat #mainHeader .gk-tabslot{display:flex;align-items:center;justify-con
 #gkCtl button{padding:3px 7px;font-size:11px;height:24px}
 #gkCtl [class*="text-[10px]"]{display:none !important}
 #gkComposer .gc-h{display:none !important}
-@keyframes gcNudge{0%,100%{box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 0 rgba(79,209,197,.0);border-color:#2c3458}50%{box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 7px rgba(79,209,197,.22);border-color:#4fd1c5}}
+@keyframes gcNudge{0%,100%{box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 0 rgba(122,167,217,.0);border-color:#2a3342}50%{box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 7px rgba(122,167,217,.22);border-color:#7aa7d9}}
 @keyframes gcBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
 #gkComposer.nudge .gc-in{animation:gcNudge 2.2s ease-in-out infinite}
-#gkHero .gh-arrow{display:block;margin:18px auto 0;font-size:26px;color:#4fd1c5;animation:gcBob 1.3s ease-in-out infinite}
+#gkHero .gh-arrow{display:block;margin:18px auto 0;font-size:26px;color:#7aa7d9;animation:gcBob 1.3s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){#gkComposer.nudge .gc-in,#gkHero .gh-arrow{animation:none}}   /* sin renglón de ayuda: el espacio es del lienzo */
 body.gk-chat #mainHeader h1{display:none !important}
 @media (min-width:1500px){body.gk-chat #mainHeader h1{display:block !important}}
@@ -56,39 +56,39 @@ body.gk-chat #gkTabs{gap:3px}
 body.gk-cover #defsView, body.gk-cover #topicPanel, body.gk-cover #readerPanel{visibility:hidden !important}   /* con una lente o las tarjetas a pantalla completa, los paneles laterales no asoman por debajo */
 body.gk-chat #vizPanel{bottom:var(--gk-comp-h,0px)}
 body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
-#gkComposer{flex:0 0 auto;position:relative;z-index:31;padding:6px 16px 10px;background:linear-gradient(rgba(10,14,26,0),#0a0e1a 35%);font-family:Inter,system-ui,sans-serif}
-#gkComposer .gc-in{max-width:880px;margin:0 auto;display:flex;align-items:flex-end;gap:10px;background:#11162b;border:1px solid #2c3458;border-radius:22px;padding:8px 8px 8px 18px;box-shadow:0 10px 40px rgba(0,0,0,.45);transition:border-color .15s,box-shadow .15s}
-#gkComposer .gc-in:focus-within{border-color:#4fd1c5;box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 3px rgba(79,209,197,.16)}
-#gkComposer textarea{flex:1;min-width:0;background:transparent;border:0;outline:0;resize:none;color:#eef1fb;font:400 15px/1.5 Inter,system-ui,sans-serif;padding:8px 0;max-height:168px;overflow-y:auto}
-#gkComposer textarea::placeholder{color:#6a7399}
-#gkComposer button{flex:0 0 auto;border:0;border-radius:15px;background:#4fd1c5;color:#071018;padding:10px 22px;font:700 14px Inter,system-ui,sans-serif;cursor:pointer;transition:filter .15s,transform .1s}
+#gkComposer{flex:0 0 auto;position:relative;z-index:31;padding:6px 16px 10px;background:linear-gradient(rgba(11,15,21,0),#0b0f15 35%);font-family:Inter,system-ui,sans-serif}
+#gkComposer .gc-in{max-width:880px;margin:0 auto;display:flex;align-items:flex-end;gap:10px;background:#121821;border:1px solid #2a3342;border-radius:22px;padding:8px 8px 8px 18px;box-shadow:0 10px 40px rgba(0,0,0,.45);transition:border-color .15s,box-shadow .15s}
+#gkComposer .gc-in:focus-within{border-color:#7aa7d9;box-shadow:0 10px 40px rgba(0,0,0,.45),0 0 0 3px rgba(122,167,217,.16)}
+#gkComposer textarea{flex:1;min-width:0;background:transparent;border:0;outline:0;resize:none;color:#e8ebf0;font:400 15px/1.5 Inter,system-ui,sans-serif;padding:8px 0;max-height:168px;overflow-y:auto}
+#gkComposer textarea::placeholder{color:#6c7586}
+#gkComposer button{flex:0 0 auto;border:0;border-radius:15px;background:#7aa7d9;color:#0b1118;padding:10px 22px;font:700 14px Inter,system-ui,sans-serif;cursor:pointer;transition:filter .15s,transform .1s}
 #gkComposer button:hover{filter:brightness(1.08)}
 #gkComposer button:active{transform:scale(.97)}
 #gkComposer button:disabled{opacity:.5;cursor:wait}
-#gkComposer .gc-h{max-width:880px;margin:6px auto 0;text-align:center;font-size:11.5px;color:#5b6388}
+#gkComposer .gc-h{max-width:880px;margin:6px auto 0;text-align:center;font-size:11.5px;color:#5d6677}
 #gkTabs{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
 #gkTabs::-webkit-scrollbar{display:none}
-#gkTabs button{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;border:1px solid transparent;background:none;color:#aab2d0;border-radius:999px;padding:6px 13px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
-#gkTabs button:hover{color:#eef1fb;background:#161c35}
-#gkTabs button.on{background:#1d2442;color:#4fd1c5;border-color:#2c3458}
-#gkTabs button.all{padding:6px 10px;color:#8a92b2}
+#gkTabs button{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;background:none;color:#a9b1bf;border-radius:999px;padding:6px 13px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+#gkTabs button:hover{color:#e8ebf0;background:#171e29}
+#gkTabs button.on{background:#1e2633;color:#7aa7d9;border-color:#2a3342}
+#gkTabs button.all{padding:6px 10px;color:#8b94a5}
 #gkTabs.idle button:not(.all){opacity:.55}
-#gkTabs .sep{flex:0 0 1px;height:18px;background:#2c3458;margin:0 4px}
-#gkTabs .len{display:flex;align-items:center;gap:2px;padding:2px;border-radius:999px;border:1.5px solid transparent;background:linear-gradient(#0f1428,#0f1428) padding-box,linear-gradient(130deg,#4fd1c5,#8b7cf6) border-box}
+#gkTabs .sep{flex:0 0 1px;height:18px;background:#2a3342;margin:0 4px}
+#gkTabs .len{display:flex;align-items:center;gap:2px;padding:2px;border-radius:999px;border:1.5px solid transparent;background:linear-gradient(#0f1319,#0f1319) padding-box,linear-gradient(0deg,#7aa7d9,#7aa7d9) border-box}
 #gkTabs .len button{padding:4px 11px}
-#gkTabs .len button.on{background:linear-gradient(120deg,rgba(79,209,197,.22),rgba(139,124,246,.24));color:#eef1fb;border-color:transparent}
-#gkNeed{position:fixed;left:50%;bottom:calc(var(--gk-comp-h,72px) + 10px);transform:translateX(-50%);z-index:60;max-width:min(520px,calc(100vw - 32px));background:#1d2442;color:#eef1fb;border:1px solid #4fd1c5;border-radius:12px;padding:9px 15px;font:600 13px Inter,system-ui,sans-serif;box-shadow:0 10px 34px rgba(0,0,0,.5);pointer-events:none;opacity:0;transition:opacity .2s}
+#gkTabs .len button.on{background:rgba(122,167,217,.18);color:#e8ebf0;border-color:transparent}
+#gkNeed{position:fixed;left:50%;bottom:calc(var(--gk-comp-h,72px) + 10px);transform:translateX(-50%);z-index:60;max-width:min(520px,calc(100vw - 32px));background:#1e2633;color:#e8ebf0;border:1px solid #7aa7d9;border-radius:12px;padding:9px 15px;font:600 13px Inter,system-ui,sans-serif;box-shadow:0 10px 34px rgba(0,0,0,.5);pointer-events:none;opacity:0;transition:opacity .2s}
 #gkNeed.on{opacity:1}
 @keyframes gcShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
-#gkComposer.need .gc-in{animation:gcShake .45s ease;border-color:#4fd1c5;box-shadow:0 0 0 4px rgba(79,209,197,.28)}
+#gkComposer.need .gc-in{animation:gcShake .45s ease;border-color:#7aa7d9;box-shadow:0 0 0 4px rgba(122,167,217,.28)}
 #gkHero{position:fixed;left:0;right:0;top:var(--gk-head-h,0px);bottom:var(--gk-comp-h,0px);z-index:12;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;pointer-events:none;font-family:Inter,system-ui,sans-serif}
 #gkHero.on{display:flex}
-#gkHero .gh-logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4fd1c5,#8b7cf6);display:flex;align-items:center;justify-content:center;font:700 28px Sora,Inter,sans-serif;color:#071018;margin-bottom:18px;box-shadow:0 0 40px rgba(79,209,197,.3)}
-#gkHero h1{font:700 clamp(26px,3.6vw,38px)/1.2 Sora,Inter,sans-serif;color:#eef1fb;margin:0 0 10px}
-#gkHero p{max-width:520px;color:#8a92b2;font-size:15px;line-height:1.55;margin:0 0 22px}
+#gkHero .gh-logo{width:56px;height:56px;border-radius:16px;background:#1e2633;border:1px solid #2a3342;display:flex;align-items:center;justify-content:center;font:600 28px Newsreader,Georgia,serif;color:#7aa7d9;margin-bottom:18px;box-shadow:none}
+#gkHero h1{font:600 clamp(28px,3.8vw,42px)/1.18 Newsreader,Georgia,serif;letter-spacing:-.01em;color:#e8ebf0;margin:0 0 10px}
+#gkHero p{max-width:520px;color:#8b94a5;font-size:15px;line-height:1.55;margin:0 0 22px}
 #gkHero .gh-c{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:640px;pointer-events:auto}
-#gkHero .gh-c button{border:1px solid #2c3458;background:#11162b;color:#c7d2e8;border-radius:999px;padding:8px 15px;font:500 13.5px Inter,system-ui,sans-serif;cursor:pointer;transition:border-color .15s,color .15s}
-#gkHero .gh-c button:hover{border-color:#4fd1c5;color:#4fd1c5}
+#gkHero .gh-c button{border:1px solid #2a3342;background:#121821;color:#c3cad6;border-radius:999px;padding:8px 15px;font:500 13.5px Inter,system-ui,sans-serif;cursor:pointer;transition:border-color .15s,color .15s}
+#gkHero .gh-c button:hover{border-color:#7aa7d9;color:#7aa7d9}
 `;
 
   let input = null, btn = null, tabs = null, hero = null, comp = null, busy = false;
@@ -181,8 +181,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     const t = (k, icon, name, title) => '<button type="button" role="tab" data-tab="' + k + '" aria-selected="false" title="' + esc(title || name) + '">' + icon + ' ' + esc(name) + '</button>';
     tabs.innerHTML =
       '<button type="button" class="all" role="tab" data-tab="todas" aria-selected="false" title="' + esc(L('Ver todas las tarjetas', 'See all cards')) + '">⊞</button>' +
-      '<span class="sep"></span>' + t('mapa', '🗺️', L('Mapa mental', 'Mind map')) + t('rizoma', '🕸️', L('Rizoma', 'Rhizome')) + '<span class="sep"></span>' +
-      '<span class="len">' + t('camino', '🧭', L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', '🧠', L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', '💡', L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + t('cosmos', '🌌', L('Cosmos', 'Cosmos'), L('Tu mapa mental en 3D, como un recorrido', 'Your mind map in 3D, as a flythrough')) + '</span>';
+      '<span class="sep"></span>' + t('mapa', (window.GK_IC ? window.GK_IC('mapa') : ''), L('Mapa mental', 'Mind map')) + t('rizoma', (window.GK_IC ? window.GK_IC('rizoma') : ''), L('Rizoma', 'Rhizome')) + '<span class="sep"></span>' +
+      '<span class="len">' + t('camino', (window.GK_IC ? window.GK_IC('camino') : ''), L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', (window.GK_IC ? window.GK_IC('genio') : ''), L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', (window.GK_IC ? window.GK_IC('claridad') : ''), L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + t('cosmos', (window.GK_IC ? window.GK_IC('cosmos') : ''), L('Cosmos', 'Cosmos'), L('Tu mapa mental en 3D, como un recorrido', 'Your mind map in 3D, as a flythrough')) + '</span>';
     const slot = document.querySelector('#mainHeader .flex.gap-2.flex-1.min-w-0');   // hueco que antes ocupaba el buscador
     if (slot) { slot.classList.add('gk-tabslot'); slot.appendChild(tabs); } else anchor.parentNode.insertBefore(tabs, anchor);
     buildCtl();

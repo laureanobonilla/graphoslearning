@@ -11,7 +11,7 @@
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const sm = (a, b, x) => { x = clamp((x - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); };
   const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
-  const PAL = [[129, 140, 248], [34, 211, 238], [167, 139, 250], [244, 114, 182], [251, 191, 36], [52, 211, 153], [248, 113, 113], [96, 165, 250]];
+  const PAL = [[122, 167, 217], [208, 170, 110], [126, 184, 160], [176, 140, 168], [150, 165, 214], [200, 128, 118], [116, 186, 196], [184, 184, 120]];
 
   let pane = null, cv = null, ctx = null, card = null, hud = null;
   let on = false, raf = 0, W = 0, H = 0, DPR = 1, F = 600, geoT = 0, pollT = 0;
@@ -115,10 +115,10 @@
   function buildBack() {
     back.width = Math.max(2, Math.round(W)); back.height = Math.max(2, Math.round(H));
     const g = back.getContext('2d'), w = back.width, h = back.height;
-    const bg = g.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#05061a'); bg.addColorStop(0.6, '#0a0b2a'); bg.addColorStop(1, '#04050f');
+    const bg = g.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#080c12'); bg.addColorStop(0.6, '#0d131c'); bg.addColorStop(1, '#06090e');
     g.fillStyle = bg; g.fillRect(0, 0, w, h);
     const blob = (x, y, r, rgb, a) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(' + rgb + ',' + a + ')'); gr.addColorStop(1, 'rgba(' + rgb + ',0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); };
-    blob(w * 0.28, h * 0.4, w * 0.4, '79,70,229', 0.26); blob(w * 0.74, h * 0.62, w * 0.36, '8,145,178', 0.17); blob(w * 0.55, h * 0.15, w * 0.3, '168,85,247', 0.15);
+    blob(w * 0.28, h * 0.4, w * 0.4, '58,90,140', 0.26); blob(w * 0.74, h * 0.62, w * 0.36, '40,110,140', 0.17); blob(w * 0.55, h * 0.15, w * 0.3, '70,90,130', 0.15);
     let s = 5; const r = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
     for (let i = 0; i < 120; i++) { g.fillStyle = 'rgba(200,210,255,' + (0.15 + r() * 0.5) + ')'; g.fillRect(r() * w, r() * h, 1, 1); }
   }
@@ -208,8 +208,8 @@
       if (!isSel && !isHov && boxes.some((q) => !(bx.r < q.l || bx.l > q.r || bx.b < q.t || bx.t > q.b))) continue;
       boxes.push(bx);
       ctx.globalAlpha = (isSel || isHov ? 1 : clamp(fa * 1.2, 0, 0.95)) * (selId && !selSet.has(n.id) && !isHov ? 0.6 : 1);
-      ctx.textBaseline = 'middle'; ctx.shadowColor = 'rgba(4,5,15,.95)'; ctx.shadowBlur = 7; ctx.fillStyle = '#04050f'; ctx.fillText(txt, x, y);
-      ctx.shadowColor = 'rgba(' + PAL[n.c].join(',') + ',.85)'; ctx.shadowBlur = isSel ? 18 : 10; ctx.fillStyle = isSel ? '#fff' : '#e7ecff'; ctx.fillText(txt, x, y);
+      ctx.textBaseline = 'middle'; ctx.shadowColor = 'rgba(4,5,15,.95)'; ctx.shadowBlur = 7; ctx.fillStyle = '#06090e'; ctx.fillText(txt, x, y);
+      ctx.shadowColor = 'rgba(' + PAL[n.c].join(',') + ',.85)'; ctx.shadowBlur = isSel ? 18 : 10; ctx.fillStyle = isSel ? '#fff' : '#e8ebf0'; ctx.fillText(txt, x, y);
       ctx.shadowBlur = 0;
     }
     ctx.globalAlpha = 1;
@@ -313,22 +313,22 @@
   }
 
   /* ---------- panel ---------- */
-  const CSS = '#cosPane{position:fixed;z-index:20;display:none;overflow:hidden;background:#05061a;font-family:Inter,system-ui,sans-serif;color:#e7ecff;border-top:1px solid #1d2442}' +
+  const CSS = '#cosPane{position:fixed;z-index:20;display:none;overflow:hidden;background:#080c12;font-family:Inter,system-ui,sans-serif;color:#e8ebf0;border-top:1px solid #1e2633}' +
     '#cosPane.on{display:block}#cosPane canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}#cosPane canvas:active{cursor:grabbing}' +
     '#cosPane .cs-hud{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none}' +
-    '#cosPane .cs-hud>*{pointer-events:auto}#cosPane .cs-t{font:800 15px Sora,Inter,sans-serif;color:#e0e7ff;margin-right:4px;pointer-events:none}' +
-    '#cosPane .cs-b{border:1px solid rgba(129,140,248,.4);background:rgba(15,20,40,.72);color:#c7d2fe;border-radius:999px;padding:6px 13px;font:600 12.5px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}' +
-    '#cosPane .cs-b:hover,#cosPane .cs-b:focus-visible{background:rgba(79,70,229,.35);color:#fff;outline:none;border-color:#818cf8}' +
-    '#cosPane .cs-tip{position:absolute;left:14px;bottom:12px;font-size:11.5px;color:#8f98c9;pointer-events:none;max-width:60%}' +
-    '#cosPane .cs-card{position:absolute;right:14px;bottom:14px;width:min(380px,calc(100% - 28px));max-height:46%;overflow:auto;background:rgba(10,14,34,.88);border:1px solid rgba(129,140,248,.35);border-radius:14px;padding:13px 15px;backdrop-filter:blur(10px);box-shadow:0 10px 40px rgba(0,0,0,.45)}' +
+    '#cosPane .cs-hud>*{pointer-events:auto}#cosPane .cs-t{font:600 17px Newsreader,Georgia,serif;color:#e8ebf0;margin-right:4px;pointer-events:none}' +
+    '#cosPane .cs-b{border:1px solid rgba(122,167,217,.4);background:rgba(14,19,26,.72);color:#c3cad6;border-radius:999px;padding:6px 13px;font:600 12.5px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}' +
+    '#cosPane .cs-b:hover,#cosPane .cs-b:focus-visible{background:rgba(122,167,217,.35);color:#fff;outline:none;border-color:#7aa7d9}' +
+    '#cosPane .cs-tip{position:absolute;left:14px;bottom:12px;font-size:11.5px;color:#8b94a5;pointer-events:none;max-width:60%}' +
+    '#cosPane .cs-card{position:absolute;right:14px;bottom:14px;width:min(380px,calc(100% - 28px));max-height:46%;overflow:auto;background:rgba(14,19,26,.88);border:1px solid rgba(122,167,217,.35);border-radius:14px;padding:13px 15px;backdrop-filter:blur(10px);box-shadow:0 10px 40px rgba(0,0,0,.45)}' +
     '#cosPane .cs-ct{display:flex;align-items:center;gap:8px;font:700 15px Sora,Inter,sans-serif;color:#fff}#cosPane .cs-ct i{width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 10px currentColor}' +
-    '#cosPane .cs-x{margin-left:auto;background:none;border:0;color:#8f98c9;font-size:20px;line-height:1;cursor:pointer}' +
-    '#cosPane .cs-cp{font-size:11px;color:#8f98c9;margin:3px 0 6px}#cosPane .cs-card p{margin:6px 0 0;font-size:13px;line-height:1.5;color:#dbe1ff}#cosPane .cs-card p.cs-s{color:#aab3e6;font-size:12.5px}';
+    '#cosPane .cs-x{margin-left:auto;background:none;border:0;color:#8b94a5;font-size:20px;line-height:1;cursor:pointer}' +
+    '#cosPane .cs-cp{font-size:11px;color:#8b94a5;margin:3px 0 6px}#cosPane .cs-card p{margin:6px 0 0;font-size:13px;line-height:1.5;color:#d3d9e4}#cosPane .cs-card p.cs-s{color:#a9b1bf;font-size:12.5px}';
   function build() {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     pane = document.createElement('section'); pane.id = 'cosPane'; pane.setAttribute('aria-label', 'Cosmos');
     pane.innerHTML = '<canvas role="img" aria-label="' + esc(L('Mapa mental en 3D. Arrastra para girar, rueda para acercarte, clic en una idea para elegirla.', '3D mind map. Drag to turn, wheel to zoom, click an idea to pick it.')) + '"></canvas>' +
-      '<div class="cs-hud"><span class="cs-t">🌌 Cosmos</span><button type="button" class="cs-b" data-a="tour"></button><button type="button" class="cs-b" data-a="reset">⟲ ' + esc(L('Ver todo', 'See all')) + '</button></div>' +
+      '<div class="cs-hud"><span class="cs-t">Cosmos</span><button type="button" class="cs-b" data-a="tour"></button><button type="button" class="cs-b" data-a="reset">⟲ ' + esc(L('Ver todo', 'See all')) + '</button></div>' +
       '<div class="cs-tip">' + esc(L('Arrastra para girar · rueda para acercarte · clic en una idea para ver su definición', 'Drag to turn · wheel to zoom · click an idea to see its definition')) + '</div>' +
       '<div class="cs-card" hidden></div>';
     document.body.appendChild(pane);
