@@ -13,8 +13,8 @@
   const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   const PAL = [[122, 167, 217], [208, 170, 110], [126, 184, 160], [176, 140, 168], [150, 165, 214], [200, 128, 118], [116, 186, 196], [184, 184, 120]];
 
-  let pane = null, cv = null, ctx = null, card = null, hud = null;
-  let on = false, raf = 0, W = 0, H = 0, DPR = 1, F = 600, geoT = 0, pollT = 0;
+  let pane = null, cv = null, ctx = null, card = null, hud = null, legEl = null, emptyEl = null, tipEl = null, titleEl = null;
+  let libMode = false, on = false, raf = 0, W = 0, H = 0, DPR = 1, F = 600, geoT = 0, pollT = 0;
   let M = null, sig = '';                      // modelo actual
   const cam = { tx: 0, ty: 0, tz: 0, yaw: 0.5, pitch: 0.18, dist: 14 };
   let fly = null, tour = null, idleAt = 0, sel = null, hover = null, drag = null, picks = [], self = false;
@@ -24,8 +24,10 @@
   /* ---------- datos del mapa ---------- */
   const labelOf = (n) => String(n.baseTitle || n.label || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
   function readModel() {
-    let all = [], es = [];
-    try { all = nodes.get().filter((n) => !n.isSubscheme && !n.isPointer && labelOf(n)); es = edges.get(); } catch (_e) { return null; }
+    try { return modelFrom(nodes.get(), edges.get()); } catch (_e) { return null; }
+  }
+  function modelFrom(allNodes, allEdges) {
+    const all = allNodes.filter((n) => !n.isSubscheme && !n.isPointer && labelOf(n)), es = allEdges;
     const ids = new Set(all.map((n) => String(n.id)));
     const kids = new Map(), parent = new Map();
     es.forEach((e) => {
@@ -158,17 +160,17 @@
     // ramas
     M.links.forEach((e) => {
       const a = e.a.p, b = e.b.p, mx = [(a[0] + b[0]) / 2 + e.bow, (a[1] + b[1]) / 2 + Math.abs(e.bow) * 0.6, (a[2] + b[2]) / 2 - e.bow];
-      const col = PAL[e.b.c], hot = selId && (e.a.id === selId || e.b.id === selId);
+      const col = e.cross ? [232, 200, 140] : PAL[e.b.c], hot = selId && (e.a.id === selId || e.b.id === selId);
       let pa = null;
       for (let i = 0; i <= 8; i++) {
         const k = i / 8, ik = 1 - k;
         const q = [ik * ik * a[0] + 2 * ik * k * mx[0] + k * k * b[0], ik * ik * a[1] + 2 * ik * k * mx[1] + k * k * b[1], ik * ik * a[2] + 2 * ik * k * mx[2] + k * k * b[2]];
         if (!proj(q, A)) { pa = null; continue; }
         if (pa) {
-          const fa = fogA((A.z + pa.z) / 2) * (selId && !hot ? 0.55 : 1), lw = clamp((e.b.depth <= 1 ? 2.2 : 1.3) * (A.s / 120), 0.5, 4);
-          ctx.strokeStyle = 'rgba(' + col.join(',') + ',' + ((hot ? 0.9 : 0.5) * fa).toFixed(3) + ')'; ctx.lineWidth = lw * (hot ? 3 : 2.4);
+          const fa = fogA((A.z + pa.z) / 2) * (selId && !hot ? 0.55 : 1), lw = clamp((e.cross ? 2.6 : e.b.depth <= 1 ? 2.2 : 1.3) * (A.s / 120), 0.5, 4);
+          ctx.strokeStyle = 'rgba(' + col.join(',') + ',' + ((hot ? 0.9 : e.cross ? 0.85 : 0.5) * fa).toFixed(3) + ')'; ctx.lineWidth = lw * (hot ? 3 : 2.4);
           ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(A.x, A.y); ctx.stroke();
-          ctx.strokeStyle = 'rgba(235,240,255,' + ((hot ? 0.8 : 0.42) * fa).toFixed(3) + ')'; ctx.lineWidth = Math.max(0.6, lw * 0.5);
+          ctx.strokeStyle = (e.cross ? 'rgba(250,222,160,' : 'rgba(235,240,255,') + ((hot ? 0.8 : e.cross ? 0.75 : 0.42) * fa).toFixed(3) + ')'; ctx.lineWidth = Math.max(0.6, lw * 0.5);
           ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(A.x, A.y); ctx.stroke();
         }
         pa = { x: A.x, y: A.y, z: A.z };
@@ -245,13 +247,13 @@
     sel = id; idleAt = performance.now() + 5000;
     flyTo({ tx: n.p[0], ty: n.p[1], tz: n.p[2], dist: n.depth === 0 ? Math.max(5, M.rad * 1.4) : 3.2, pitch: cam.pitch * 0.8 }, (opts && opts.ms) || 1100);
     showCard(n);
-    if (!opts || !opts.silent) {                       // el texto y las definiciones siguen a la idea elegida, como en el mapa mental
+    if ((!opts || !opts.silent) && !libMode) {              // el texto y las definiciones siguen a la idea elegida, como en el mapa mental
       self = true;
       try { if (window.gkDefsGoTo) window.gkDefsGoTo(n.n.id); } catch (_e) { /* nada */ }
       try { document.dispatchEvent(new CustomEvent('gk:nodepick', { detail: n.n.id })); } catch (_e) { /* nada */ }
       self = false;
       trk('cosmos_pick', { depth: n.depth, tour: !!(opts && opts.tour) });
-    }
+    } else if (libMode && (!opts || !opts.silent)) trk('lib_pick', { depth: n.depth, cross: (M.lib.cross.get(id) || []).length });
   }
   function showCard(n) {
     if (!card) return;
@@ -262,11 +264,20 @@
       (d ? '<p>' + esc(d.length > 420 ? d.slice(0, 420) + '…' : d) + '</p>' : '') +
       (s ? '<p class="cs-s">' + esc(s.length > 280 ? s.slice(0, 280) + '…' : s) + '</p>' : '') +
       (ex ? '<p class="cs-s"><b>' + esc(L('Ejemplo', 'Example')) + ':</b> ' + esc(ex.length > 240 ? ex.slice(0, 240) + '…' : ex) + '</p>' : '') +
+      libExtra(n) +
       (!d && !s && !ex ? '<p class="cs-s">' + esc(L('Esta idea aún no tiene definición. Ábrela en el mapa mental para pedirla.', 'This idea has no definition yet. Open it in the mind map to request one.')) + '</p>' : '');
     card.hidden = false;
   }
+  function libExtra(n) {
+    if (!libMode || !M.lib) return '';
+    const pr = M.lib.projects[n.proj]; const cr = M.lib.cross.get(n.id) || [];
+    let h = '<div class="cs-pj"><b>' + esc(L('Mapa', 'Map')) + ':</b> ' + esc(pr ? pr.title : '') + ' <button type="button" class="cs-open" data-open="' + esc(pr ? pr.id : '') + '">' + esc(L('Abrir este mapa', 'Open this map')) + '</button></div>';
+    if (cr.length) h += '<div class="cs-cr"><b>' + esc(L('Se conecta con', 'Connects to')) + ':</b>' + cr.slice(0, 5).map((c) => { const t = M.byId.get(c.to); return t ? '<button type="button" class="cs-go" data-go="' + esc(c.to) + '"><i style="background:rgb(' + PAL[t.c].join(',') + ')"></i>' + esc(t.label) + ' <small>' + esc((M.lib.projects[t.proj] || {}).title || '') + '</small>' + (c.why ? '<em>' + esc(c.why) + '</em>' : '') + '</button>' : ''; }).join('') + '</div>';
+    return h;
+  }
   /* recorrido: visita las ideas principales y sus ramas, una a una */
   function buildTour() {
+    if (M.lib) return M.lib.tops.slice(0, 16);
     const seq = [M.top]; const walk = (id, d) => { (M.model.kids.get(id) || []).slice(0, d === 0 ? 7 : 2).forEach((k) => { seq.push(k); if (d < 1) walk(k, d + 1); }); };
     walk(M.top, 0); return seq.slice(0, 16);
   }
@@ -305,6 +316,9 @@
       cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0013), 1.6, M ? M.rad * 5 + 10 : 60);
     }, { passive: false });
     pane.addEventListener('click', (e) => {
+      const op = e.target.closest('[data-open]'); if (op) { openProject(op.dataset.open); return; }
+      const gg = e.target.closest('[data-go]'); if (gg) { select(gg.dataset.go); return; }
+      const lg = e.target.closest('[data-proj]'); if (lg && M && M.lib) { const t = M.lib.tops[+lg.dataset.proj]; if (t) select(t); return; }
       const b = e.target.closest('[data-a]'); if (b) { const a = b.dataset.a; if (a === 'tour') { tour ? stopTour() : startTour(); } else if (a === 'reset') { stopTour(); sel = null; card.hidden = true; overview(); trk('cosmos_reset'); } return; }
       if (e.target.closest('.cs-x')) { sel = null; card.hidden = true; }
     });
@@ -314,7 +328,7 @@
 
   /* ---------- panel ---------- */
   const CSS = '#cosPane{position:fixed;z-index:20;display:none;overflow:hidden;background:#080c12;font-family:Inter,system-ui,sans-serif;color:#e8ebf0;border-top:1px solid #1e2633}' +
-    '#cosPane.on{display:block}#cosPane canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}#cosPane canvas:active{cursor:grabbing}' +
+    '#cosPane [hidden]{display:none !important}#cosPane.on{display:block}#cosPane canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}#cosPane canvas:active{cursor:grabbing}' +
     '#cosPane .cs-hud{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none}' +
     '#cosPane .cs-hud>*{pointer-events:auto}#cosPane .cs-t{font:600 17px Newsreader,Georgia,serif;color:#e8ebf0;margin-right:4px;pointer-events:none}' +
     '#cosPane .cs-b{border:1px solid rgba(122,167,217,.4);background:rgba(14,19,26,.72);color:#c3cad6;border-radius:999px;padding:6px 13px;font:600 12.5px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}' +
@@ -323,16 +337,22 @@
     '#cosPane .cs-card{position:absolute;right:14px;bottom:14px;width:min(380px,calc(100% - 28px));max-height:46%;overflow:auto;background:rgba(14,19,26,.88);border:1px solid rgba(122,167,217,.35);border-radius:14px;padding:13px 15px;backdrop-filter:blur(10px);box-shadow:0 10px 40px rgba(0,0,0,.45)}' +
     '#cosPane .cs-ct{display:flex;align-items:center;gap:8px;font:700 15px Sora,Inter,sans-serif;color:#fff}#cosPane .cs-ct i{width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 10px currentColor}' +
     '#cosPane .cs-x{margin-left:auto;background:none;border:0;color:#8b94a5;font-size:20px;line-height:1;cursor:pointer}' +
+    '#cosPane .cs-pj{margin:8px 0 0;font-size:12.5px;color:#c3cad6}#cosPane .cs-open{margin-left:6px;border:1px solid #2a3342;background:#1e2633;color:#e8ebf0;border-radius:999px;padding:3px 10px;font:600 11.5px Inter,sans-serif;cursor:pointer}#cosPane .cs-open:hover{border-color:#7aa7d9}' +
+    '#cosPane .cs-cr{margin-top:8px;font-size:12px;color:#a9b1bf;display:flex;flex-direction:column;gap:4px}#cosPane .cs-go{display:flex;align-items:center;gap:6px;text-align:left;background:rgba(30,38,51,.7);border:1px solid #2a3342;border-radius:8px;padding:5px 8px;color:#e8ebf0;font:600 12px Inter,sans-serif;cursor:pointer;flex-wrap:wrap}#cosPane .cs-go:hover{border-color:#d0aa6e}#cosPane .cs-go i{width:8px;height:8px;border-radius:50%}#cosPane .cs-go small{color:#8b94a5;font-weight:500}#cosPane .cs-go em{flex-basis:100%;font-style:normal;color:#d0aa6e;font-weight:500;font-size:11px}' +
+    '#cosPane .cs-leg{position:absolute;left:14px;top:50px;display:flex;flex-wrap:wrap;gap:6px;max-width:min(70%,640px)}#cosPane .cs-leg button{display:inline-flex;align-items:center;gap:6px;border:1px solid #2a3342;background:rgba(14,19,26,.78);color:#c3cad6;border-radius:999px;padding:4px 10px;font:600 11.5px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px);max-width:200px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}#cosPane .cs-leg button:hover{border-color:#7aa7d9;color:#fff}#cosPane .cs-leg i{width:8px;height:8px;border-radius:50%;flex:0 0 auto}' +
+    '#cosPane .cs-empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;color:#a9b1bf;font-size:14px;line-height:1.55;gap:8px}#cosPane .cs-empty b{font:600 22px Newsreader,Georgia,serif;color:#e8ebf0}' +
     '#cosPane .cs-cp{font-size:11px;color:#8b94a5;margin:3px 0 6px}#cosPane .cs-card p{margin:6px 0 0;font-size:13px;line-height:1.5;color:#d3d9e4}#cosPane .cs-card p.cs-s{color:#a9b1bf;font-size:12.5px}';
   function build() {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     pane = document.createElement('section'); pane.id = 'cosPane'; pane.setAttribute('aria-label', 'Cosmos');
     pane.innerHTML = '<canvas role="img" aria-label="' + esc(L('Mapa mental en 3D. Arrastra para girar, rueda para acercarte, clic en una idea para elegirla.', '3D mind map. Drag to turn, wheel to zoom, click an idea to pick it.')) + '"></canvas>' +
       '<div class="cs-hud"><span class="cs-t">Cosmos</span><button type="button" class="cs-b" data-a="tour"></button><button type="button" class="cs-b" data-a="reset">⟲ ' + esc(L('Ver todo', 'See all')) + '</button></div>' +
+      '<div class="cs-leg" hidden></div><div class="cs-empty" hidden></div>' +
       '<div class="cs-tip">' + esc(L('Arrastra para girar · rueda para acercarte · clic en una idea para ver su definición', 'Drag to turn · wheel to zoom · click an idea to see its definition')) + '</div>' +
       '<div class="cs-card" hidden></div>';
     document.body.appendChild(pane);
     cv = pane.querySelector('canvas'); ctx = cv.getContext('2d'); card = pane.querySelector('.cs-card'); hud = pane.querySelector('.cs-hud');
+    legEl = pane.querySelector('.cs-leg'); emptyEl = pane.querySelector('.cs-empty'); tipEl = pane.querySelector('.cs-tip'); titleEl = pane.querySelector('.cs-t');
     paintHud(); bind();
   }
   function geo() {
@@ -364,10 +384,132 @@
   }
   const signature = () => { try { return nodes.length + '|' + edges.length + '|' + nodes.get().map((n) => n.id + ':' + labelOf(n)).join(',').length; } catch (_e) { return ''; } };
 
+  /* ---------- Biblioteca: todos los mapas guardados juntos, con puentes entre ideas parecidas ---------- */
+  const STOP = new Set('de la el los las un una unos unas y o u en del al que se por con para como su sus es son lo le les mas pero sin sobre entre desde hasta este esta estos estas ese esa eso muy the of and to in is are for on with as by that this from or an be it its'.split(' '));
+  const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  async function gather() {
+    let cat = [];
+    try { cat = JSON.parse(localStorage.getItem('gk_projects_' + getActiveUserKey()) || '[]'); } catch (_e) { cat = []; }
+    cat = cat.filter((e) => e && e.id).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 14);
+    const got = await Promise.all(cat.map(async (e) => {
+      let rec = null;
+      try { const raw = localStorage.getItem('gk_proj_snapshot_' + e.id); if (raw) rec = JSON.parse(raw); } catch (_e) { rec = null; }
+      if (!rec && !String(e.id).startsWith('local_')) {
+        try { const r = await fetch('/.netlify/functions/db?projectId=' + encodeURIComponent(e.id)); if (r.ok) { const j = await r.json(); rec = j && j.data; } } catch (_e) { rec = null; }
+      }
+      return rec && Array.isArray(rec.nodes) && rec.nodes.length >= 2 ? { id: e.id, title: e.title || L('Mapa', 'Map'), nodes: rec.nodes, edges: rec.edges || [] } : null;
+    }));
+    return got.filter(Boolean);
+  }
+  function crossLinks(items) {
+    const docs = items.map((it) => {
+      const w = new Map(); const add = (t, wt) => norm(t).split(' ').forEach((x) => { if (x.length >= 4 && !STOP.has(x)) { const k = x.slice(0, 6), o = w.get(k) || { w: 0, orig: x }; o.w += wt; w.set(k, o); } });
+      add(it.label, 3); add(it.def, 1); add(it.simple, 0.5); return w;
+    });
+    const df = new Map(); docs.forEach((d) => d.forEach((_v, k) => df.set(k, (df.get(k) || 0) + 1)));
+    const N = docs.length, idf = (k) => Math.log(1 + N / (df.get(k) || 1));
+    const vec = docs.map((d) => { let sq = 0; const v = new Map(); d.forEach((o, k) => { const x = o.w * idf(k); v.set(k, x); sq += x * x; }); return { v, n: Math.sqrt(sq) || 1 }; });
+    const nl = items.map((it) => norm(it.label)), cand = [];
+    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {
+      if (items[i].proj === items[j].proj) continue;
+      if (nl[i].length >= 3 && nl[i] === nl[j]) { cand.push({ i, j, sim: 2, why: L('mismo concepto', 'same concept') }); continue; }
+      let dot = 0; const shared = []; vec[i].v.forEach((x, k) => { const y = vec[j].v.get(k); if (y) { dot += x * y; shared.push(k); } });
+      if (shared.length < 2) continue;
+      const sim = dot / (vec[i].n * vec[j].n);
+      if (sim >= 0.24) cand.push({ i, j, sim, why: shared.slice(0, 3).map((k) => docs[i].get(k).orig).join(', ') });
+    }
+    cand.sort((a, b) => b.sim - a.sim);
+    const cnt = new Array(N).fill(0), out = [];
+    cand.forEach((c) => { if (out.length >= 90 || cnt[c.i] >= 2 || cnt[c.j] >= 2) return; cnt[c.i]++; cnt[c.j]++; out.push({ a: items[c.i].id, b: items[c.j].id, why: c.why }); });
+    return out;
+  }
+  function buildLib(projects) {
+    const parts = [];
+    projects.forEach((p, i) => {
+      const pre = 'p' + i + '~';
+      const m = modelFrom(p.nodes.map((n) => Object.assign({}, n, { id: pre + n.id })), p.edges.map((e) => ({ from: pre + e.from, to: pre + e.to })));
+      if (m.all.length < 2) return;
+      const lay = layout(m); if (lay) parts.push({ p, m, lay });
+    });
+    if (parts.length < 2) return { count: parts.length };
+    const P = parts.length, maxRad = Math.max.apply(null, parts.map((x) => x.lay.rad)), Rc = maxRad * 1.25 + 3 + P * 0.6;
+    const list = [], byId = new Map(), links = [], parent = new Map(), kids = new Map(), tops = [], projs = [];
+    parts.forEach((x, k) => {
+      const y = P === 1 ? 0 : 1 - (k + 0.5) * 2 / P, r = Math.sqrt(1 - y * y), ph = k * 2.39996, ctr = [Math.cos(ph) * r * Rc, y * Rc * 0.8, Math.sin(ph) * r * Rc], ang = k * 2.4, ca = Math.cos(ang), sa = Math.sin(ang);
+      x.lay.list.forEach((e) => {
+        const px = e.p[0], pz = e.p[2]; e.p[0] = px * ca + pz * sa + ctr[0]; e.p[1] += ctr[1]; e.p[2] = -px * sa + pz * ca + ctr[2];
+        e.proj = k; e.c = k % PAL.length; list.push(e); byId.set(e.id, e);
+      });
+      x.lay.links.forEach((l) => links.push(l));
+      x.m.parent.forEach((v, key) => parent.set(key, v)); x.m.kids.forEach((v, key) => kids.set(key, v));
+      tops.push(x.lay.top); projs.push({ id: x.p.id, title: x.p.title });
+    });
+    const items = list.slice(0, 600).map((e) => ({ id: e.id, proj: e.proj, label: e.label, def: e.n.definition || '', simple: e.n.simple || e.n.simpleExplanation || '' }));
+    const cr = crossLinks(items), cross = new Map();
+    cr.forEach((c) => {
+      const a = byId.get(c.a), b = byId.get(c.b); if (!a || !b) return;
+      links.push({ a, b, bow: 0.9, cross: true });
+      if (!cross.has(c.a)) cross.set(c.a, []); if (!cross.has(c.b)) cross.set(c.b, []);
+      cross.get(c.a).push({ to: c.b, why: c.why }); cross.get(c.b).push({ to: c.a, why: c.why });
+    });
+    let rad = 1; list.forEach((e) => { rad = Math.max(rad, Math.hypot(e.p[0], e.p[1], e.p[2])); });
+    return { list, byId, links, rad, top: tops[0], model: { parent, kids }, lib: { projects: projs, tops, cross, nCross: cr.length } };
+  }
+  function openProject(pid) {
+    trk('lib_open_map', {});
+    (async () => {
+      try {
+        if (typeof loadProjectById !== 'function') return;
+        await loadProjectById(pid);
+        await new Promise((r) => setTimeout(r, 250));
+        if (window.GK_NAV) await window.GK_NAV.go('mapa');
+      } catch (_e) { /* nada */ }
+    })();
+  }
+  function paintLegend() {
+    if (!legEl) return;
+    if (!libMode || !M || !M.lib) { legEl.hidden = true; return; }
+    legEl.innerHTML = M.lib.projects.map((p, i) => '<button type="button" data-proj="' + i + '" title="' + esc(p.title) + '"><i style="background:rgb(' + PAL[i % PAL.length].join(',') + ')"></i>' + esc(p.title) + '</button>').join('');
+    legEl.hidden = false;
+  }
+  function setMode(lib) {
+    libMode = lib;
+    if (titleEl) titleEl.textContent = lib ? L('Biblioteca', 'Library') : 'Cosmos';
+    if (tipEl) tipEl.textContent = lib ? L('Cada color es un mapa · las líneas doradas unen ideas parecidas de mapas distintos · clic en una idea para ver de dónde viene', 'Each color is a map · gold lines join similar ideas from different maps · click an idea to see where it comes from') : L('Arrastra para girar · rueda para acercarte · clic en una idea para ver su definición', 'Drag to turn · wheel to zoom · click an idea to see its definition');
+    if (emptyEl) emptyEl.hidden = true;
+    paintLegend();
+  }
+  async function showLibrary() {
+    if (on) show(false);
+    if (!pane) build();
+    setMode(true);
+    const projects = await gather();
+    const lib = buildLib(projects);
+    on = true; pane.classList.add('on'); geo(); resize();
+    sel = null; card.hidden = true; tour = null; fly = null;
+    if (!lib || !lib.list) {
+      M = null; picks = [];
+      emptyEl.innerHTML = '<b>' + esc(L('Tu biblioteca empieza con dos mapas', 'Your library starts with two maps')) + '</b>' +
+        '<span>' + esc(L('Cada mapa que generes se guarda aquí. Cuando tengas dos o más, verás cómo se conectan sus ideas aunque sean de temas distintos.', 'Every map you create is saved here. Once you have two or more, you will see how their ideas connect even across different topics.')) + '</span>' +
+        '<span>' + esc(L('Mapas guardados con ideas suficientes: ' + (lib ? lib.count : 0), 'Saved maps with enough ideas: ' + (lib ? lib.count : 0))) + '</span>';
+      emptyEl.hidden = false; paintHud();
+      trk('lib_open', { maps: lib ? lib.count : 0, empty: true });
+    } else {
+      M = lib; cam.tx = cam.ty = cam.tz = 0; cam.dist = clamp(M.rad * 2.3 + 2, 10, 90); cam.yaw = 0.5; cam.pitch = 0.25;
+      idleAt = performance.now() + 2500; paintHud(); paintLegend();
+      trk('lib_open', { maps: M.lib.projects.length, ideas: M.list.length, cross: M.lib.nCross });
+    }
+    document.body.classList.add('gk-cos');
+    raf = requestAnimationFrame(frame); geoT = setInterval(geo, 300);
+    return true;
+  }
+
   function show(v) {
+    if (v && on && libMode) show(false);
     if (v === on) return on;
     if (v) {
       if (!pane) build();
+      setMode(false);
       if (!rebuild(false)) return false;
       sig = signature(); on = true; pane.classList.add('on'); geo(); resize();
       cam.yaw = 0.5; cam.pitch = 0.2; fly = null;
@@ -384,12 +526,13 @@
       return true;
     }
     on = false; cancelAnimationFrame(raf); clearInterval(geoT); clearInterval(pollT); fly = null; tour = null;
+    if (libMode) { libMode = false; if (emptyEl) emptyEl.hidden = true; if (legEl) legEl.hidden = true; }
     if (pane) pane.classList.remove('on');
     document.body.classList.remove('gk-cos');
     return false;
   }
 
-  window.GK_COSMOS = { show, isOn: () => on };
-  const hook = () => { try { window.GK_NAV.onChange((a) => { if (a !== 'cosmos' && on) show(false); }); return true; } catch (_e) { return false; } };
+  window.GK_COSMOS = { show, showLibrary, isOn: () => on };
+  const hook = () => { try { window.GK_NAV.onChange((a) => { if (on && a !== (libMode ? 'biblioteca' : 'cosmos')) show(false); }); return true; } catch (_e) { return false; } };
   if (!hook()) { const iv = setInterval(() => { if (hook()) clearInterval(iv); }, 300); }
 })();

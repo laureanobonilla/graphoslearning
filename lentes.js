@@ -20,6 +20,7 @@ const IC_PATHS = {
   camino: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h6a3 3 0 0 0 0-6h-4a3 3 0 0 1 0-6h6"/>',
   genio: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
   claridad: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>',
+  biblio: '<path d="M5 4v16M10 4v16M15.5 5.5l4 14"/><path d="M3 20h18"/>',
   cosmos: '<circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="9" ry="4" transform="rotate(-25 12 12)"/><ellipse cx="12" cy="12" rx="9" ry="4" transform="rotate(65 12 12)" opacity=".5"/>'
 };
 const ic = (k) => '<svg class="gk-ic" viewBox="0 0 24 24" aria-hidden="true">' + (IC_PATHS[k] || '') + '</svg>';
@@ -808,6 +809,13 @@ function topicNow() {
 function setActive(k) { activeTab = k || ''; if (k === 'mapa' || k === 'rizoma') lastView = k; navHooks.forEach((f) => { try { f(activeTab); } catch (_e) { /* nada */ } }); }
 function setTopic(t) { curTopic = String(t || '').trim().slice(0, 200); setActive(activeTab); }
 async function goTab(k) {
+  if (k === 'biblioteca') {
+    if (S) close();
+    if (cardsEl && !cardsEl.hidden) closeCards(false);
+    try { if (window.GK_COSMOS) await window.GK_COSMOS.showLibrary(); } catch (_e) { /* nada */ }
+    setActive('biblioteca');
+    return;
+  }
   const topic = topicNow();
   if (!topic) { try { if (window.GK_NEEDTOPIC && !document.getElementById('gcTopic')) window.GK_NEEDTOPIC(k); } catch (_e) { /* nada */ } const c = document.getElementById('gcTopic') || document.getElementById('gkComposerInput'); if (c) c.focus(); return; }
   curTopic = topic;

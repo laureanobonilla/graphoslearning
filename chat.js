@@ -70,6 +70,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
 #gkTabs::-webkit-scrollbar{display:none}
 #gkTabs button{flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;border:1px solid transparent;background:none;color:#a9b1bf;border-radius:999px;padding:6px 13px;font:600 13px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
 #gkTabs button:hover{color:#e8ebf0;background:#171e29}
+@media (max-width:1350px){body.gk-chat #gkTabs [data-tab="biblioteca"] .tl{display:none}}
+@media (max-width:1450px){body.gk-chat #gkTabs button{padding:6px 8px;gap:5px;font-size:12.5px}body.gk-chat #gkTabs .len button{padding:4px 7px}body.gk-chat #gkTabs .sep{margin:0 2px}}
 #gkTabs button.on{background:#1e2633;color:#7aa7d9;border-color:#2a3342}
 #gkTabs button.all{padding:6px 10px;color:#8b94a5}
 #gkTabs.idle button:not(.all){opacity:.55}
@@ -178,11 +180,11 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
   function buildTabs() {
     const anchor = document.getElementById('btnToggleReader'); if (!anchor || !anchor.parentNode) return false;
     tabs = document.createElement('nav'); tabs.id = 'gkTabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', L('Cómo explorar el tema', 'How to explore the topic'));
-    const t = (k, icon, name, title) => '<button type="button" role="tab" data-tab="' + k + '" aria-selected="false" title="' + esc(title || name) + '">' + icon + ' ' + esc(name) + '</button>';
+    const t = (k, icon, name, title) => '<button type="button" role="tab" data-tab="' + k + '" aria-selected="false" title="' + esc(title || name) + '">' + icon + '<span class="tl">' + esc(name) + '</span></button>';
     tabs.innerHTML =
       '<button type="button" class="all" role="tab" data-tab="todas" aria-selected="false" title="' + esc(L('Ver todas las tarjetas', 'See all cards')) + '">⊞</button>' +
       '<span class="sep"></span>' + t('mapa', (window.GK_IC ? window.GK_IC('mapa') : ''), L('Mapa mental', 'Mind map')) + t('rizoma', (window.GK_IC ? window.GK_IC('rizoma') : ''), L('Rizoma', 'Rhizome')) + '<span class="sep"></span>' +
-      '<span class="len">' + t('camino', (window.GK_IC ? window.GK_IC('camino') : ''), L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', (window.GK_IC ? window.GK_IC('genio') : ''), L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', (window.GK_IC ? window.GK_IC('claridad') : ''), L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + t('cosmos', (window.GK_IC ? window.GK_IC('cosmos') : ''), L('Cosmos', 'Cosmos'), L('Tu mapa mental en 3D, como un recorrido', 'Your mind map in 3D, as a flythrough')) + '</span>';
+      '<span class="len">' + t('camino', (window.GK_IC ? window.GK_IC('camino') : ''), L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', (window.GK_IC ? window.GK_IC('genio') : ''), L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', (window.GK_IC ? window.GK_IC('claridad') : ''), L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + t('cosmos', (window.GK_IC ? window.GK_IC('cosmos') : ''), L('Cosmos', 'Cosmos'), L('Tu mapa mental en 3D, como un recorrido', 'Your mind map in 3D, as a flythrough')) + '</span><span class="sep"></span>' + t('biblioteca', (window.GK_IC ? window.GK_IC('biblio') : ''), L('Biblioteca', 'Library'), L('Todos tus mapas juntos y cómo se conectan', 'All your maps together and how they connect')) ;
     const slot = document.querySelector('#mainHeader .flex.gap-2.flex-1.min-w-0');   // hueco que antes ocupaba el buscador
     if (slot) { slot.classList.add('gk-tabslot'); slot.appendChild(tabs); } else anchor.parentNode.insertBefore(tabs, anchor);
     buildCtl();
