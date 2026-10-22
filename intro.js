@@ -26,8 +26,8 @@
     ? ['History', 'Physics', 'Ideas', 'Music', 'Code', 'Biology', 'Art', 'Philosophy', 'Chemistry', 'Languages', 'Economics', 'Memory', 'Logic', 'Cosmos']
     : ['Historia', 'Física', 'Ideas', 'Música', 'Código', 'Biología', 'Arte', 'Filosofía', 'Química', 'Idiomas', 'Economía', 'Memoria', 'Lógica', 'Cosmos'];
 
-  var DUR = 6.2;          // segundos totales (el título y el mensaje quedan ~2,7 s)
-  var FLY = 4.0;          // fin del vuelo (luego queda el título)
+  var DUR = 4.0;          // segundos totales (el título y el mensaje quedan ~2,7 s)
+  var FLY = 2.5;          // fin del vuelo (luego queda el título)
   var reduce = false;
   try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
@@ -445,8 +445,22 @@
       root.classList.toggle('gi-dim', document.body.classList.contains('gk-entry'));
     }, 400);
   }
+  /* El mensaje se queda a la vista (arriba, discreto) hasta que la persona empieza a usar la app. */
+  var capShown = false;
+  function showCaption() {
+    if (capShown || started()) return; capShown = true;
+    var c = document.createElement('div'); c.id = 'gkIntroMsg'; c.textContent = root.querySelector('.gi-msg').textContent;
+    var s2 = document.createElement('style');
+    s2.textContent = '#gkIntroMsg{position:fixed;left:50%;top:calc(var(--gk-head-h,64px) + 16px);transform:translate(-50%,-6px);z-index:11;max-width:min(560px,calc(100vw - 40px));text-align:center;font:500 clamp(14px,1.5vw,17px)/1.45 Inter,system-ui,sans-serif;color:#c7d2fe;text-shadow:0 0 18px rgba(99,102,241,.55),0 1px 2px rgba(4,5,15,.9);pointer-events:none;opacity:0;transition:opacity .9s ease,transform .9s ease}#gkIntroMsg.on{opacity:.95;transform:translate(-50%,0)}';
+    document.head.appendChild(s2); document.body.appendChild(c);
+    requestAnimationFrame(function () { requestAnimationFrame(function () { c.classList.add('on'); }); });
+    var born = Date.now(), iv = setInterval(function () {
+      if (started() || Date.now() - born > 25000) { clearInterval(iv); c.classList.remove('on'); setTimeout(function () { try { c.remove(); s2.remove(); } catch (e) {} }, 1000); }
+    }, 400);
+  }
   function endIntro(fast) {
     if (done || amb) return;
+    showCaption();
     window.__gkIntroState = fast ? 'skipped' : 'done';
     trkI(fast ? 'intro_skip' : 'intro_end', { seg: Math.round(((performance.now() - (t0 || performance.now())) / 100)) / 10 });
     if (ambientOk()) toAmbient(); else finish(fast);
@@ -484,7 +498,7 @@
   if (reduce) {
     root.classList.add('gi-show');
     ctx.drawImage(back, 0, 0, W, H);
-    setTimeout(function () { finish(false); }, 1600);
+    setTimeout(function () { showCaption(); finish(false); }, 1600);
   } else {
     raf = requestAnimationFrame(frame);
   }
