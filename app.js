@@ -1342,6 +1342,23 @@ const depthView = (() => {
 
 // Libro: marca de procedencia de un nodo del esquema inicial ("libro p. N" si la página se verifica; "IA" si no).
 function bookPageOf(n) { return (window.GK_BOOK && GK_BOOK.on() && n && n.page && GK_BOOK.verify(n.label, n.page)) ? Number(n.page) : (window.GK_BOOK && GK_BOOK.on() ? 0 : undefined); }
+// Con un texto largo o una página web como fuente: ¿el concepto se menciona en ese texto? (si no, se marca "IA"; con solo un tema no se marca nada)
+function textHasLabel(text, label) {
+    const nz = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const words = (nz(label).match(/[a-z]{4,}/g) || []); if (!words.length) return true;
+    const T = nz(text); return words.filter(w => T.indexOf(w.slice(0, 6)) >= 0).length >= Math.ceil(words.length / 2);
+}
+function markAiNodesNotInSource(data, srcText, rootId) {
+    const nz = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+    const T = nz(srcText);
+    nodes.update({ id: rootId, fromDoc: true });
+    [...(data.branches || []), ...(data.subBranches || [])].forEach(n => {
+        const cur = nodes.get(n.id); if (!cur) return;
+        const q = nz(n.sourceQuote);
+        const fromSource = q.length > 8 && T.indexOf(q) >= 0;
+        if (!fromSource) nodes.update({ id: n.id, label: String(cur.label).replace(/\n_IA_$/, '') + '\n_IA_', aiAdded: true });
+    });
+}
 function bookTag(n) { const p = bookPageOf(n); return p === undefined ? '' : (p ? `\n_libro p. ${p}_` : '\n_IA_'); }
 async function renderThreeLevelTree(data, opts = {}) {
     const { originPanelId = null, attachToNodeId = null } = opts;
@@ -2010,6 +2027,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         let bookText = null;   // con libro: el texto de la izquierda son pasajes del libro, no algo generado
         if (window.GK_BOOK && GK_BOOK.on() && !attachToNodeId && topicText.trim().split(/\s+/).length < 60 && data.root && (data.branches || []).some(b => b.page)) { try { bookText = GK_BOOK.enrich(data); } catch (e) { console.error('[libro] texto fuente:', e); } }
         await renderThreeLevelTree(data, { originPanelId, attachToNodeId });
+        if (isLong && !bookText && data.root) { try { markAiNodesNotInSource(data, topicText, attachToNodeId || data.root.id); } catch (e) { console.error('[fuente] marcas:', e); } }
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview });
         scheduleSaveBanner();
@@ -2422,8 +2440,10 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
             const cId = nodes.get(concept.id) ? `${concept.id}_${Date.now()}_${idx}` : concept.id;
             let bookMark = null;
             if (window.GK_BOOK && GK_BOOK.on()) bookMark = (concept.page && GK_BOOK.verify(concept.label, concept.page)) ? Number(concept.page) : 0;
+            let docTag = '';
+            if (bookMark === null && currentDocumentText && nodes.get().some(n => n.fromDoc) && !textHasLabel(currentDocumentText, concept.label)) docTag = '\n_IA_';
             nodes.update({
-                id: cId, label: `*${concept.label}*` + (bookMark === null ? '' : (bookMark ? `\n_libro p. ${bookMark}_` : '\n_IA_')), baseTitle: concept.label,
+                id: cId, label: `*${concept.label}*` + (bookMark === null ? docTag : (bookMark ? `\n_libro p. ${bookMark}_` : '\n_IA_')), baseTitle: concept.label,
                 bookPage: bookMark === null ? undefined : bookMark,
                 color: expandChildColor, expanded: false,
                 x: parentPos.x, y: parentPos.y, fixed: { x: false, y: false }
