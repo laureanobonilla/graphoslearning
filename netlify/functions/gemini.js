@@ -87,7 +87,7 @@ async function rawHandler(event, context) {
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, lang: rawLang } = JSON.parse(event.body);
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, bookMode, lang: rawLang } = JSON.parse(event.body);
         const lang = normalizeLang(rawLang);
         // Todas las llamadas de abajo pasan por aquí: añade la instrucción de idioma.
         const generateWithFallback = (payload, opts) => generateWithFallbackBase(localizePayload(payload, lang), opts);
@@ -110,7 +110,8 @@ async function rawHandler(event, context) {
                         properties: {
                             id: { type: 'STRING' },
                             label: { type: 'STRING' },
-                            relationship: { type: 'STRING', description: 'Verbo o enlace ultracorto (1 a 3 palabras).' }
+                            relationship: { type: 'STRING', description: 'Verbo o enlace ultracorto (1 a 3 palabras).' },
+                            page: { type: 'INTEGER', description: 'Solo si el concepto sale de un fragmento del libro: el número N de su marca [p. N]. Si lo aportas tú, omite este campo.' }
                         },
                         required: ["id", "label", "relationship"]
                     }
@@ -133,7 +134,7 @@ async function rawHandler(event, context) {
             }
 
             const docPrompt = documentContext 
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nExtrae las derivaciones a partir del documento o complementa con conocimiento riguroso.`
+                ? `DOCUMENTO DE BASE${bookMode ? ' (fragmentos de un libro, cada uno con su página [p. N])' : ''}:\n"""${documentContext.slice(0, 12000)}"""\n\n${bookMode ? 'PRIORIDAD AL LIBRO: propón los conceptos que el libro trata bajo este tema y, en cada uno, pon en "page" la página [p. N] del fragmento de donde sale. Usa solo páginas que aparezcan arriba. Complementa con conocimiento propio únicamente si el libro no alcanza, y en ese caso omite "page".' : 'Extrae las derivaciones a partir del documento o complementa con conocimiento riguroso.'}`
                 : 'Usa conocimiento riguroso del tema.';
 
             const curiosityInstruction = includeCuriosity
@@ -339,7 +340,7 @@ async function rawHandler(event, context) {
             }
 
             const docPrompt = documentContext
-                ? `DOCUMENTO DE BASE:\n"""${documentContext.slice(0, 12000)}"""\n\nSintetiza la explicación del texto o proporciona una definición rigurosa.`
+                ? `DOCUMENTO DE BASE${bookMode ? ' (fragmentos de un libro, cada uno con su página [p. N])' : ''}:\n"""${documentContext.slice(0, 12000)}"""\n\n${bookMode ? 'Define el concepto con lo que dice el libro y cita la página entre paréntesis, por ejemplo (p. 272), al final de cada afirmación que venga de él. Si los fragmentos no definen el concepto, dilo con una frase y complementa con conocimiento riguroso SIN citar página.' : 'Sintetiza la explicación del texto o proporciona una definición rigurosa.'}`
                 : `Proporciona una definición conceptual clara y directa.`;
 
             const interactiveRule = interactive

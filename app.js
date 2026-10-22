@@ -643,6 +643,7 @@ async function authHeaders(extra = {}) {
 // Wrapper único para llamar a nuestras funciones: agrega auth y cookies, y nunca lanza
 // si la función responde con un error controlado (402/429/503) — deja que el llamador decida.
 async function apiFetch(path, options = {}) {
+    if (window.GK_BOOK && GK_BOOK.on() && /functions\/gemini/.test(path) && typeof options.body === 'string') options = { ...options, body: GK_BOOK.patchBody(options.body) };
     const res = await fetch(path, {
         ...options,
         credentials: 'same-origin',
@@ -2412,8 +2413,11 @@ document.getElementById('btnMenuExpand')?.addEventListener('click', async () => 
         const expandChildColor = colorForChildOf(selectedNodeId);
         (data.concepts || []).forEach((concept, idx) => {
             const cId = nodes.get(concept.id) ? `${concept.id}_${Date.now()}_${idx}` : concept.id;
+            let bookMark = null;
+            if (window.GK_BOOK && GK_BOOK.on()) bookMark = (concept.page && GK_BOOK.verify(concept.label, concept.page)) ? Number(concept.page) : 0;
             nodes.update({
-                id: cId, label: `*${concept.label}*`, baseTitle: concept.label,
+                id: cId, label: `*${concept.label}*` + (bookMark === null ? '' : (bookMark ? `\n_libro p. ${bookMark}_` : '\n_IA_')), baseTitle: concept.label,
+                bookPage: bookMark === null ? undefined : bookMark,
                 color: expandChildColor, expanded: false,
                 x: parentPos.x, y: parentPos.y, fixed: { x: false, y: false }
             });
