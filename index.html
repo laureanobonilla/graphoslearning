@@ -469,6 +469,10 @@
             transition: border-color .15s, color .15s, transform .15s; }
         #schemeBreadcrumb { position: absolute; top: 16px; left: 16px; z-index: 20; display: flex; align-items: center; gap: 10px; }
         #schemeBreadcrumb.hidden { display: none; }
+        #schemeBreadcrumb { z-index: 40; }
+        /* dentro de un subesquema: la pestaña «Ver texto» baja y, con el texto abierto, «Volver» se corre a su derecha (antes quedaban tapados) */
+        body:has(#schemeBreadcrumb:not(.hidden)) #topicTab.on { margin-top: 56px; }
+        body:has(#topicPanel.on) #schemeBreadcrumb:not(.hidden) { left: calc(var(--tp-w, 440px) + 16px); }
         .gk-canvas-pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px 9px 12px; border-radius: 999px; border: 1px solid #2c3458; background: rgba(17,22,43,.92); color: #eef1fb;
             font: 600 13px 'Sora', sans-serif; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 6px 22px rgba(0,0,0,.35); transition: border-color .15s, color .15s; }
         .gk-canvas-pill:hover { border-color: #4fd1c5; color: #4fd1c5; }
