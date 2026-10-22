@@ -77,6 +77,10 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
 #gkTabs .len{display:flex;align-items:center;gap:2px;padding:2px;border-radius:999px;border:1.5px solid transparent;background:linear-gradient(#0f1428,#0f1428) padding-box,linear-gradient(130deg,#4fd1c5,#8b7cf6) border-box}
 #gkTabs .len button{padding:4px 11px}
 #gkTabs .len button.on{background:linear-gradient(120deg,rgba(79,209,197,.22),rgba(139,124,246,.24));color:#eef1fb;border-color:transparent}
+#gkNeed{position:fixed;left:50%;bottom:calc(var(--gk-comp-h,72px) + 10px);transform:translateX(-50%);z-index:60;max-width:min(520px,calc(100vw - 32px));background:#1d2442;color:#eef1fb;border:1px solid #4fd1c5;border-radius:12px;padding:9px 15px;font:600 13px Inter,system-ui,sans-serif;box-shadow:0 10px 34px rgba(0,0,0,.5);pointer-events:none;opacity:0;transition:opacity .2s}
+#gkNeed.on{opacity:1}
+@keyframes gcShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+#gkComposer.need .gc-in{animation:gcShake .45s ease;border-color:#4fd1c5;box-shadow:0 0 0 4px rgba(79,209,197,.28)}
 #gkHero{position:fixed;left:0;right:0;top:var(--gk-head-h,0px);bottom:var(--gk-comp-h,0px);z-index:12;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;pointer-events:none;font-family:Inter,system-ui,sans-serif}
 #gkHero.on{display:flex}
 #gkHero .gh-logo{width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,#4fd1c5,#8b7cf6);display:flex;align-items:center;justify-content:center;font:700 28px Sora,Inter,sans-serif;color:#071018;margin-bottom:18px;box-shadow:0 0 40px rgba(79,209,197,.3)}
@@ -156,6 +160,19 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
       console.error(e);
     } finally { busy = false; btn.disabled = false; }
   }
+
+  /* Pestañas sin tema: en vez de no hacer nada, la barra se sacude y explica qué falta. */
+  const TABN = { mapa: L('el mapa mental', 'the mind map'), rizoma: L('el rizoma', 'the rhizome'), camino: L('Camino', 'Path'), genio: L('Genio', 'Genius'), claridad: L('Claridad', 'Clarity'), cosmos: L('Cosmos', 'Cosmos'), todas: L('las tarjetas', 'the cards') };
+  let needT = 0;
+  window.GK_NEEDTOPIC = (k) => {
+    try {
+      let n = document.getElementById('gkNeed'); if (!n) { n = document.createElement('div'); n.id = 'gkNeed'; n.setAttribute('role', 'status'); document.body.appendChild(n); }
+      n.textContent = L('Para ver ' + (TABN[k] || 'esto') + ', escribe primero un tema aquí abajo y pulsa Estudiar.', 'To see ' + (TABN[k] || 'this') + ', type a topic below first and press Study.');
+      n.classList.add('on'); comp.classList.remove('need'); void comp.offsetWidth; comp.classList.add('need');
+      clearTimeout(needT); needT = setTimeout(() => { n.classList.remove('on'); comp.classList.remove('need'); }, 4200);
+      trk('tab_needs_topic', { tab: k });
+    } catch (_e) { /* nada */ }
+  };
 
   /* ---------- pestañas ---------- */
   function buildTabs() {

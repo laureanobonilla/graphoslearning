@@ -794,7 +794,7 @@ function setActive(k) { activeTab = k || ''; if (k === 'mapa' || k === 'rizoma')
 function setTopic(t) { curTopic = String(t || '').trim().slice(0, 200); setActive(activeTab); }
 async function goTab(k) {
   const topic = topicNow();
-  if (!topic) { const c = document.getElementById('gcTopic') || document.getElementById('gkComposerInput'); if (c) c.focus(); return; }
+  if (!topic) { try { if (window.GK_NEEDTOPIC && !document.getElementById('gcTopic')) window.GK_NEEDTOPIC(k); } catch (_e) { /* nada */ } const c = document.getElementById('gcTopic') || document.getElementById('gkComposerInput'); if (c) c.focus(); return; }
   curTopic = topic;
   if (S) close();
   if (cardsEl && !cardsEl.hidden) closeCards(false);

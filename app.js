@@ -736,6 +736,34 @@ document.addEventListener('pagehide', () => {
     } catch (_err) { /* nunca debe notarse en la UI */ }
 });
 
+// Qué aprietan y cuándo se van (para ver si la gente prueba botones sin que pase nada). Tope por visita para no llenar la tabla.
+(function () {
+    let n = 0, recent = [], lastRage = 0;
+    const send = (event, metadata) => { try { if (n++ < 60) track(event, metadata); } catch (_e) { /* nada */ } };
+    const topicEmpty = () => { const i = document.getElementById('gkComposerInput') || document.getElementById('startTopic'); return !i || !String(i.value || '').trim(); };
+    document.addEventListener('click', (e) => {
+        try {
+            const el = e.target && e.target.closest ? e.target.closest('button,a,[role="tab"],[data-tab],input,select,textarea,summary,label') : null;
+            const raw = el ? (el.getAttribute('data-tab') ? 'tab:' + el.getAttribute('data-tab') : (el.id ? '#' + el.id : (el.getAttribute('aria-label') || el.textContent || el.tagName))) : 'vacío:' + (e.target && e.target.tagName ? e.target.tagName : '?');
+            const label = String(raw).replace(/\s+/g, ' ').trim().slice(0, 40);
+            const now = Date.now(); recent = recent.filter((t) => now - t < 4000); recent.push(now);
+            const hasMap = typeof nodes !== 'undefined' && nodes.length > 0;
+            send('ui_click', { t: label, sin_tema: topicEmpty(), sin_mapa: !hasMap, intro: !!document.getElementById('gkIntro') });
+            if (recent.length >= 4 && now - lastRage > 15000 && !hasMap) { lastRage = now; send('ui_rage', { clics: recent.length, ultimo: label, sin_tema: topicEmpty() }); }
+        } catch (_e) { /* nunca debe notarse */ }
+    }, true);
+    // Salida: visibilitychange llega aunque pagehide no (celulares, navegadores internos).
+    let hid = false;
+    document.addEventListener('visibilitychange', () => {
+        try {
+            if (document.visibilityState !== 'hidden') { hid = false; return; }
+            if (hid) return; hid = true;
+            const body = JSON.stringify({ event: 'page_hide', anonId: getAnonId(), displayName: getDisplayName(), metadata: { seconds_on_page: Math.round((Date.now() - pageEnterTime) / 1000), had_nodes: typeof nodes !== 'undefined' ? nodes.length > 0 : null, intro: window.__gkIntroState || null, sin_tema: topicEmpty() } });
+            navigator.sendBeacon?.('/.netlify/functions/track-event', new Blob([body], { type: 'application/json' }));
+        } catch (_e) { /* nada */ }
+    });
+})();
+
 const RELATED_EDGE_LABELS = new Set(['relacionado', 'related']);
 function isRelatedEdgeLabel(l) { return RELATED_EDGE_LABELS.has(l); }
 

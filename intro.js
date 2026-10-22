@@ -67,7 +67,8 @@
     '#gkIntro .gi-skip:hover,#gkIntro .gi-skip:focus-visible{background:rgba(255,255,255,.16);outline:2px solid #818cf8;outline-offset:2px}';
   (document.head || document.documentElement).appendChild(st);
   (document.body || document.documentElement).appendChild(root);
-  window.__gkIntro = true;
+  window.__gkIntro = true; window.__gkIntroState = 'playing';
+  var trkI = function (e, m) { try { if (typeof track === 'function') track(e, m || {}); } catch (x) {} };
 
   var cv = root.querySelector('canvas');
   var ctx = cv.getContext('2d');
@@ -446,6 +447,8 @@
   }
   function endIntro(fast) {
     if (done || amb) return;
+    window.__gkIntroState = fast ? 'skipped' : 'done';
+    trkI(fast ? 'intro_skip' : 'intro_end', { seg: Math.round(((performance.now() - (t0 || performance.now())) / 100)) / 10 });
     if (ambientOk()) toAmbient(); else finish(fast);
   }
   function onInput(ev) { if (amb && ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) stopAmbient(); }
