@@ -26,7 +26,7 @@
     ? ['History', 'Physics', 'Ideas', 'Music', 'Code', 'Biology', 'Art', 'Philosophy', 'Chemistry', 'Languages', 'Economics', 'Memory', 'Logic', 'Cosmos']
     : ['Historia', 'Física', 'Ideas', 'Música', 'Código', 'Biología', 'Arte', 'Filosofía', 'Química', 'Idiomas', 'Economía', 'Memoria', 'Lógica', 'Cosmos'];
 
-  var DUR = 5.2;          // segundos totales
+  var DUR = 6.2;          // segundos totales (el título y el mensaje quedan ~2,7 s)
   var FLY = 4.0;          // fin del vuelo (luego queda el título)
   var reduce = false;
   try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
