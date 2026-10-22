@@ -1933,7 +1933,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         for (let attempt = 0; attempt < 3; attempt++) {
             resp = await apiFetch('/.netlify/functions/gemini', {
                 method: 'POST',
-                body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText, ticket: welcome ? ticket : undefined })
+                body: JSON.stringify({ action: welcome ? 'welcome_schema' : 'parse_text', text: topicText, ticket: welcome ? ticket : undefined, fbHint: (!welcome && opts && opts.fbTrial) ? true : undefined })
             });
             if (resp.ok || (resp.status !== 503 && resp.status !== 502 && resp.status !== 500) || attempt === 2) break;
             track('schema_auto_retry', { status: resp.status, attempt: attempt + 1 });

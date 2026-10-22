@@ -46,9 +46,14 @@ async function guestFromFacebook(guestId) {
     if (!guestId) return false;
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
     const actor = encodeURIComponent('guest:' + guestId);
-    const rows = await get(`events?actor_id=eq.${actor}&event_name=in.(first_visit,return_visit)&created_at=gte.${since}` +
-        `&or=(metadata->>fb_click.eq.true,metadata->>ref.ilike.*facebook*,metadata->>ref.ilike.*instagram*,metadata->>utm_source.ilike.*facebook*,metadata->>utm_source.eq.fb,metadata->>utm_source.eq.ig)&select=id&limit=1`);
-    return Array.isArray(rows) && rows.length > 0;
+    // Consulta simple (sin filtros "or" sobre JSON, que son frágiles): se traen sus visitas y se revisan aquí.
+    const rows = await get(`events?actor_id=eq.${actor}&event_name=in.(first_visit,return_visit)&created_at=gte.${encodeURIComponent(since)}&select=metadata&limit=30`);
+    if (!Array.isArray(rows)) return false;
+    const fb = /facebook|instagram|^fb$|^ig$|fb\.me|fb\.com/i;
+    return rows.some((r) => {
+        const m = (r && r.metadata) || {};
+        return m.fb_click === true || m.fb_click === 'true' || fb.test(String(m.ref || '')) || fb.test(String(m.utm_source || ''));
+    });
 }
 
 module.exports = { UUID_RE, adRow, ticketValid, guestHasTrial, guestFromFacebook };

@@ -604,7 +604,7 @@ async function generate() {
   showLoading();
   trk('lens_generate', { lens: S.lens });
   try {
-    const body = JSON.stringify({ action: 'lens', lens: S.lens, topic: S.tg.name, contextPath: S.tg.ctx, level: S.level, mapContext: S.tg.map || '' });
+    const body = JSON.stringify({ action: 'lens', lens: S.lens, topic: S.tg.name, contextPath: S.tg.ctx, level: S.level, mapContext: S.tg.map || '', fbHint: fbTrialOk() ? true : undefined });
     const call = () => apiFetch('/.netlify/functions/gemini', { method: 'POST', body });
     let r;
     try { r = await call(); } catch (e) { if (e && e.message === 'billing_blocked') throw e; r = { ok: false, status: 0 }; }

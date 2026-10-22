@@ -191,13 +191,14 @@ function withBilling(raw, overrides = {}) {
         sanitize(body);
         const ticket = typeof body.ticket === 'string' ? body.ticket.slice(0, 40) : '';
         delete body.ticket;
+        const fbHint = body.fbHint === true; delete body.fbHint;   // el navegador dice que viene de Facebook (solo sirve si la verificación en Supabase no pudo confirmarlo)
         const entry = (body.entry === 'ad' || body.entry === 'gk') ? body.entry : '';
         delete body.entry;
 
         let balance = null;
         let welcomeFree = false;
         let consumeTicket = null;
-        let fbTrial = false;
+        let fbTrial = false, fbVia = 'facebook';
         let escTrialEvent = null;
         let oracleFree = false, oracleFreeLeft = 0;
         if ((action === 'welcome_schema' || action === 'm_welcome') && identity.isAdmin) welcomeFree = true;
@@ -229,7 +230,12 @@ function withBilling(raw, overrides = {}) {
                     if (!hasTrial && hasWelcomeCookie(event) && !identity.isNew) hasTrial = true;   // quien ya tenía su esquema antes de esta regla puede seguir con él
                     if (isWelcome && !hasTrial && ticket && await deps.trial.ticketValid(ticket)) { allowed = true; consumeTicket = ticket; }
                     else if (!isWelcome && hasTrial && !TRIAL_NEW_SCHEMA.has(action)) allowed = true;
-                    else if (TRIAL_FB && !isWelcome && !hasTrial && FB_TRIAL_ACTIONS.has(action) && deps.trial.guestFromFacebook && await deps.trial.guestFromFacebook(identity.guestId)) { allowed = true; fbTrial = true; }
+                    else if (TRIAL_FB && !isWelcome && !hasTrial && FB_TRIAL_ACTIONS.has(action) && deps.trial.guestFromFacebook) {
+                        let fromFb = false;
+                        try { fromFb = await deps.trial.guestFromFacebook(identity.guestId); } catch (e2) { console.error('[billing] guestFromFacebook:', e2.message); }
+                        if (fromFb) { allowed = true; fbTrial = true; }
+                        else if (fbHint) { allowed = true; fbTrial = true; fbVia = 'facebook_claimed'; console.warn('[billing] prueba FB aceptada por aviso del navegador (no se halló su visita en events)'); }
+                    }
                 } catch (err) { console.error('[billing] verificación de prueba:', err.message); }
                 if (!allowed) {
                     const reason = isWelcome ? (hasTrial ? 'trial_used' : 'no_ticket') : (TRIAL_NEW_SCHEMA.has(action) ? 'new_schema' : 'no_trial');
@@ -322,7 +328,7 @@ function withBilling(raw, overrides = {}) {
         }
 
         if (fbTrial && !identity.isAdmin && data && !data.error && computeCost(action, data) > 0) {   // solo se gasta la prueba si de verdad se generó algo
-            try { await deps.store.logEvent(identity.id, 'guest', null, 'trial_used', { guest: identity.guestId, action, via: 'facebook' }, null, 'graphikosmos'); }
+            try { await deps.store.logEvent(identity.id, 'guest', null, 'trial_used', { guest: identity.guestId, action, via: fbVia }, null, 'graphikosmos'); }
             catch (err) { console.error('[billing] no se pudo registrar la prueba de Facebook:', err.message); }
         }
 
