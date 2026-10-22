@@ -1339,6 +1339,9 @@ const depthView = (() => {
   } catch (_e) { return { set() {} }; }
 })();
 
+// Libro: marca de procedencia de un nodo del esquema inicial ("libro p. N" si la página se verifica; "IA" si no).
+function bookPageOf(n) { return (window.GK_BOOK && GK_BOOK.on() && n && n.page && GK_BOOK.verify(n.label, n.page)) ? Number(n.page) : (window.GK_BOOK && GK_BOOK.on() ? 0 : undefined); }
+function bookTag(n) { const p = bookPageOf(n); return p === undefined ? '' : (p ? `\n_libro p. ${p}_` : '\n_IA_'); }
 async function renderThreeLevelTree(data, opts = {}) {
     const { originPanelId = null, attachToNodeId = null } = opts;
     // Si hay más de un panel de lectura registrado, coloreamos el borde de
@@ -1521,7 +1524,7 @@ async function renderThreeLevelTree(data, opts = {}) {
         const rootAppearance = appearanceFor(!!(root.sourceQuote && root.sourceQuote.trim()), 0);
         const rootGaps = gapsForNode(root.id);
         nodes.add({
-            id: root.id, label: `*${root.label}*`, baseTitle: root.label,
+            id: root.id, label: `*${root.label}*` + bookTag(root), bookPage: bookPageOf(root), baseTitle: root.label,
             color: rootAppearance.color, definition: root.definition || null,
             x: rootX, y: rootY, fixed: { x: false, y: false },
             widthConstraint: { minimum: 140, maximum: 220 },
@@ -1561,7 +1564,7 @@ async function renderThreeLevelTree(data, opts = {}) {
         const branchAppearance = appearanceFor(!!(branch.sourceQuote && branch.sourceQuote.trim()), 1);
         const branchGaps = gapsForNode(branch.id);
         nodes.add({
-            id: branch.id, label: `*${branch.label}*`, baseTitle: branch.label,
+            id: branch.id, label: `*${branch.label}*` + bookTag(branch), bookPage: bookPageOf(branch), baseTitle: branch.label,
             color: branchAppearance.color, definition: branch.definition || null,
             x: branchX, y: branchY, fixed: { x: false, y: false },
             widthConstraint: { minimum: 130, maximum: 200 },
@@ -1605,7 +1608,7 @@ async function renderThreeLevelTree(data, opts = {}) {
             const subAppearance = appearanceFor(!!(sub.sourceQuote && sub.sourceQuote.trim()), 2);
             const subGaps = gapsForNode(sub.id);
             nodes.add({
-                id: sub.id, label: `*${sub.label}*`, baseTitle: sub.label,
+                id: sub.id, label: `*${sub.label}*` + bookTag(sub), bookPage: bookPageOf(sub), baseTitle: sub.label,
                 color: subAppearance.color, definition: sub.definition || null,
                 x: subX, y: subY, fixed: { x: false, y: false },
                 widthConstraint: { minimum: 120, maximum: 185 },

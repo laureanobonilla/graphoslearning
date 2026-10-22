@@ -43,6 +43,15 @@
     S.avg = S.tf.reduce((a, d) => a + d.len, 0) / Math.max(1, S.N);
     S.ready = S.N > 0;
   }
+  function outline() {
+    const ch = new Map();
+    S.pages.forEach((pg) => {
+      const head = String(pg.text || '').slice(0, 260);
+      const m = head.match(/C\s*AP[ÍI]?\s*T\s*U\s*L\s*O\s*(\d{1,2})\s+([^\n]{3,80})/i) || head.match(/CHAPTER\s+(\d{1,2})\s+([^\n]{3,80})/i);
+      if (m && !/foto|photo|:/i.test(m[2]) && !ch.has(+m[1])) ch.set(+m[1], { n: +m[1], p: pg.p, t: m[2].replace(/\s+/g, ' ').trim() });
+    });
+    return [...ch.values()].sort((a, b) => a.n - b.n);
+  }
   function search(q, phrase, k) {
     const qt = [...new Set(toks(q))]; if (!qt.length) return [];
     const ph = norm(phrase || '').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -79,10 +88,18 @@
     S.last = pages;
     return { txt: txt.trim(), pages };
   }
+  // Para el esquema inicial: capítulos del libro (con su página) + los fragmentos que mejor responden al tema.
+  function schemaContext(topic) {
+    const ol = outline();
+    const head = ol.length ? 'ESTRUCTURA DEL LIBRO (capítulo, título, página donde empieza):\n' + ol.map((c) => 'Cap. ' + c.n + ' — ' + c.t + ' [p. ' + c.p + ']').join('\n') + '\n\n' : '';
+    const c = context(topic, '', 'schema');
+    let txt = head + (c.txt ? 'FRAGMENTOS RELEVANTES:\n' + c.txt : '');
+    if (txt.length > 11800) txt = txt.slice(0, 11800);
+    return txt;
+  }
   // ¿El concepto realmente aparece en la página que la IA dice?
   function verify(label, page) {
     page = Number(page); if (!page) return false;
-    if (S.last.indexOf(page) < 0) return false;
     const pg = S.pages.find((x) => x.p === page); if (!pg) return false;
     const t = norm(pg.text), words = toks(label);
     if (!words.length) return false;
@@ -94,6 +111,11 @@
   function patchBody(raw) {
     try {
       const b = JSON.parse(raw);
+      if (S.ready && b && b.action === 'parse_text' && typeof b.text === 'string' && b.text.trim().split(/\s+/).length < 25) {
+        const t = schemaContext(b.text);
+        if (t) { b.documentContext = t; b.bookMode = true; b.bookName = S.name; return JSON.stringify(b); }
+        return raw;
+      }
       if (!S.ready || !b || !ACTIONS[b.action] || !b.topic) return raw;
       const c = context(b.topic, Array.isArray(b.contextPath) ? b.contextPath.join(' → ') : b.contextPath, b.action);
       if (!c.txt) return raw;
@@ -168,5 +190,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 
-  window.GK_BOOK = { on: () => S.ready, load, patchBody, verify, context, search, state: S, wipe };
+  window.GK_BOOK = { outline, on: () => S.ready, load, patchBody, verify, context, search, state: S, wipe };
 })();

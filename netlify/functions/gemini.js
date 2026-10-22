@@ -87,7 +87,7 @@ async function rawHandler(event, context) {
     }
 
     try {
-        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, bookMode, lang: rawLang } = JSON.parse(event.body);
+        const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, bookMode, bookName, lang: rawLang } = JSON.parse(event.body);
         const lang = normalizeLang(rawLang);
         // Todas las llamadas de abajo pasan por aquí: añade la instrucción de idioma.
         const generateWithFallback = (payload, opts) => generateWithFallbackBase(localizePayload(payload, lang), opts);
@@ -409,7 +409,10 @@ async function rawHandler(event, context) {
             const isShortTopic = text.trim().split(/\s+/).length < 25;
             const { focusTerms } = JSON.parse(event.body);
 
-            const inputContext = isShortTopic
+            const bookIntro = (bookMode && documentContext && isShortTopic)
+                ? `Construye un esquema conceptual de 3 niveles sobre "${text}" basado en EL LIBRO "${bookName || ''}", cuyos datos están abajo. Usa su organización real: las ramas (Nivel 2) deben seguir las partes o capítulos del libro que correspondan al tema, y los sub-nodos (Nivel 3) los temas o secciones que el libro desarrolla en ellos. Si el tema es amplio (por ejemplo la materia completa), las ramas son sus grandes bloques según el libro; si es un tema concreto, usa los fragmentos. Para CADA nodo (raíz, ramas y sub-nodos) pon en "page" el número N de una marca [p. N] donde el libro lo trata (para un capítulo, la página donde empieza). Usa únicamente páginas que aparezcan en los datos. Si un nodo lo aportas tú porque el libro no lo cubre, omite "page".\n\n"""${documentContext.slice(0, 12000)}"""`
+                : null;
+            const inputContext = bookIntro ? bookIntro : isShortTopic
                 ? `Construye un esquema conceptual exhaustivo de 3 niveles sobre el tema: "${text}".
                    REGLA DE EXHAUSTIVIDAD: Si el concepto o sus sub-ramas tienen fases, partes, clasificaciones o elementos canónicos definidos (ej. "Fases de la división celular", "Poderes del Estado"), DEBES incluir TODOS los elementos reales que componen cada nivel sin omitir ninguno. Si es un tema abierto (ej. "Política Exterior de Colombia"), despliega un abanico completo con todas las dimensiones y sub-elementos clave.`
                 : `Analiza minuciosamente el siguiente documento y estructura un mapa conceptual de 3 niveles estrictamente fiel a su contenido:\n"""${text}"""\n
@@ -432,6 +435,7 @@ async function rawHandler(event, context) {
                         properties: {
                             id: { type: 'STRING' },
                             label: { type: 'STRING' },
+                            page: { type: 'INTEGER', description: 'Página [p. N] del libro donde se trata este nodo; omitir si no sale del libro.' },
                             sourceQuote: { type: 'STRING', description: 'Cita literal breve del documento origen, o cadena vacía si no aplica.' }
                         },
                         required: ["id", "label"]
@@ -445,6 +449,7 @@ async function rawHandler(event, context) {
                                 id: { type: 'STRING' },
                                 label: { type: 'STRING' },
                                 relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde la raíz.' },
+                                page: { type: 'INTEGER', description: 'Página [p. N] del libro donde se trata este nodo; omitir si no sale del libro.' },
                                 sourceQuote: { type: 'STRING', description: 'Cita literal breve del documento origen, o cadena vacía si no aplica.' }
                             },
                             required: ["id", "label", "relationship"]
@@ -460,6 +465,7 @@ async function rawHandler(event, context) {
                                 label: { type: 'STRING' },
                                 parentId: { type: 'STRING', description: 'ID exacto del nodo en "branches" (Nivel 2) al que pertenece.' },
                                 relationship: { type: 'STRING', description: 'Conector de 1 a 3 palabras desde su nodo padre.' },
+                                page: { type: 'INTEGER', description: 'Página [p. N] del libro donde se trata este nodo; omitir si no sale del libro.' },
                                 sourceQuote: { type: 'STRING', description: 'Cita literal breve del documento origen, o cadena vacía si no aplica.' }
                             },
                             required: ["id", "label", "parentId", "relationship"]
