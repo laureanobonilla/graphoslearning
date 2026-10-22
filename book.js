@@ -10,9 +10,9 @@
   const L = (a, b) => (es() ? a : b);
   const ACTIONS = { expand: 1, examples: 1, define: 1, simple_explanation: 1, custom_prompt: 1 };
   const STOP = new Set('de la el los las un una unos unas y o en del al que se por con para como su sus es son lo le les mas pero sin sobre entre desde hasta este esta estos estas ese esa eso muy a e the of and to in is are for on with as by an or that this from'.split(' '));
-  const MAXCTX = 10800;
+  const MAXCTX = 8000;
 
-  const S = { name: '', title: '', pages: [], chunks: [], tf: [], df: null, avg: 1, N: 0, ready: false, busy: false, last: [] };
+  const S = { name: '', title: '', pages: [], chunks: [], tf: [], df: null, avg: 1, N: 0, ready: false, busy: false, last: [], fails: 0, lastErr: '', note: '' };
 
   const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const stem = (w) => (w.length > 5 ? w.replace(/(es|s)$/, '') : w);
@@ -80,9 +80,10 @@
     const q = topic + ' ' + topic + ' ' + (action === 'define' ? 'definición concepto se define como' : '') + ' ' + up;
     const hits = search(q, topic, 9);
     let txt = '', pages = [];
+    const cap = S.fails > 0 ? 3500 : MAXCTX;
     for (const h of hits) {
       const c = S.chunks[h.i]; const piece = '[p. ' + c.p + '] ' + c.t + '\n\n';
-      if (txt.length + piece.length > MAXCTX) break;
+      if (txt.length + piece.length > cap) break;
       txt += piece; if (pages.indexOf(c.p) < 0) pages.push(c.p);
     }
     S.last = pages;
@@ -124,6 +125,15 @@
     } catch (_e) { return raw; }
   }
 
+  // Resultado de cada llamada a la IA hecha con libro: si falla, se registra el motivo y la siguiente va con menos texto.
+  function report(raw, ok, status, data) {
+    try {
+      const b = JSON.parse(raw || '{}'); if (!b.bookMode) return;
+      if (ok) { S.fails = 0; S.lastErr = ''; return; }
+      S.fails++; S.lastErr = status + (data && data.error ? ' · ' + String(data.error).slice(0, 80) : '');
+      if (window.track) track('book_api_error', { action: b.action, status, err: String(data && data.error || '').slice(0, 120), ctx: (b.documentContext || '').length, fails: S.fails });
+    } catch (_e) { /* nada */ }
+  }
   // ---------- guardado local (para no volver a leer el PDF) ----------
   const DB = 'gk_book', ST = 'book';
   function idb() { return new Promise((res, rej) => { const r = indexedDB.open(DB, 1); r.onupgradeneeded = () => r.result.createObjectStore(ST); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
@@ -157,7 +167,7 @@
     } finally { S.busy = false; ui(); }
     autoMap();
   }
-  function note(t) { S.note = t; ui(); setTimeout(() => { if (S.note === t) { S.note = ''; ui(); } }, 15000); }
+  function note(t) { S.note = t; ui(); setTimeout(() => { if (S.note === t) { S.note = ''; ui(); } }, 45000); }
   // Con un libro cargado, el campo de tema invita a preguntarle algo.
   function hint() {
     ['startTopic', 'gkComposerInput', 'gcTopic'].forEach((id) => { const i = document.getElementById(id); if (!i) return; if (!i.dataset.gkPh) i.dataset.gkPh = i.placeholder || ''; i.placeholder = S.ready ? L('Escribe un tema o pregúntale algo al libro…', 'Type a topic or ask the book something…') : i.dataset.gkPh; });
@@ -169,7 +179,7 @@
       GK_NAV.setTopic(S.title || L('Contenido del libro', 'Book contents'));
       await GK_NAV.go('mapa');
       if (window.track) track('book_automap', { ok: nodes.length > 0 });
-      if (nodes.length === 0) note(L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.'));
+      if (nodes.length === 0) note((S.lastErr ? L('Error ', 'Error ') + S.lastErr + '. ' : '') + L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.'));
     } catch (e) { console.error('[libro] mapa automático:', e); note(L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.')); }
   }
 
@@ -212,5 +222,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 
-  window.GK_BOOK = { outline, on: () => S.ready, load, patchBody, verify, context, search, state: S, wipe };
+  window.GK_BOOK = { report, outline, on: () => S.ready, load, patchBody, verify, context, search, state: S, wipe };
 })();

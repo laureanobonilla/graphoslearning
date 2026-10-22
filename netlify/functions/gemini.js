@@ -502,7 +502,7 @@ async function rawHandler(event, context) {
                     responseMimeType: 'application/json',
                     responseSchema: schema
                 }
-            });
+            }, (bookMode && documentContext) ? LENS_OPTS : undefined);   // con libro: tiempo acotado, razonamiento corto y respaldo ligero; sin libro, igual que siempre
             return { statusCode: 200, body: response.text };
         }
 

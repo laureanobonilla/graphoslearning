@@ -651,6 +651,7 @@ async function apiFetch(path, options = {}) {
     });
     let data = null;
     try { data = await res.json(); } catch { /* respuesta sin cuerpo JSON */ }
+    if (window.GK_BOOK && GK_BOOK.on() && /functions\/gemini/.test(path)) GK_BOOK.report(options.body, res.ok, res.status, data);
     return { ok: res.ok, status: res.status, data: data || {} };
 }
 
