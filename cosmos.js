@@ -13,7 +13,7 @@
   const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
   const PAL = [[122, 167, 217], [208, 170, 110], [126, 184, 160], [176, 140, 168], [150, 165, 214], [200, 128, 118], [116, 186, 196], [184, 184, 120]];
 
-  let pane = null, cv = null, ctx = null, card = null, hud = null, legEl = null, emptyEl = null, tipEl = null, titleEl = null;
+  let galEl = null, galProj = [], galSel = new Set(), pane = null, cv = null, ctx = null, card = null, hud = null, legEl = null, emptyEl = null, tipEl = null, titleEl = null;
   let libMode = false, on = false, raf = 0, W = 0, H = 0, DPR = 1, F = 600, geoT = 0, pollT = 0;
   let M = null, sig = '';                      // modelo actual
   const cam = { tx: 0, ty: 0, tz: 0, yaw: 0.5, pitch: 0.18, dist: 14 };
@@ -316,11 +316,18 @@
       cam.dist = clamp(cam.dist * Math.exp(e.deltaY * 0.0013), 1.6, M ? M.rad * 5 + 10 : 60);
     }, { passive: false });
     pane.addEventListener('click', (e) => {
+      const ck = e.target.closest('.gl-ck'); if (ck) { return; }
+      const card1 = e.target.closest('.gl-card'); if (card1 && !e.target.closest('input')) { openProject(card1.dataset.pid); return; }
       const op = e.target.closest('[data-open]'); if (op) { openProject(op.dataset.open); return; }
       const gg = e.target.closest('[data-go]'); if (gg) { select(gg.dataset.go); return; }
       const lg = e.target.closest('[data-proj]'); if (lg && M && M.lib) { const t = M.lib.tops[+lg.dataset.proj]; if (t) select(t); return; }
-      const b = e.target.closest('[data-a]'); if (b) { const a = b.dataset.a; if (a === 'tour') { tour ? stopTour() : startTour(); } else if (a === 'reset') { stopTour(); sel = null; card.hidden = true; overview(); trk('cosmos_reset'); } return; }
+      const b = e.target.closest('[data-a]'); if (b) { const a = b.dataset.a; if (a === 'libback') { libBack(); } else if (a === 'lib3d') { libThreeD(); } else if (a === 'tour') { tour ? stopTour() : startTour(); } else if (a === 'reset') { stopTour(); sel = null; card.hidden = true; overview(); trk('cosmos_reset'); } return; }
       if (e.target.closest('.cs-x')) { sel = null; card.hidden = true; }
+    });
+    pane.addEventListener('change', (e) => {
+      const t = e.target; if (!t || !t.dataset || !t.dataset.sel) return;
+      if (t.checked) galSel.add(t.dataset.sel); else galSel.delete(t.dataset.sel);
+      saveSel(); renderGallery(); trk('lib_compare', { n: galSel.size });
     });
     document.addEventListener('gk:nodepick', (e) => { if (!on || self || e.detail == null || !M) return; const id = String(e.detail); if (M.byId.has(id) && id !== sel) select(id, { silent: true }); });
     window.addEventListener('resize', () => { if (on) resize(); });
@@ -328,8 +335,19 @@
 
   /* ---------- panel ---------- */
   const CSS = '#cosPane{position:fixed;z-index:20;display:none;overflow:hidden;background:#080c12;font-family:Inter,system-ui,sans-serif;color:#e8ebf0;border-top:1px solid #1e2633}' +
-    '#cosPane [hidden]{display:none !important}#cosPane.on{display:block}#cosPane canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}#cosPane canvas:active{cursor:grabbing}' +
-    '#cosPane .cs-hud{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none}' +
+    '#cosPane[data-view="gal"] > canvas,#cosPane[data-view="gal"] .cs-tip,#cosPane[data-view="gal"] .cs-card,#cosPane[data-view="gal"] [data-a="tour"],#cosPane[data-view="gal"] [data-a="reset"],#cosPane[data-view="gal"] .cs-leg{display:none !important}' +
+    '#cosPane [data-a="libback"],#cosPane [data-a="lib3d"]{display:none}#cosPane[data-view="gal"] [data-a="lib3d"],#cosPane[data-view="lib"] [data-a="libback"]{display:inline-block}' +
+    '#cosPane .cs-gal{z-index:1;position:absolute;inset:0;overflow:auto;padding:58px 20px 24px}' +
+    '#cosPane .gl-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 12px}#cosPane .gl-h b{font:600 18px Newsreader,Georgia,serif;color:#e8ebf0}#cosPane .gl-h span{font-size:12.5px;color:#8b94a5}#cosPane .gl-h button{margin-left:auto}' +
+    '#cosPane .gl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}' +
+    '#cosPane .gl-card{position:relative;background:#121821;border:1px solid #2a3342;border-radius:12px;padding:10px;cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:border-color .15s}#cosPane .gl-card:hover{border-color:#46526a}#cosPane .gl-card.on{border-color:#7aa7d9;box-shadow:0 0 0 1px rgba(122,167,217,.35)}' +
+    '#cosPane .gl-th{width:100%;height:112px;background:#0b0f15;border-radius:8px;display:block}#cosPane .gl-ck{position:absolute;top:16px;left:16px;display:flex;align-items:center;gap:6px;background:rgba(14,19,26,.82);border:1px solid #2a3342;border-radius:6px;padding:3px 7px;font-size:11px;color:#c3cad6;cursor:pointer}#cosPane .gl-ck input{accent-color:#7aa7d9;margin:0;cursor:pointer}' +
+    '#cosPane .gl-t{font:600 15px Newsreader,Georgia,serif;color:#e8ebf0;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}#cosPane .gl-m{font-size:11.5px;color:#8b94a5}#cosPane .gl-x{font-size:11.5px;color:#d0aa6e}' +
+    '#cosPane .gl-con{margin-top:22px}#cosPane .gl-con h3{font:600 16px Newsreader,Georgia,serif;color:#e8ebf0;margin:0 0 4px}#cosPane .gl-con p.gl-n{margin:0 0 10px;font-size:12.5px;color:#8b94a5}' +
+    '#cosPane .gl-pair{margin:0 0 14px}#cosPane .gl-pair h4{margin:0 0 6px;font:600 12.5px Inter,sans-serif;color:#c3cad6;display:flex;align-items:center;gap:6px;flex-wrap:wrap}#cosPane .gl-pair h4 i{width:8px;height:8px;border-radius:50%;display:inline-block}' +
+    '#cosPane .gl-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;border:1px solid #2a3342;background:#121821;border-radius:8px;margin:0 0 5px;font-size:13px;color:#e8ebf0}#cosPane .gl-row em{font-style:normal;color:#d0aa6e;font-size:11.5px;margin-left:auto}#cosPane .gl-row .ar{color:#d0aa6e}' +
+    '#cosPane [hidden]{display:none !important}#cosPane.on{display:block}#cosPane > canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}#cosPane > canvas:active{cursor:grabbing}' +
+    '#cosPane .cs-hud{z-index:3;position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;pointer-events:none}' +
     '#cosPane .cs-hud>*{pointer-events:auto}#cosPane .cs-t{font:600 17px Newsreader,Georgia,serif;color:#e8ebf0;margin-right:4px;pointer-events:none}' +
     '#cosPane .cs-b{border:1px solid rgba(122,167,217,.4);background:rgba(14,19,26,.72);color:#c3cad6;border-radius:999px;padding:6px 13px;font:600 12.5px Inter,sans-serif;cursor:pointer;backdrop-filter:blur(6px)}' +
     '#cosPane .cs-b:hover,#cosPane .cs-b:focus-visible{background:rgba(122,167,217,.35);color:#fff;outline:none;border-color:#7aa7d9}' +
@@ -346,13 +364,13 @@
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     pane = document.createElement('section'); pane.id = 'cosPane'; pane.setAttribute('aria-label', 'Cosmos');
     pane.innerHTML = '<canvas role="img" aria-label="' + esc(L('Mapa mental en 3D. Arrastra para girar, rueda para acercarte, clic en una idea para elegirla.', '3D mind map. Drag to turn, wheel to zoom, click an idea to pick it.')) + '"></canvas>' +
-      '<div class="cs-hud"><span class="cs-t">Cosmos</span><button type="button" class="cs-b" data-a="tour"></button><button type="button" class="cs-b" data-a="reset">⟲ ' + esc(L('Ver todo', 'See all')) + '</button></div>' +
-      '<div class="cs-leg" hidden></div><div class="cs-empty" hidden></div>' +
+      '<div class="cs-hud"><span class="cs-t">Cosmos</span><button type="button" class="cs-b" data-a="tour"></button><button type="button" class="cs-b" data-a="reset">⟲ ' + esc(L('Ver todo', 'See all')) + '</button><button type="button" class="cs-b" data-a="libback">← ' + esc(L('Mis mapas', 'My maps')) + '</button><button type="button" class="cs-b" data-a="lib3d">' + esc(L('Ver en 3D', 'See in 3D')) + '</button></div>' +
+      '<div class="cs-leg" hidden></div><div class="cs-empty" hidden></div><div class="cs-gal" hidden></div>' +
       '<div class="cs-tip">' + esc(L('Arrastra para girar · rueda para acercarte · clic en una idea para ver su definición', 'Drag to turn · wheel to zoom · click an idea to see its definition')) + '</div>' +
       '<div class="cs-card" hidden></div>';
     document.body.appendChild(pane);
     cv = pane.querySelector('canvas'); ctx = cv.getContext('2d'); card = pane.querySelector('.cs-card'); hud = pane.querySelector('.cs-hud');
-    legEl = pane.querySelector('.cs-leg'); emptyEl = pane.querySelector('.cs-empty'); tipEl = pane.querySelector('.cs-tip'); titleEl = pane.querySelector('.cs-t');
+    galEl = pane.querySelector('.cs-gal'); legEl = pane.querySelector('.cs-leg'); emptyEl = pane.querySelector('.cs-empty'); tipEl = pane.querySelector('.cs-tip'); titleEl = pane.querySelector('.cs-t');
     paintHud(); bind();
   }
   function geo() {
@@ -397,7 +415,7 @@
       if (!rec && !String(e.id).startsWith('local_')) {
         try { const r = await fetch('/.netlify/functions/db?projectId=' + encodeURIComponent(e.id)); if (r.ok) { const j = await r.json(); rec = j && j.data; } } catch (_e) { rec = null; }
       }
-      return rec && Array.isArray(rec.nodes) && rec.nodes.length >= 2 ? { id: e.id, title: e.title || L('Mapa', 'Map'), nodes: rec.nodes, edges: rec.edges || [] } : null;
+      return rec && Array.isArray(rec.nodes) && rec.nodes.length >= 2 ? { id: e.id, title: e.title || L('Mapa', 'Map'), date: e.date || '', nodes: rec.nodes, edges: rec.edges || [] } : null;
     }));
     return got.filter(Boolean);
   }
@@ -479,37 +497,95 @@
     if (emptyEl) emptyEl.hidden = true;
     paintLegend();
   }
+  /* ---------- Galería de mapas (vista por defecto de la Biblioteca) ---------- */
+  const SELK = 'gk_lib_sel';
+  function loadSel() {
+    try { const a = JSON.parse(localStorage.getItem(SELK) || 'null'); if (Array.isArray(a)) { const ok = a.filter((id) => galProj.some((p) => p.id === id)); if (ok.length) return new Set(ok); } } catch (_e) { /* nada */ }
+    return new Set(galProj.slice(0, 6).map((p) => p.id));
+  }
+  function saveSel() { try { localStorage.setItem(SELK, JSON.stringify(Array.from(galSel))); } catch (_e) { /* nada */ } }
+  function drawThumb(cvs, p, i) {
+    try {
+      const m = p._lay || (p._lay = (function () { const mm = modelFrom(p.nodes, p.edges); return mm.all.length >= 2 ? layout(mm) : null; })());
+      const g = cvs.getContext('2d'), w = cvs.width, h = cvs.height; g.clearRect(0, 0, w, h);
+      if (!m) return;
+      const ca = Math.cos(0.7), sa = Math.sin(0.7), pr = m.list.map((e) => ({ e, x: e.p[0] * ca - e.p[2] * sa, y: -e.p[1] * 0.95 + (e.p[0] * sa + e.p[2] * ca) * 0.25 }));
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; pr.forEach((q) => { x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); });
+      const pad = 16, k = Math.min((w - pad * 2) / Math.max(0.01, x1 - x0), (h - pad * 2) / Math.max(0.01, y1 - y0)), ox = (w - (x1 - x0) * k) / 2 - x0 * k, oy = (h - (y1 - y0) * k) / 2 - y0 * k;
+      const pos = new Map(pr.map((q) => [q.e.id, [q.x * k + ox, q.y * k + oy]])), col = PAL[i % PAL.length];
+      g.lineCap = 'round'; g.strokeStyle = 'rgba(' + col.join(',') + ',.55)'; g.lineWidth = 1.1;
+      m.links.forEach((l) => { const A = pos.get(l.a.id), B = pos.get(l.b.id); if (A && B) { g.beginPath(); g.moveTo(A[0], A[1]); g.lineTo(B[0], B[1]); g.stroke(); } });
+      pr.forEach((q) => { const P = pos.get(q.e.id), r = q.e.depth === 0 ? 4.6 : q.e.depth === 1 ? 3.2 : 2.2; g.fillStyle = q.e.depth === 0 ? '#e8ebf0' : 'rgba(' + col.join(',') + ',.95)'; g.beginPath(); g.arc(P[0], P[1], r, 0, 6.283); g.fill(); });
+    } catch (_e) { /* nada */ }
+  }
+  function connectionsOf(sel) {
+    const ps = galProj.filter((p) => sel.has(p.id)); if (ps.length < 2) return { ps, pairs: [] };
+    const items = [];
+    ps.forEach((p, k) => { const m = modelFrom(p.nodes, p.edges); m.all.slice(0, 220).forEach((n) => items.push({ id: k + '~' + n.id, proj: k, label: labelOf(n), def: n.definition || '', simple: n.simple || n.simpleExplanation || '' })); });
+    const byId = new Map(items.map((it) => [it.id, it])), links = crossLinks(items), pairs = new Map();
+    links.forEach((c) => { const a = byId.get(c.a), b = byId.get(c.b); if (!a || !b) return; const key = Math.min(a.proj, b.proj) + '-' + Math.max(a.proj, b.proj); if (!pairs.has(key)) pairs.set(key, []); pairs.get(key).push(a.proj < b.proj ? { a, b, why: c.why } : { a: b, b: a, why: c.why }); });
+    return { ps, pairs: Array.from(pairs.entries()).map(([key, rows]) => { const [i, j] = key.split('-').map(Number); return { pa: ps[i], pb: ps[j], ia: i, ib: j, rows }; }) };
+  }
+  function fmtDate(d) { try { return d ? new Date(d).toLocaleDateString(EN() ? 'en' : 'es', { day: 'numeric', month: 'short' }) : ''; } catch (_e) { return ''; } }
+  function renderGallery() {
+    if (!galEl) return;
+    const sel = galSel, con = connectionsOf(sel), perProj = new Map();
+    con.pairs.forEach((pr) => { perProj.set(pr.pa.id, (perProj.get(pr.pa.id) || 0) + pr.rows.length); perProj.set(pr.pb.id, (perProj.get(pr.pb.id) || 0) + pr.rows.length); });
+    if (!galProj.length) {
+      galEl.innerHTML = '<div class="gl-con"><h3>' + esc(L('Aún no tienes mapas guardados', 'You have no saved maps yet')) + '</h3><p class="gl-n">' + esc(L('Cada mapa que generes se guarda aquí. Cuando tengas dos o más podrás elegir cuáles comparar y ver cómo se conectan sus ideas.', 'Every map you create is saved here. With two or more you can pick which ones to compare and see how their ideas connect.')) + '</p></div>';
+      return;
+    }
+    const cards = galProj.map((p, i) => '<article class="gl-card' + (sel.has(p.id) ? ' on' : '') + '" data-pid="' + esc(p.id) + '" title="' + esc(L('Clic para abrir este mapa', 'Click to open this map')) + '">' +
+      '<label class="gl-ck"><input type="checkbox" data-sel="' + esc(p.id) + '"' + (sel.has(p.id) ? ' checked' : '') + '> ' + esc(L('Comparar', 'Compare')) + '</label>' +
+      '<canvas class="gl-th" width="420" height="224" data-th="' + i + '"></canvas>' +
+      '<div class="gl-t">' + esc(p.title) + '</div><div class="gl-m">' + p.nodes.length + ' ' + esc(L('ideas', 'ideas')) + (fmtDate(p.date) ? ' · ' + esc(fmtDate(p.date)) : '') + '</div>' +
+      (perProj.get(p.id) ? '<div class="gl-x">' + perProj.get(p.id) + ' ' + esc(perProj.get(p.id) === 1 ? L('conexión con los otros mapas elegidos', 'connection with the other chosen maps') : L('conexiones con los otros mapas elegidos', 'connections with the other chosen maps')) + '</div>' : '') + '</article>').join('');
+    let conH = '<div class="gl-con"><h3>' + esc(L('Conexiones entre los mapas elegidos', 'Connections between the chosen maps')) + '</h3>';
+    if (sel.size < 2) conH += '<p class="gl-n">' + esc(L('Marca "Comparar" en dos o más mapas para ver qué ideas tienen en común.', 'Tick "Compare" on two or more maps to see which ideas they share.')) + '</p>';
+    else if (!con.pairs.length) conH += '<p class="gl-n">' + esc(L('No encontré ideas en común entre estos mapas. Prueba con otros o añade más definiciones.', 'No shared ideas found between these maps. Try other ones or add more definitions.')) + '</p>';
+    else {
+      conH += '<p class="gl-n">' + esc(L('Se detectan por palabras compartidas en títulos y definiciones; puede haber falsos positivos.', 'Detected from shared words in titles and definitions; there may be false positives.')) + '</p>';
+      conH += con.pairs.map((pr) => '<div class="gl-pair"><h4><i style="background:rgb(' + PAL[galProj.indexOf(pr.pa) % PAL.length].join(',') + ')"></i>' + esc(pr.pa.title) + ' <span class="ar">↔</span> <i style="background:rgb(' + PAL[galProj.indexOf(pr.pb) % PAL.length].join(',') + ')"></i>' + esc(pr.pb.title) + '</h4>' +
+        pr.rows.slice(0, 8).map((r) => '<div class="gl-row"><span>' + esc(r.a.label) + '</span><span class="ar">↔</span><span>' + esc(r.b.label) + '</span><em>' + esc(r.why) + '</em></div>').join('') + '</div>').join('');
+    }
+    galEl.innerHTML = '<div class="gl-h"><b>' + esc(L('Tus mapas', 'Your maps')) + '</b><span>' + esc(L('Marca los que quieras comparar. Clic en un mapa para abrirlo.', 'Tick the ones you want to compare. Click a map to open it.')) + '</span></div><div class="gl-grid">' + cards + '</div>' + conH + '</div>';
+    galEl.querySelectorAll('canvas[data-th]').forEach((c) => { const i = +c.dataset.th; drawThumb(c, galProj[i], i); });
+  }
+  function enterView(v) {
+    pane.dataset.view = v || '';
+    galEl.hidden = v !== 'gal';
+    if (v === 'gal') { cancelAnimationFrame(raf); card.hidden = true; if (legEl) legEl.hidden = true; if (titleEl) titleEl.textContent = L('Biblioteca', 'Library'); }
+  }
   async function showLibrary() {
     if (on) show(false);
     if (!pane) build();
-    setMode(true);
-    const projects = await gather();
-    const lib = buildLib(projects);
+    setMode(true); libMode = true;
+    galProj = await gather(); galSel = loadSel();
     on = true; pane.classList.add('on'); geo(); resize();
-    sel = null; card.hidden = true; tour = null; fly = null;
-    if (!lib || !lib.list) {
-      M = null; picks = [];
-      emptyEl.innerHTML = '<b>' + esc(L('Tu biblioteca empieza con dos mapas', 'Your library starts with two maps')) + '</b>' +
-        '<span>' + esc(L('Cada mapa que generes se guarda aquí. Cuando tengas dos o más, verás cómo se conectan sus ideas aunque sean de temas distintos.', 'Every map you create is saved here. Once you have two or more, you will see how their ideas connect even across different topics.')) + '</span>' +
-        '<span>' + esc(L('Mapas guardados con ideas suficientes: ' + (lib ? lib.count : 0), 'Saved maps with enough ideas: ' + (lib ? lib.count : 0))) + '</span>';
-      emptyEl.hidden = false; paintHud();
-      trk('lib_open', { maps: lib ? lib.count : 0, empty: true });
-    } else {
-      M = lib; cam.tx = cam.ty = cam.tz = 0; cam.dist = clamp(M.rad * 2.3 + 2, 10, 90); cam.yaw = 0.5; cam.pitch = 0.25;
-      idleAt = performance.now() + 2500; paintHud(); paintLegend();
-      trk('lib_open', { maps: M.lib.projects.length, ideas: M.list.length, cross: M.lib.nCross });
-    }
-    document.body.classList.add('gk-cos');
-    raf = requestAnimationFrame(frame); geoT = setInterval(geo, 300);
+    sel = null; tour = null; fly = null; M = null;
+    enterView('gal'); renderGallery();
+    document.body.classList.add('gk-cos'); geoT = setInterval(geo, 300);
+    trk('lib_open', { maps: galProj.length });
     return true;
   }
+  function libThreeD() {
+    const chosen = galProj.filter((p) => galSel.has(p.id));
+    const lib = buildLib(chosen);
+    if (!lib || !lib.list) { try { appAlert(L('Elige al menos dos mapas para verlos juntos en 3D.', 'Pick at least two maps to see them together in 3D.')); } catch (_e) { /* nada */ } return; }
+    M = lib; sel = null; card.hidden = true; fly = null; tour = null;
+    cam.tx = cam.ty = cam.tz = 0; cam.dist = clamp(M.rad * 2.3 + 2, 10, 90); cam.yaw = 0.5; cam.pitch = 0.25; idleAt = performance.now() + 2500;
+    enterView('lib'); paintLegend(); paintHud(); resize();
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+    trk('lib_3d', { maps: M.lib.projects.length, ideas: M.list.length, cross: M.lib.nCross });
+  }
+  function libBack() { M = null; sel = null; enterView('gal'); renderGallery(); }
 
   function show(v) {
     if (v && on && libMode) show(false);
     if (v === on) return on;
     if (v) {
       if (!pane) build();
-      setMode(false);
+      setMode(false); pane.dataset.view = ''; if (galEl) galEl.hidden = true;
       if (!rebuild(false)) return false;
       sig = signature(); on = true; pane.classList.add('on'); geo(); resize();
       cam.yaw = 0.5; cam.pitch = 0.2; fly = null;
@@ -526,7 +602,7 @@
       return true;
     }
     on = false; cancelAnimationFrame(raf); clearInterval(geoT); clearInterval(pollT); fly = null; tour = null;
-    if (libMode) { libMode = false; if (emptyEl) emptyEl.hidden = true; if (legEl) legEl.hidden = true; }
+    if (libMode) { libMode = false; if (emptyEl) emptyEl.hidden = true; if (legEl) legEl.hidden = true; if (galEl) galEl.hidden = true; if (pane) pane.dataset.view = ''; }
     if (pane) pane.classList.remove('on');
     document.body.classList.remove('gk-cos');
     return false;
