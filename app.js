@@ -736,6 +736,21 @@ document.addEventListener('pagehide', () => {
     } catch (_err) { /* nunca debe notarse en la UI */ }
 });
 
+// Cuánto tarda en cargar la página (para saber si la gente se va antes de verla).
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        try {
+            const nav = performance.getEntriesByType('navigation')[0] || {};
+            const fcp = (performance.getEntriesByName('first-contentful-paint')[0] || {}).startTime;
+            const res = performance.getEntriesByType('resource');
+            const kb = Math.round(res.reduce((s, r) => s + (r.transferSize || 0), 0) / 1024);
+            const slow = res.slice().sort((x, y) => y.duration - x.duration).slice(0, 3).map((r) => (r.name.split('/').pop() || r.name).slice(0, 28) + ':' + Math.round(r.duration));
+            const c = navigator.connection || {};
+            track('page_timing', { fcp: fcp ? Math.round(fcp) : null, dcl: Math.round(nav.domContentLoadedEventEnd || 0), load: Math.round(nav.loadEventEnd || performance.now()), kb, res: res.length, lentos: slow, red: c.effectiveType || null });
+        } catch (_e) { /* nada */ }
+    }, 300);
+});
+
 // Qué aprietan y cuándo se van (para ver si la gente prueba botones sin que pase nada). Tope por visita para no llenar la tabla.
 (function () {
     let n = 0, recent = [], lastRage = 0;
