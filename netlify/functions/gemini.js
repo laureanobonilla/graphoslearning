@@ -406,11 +406,11 @@ async function rawHandler(event, context) {
         // EXACTAMENTE igual que parse_text; solo cambia que billing.js lo deja gratis
         // (una vez por persona).
         if (action === 'parse_text' || action === 'welcome_schema') {
-            const isShortTopic = text.trim().split(/\s+/).length < 25;
+            const isShortTopic = text.trim().split(/\s+/).length < ((bookMode && documentContext) ? 60 : 25);
             const { focusTerms } = JSON.parse(event.body);
 
             const bookIntro = (bookMode && documentContext && isShortTopic)
-                ? `Construye un esquema conceptual de 3 niveles sobre "${text}" basado en EL LIBRO "${bookName || ''}", cuyos datos están abajo. Usa su organización real: las ramas (Nivel 2) deben seguir las partes o capítulos del libro que correspondan al tema, y los sub-nodos (Nivel 3) los temas o secciones que el libro desarrolla en ellos. Si el tema es amplio (por ejemplo la materia completa), las ramas son sus grandes bloques según el libro; si es un tema concreto, usa los fragmentos. Para CADA nodo (raíz, ramas y sub-nodos) pon en "page" el número N de una marca [p. N] donde el libro lo trata (para un capítulo, la página donde empieza). Usa únicamente páginas que aparezcan en los datos. Si un nodo lo aportas tú porque el libro no lo cubre, omite "page".\n\n"""${documentContext.slice(0, 12000)}"""`
+                ? `${/[?¿]/.test(text) ? `El usuario le hace una PREGUNTA al libro: "${text}". El esquema debe tratar de RESPONDERLA: la raíz es el tema central de la pregunta, las ramas son las partes de la respuesta según el libro y los sub-nodos los conceptos o pasos que las sostienen. Construye un esquema conceptual de 3 niveles` : `Construye un esquema conceptual de 3 niveles sobre "${text}"`} basado en EL LIBRO "${bookName || ''}", cuyos datos están abajo. Usa su organización real: las ramas (Nivel 2) deben seguir las partes o capítulos del libro que correspondan al tema, y los sub-nodos (Nivel 3) los temas o secciones que el libro desarrolla en ellos. Si el tema es amplio (por ejemplo la materia completa), las ramas son sus grandes bloques según el libro; si es un tema concreto, usa los fragmentos. Para CADA nodo (raíz, ramas y sub-nodos) pon en "page" el número N de una marca [p. N] donde el libro lo trata (para un capítulo, la página donde empieza). Usa únicamente páginas que aparezcan en los datos. Si un nodo lo aportas tú porque el libro no lo cubre, omite "page".\n\n"""${documentContext.slice(0, 12000)}"""`
                 : null;
             const inputContext = bookIntro ? bookIntro : isShortTopic
                 ? `Construye un esquema conceptual exhaustivo de 3 niveles sobre el tema: "${text}".

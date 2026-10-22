@@ -111,7 +111,7 @@
   function patchBody(raw) {
     try {
       const b = JSON.parse(raw);
-      if (S.ready && b && b.action === 'parse_text' && typeof b.text === 'string' && b.text.trim().split(/\s+/).length < 25) {
+      if (S.ready && b && b.action === 'parse_text' && typeof b.text === 'string' && b.text.trim().split(/\s+/).length < 60) {
         const t = schemaContext(b.text);
         if (t) { b.documentContext = t; b.bookMode = true; b.bookName = S.name; return JSON.stringify(b); }
         return raw;
@@ -157,14 +157,20 @@
     } finally { S.busy = false; ui(); }
     autoMap();
   }
+  function note(t) { S.note = t; ui(); setTimeout(() => { if (S.note === t) { S.note = ''; ui(); } }, 15000); }
+  // Con un libro cargado, el campo de tema invita a preguntarle algo.
+  function hint() {
+    ['startTopic', 'gkComposerInput', 'gcTopic'].forEach((id) => { const i = document.getElementById(id); if (!i) return; if (!i.dataset.gkPh) i.dataset.gkPh = i.placeholder || ''; i.placeholder = S.ready ? L('Escribe un tema o pregúntale algo al libro…', 'Type a topic or ask the book something…') : i.dataset.gkPh; });
+  }
   // Al subir el libro, el mapa se arma solo con el libro (sin pulsar "Estudiar"), si no hay uno abierto.
-  async function autoMap() {
+  async function autoMap(manual) {
     try {
-      if (!S.ready || typeof nodes === 'undefined' || nodes.length > 0 || !window.GK_NAV) return;
+      if (!S.ready || typeof nodes === 'undefined' || (nodes.length > 0 && !manual) || !window.GK_NAV) return;
       GK_NAV.setTopic(S.title || L('Contenido del libro', 'Book contents'));
       await GK_NAV.go('mapa');
       if (window.track) track('book_automap', { ok: nodes.length > 0 });
-    } catch (e) { console.error('[libro] mapa automático:', e); }
+      if (nodes.length === 0) note(L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.'));
+    } catch (e) { console.error('[libro] mapa automático:', e); note(L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.')); }
   }
 
   // ---------- interfaz ----------
@@ -173,11 +179,14 @@
     if (!el) return;
     const on = S.ready && !S.busy;
     el.className = 'gkb show' + (on ? ' on' : '') + (S.busy ? ' busy' : '');
-    document.body.classList.toggle('gk-book', on);
+    document.body.classList.toggle('gk-book', on); hint();
     if (S.busy) { el.innerHTML = '<span class="gkb-t">' + (msg || '') + '</span>'; return; }
     if (on) {
       el.innerHTML = '<span class="gkb-t" title="' + S.name.replace(/"/g, '') + '">' + L('Libro: ', 'Book: ') + '<b>' + S.name.slice(0, 26).replace(/</g, '&lt;') + (S.name.length > 26 ? '…' : '') + '</b> · ' + S.pages.length + ' pp</span><button type="button" class="gkb-x" aria-label="' + L('Quitar libro', 'Remove book') + '">×</button>';
       el.querySelector('.gkb-x').onclick = (e) => { e.stopPropagation(); if (confirm(L('¿Quitar el libro? Los mapas ya creados se conservan.', 'Remove the book? Existing maps are kept.'))) wipe(); };
+      const noMap = typeof nodes !== 'undefined' && nodes.length === 0;
+      if (noMap) { const b = document.createElement('button'); b.type = 'button'; b.className = 'gkb-m'; b.textContent = L('Armar mapa', 'Build map'); b.onclick = (e) => { e.stopPropagation(); autoMap(true); }; el.insertBefore(b, el.querySelector('.gkb-x')); }
+      if (S.note) { const n = document.createElement('div'); n.className = 'gkb-n'; n.textContent = S.note; el.appendChild(n); }
       el.onclick = null; el.title = L('Los conceptos y definiciones se buscan en este libro', 'Concepts and definitions are looked up in this book');
     } else {
       el.innerHTML = '<span class="gkb-t">' + L('Subir libro (PDF)', 'Upload book (PDF)') + '</span>';
@@ -188,7 +197,7 @@
     const s = document.createElement('style');
     s.textContent = '.gkb{position:fixed;left:12px;bottom:14px;z-index:60;display:none;align-items:center;gap:6px;max-width:300px;padding:6px 11px;border-radius:7px;border:1px solid #2a3550;background:#121a2c;color:#aab6cc;font:12px/1.2 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)}' +
       '.gkb:hover{border-color:#6f86b3;color:#e2e8f0}.gkb.on{cursor:default}.gkb.on b{color:#e2e8f0}.gkb.busy{cursor:progress}.gkb-t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-      '.gkb-x{border:0;background:none;color:#8a97b0;font-size:15px;line-height:1;cursor:pointer;padding:0 2px}.gkb-x:hover{color:#fff}' +
+      '.gkb-m{border:1px solid #3b5a8f;background:#16233f;color:#d6e2f7;border-radius:5px;font:600 11px system-ui;padding:3px 8px;cursor:pointer}.gkb-n{position:absolute;left:0;bottom:calc(100% + 6px);width:300px;padding:8px 10px;border-radius:7px;background:#121a2c;border:1px solid #3b5a8f;color:#d6e2f7;font:12px/1.4 system-ui,sans-serif;white-space:normal}.gkb-x{border:0;background:none;color:#8a97b0;font-size:15px;line-height:1;cursor:pointer;padding:0 2px}.gkb-x:hover{color:#fff}' +
       '@media(min-width:781px){.gkb.show{display:flex}}';
     document.head.appendChild(s);
   }
@@ -199,7 +208,7 @@
     inp.onchange = () => { const f = inp.files && inp.files[0]; inp.value = ''; load(f); };
     el.addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !S.ready) { e.preventDefault(); inp.click(); } });
     document.body.append(el, inp);
-    ui(); restore();
+    ui(); restore(); setInterval(() => { if (S.ready && !S.busy) ui(); }, 2500);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 
