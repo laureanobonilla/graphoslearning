@@ -804,6 +804,14 @@ async function goTab(k) {
     openLens(k, { target: rt || { id: null, name: topic, sel: false, ctx: '', map: '', topicOnly: true }, level, from: 'tab' });
     return;
   }
+  if (k === 'cosmos') {
+    if (!mapNow && !(await runMap(topic))) return;
+    await new Promise((r) => setTimeout(r, 150));
+    if (!(window.GK_COSMOS && window.GK_COSMOS.show(true))) { try { appAlert(L('El cosmos necesita al menos 2 ideas en el mapa.', 'The cosmos needs at least 2 ideas on the map.')); } catch (_e) { /* nada */ } return; }
+    try { const v = window.__gkRhizomeView; if (v) v(false); } catch (_e) { /* nada */ }
+    setActive('cosmos');
+    return;
+  }
   const view = (on) => { try { return window.__gkRhizomeView ? window.__gkRhizomeView(on) : false; } catch (_e) { return false; } };
   if (k === 'mapa') { if (!mapNow && !(await runMap(topic))) return; view(false); setActive('mapa'); return; }
   if (k === 'rizoma') {

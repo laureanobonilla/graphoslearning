@@ -43,7 +43,7 @@
     '<button type="button" class="gi-skip">' + SKIP + '</button>';
   var st = document.createElement('style');
   st.textContent =
-    '#gkIntro{position:fixed;inset:0;z-index:2147483000;background:#04050f;overflow:hidden;opacity:1;transition:opacity .7s ease;font-family:Sora,Inter,system-ui,sans-serif;color:#fff;cursor:pointer}' +
+    '#gkIntro{position:fixed;inset:0;z-index:2147483000;background:#04050f;overflow:hidden;opacity:1;transition:opacity .7s ease,background-color 1.2s ease;font-family:Sora,Inter,system-ui,sans-serif;color:#fff;cursor:pointer}' +
     '#gkIntro.gi-out{opacity:0;pointer-events:none}' +
     '#gkIntro canvas{position:absolute;inset:0;width:100%;height:100%;display:block}' +
     '#gkIntro .gi-vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,rgba(4,5,15,0) 45%,rgba(4,5,15,.78) 100%)}' +
@@ -58,6 +58,11 @@
     '#gkIntro.gi-show .gi-foot{opacity:0}' +
     '#gkIntro .gi-bar{display:block;width:150px;height:2px;border-radius:2px;background:rgba(129,140,248,.2);overflow:hidden}' +
     '#gkIntro .gi-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#6366f1,#22d3ee);box-shadow:0 0 10px #22d3ee}' +
+    '#gkIntro.gi-amb{background:transparent;z-index:10;pointer-events:none;opacity:.4;transition:opacity 1.2s ease;-webkit-mask-image:radial-gradient(ellipse 36% 42% at 50% 50%,rgba(0,0,0,.12) 0%,#000 100%);mask-image:radial-gradient(ellipse 36% 42% at 50% 50%,rgba(0,0,0,.12) 0%,#000 100%)}' +
+    '#gkIntro.gi-amb.gi-dim{opacity:.16}' +
+    '#gkIntro.gi-amb canvas{mix-blend-mode:screen}' +
+    '#gkIntro.gi-amb .gi-vig,#gkIntro.gi-amb .gi-foot,#gkIntro.gi-amb .gi-skip{display:none}' +
+    '#gkIntro.gi-amb.gi-out{opacity:0}' +
     '#gkIntro .gi-skip{position:absolute;right:18px;bottom:18px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16);color:#c7d2fe;font:500 12px Inter,system-ui,sans-serif;padding:6px 14px;border-radius:999px;cursor:pointer;backdrop-filter:blur(6px)}' +
     '#gkIntro .gi-skip:hover,#gkIntro .gi-skip:focus-visible{background:rgba(255,255,255,.16);outline:2px solid #818cf8;outline-offset:2px}';
   (document.head || document.documentElement).appendChild(st);
@@ -210,12 +215,12 @@
 
   /* ---------- cámara ---------- */
   var cam = { pos: [0, 0, 0], f: [0, 0, 1], r: [1, 0, 0], u: [0, 1, 0] };
-  function setCamera(t) {
+  function setCamera(t, uo) {
     // progreso del vuelo: arranque suave, velocidad estable, frenada al final
     var k = clamp(t / FLY, 0, 1);
     var e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
     var prog = 0.9 * k + 0.1 * e;                       // mezcla lineal + easing
-    var u = prog * (N - 0.9) ;                           // termina antes de la raíz
+    var u = uo != null ? uo : prog * (N - 0.9);          // termina antes de la raíz
     var p = pathAt(u);
     var look = pathAt(u + 0.75);
     // balanceo natural al "caminar/flotar"
@@ -248,15 +253,16 @@
 
   /* ---------- render ---------- */
   var T0 = 0, tmpA = {}, tmpB = {};
-  function render(t) {
+  function render(t, uo) {
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    var u = setCamera(t);
+    var amb = uo != null;
+    var u = setCamera(t, uo);
 
     // fondo con paralaje leve
     var px = -((cam.pos[0]) * 6) % 40, py = ((cam.pos[1]) * 5) % 30;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
-    ctx.drawImage(back, -(back.width - W) / 2 + px, -(back.height - H) / 2 + py);
+    if (amb) ctx.clearRect(0, 0, W, H); else ctx.drawImage(back, -(back.width - W) / 2 + px, -(back.height - H) / 2 + py);
 
     ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
@@ -337,7 +343,7 @@
         }
       }
       // etiqueta
-      if (n.label && o.z > 1.0 && o.z < 9) {
+      if (!amb && n.label && o.z > 1.0 && o.z < 9) {
         var fl = sm(1.0, 2.0, o.z) * (1 - sm(5.5, 9, o.z));
         var fs = clamp(o.s * 0.115, 10, 30);
         if (fl > 0.02) {
@@ -357,7 +363,7 @@
     ctx.globalAlpha = 1;
 
     // destello al llegar a la raíz (el título aparece en ese momento)
-    var fl2 = sm(FLY - 0.9, FLY - 0.15, t) * (1 - sm(FLY - 0.1, FLY + 0.9, t));
+    var fl2 = amb ? 0 : sm(FLY - 0.9, FLY - 0.15, t) * (1 - sm(FLY - 0.1, FLY + 0.9, t));
     if (fl2 > 0.01) {
       var gr = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.55);
       gr.addColorStop(0, 'rgba(199,210,254,' + (0.55 * fl2).toFixed(3) + ')');
@@ -368,7 +374,7 @@
     ctx.globalCompositeOperation = 'source-over';
 
     // velo oscuro tras el título para que se lea limpio
-    var sc = sm(FLY - 0.9, FLY, t);
+    var sc = amb ? 0 : sm(FLY - 0.9, FLY, t);
     if (sc > 0.01) {
       var g3 = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W * 0.55, H));
       g3.addColorStop(0, 'rgba(4,5,15,' + (0.78 * sc).toFixed(3) + ')');
@@ -378,39 +384,97 @@
     }
 
     // fundido inicial desde negro
-    var fi = 1 - sm(0, 0.55, t);
+    var fi = amb ? 0 : 1 - sm(0, 0.55, t);
     if (fi > 0.01) { ctx.globalAlpha = fi; ctx.fillStyle = '#04050f'; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
     return u;
   }
 
   /* ---------- ciclo ---------- */
-  var raf = 0, done = false, shown = false, t0 = 0;
+  var raf = 0, done = false, shown = false, t0 = 0, amb = false, ambT0 = 0, lastF = 0, watch = 0;
+  function cleanup() {
+    try { root.remove(); st.remove(); } catch (e) {}
+    window.removeEventListener('resize', resize);
+    document.removeEventListener('keydown', onKey, true);
+    document.removeEventListener('input', onInput, true);
+    document.removeEventListener('visibilitychange', onVis);
+    clearInterval(watch);
+    try { window.dispatchEvent(new CustomEvent('gk-intro-done')); } catch (e) {}
+  }
   function finish(fast) {
     if (done) return; done = true;
     cancelAnimationFrame(raf);
     root.classList.add('gi-out');
     if (fast) root.style.transitionDuration = '.25s';
-    setTimeout(function () {
-      try { root.remove(); st.remove(); } catch (e) {}
-      window.removeEventListener('resize', resize);
-      document.removeEventListener('keydown', onKey, true);
-      try { window.dispatchEvent(new CustomEvent('gk-intro-done')); } catch (e) {}
-    }, fast ? 300 : 760);
+    setTimeout(cleanup, fast ? 300 : 760);
   }
-  function onKey(ev) { if (ev.key === 'Escape' || ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); finish(true); } }
-  root.addEventListener('click', function () { finish(true); });
+  /* Fondo de baja intensidad mientras la persona decide qué estudiar; se apaga al empezar de verdad. */
+  function ambientOk() {
+    if (reduce || window.__introT != null) return false;
+    if (W < 781 || /^\/m(\/|$)/.test(location.pathname)) return false;
+    if ((navigator.hardwareConcurrency || 4) <= 2 && !/[?&]fondo=1/.test(location.search)) return false;
+    if (/[?&]fondo=0/.test(location.search)) return false;
+    return true;
+  }
+  function started() {
+    try {
+      if (window.GK_NAV && window.GK_NAV.hasMap && window.GK_NAV.hasMap()) return true;
+      if (document.querySelector('#gkLens:not([hidden])')) return true;
+      var cards = document.querySelector('#gkCards:not([hidden])');
+      if (cards && !document.body.classList.contains('gk-entry')) return true;
+      var m = document.getElementById('gkComposerInput') || document.getElementById('startTopic');
+      if (m && String(m.value || '').trim().length > 1) return true;
+    } catch (e) {}
+    return false;
+  }
+  function stopAmbient() {
+    if (done) return; done = true;
+    cancelAnimationFrame(raf);
+    root.style.transitionDuration = '1.4s';
+    root.classList.add('gi-out');
+    setTimeout(cleanup, 1500);
+  }
+  function toAmbient() {
+    amb = true; ambT0 = performance.now();
+    root.classList.remove('gi-show');
+    root.classList.add('gi-amb');
+    root.removeAttribute('role'); root.setAttribute('aria-hidden', 'true');
+    root.style.cursor = 'default';
+    watch = setInterval(function () {
+      if (started()) { stopAmbient(); return; }
+      root.classList.toggle('gi-dim', document.body.classList.contains('gk-entry'));
+    }, 400);
+  }
+  function endIntro(fast) {
+    if (done || amb) return;
+    if (ambientOk()) toAmbient(); else finish(fast);
+  }
+  function onInput(ev) { if (amb && ev.target && /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) stopAmbient(); }
+  function onVis() { if (!document.hidden && !done) { lastF = 0; raf = requestAnimationFrame(frame); } }
+  function onKey(ev) { if (!amb && (ev.key === 'Escape' || ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); endIntro(true); } }
+  root.addEventListener('click', function () { endIntro(true); });
   document.addEventListener('keydown', onKey, true);
+  document.addEventListener('input', onInput, true);
+  document.addEventListener('visibilitychange', onVis);
   window.addEventListener('resize', resize);
   resize();
 
   function frame(now) {
     if (done) return;
+    if (amb) {
+      raf = requestAnimationFrame(frame);
+      if (document.hidden || now - lastF < 33) return;     // ~30 cuadros por segundo
+      lastF = now;
+      var a = (performance.now() - ambT0) / 1000;
+      var uo = (N - 0.9) - 3.4 * (0.5 - 0.5 * Math.cos(a * 0.05));
+      render(FLY + a, uo);
+      return;
+    }
     if (!t0) t0 = now;
     var t = window.__introT != null ? window.__introT : (now - t0) / 1000;
     render(t);
     barI.style.width = (clamp(t / FLY, 0, 1) * 100).toFixed(1) + '%';
     if (!shown && t >= FLY - 0.7) { shown = true; root.classList.add('gi-show'); }
-    if (t >= DUR && window.__introT == null) { finish(false); return; }
+    if (t >= DUR && window.__introT == null) { endIntro(false); if (!amb) return; }
     raf = requestAnimationFrame(frame);
   }
 
@@ -422,5 +486,5 @@
     raf = requestAnimationFrame(frame);
   }
   // seguro: nunca dejar la pantalla tapada
-  setTimeout(function () { finish(false); }, (DUR + 3) * 1000);
+  setTimeout(function () { if (!amb) finish(false); }, (DUR + 3) * 1000);
 })();
