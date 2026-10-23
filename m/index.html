@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600&family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/m/m.css?v=6">
+<link rel="stylesheet" href="/m/m.css?v=7">
 <script>
 /* Si se abre en una pantalla ancha, lo normal es la versión de escritorio.
    ?force=1 (o ?m=1) lo deja aquí para poder probar en PC. */
@@ -152,6 +152,19 @@
   </div>
 </div>
 
+<!-- Pantalla bloqueada mientras se arma el resultado de ¿Quién eres? -->
+<div id="qerWait" hidden role="status" aria-live="polite"><div class="qw-box"><div class="qw-dot"></div><p>Armando tus resultados…</p></div></div>
+
+<!-- Modal: registro (después de la opinión) -->
+<div id="modalRegister" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mrTitle">
+    <h2 id="mrTitle">Guarda tu mapa</h2>
+    <p>Crea una cuenta gratis para conservar este mapa y volver a él cuando quieras.</p>
+    <button id="mrGo" class="btn-primary" type="button"><span class="btn-txt">Crear cuenta o entrar</span></button>
+    <button id="mrClose" class="btn-link" type="button">Ahora no</button>
+  </div>
+</div>
+
 <!-- Modal: opinión (una sola vez, a los 60 s de ver un mapa) -->
 <div id="modalFeedback" class="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mfTitle">
@@ -186,6 +199,6 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=10"></script>
 <script src="/install.js?v=2"></script>
-<script src="/m/m.js?v=13"></script>
+<script src="/m/m.js?v=14"></script>
 </body>
 </html>

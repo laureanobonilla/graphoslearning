@@ -369,7 +369,7 @@ function goToGraphikosmos(data) {
     localStorage.setItem('gk_qer_pending', JSON.stringify({ title: data.archetypeName || 'Tu resultado', text, at: Date.now() }));
     track('reading_to_graphikosmos', { chapters: nodes.length });
     $('loadingLabel').textContent = 'Convirtiendo tus conclusiones en un mapa mental…';
-    setTimeout(() => { location.href = '/m/?qer=1'; }, 250);
+    setTimeout(() => { location.href = '/m/?qer=1&intro=0'; }, 250);
     return true;
   } catch { return false; }
 }

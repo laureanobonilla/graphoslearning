@@ -59,7 +59,7 @@
       try {
         const q = JSON.parse(localStorage.getItem('gk_qer_pending') || 'null');
         if (q && typeof q.text === 'string' && q.text.length >= 200 && Date.now() - (q.at || 0) < 6 * 3600 * 1000) {
-          QER = { title: clip(q.title || '', 80), text: q.text.slice(0, 3000) };
+          QER = { title: clip(q.title || '', 80), text: q.text.slice(0, 3000) }; document.addEventListener('DOMContentLoaded', () => qerWait(true)); if (document.readyState !== 'loading') qerWait(true);
           const sid = crypto.randomUUID();
           TICKET_P = fetch(FN + 'hf-save', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, tool: 'aprende', first: true, anonId: anonId(), step: 1, total: 1, answers: { origen: 'quien-eres' }, utm: { campaign: 'quien-eres', ad: 'qer' } }) })
             .then((r) => { if (r.ok) TICKET = sid; }).catch(() => {});
@@ -115,6 +115,8 @@
 
   /* ---------- Modelo ---------- */
   let G = emptyG();
+  /* Pantalla bloqueada mientras se arma el mapa que viene de «¿Quién eres?» (no se ve la portada). */
+  function qerWait(on) { const w = document.getElementById('qerWait'); if (w) w.hidden = !on; }
   function emptyG() { return { rootId: null, nodes: {}, seq: 0, projectId: null }; }
   let cur = null;          // nodo central del mapa que se ve
   let view = 'home';
@@ -235,20 +237,21 @@
   }, 300);
   if (QER) setTimeout(async () => {
     try {
-      if (G && G.rootId) return;
+      if (G && G.rootId) { qerWait(false); return; }
+      setTimeout(() => qerWait(false), 70000);
       const msg = $('#homeMsg'), btn = $('#btnGenerate'); msg.className = 'msg'; msg.textContent = 'Convirtiendo tu resultado en un mapa mental…'; busy(btn, true);
       track('m_from_quien_eres', { chars: QER.text.length });
       await TICKET_P;
       const r = await callGemini({ action: 'm_welcome', text: QER.text, topic: QER.title, levels: 3, ticket: TICKET || undefined });
       busy(btn, false);
-      if (!r.ok) { track('m_map_error', { kind: r.kind, status: r.data && r.data.error, where: 'quien-eres' }); if (handleBlocked(r.kind, 'quien-eres')) { msg.textContent = ''; return; } msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return; }
-      msg.textContent = ''; TICKET = ''; G = emptyG();
+      if (!r.ok) { qerWait(false); track('m_map_error', { kind: r.kind, status: r.data && r.data.error, where: 'quien-eres' }); if (handleBlocked(r.kind, 'quien-eres')) { msg.textContent = ''; return; } msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return; }
+      msg.textContent = ''; TICKET = ''; G = emptyG(); G.voice = 'tu'; qerWait(false);
       const root = newNode(clip(r.data.root && r.data.root.label, 80) || QER.title || 'Tu resultado', '', null); G.rootId = root.id;
       addTree(root.id, r.data); mapsCount++;
       if (window.GK_INSTALL) window.GK_INSTALL.maybe();
       track('m_map_ok', { depth: 0, branches: root.children.length, from: 'quien-eres' });
       scheduleSave(); go('map', root.id, true);
-    } catch { /* nada */ }
+    } catch { qerWait(false); }
   }, 300);
   if (TICKET && APR_TOPIC.length >= 2) setTimeout(() => { try { if (G && G.rootId) return; $('#topicInput').value = APR_TOPIC; track('m_aprende_arrival', {}); $('#homeForm').requestSubmit(); } catch { /* nada */ } }, 300);
 
@@ -598,7 +601,7 @@
     if (glossaryInflight[id]) return;
     glossaryInflight[id] = true;
     const started = Date.now();
-    const r = await callGemini({ action: 'glossary', topic: G.nodes[id].label, contextPath: pathOf(id).join(' > ').slice(0, 380), terms: terms.map((t) => ({ id: t.id, label: t.label })) });
+    const r = await callGemini({ action: 'glossary', voice: G.voice === 'tu' ? 'tu' : undefined, topic: G.nodes[id].label, contextPath: pathOf(id).join(' > ').slice(0, 380), terms: terms.map((t) => ({ id: t.id, label: t.label })) });
     glossaryInflight[id] = false;
     const stillHere = view === 'defs' && cur === id;
     if (!r.ok || !r.data || !Array.isArray(r.data.items)) {
@@ -689,7 +692,7 @@
     const edges = [];
     ids.forEach((id) => G.nodes[id].children.forEach((c) => edges.push({ id: 'e_' + id + '_' + c, from: id, to: c, label: G.nodes[c].rel || '' })));
     const u = user();
-    return { owner: u ? (u.user_metadata && u.user_metadata.full_name) || u.email : 'Invitado', email: u ? u.email : 'local', nodes, edges, mobile: true, readerText: '', documentContext: '', panelState: null };
+    return { owner: u ? (u.user_metadata && u.user_metadata.full_name) || u.email : 'Invitado', email: u ? u.email : 'local', nodes, edges, mobile: true, qerVoice: G.voice === 'tu' ? true : undefined, readerText: '', documentContext: '', panelState: null };
   }
   function importProject(rec) {
     const nodes = Array.isArray(rec && rec.nodes) ? rec.nodes.slice(0, MAX_NODES) : [];
@@ -712,6 +715,7 @@
       (kids[raw.id] || []).forEach((e) => { if (!seen.has(e.to)) queue.push([byId[e.to], n.id, e.label]); });
     }
     hasParent.clear();
+    if (rec.qerVoice) g.voice = 'tu';
     G = g; return true;
   }
 
@@ -832,7 +836,7 @@
   updateLogin();
 
   /* ---------- Modales ---------- */
-  /* Opinión: una sola vez por dispositivo, 60 s después de ver un mapa; se puede saltar. Se guarda como evento m_feedback (metadata: rating, text). */
+  /* Opinión: una sola vez por dispositivo, 30 s después de ver un mapa; se puede saltar. Se guarda como evento m_feedback (metadata: rating, text). */
   let fbArmed = false, fbRate = '', fbShownAt = 0;
   function fbDone() { try { return !!localStorage.getItem('gk_m_fb'); } catch { return true; } }
   function armFeedback() {
@@ -845,24 +849,31 @@
       try { localStorage.setItem('gk_m_fb', String(Date.now())); } catch { /* nada */ }
       fbShownAt = Date.now(); track('m_feedback_shown', {}); openModal('#modalFeedback');
     };
-    setTimeout(attempt, 60000);
+    setTimeout(attempt, 30000);
+  }
+  /* Después de la opinión (enviada o saltada) y solo a quien aún no tiene cuenta: invitación a registrarse, una vez. */
+  function askRegisterAfterFeedback() {
+    if (user()) return;
+    setTimeout(() => { if (document.querySelector('.modal:not([hidden])')) return; track('m_register_prompt', { after: 'feedback' }); openModal('#modalRegister'); }, 400);
   }
   document.querySelectorAll('#mfRate button').forEach((b) => b.addEventListener('click', () => {
     fbRate = b.dataset.r; document.querySelectorAll('#mfRate button').forEach((x) => x.classList.toggle('on', x === b));
   }));
   $('#mfSend').addEventListener('click', () => {
     const text = clip($('#mfText').value, 600);
-    if (!fbRate && !text) { closeModals(); track('m_feedback_skipped', { seconds: Math.round((Date.now() - fbShownAt) / 1000) }); return; }
+    if (!fbRate && !text) { closeModals(); track('m_feedback_skipped', { seconds: Math.round((Date.now() - fbShownAt) / 1000) }); askRegisterAfterFeedback(); return; }
     track('m_feedback', { rating: fbRate, text, seconds: Math.round((Date.now() - fbShownAt) / 1000) });
-    closeModals(); toast('Gracias por tu opinión.');
+    closeModals(); toast('Gracias por tu opinión.'); askRegisterAfterFeedback();
   });
-  $('#mfSkip').addEventListener('click', () => { track('m_feedback_skipped', { seconds: Math.round((Date.now() - fbShownAt) / 1000) }); closeModals(); });
-  $('#modalFeedback').addEventListener('click', (e) => { if (e.target.id === 'modalFeedback') track('m_feedback_skipped', { via: 'backdrop' }); });
+  $('#mfSkip').addEventListener('click', () => { track('m_feedback_skipped', { seconds: Math.round((Date.now() - fbShownAt) / 1000) }); closeModals(); askRegisterAfterFeedback(); });
+  $('#modalFeedback').addEventListener('click', (e) => { if (e.target.id === 'modalFeedback') { track('m_feedback_skipped', { via: 'backdrop' }); askRegisterAfterFeedback(); } });
 
   function openModal(sel) { $(sel).hidden = false; }
   function closeModals() { document.querySelectorAll('.modal').forEach((m) => { m.hidden = true; }); }
   document.querySelectorAll('.modal').forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) closeModals(); }));
   $('#mlClose').addEventListener('click', closeModals);
+  $('#mrGo').addEventListener('click', () => { track('m_login_clicked', { from: 'after_feedback' }); closeModals(); if (window.netlifyIdentity) netlifyIdentity.open('signup'); else toast('No se pudo abrir el registro.'); });
+  $('#mrClose').addEventListener('click', () => { track('m_register_declined'); closeModals(); });
   $('#mcClose').addEventListener('click', closeModals);
   $('#mlGo').addEventListener('click', () => { track('m_login_clicked', { from: 'paywall' }); closeModals(); if (window.netlifyIdentity) netlifyIdentity.open('signup'); else toast('No se pudo abrir el registro.'); });
   function openContact() {

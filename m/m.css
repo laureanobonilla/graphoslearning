@@ -196,3 +196,11 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .fb-rate button.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 22%,var(--surface-2))}
 #mfText{border-radius:12px;border:1.5px solid var(--line);background:var(--void);color:var(--text-hi);font:500 16px/1.4 var(--font-body);padding:12px 14px;outline:none;resize:none}
 #mfText:focus{border-color:var(--cyan)}
+
+#qerWait{position:fixed;inset:0;z-index:100000;background:var(--void,#0a0f18);display:flex;align-items:center;justify-content:center}
+#qerWait[hidden]{display:none}
+.qw-box{text-align:center;color:var(--text-hi)}
+.qw-box p{margin:18px 0 0;font:600 18px var(--font-display)}
+.qw-dot{width:44px;height:44px;margin:0 auto;border-radius:50%;border:3px solid var(--line);border-top-color:var(--cyan);animation:qwSpin 1s linear infinite}
+@keyframes qwSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.qw-dot{animation:none}}
