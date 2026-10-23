@@ -4,6 +4,7 @@ window.QER_CFG = {
  "lang": "es",
  "locale": "es",
  "format": "paid-self-es",
+ "toGraphikosmos": true,
  "kind": "self",
  "freeCount": 0,
  "totalChapters": 10,

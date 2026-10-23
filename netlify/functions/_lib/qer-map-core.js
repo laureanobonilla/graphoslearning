@@ -251,6 +251,12 @@ FORMATS['paid-self-es'] = {
     axisPrompt: (t) => readingAxisPrompt(t).replace(/\b50 respuestas/g, '25 respuestas') + PAID_ES_NOTE + PROFILE_NOTE('es'), nodesSchema: READING_NODES_SCHEMA, minChars: paidMin,
     chunkPrompt: (t, a, i) => readingChunkPrompt(t, a, i, { freeCount: PAID_FREE_COUNT, paywall: true }) + PAID_ES_NOTE
 };
+// Versión GRATIS del examen de «¿Quién eres?» (sin muro): mismos prompts y perfil, pero los 10 capítulos salen abiertos.
+// El formato de pago 'paid-self-es' queda intacto para volver a cobrar. Su resultado se convierte en mapa mental en Graphikosmos.
+FORMATS['free-self-es'] = Object.assign({}, FORMATS['paid-self-es'], {
+    freeCount: TOTAL_NODES, minChars: () => 650,
+    chunkPrompt: (t, a, i) => readingChunkPrompt(t, a, i, { freeCount: TOTAL_NODES, paywall: false }) + PAID_ES_NOTE
+});
 function registerPaid(name, file, lang) {
     try {
         const m = require(file);

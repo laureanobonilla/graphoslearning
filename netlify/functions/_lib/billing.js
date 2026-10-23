@@ -265,7 +265,7 @@ function withBilling(raw, overrides = {}) {
             // inicial. Si no cumple, se cobra como un parse_text normal (nunca se
             // rechaza: es mejor cobrar que dejar a alguien sin esquema).
             if ((action === 'welcome_schema' || action === 'm_welcome') && !(identity.kind === 'guest' && TRIAL_POLICY && consumeTicket)) {
-                const paidAction = action === 'm_welcome' ? 'm_map' : 'parse_text';
+                const paidAction = action === 'm_welcome' ? (String(body.text || '').length >= 200 ? 'm_text' : 'm_map') : 'parse_text';
                 const initial = identity.kind === 'user'
                     ? require('./packages').freeUserNodes()
                     : require('./packages').freeGuestNodes();

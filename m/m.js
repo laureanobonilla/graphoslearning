@@ -48,13 +48,27 @@
   ['ref', 'utm_source', 'utm_medium', 'utm_campaign'].forEach((k) => { const v = qp.get(k); if (v) ORIGIN[k] = clip(v, 60); });
   try { if (Object.keys(ORIGIN).length) sessionStorage.setItem('gk_m_origin', JSON.stringify(ORIGIN)); else Object.assign(ORIGIN, JSON.parse(sessionStorage.getItem('gk_m_origin') || '{}')); } catch { /* nada */ }
   /* Llegada desde /aprender/ (anuncio): el código es el «boleto» de UN esquema de prueba (se verifica en el servidor). */
-  let TICKET = '', APR_TOPIC = '', TICKET_P = Promise.resolve(), PEND_TEXT = null;
+  let TICKET = '', APR_TOPIC = '', TICKET_P = Promise.resolve(), PEND_TEXT = null, QER = null;
   try {
     const a = qp.get('aprende') || '';
     try {   /* "Ver como mapa" de Escribir deja el texto en este navegador con ese mismo código */
       const pend = JSON.parse(localStorage.getItem('gk_ap_pending') || 'null');
       if (pend && pend.sid === a && typeof pend.text === 'string' && pend.text.length >= 200) { PEND_TEXT = { title: clip(pend.title || '', 80), text: pend.text.slice(0, 12000) }; localStorage.removeItem('gk_ap_pending'); }
     } catch { /* nada */ }
+    if (qp.get('qer') === '1') {   /* resultado de «¿Quién eres?»: su lectura pasa a ser el primer mapa (gratis, una vez) */
+      try {
+        const q = JSON.parse(localStorage.getItem('gk_qer_pending') || 'null');
+        if (q && typeof q.text === 'string' && q.text.length >= 200 && Date.now() - (q.at || 0) < 6 * 3600 * 1000) {
+          QER = { title: clip(q.title || '', 80), text: q.text.slice(0, 3000) };
+          const sid = crypto.randomUUID();
+          TICKET_P = fetch(FN + 'hf-save', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sid, tool: 'aprende', first: true, anonId: anonId(), step: 1, total: 1, answers: { origen: 'quien-eres' }, utm: { campaign: 'quien-eres', ad: 'qer' } }) })
+            .then((r) => { if (r.ok) TICKET = sid; }).catch(() => {});
+        }
+        localStorage.removeItem('gk_qer_pending');
+      } catch { /* nada */ }
+      const q3 = new URLSearchParams(location.search); q3.delete('qer');
+      const rest3 = q3.toString(); history.replaceState(null, '', location.pathname + (rest3 ? '?' + rest3 : '') + location.hash);
+    }
     if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(a)) {
       TICKET = PEND_TEXT ? '' : a; APR_TOPIC = PEND_TEXT ? '' : clip(qp.get('t') || '', 120);
       const q2 = new URLSearchParams(location.search); ['aprende', 'ref', 't'].forEach((k) => q2.delete(k));
@@ -216,6 +230,23 @@
       msg.textContent = ''; G = emptyG();
       const root = newNode(clip(r.data.root && r.data.root.label, 80) || PEND_TEXT.title || 'Mi texto', '', null); G.rootId = root.id;
       addTree(root.id, r.data); mapsCount++; scheduleSave(); go('map', root.id, true);
+    } catch { /* nada */ }
+  }, 300);
+  if (QER) setTimeout(async () => {
+    try {
+      if (G && G.rootId) return;
+      const msg = $('#homeMsg'), btn = $('#btnGenerate'); msg.className = 'msg'; msg.textContent = 'Convirtiendo tu resultado en un mapa mental…'; busy(btn, true);
+      track('m_from_quien_eres', { chars: QER.text.length });
+      await TICKET_P;
+      const r = await callGemini({ action: 'm_welcome', text: QER.text, topic: QER.title, levels: 3, ticket: TICKET || undefined });
+      busy(btn, false);
+      if (!r.ok) { track('m_map_error', { kind: r.kind, status: r.data && r.data.error, where: 'quien-eres' }); if (handleBlocked(r.kind, 'quien-eres')) { msg.textContent = ''; return; } msg.textContent = failMessage(r.kind, r.data); msg.classList.add('err'); return; }
+      msg.textContent = ''; TICKET = ''; G = emptyG();
+      const root = newNode(clip(r.data.root && r.data.root.label, 80) || QER.title || 'Tu resultado', '', null); G.rootId = root.id;
+      addTree(root.id, r.data); mapsCount++;
+      if (window.GK_INSTALL) window.GK_INSTALL.maybe();
+      track('m_map_ok', { depth: 0, branches: root.children.length, from: 'quien-eres' });
+      scheduleSave(); go('map', root.id, true);
     } catch { /* nada */ }
   }, 300);
   if (TICKET && APR_TOPIC.length >= 2) setTimeout(() => { try { if (G && G.rootId) return; $('#topicInput').value = APR_TOPIC; track('m_aprende_arrival', {}); $('#homeForm').requestSubmit(); } catch { /* nada */ } }, 300);
@@ -526,7 +557,9 @@
     clearTimeout(saveTimer); try { await saveProject(); } catch { /* nada */ }
     location.href = '/escribir/?practicar=' + encodeURIComponent(topic);
   });
-  $('#btnDefs').addEventListener('click', () => { track('m_defs_opened', { depth: depthOf(cur) }); go('defs', cur); });
+  const defsBtn = $('#btnDefs');
+  try { if (!localStorage.getItem('gk_m_defs_seen')) defsBtn.classList.add('glow'); } catch { defsBtn.classList.add('glow'); }
+  defsBtn.addEventListener('click', () => { defsBtn.classList.remove('glow'); try { localStorage.setItem('gk_m_defs_seen', '1'); } catch { /* nada */ } track('m_defs_opened', { depth: depthOf(cur) }); go('defs', cur); });
   $('#btnDefsBack').addEventListener('click', () => { track('m_defs_back'); go('map', cur, false); });
   let allOpen = false;
   $('#btnToggleAll').addEventListener('click', () => {

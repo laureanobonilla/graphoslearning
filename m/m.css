@@ -183,3 +183,10 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .ln-load{display:flex;flex-direction:column;align-items:center;gap:14px;padding:70px 20px;color:var(--text-mid);font-size:16px;text-align:center}
 .ln-load .spin{display:block;border-color:rgba(232,235,240,.2);border-top-color:var(--cyan)}
 .btn-lens{margin-top:10px}
+
+/* Invitaciones a tocar: «Ver definiciones» brilla hasta que se usa la primera vez; los nodos pulsan unas veces al aparecer. */
+#btnDefs.glow{position:relative;box-shadow:0 0 0 0 rgba(122,167,217,.55),0 0 18px rgba(122,167,217,.45);animation:gkGlow 2.2s ease-in-out infinite}
+@keyframes gkGlow{0%,100%{box-shadow:0 0 0 0 rgba(122,167,217,.5),0 0 12px rgba(122,167,217,.35)}50%{box-shadow:0 0 0 7px rgba(122,167,217,0),0 0 26px rgba(122,167,217,.7)}}
+.mnode:not(.root){cursor:pointer;animation:gkNodeHint 2.6s ease-in-out .9s 3}
+@keyframes gkNodeHint{0%,100%{box-shadow:0 4px 18px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 40%,transparent),0 0 20px color-mix(in srgb,var(--c) 70%,transparent)}}
+@media (prefers-reduced-motion:reduce){#btnDefs.glow,.mnode:not(.root){animation:none}#btnDefs.glow{box-shadow:0 0 0 2px rgba(122,167,217,.6),0 0 18px rgba(122,167,217,.5)}}

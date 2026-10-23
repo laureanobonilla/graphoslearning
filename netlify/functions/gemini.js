@@ -968,7 +968,7 @@ FRAGMENTO:\n"""${chunk}"""`,
             return { statusCode: 200, body: JSON.stringify({ topics }) };
         }
 
-        if (action === 'm_map' || action === 'm_welcome') {
+        if (action === 'm_map' || (action === 'm_welcome' && String(text || '').length < 200)) {
             const mb = JSON.parse(event.body);
             const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
             const tema = clipS(topic, 200);
@@ -1022,7 +1022,7 @@ REGLAS:
         // MÓVIL — esquema a partir de un texto que el usuario seleccionó (definiciones, etc.).
         // Mismo formato y costo que m_map: una raíz y 5 a 7 ramas.
         // ==========================================
-        if (action === 'm_text') {
+        if (action === 'm_text' || action === 'm_welcome') {   // m_welcome llega aquí solo con texto (resultado de «¿Quién eres?»)
             const clipS = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
             const src = clipS(text, 3000);
             if (src.split(/\s+/).filter(Boolean).length < 4) return { statusCode: 400, body: JSON.stringify({ error: 'Falta el texto' }) };

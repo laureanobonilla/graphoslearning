@@ -338,7 +338,7 @@ async function submitQuiz() {
   showScreen('loading');
   const label = $('loadingLabel'), steps = CFG.t.loading_steps;
   label.textContent = steps[0];
-  const payload = { format: CFG.format, answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })) };
+  const payload = { format: CFG.toGraphikosmos ? 'free-self-es' : CFG.format, answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })) };
   const t0 = Date.now();
   try {
     const axis = await postWithOneRetry('qer-generate-map', payload);
@@ -350,11 +350,28 @@ async function submitQuiz() {
     const data = await postWithOneRetry('qer-generate-map-finalize', { readingId: axis.readingId });
     track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000), answered: answers.filter(Boolean).length });
     clearQuizProgress();
-    renderReveal(data);
+    if (!(CFG.toGraphikosmos && goToGraphikosmos(data))) renderReveal(data);
   } catch (err) {
     track('reading_generated_error', { reason: String(err.message).slice(0, 200), seconds: Math.round((Date.now() - t0) / 1000) });
     showError(tt('err_title'), err.message, submitQuiz);
   }
+}
+// «¿Quién eres?» gratis: al terminar la última pregunta, las conclusiones pasan a Graphikosmos (móvil) y allí se arma el mapa mental.
+// La lectura se guarda en este navegador por si la persona vuelve. «?sinmapa=1» deja la pantalla de lectura de siempre.
+function goToGraphikosmos(data) {
+  try {
+    if (/[?&]sinmapa=1/.test(location.search)) return false;
+    const nodes = (data.nodes || []).filter(n => n && n.text);
+    if (nodes.length < 3) return false;
+    const parts = [data.archetypeName ? `Tu perfil: ${data.archetypeName}.` : '', data.hookLine || '', ...nodes.map(n => `${n.label}: ${String(n.text).replace(/\s+/g, ' ').slice(0, 230)}`), data.closingLine || ''].filter(Boolean);
+    const text = parts.join('\n').slice(0, 3000);
+    if (text.length < 200) return false;
+    localStorage.setItem('gk_qer_pending', JSON.stringify({ title: data.archetypeName || 'Tu resultado', text, at: Date.now() }));
+    track('reading_to_graphikosmos', { chapters: nodes.length });
+    $('loadingLabel').textContent = 'Convirtiendo tus conclusiones en un mapa mental…';
+    setTimeout(() => { location.href = '/m/?qer=1'; }, 250);
+    return true;
+  } catch { return false; }
 }
 function showError(title, detail, retryFn) {
   $('errorMsg').textContent = title; $('errorDetail').textContent = detail || tt('err_detail');
