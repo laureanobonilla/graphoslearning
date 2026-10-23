@@ -140,6 +140,7 @@
     $('#btnNew').hidden = (v === 'home');
     if (v === 'home') { $('#topicInput').value = ''; $('#homeMsg').textContent = ''; $('#homeMsg').className = 'msg'; }
     if (v === 'map') renderMap(!!show.animate);
+    if (v === 'map') armFeedback();
     if (v === 'defs') renderDefs();
     if (v === 'projects') renderProjects();
     if (v === 'home') setTimeout(() => { try { $('#topicInput').focus({ preventScroll: true }); } catch { /* nada */ } }, 50);
@@ -831,6 +832,33 @@
   updateLogin();
 
   /* ---------- Modales ---------- */
+  /* Opinión: una sola vez por dispositivo, 60 s después de ver un mapa; se puede saltar. Se guarda como evento m_feedback (metadata: rating, text). */
+  let fbArmed = false, fbRate = '', fbShownAt = 0;
+  function fbDone() { try { return !!localStorage.getItem('gk_m_fb'); } catch { return true; } }
+  function armFeedback() {
+    if (fbArmed || fbDone()) return; fbArmed = true;
+    let tries = 0;
+    const attempt = () => {
+      const busyNow = view !== 'map' || document.querySelector('.modal:not([hidden])') || ($('#sheet') && !$('#sheet').hidden) || ($('#introSplash') && $('#introSplash').offsetParent);
+      if (busyNow && ++tries < 30) { setTimeout(attempt, 10000); return; }
+      if (busyNow || fbDone()) return;
+      try { localStorage.setItem('gk_m_fb', String(Date.now())); } catch { /* nada */ }
+      fbShownAt = Date.now(); track('m_feedback_shown', {}); openModal('#modalFeedback');
+    };
+    setTimeout(attempt, 60000);
+  }
+  document.querySelectorAll('#mfRate button').forEach((b) => b.addEventListener('click', () => {
+    fbRate = b.dataset.r; document.querySelectorAll('#mfRate button').forEach((x) => x.classList.toggle('on', x === b));
+  }));
+  $('#mfSend').addEventListener('click', () => {
+    const text = clip($('#mfText').value, 600);
+    if (!fbRate && !text) { closeModals(); track('m_feedback_skipped', { seconds: Math.round((Date.now() - fbShownAt) / 1000) }); return; }
+    track('m_feedback', { rating: fbRate, text, seconds: Math.round((Date.now() - fbShownAt) / 1000) });
+    closeModals(); toast('Gracias por tu opinión.');
+  });
+  $('#mfSkip').addEventListener('click', () => { track('m_feedback_skipped', { seconds: Math.round((Date.now() - fbShownAt) / 1000) }); closeModals(); });
+  $('#modalFeedback').addEventListener('click', (e) => { if (e.target.id === 'modalFeedback') track('m_feedback_skipped', { via: 'backdrop' }); });
+
   function openModal(sel) { $(sel).hidden = false; }
   function closeModals() { document.querySelectorAll('.modal').forEach((m) => { m.hidden = true; }); }
   document.querySelectorAll('.modal').forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) closeModals(); }));

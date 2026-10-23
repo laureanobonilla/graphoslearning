@@ -190,3 +190,9 @@ svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-lin
 .mnode:not(.root){cursor:pointer;animation:gkNodeHint 2.6s ease-in-out .9s 3}
 @keyframes gkNodeHint{0%,100%{box-shadow:0 4px 18px rgba(0,0,0,.35)}50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 40%,transparent),0 0 20px color-mix(in srgb,var(--c) 70%,transparent)}}
 @media (prefers-reduced-motion:reduce){#btnDefs.glow,.mnode:not(.root){animation:none}#btnDefs.glow{box-shadow:0 0 0 2px rgba(122,167,217,.6),0 0 18px rgba(122,167,217,.5)}}
+
+.fb-rate{display:flex;gap:8px}
+.fb-rate button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--text-hi);font:600 14px var(--font-body)}
+.fb-rate button.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 22%,var(--surface-2))}
+#mfText{border-radius:12px;border:1.5px solid var(--line);background:var(--void);color:var(--text-hi);font:500 16px/1.4 var(--font-body);padding:12px 14px;outline:none;resize:none}
+#mfText:focus{border-color:var(--cyan)}

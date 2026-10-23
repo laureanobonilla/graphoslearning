@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600&family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/m/m.css?v=5">
+<link rel="stylesheet" href="/m/m.css?v=6">
 <script>
 /* Si se abre en una pantalla ancha, lo normal es la versión de escritorio.
    ?force=1 (o ?m=1) lo deja aquí para poder probar en PC. */
@@ -152,6 +152,22 @@
   </div>
 </div>
 
+<!-- Modal: opinión (una sola vez, a los 60 s de ver un mapa) -->
+<div id="modalFeedback" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mfTitle">
+    <h2 id="mfTitle">¿Qué te parece Graphikosmos?</h2>
+    <p>Es una pausa breve, solo una vez. Puedes saltarla y seguir sin decir nada.</p>
+    <div class="fb-rate" id="mfRate" role="group" aria-label="Tu impresión">
+      <button type="button" data-r="util">Me sirve</button>
+      <button type="button" data-r="regular">Más o menos</button>
+      <button type="button" data-r="no">No me sirve</button>
+    </div>
+    <textarea id="mfText" rows="3" maxlength="600" placeholder="Opinión o sugerencia (opcional)"></textarea>
+    <button id="mfSend" class="btn-primary" type="button"><span class="btn-txt">Enviar opinión</span></button>
+    <button id="mfSkip" class="btn-link" type="button">Saltar y seguir</button>
+  </div>
+</div>
+
 <!-- Modal: sin nodos (contacto) -->
 <div id="modalContact" class="modal" hidden>
   <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="mcTitle">
@@ -170,6 +186,6 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=10"></script>
 <script src="/install.js?v=2"></script>
-<script src="/m/m.js?v=12"></script>
+<script src="/m/m.js?v=13"></script>
 </body>
 </html>
