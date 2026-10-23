@@ -223,6 +223,10 @@
     } finally { S.busy = false; ui(); }
     autoMap();
   }
+  function failMsg() {
+    if (/^40[12]/.test(S.lastErr)) return L('Para armar el mapa necesitas iniciar sesión o tener gemas. El libro sigue cargado: al iniciar sesión el mapa se arma solo.', 'To build the map you need to sign in or have gems. The book stays loaded: after signing in the map builds itself.');
+    return (S.lastErr ? 'Error ' + S.lastErr + '. ' : '') + L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.');
+  }
   function note(t) { S.note = t; ui(); setTimeout(() => { if (S.note === t) { S.note = ''; ui(); } }, 45000); }
   // Con un libro cargado, el campo de tema invita a preguntarle algo.
   function hint() {
@@ -235,8 +239,8 @@
       GK_NAV.setTopic(S.title || L('Contenido del libro', 'Book contents'));
       await GK_NAV.go('mapa');
       if (window.track) track('book_automap', { ok: nodes.length > 0 });
-      if (nodes.length === 0) note((S.lastErr ? L('Error ', 'Error ') + S.lastErr + '. ' : '') + L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.'));
-    } catch (e) { console.error('[libro] mapa automático:', e); note(L('El libro quedó cargado. Escribe un tema o una pregunta sobre el libro y pulsa Estudiar.', 'The book is loaded. Type a topic or a question about the book and press Study.')); }
+      if (nodes.length === 0) note(failMsg());
+    } catch (e) { console.error('[libro] mapa automático:', e); note(failMsg()); }
   }
 
   // ---------- interfaz ----------
