@@ -2030,6 +2030,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         if (isLong && !bookText && data.root) { try { markAiNodesNotInSource(data, topicText, attachToNodeId || data.root.id); } catch (e) { console.error('[fuente] marcas:', e); } }
         applyServerBalance(data); consumeNodes(totalNodes);
         track('schema_generate_success', { mode: isLong ? 'text' : 'topic', nodes: totalNodes, layoutMode: schemaLayoutMode, topicPreview });
+        try { window.GK_ADS && GK_ADS.firstMap(); } catch (_e) { /* nada */ }
         scheduleSaveBanner();
         // Escritorio: el esquema nace con su propio texto de solo lectura (panel izquierdo), sin bloquear al usuario.
         if (isDesktopFolding() && (!welcome || opts.topicText)) {

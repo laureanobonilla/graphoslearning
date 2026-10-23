@@ -217,6 +217,7 @@
     mapsCount++;
     if (window.GK_INSTALL) window.GK_INSTALL.maybe();
     track('m_map_ok', { depth: 0, branches: root.children.length, ms: Date.now() - started });
+    try { window.GK_ADS && GK_ADS.firstMap(); } catch { /* nada */ }
     scheduleSave();
     go('map', root.id, true);
   });
@@ -250,6 +251,7 @@
       addTree(root.id, r.data); mapsCount++;
       if (fbDone()) installNow(); else installAfterFlow = true;   /* desde «¿Quién eres?»: la guía de instalar va al final de opinión → registro, para no apilar avisos */
       track('m_map_ok', { depth: 0, branches: root.children.length, from: 'quien-eres' });
+      try { window.GK_ADS && GK_ADS.firstMap(); } catch { /* nada */ }
       scheduleSave(); go('map', root.id, true);
     } catch { qerWait(false); }
   }, 300);
