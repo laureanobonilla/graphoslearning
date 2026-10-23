@@ -248,7 +248,7 @@
       msg.textContent = ''; TICKET = ''; G = emptyG(); G.voice = 'tu'; qerWait(false);
       const root = newNode(clip(r.data.root && r.data.root.label, 80) || QER.title || 'Tu resultado', '', null); G.rootId = root.id;
       addTree(root.id, r.data); mapsCount++;
-      if (window.GK_INSTALL) window.GK_INSTALL.maybe();
+      if (fbDone()) installNow(); else installAfterFlow = true;   /* desde «¿Quién eres?»: la guía de instalar va al final de opinión → registro, para no apilar avisos */
       track('m_map_ok', { depth: 0, branches: root.children.length, from: 'quien-eres' });
       scheduleSave(); go('map', root.id, true);
     } catch { qerWait(false); }
@@ -852,8 +852,10 @@
     setTimeout(attempt, 30000);
   }
   /* Después de la opinión (enviada o saltada) y solo a quien aún no tiene cuenta: invitación a registrarse, una vez. */
+  let installAfterFlow = false;
+  function installNow() { installAfterFlow = false; try { if (window.GK_INSTALL) window.GK_INSTALL.maybe(); } catch { /* nada */ } }
   function askRegisterAfterFeedback() {
-    if (user()) return;
+    if (user()) { if (installAfterFlow) installNow(); return; }
     setTimeout(() => { if (document.querySelector('.modal:not([hidden])')) return; track('m_register_prompt', { after: 'feedback' }); openModal('#modalRegister'); }, 400);
   }
   document.querySelectorAll('#mfRate button').forEach((b) => b.addEventListener('click', () => {
@@ -872,8 +874,8 @@
   function closeModals() { document.querySelectorAll('.modal').forEach((m) => { m.hidden = true; }); }
   document.querySelectorAll('.modal').forEach((m) => m.addEventListener('click', (e) => { if (e.target === m) closeModals(); }));
   $('#mlClose').addEventListener('click', closeModals);
-  $('#mrGo').addEventListener('click', () => { track('m_login_clicked', { from: 'after_feedback' }); closeModals(); if (window.netlifyIdentity) netlifyIdentity.open('signup'); else toast('No se pudo abrir el registro.'); });
-  $('#mrClose').addEventListener('click', () => { track('m_register_declined'); closeModals(); });
+  $('#mrGo').addEventListener('click', () => { track('m_login_clicked', { from: 'after_feedback' }); closeModals(); if (installAfterFlow) installNow(); if (window.netlifyIdentity) netlifyIdentity.open('signup'); else toast('No se pudo abrir el registro.'); });
+  $('#mrClose').addEventListener('click', () => { track('m_register_declined'); closeModals(); if (installAfterFlow) installNow(); });
   $('#mcClose').addEventListener('click', closeModals);
   $('#mlGo').addEventListener('click', () => { track('m_login_clicked', { from: 'paywall' }); closeModals(); if (window.netlifyIdentity) netlifyIdentity.open('signup'); else toast('No se pudo abrir el registro.'); });
   function openContact() {

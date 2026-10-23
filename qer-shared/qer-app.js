@@ -240,7 +240,7 @@ btnBack.addEventListener('click', () => {
 });
 
 // --- guardar avance ---
-const PROGRESS_KEY = `qer_progress_${APP}_v1`;
+const PROGRESS_KEY = `qer_progress_${APP}_v2`;
 function saveQuizProgress() { try { localStorage.setItem(PROGRESS_KEY, JSON.stringify({ answers, currentIndex: currentIndex + 1, savedAt: Date.now() })); } catch { /* ok */ } }
 function loadQuizProgress() {
   try {

@@ -19,7 +19,7 @@ window.QER_CFG = {
   "doc_title": "¿Quién eres en realidad?",
   "doc_desc": "Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.",
   "cover_title": "¿Quién eres en realidad?",
-  "cover_sub": "No es un test cualquiera. Son 25 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
+  "cover_sub": "No es un test cualquiera. Son 27 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
   "cover_meta": "Gratis para empezar · Sin registrarte",
   "btn_start": "Empezar",
   "btn_resume": "Continuar donde quedaste (pregunta {n} de {total})",
@@ -282,6 +282,22 @@ window.QER_CFG = {
    ]
   },
   {
+   "id": "c_app",
+   "type": "choice",
+   "act": 3,
+   "prompt": "Si existiera una app para el celular por la que pagarías sin pensarlo mucho, ¿cuál sería?",
+   "options": [
+    "Una que convierta lo que estudio o leo en mapas mentales y definiciones",
+    "Una que me ayude a entender mis emociones y mis patrones",
+    "Una que me saque de la procrastinación y me devuelva tiempo",
+    "Una que me enseñe un idioma conversando conmigo",
+    "Una que me ayude a escribir mejor (mensajes, correos, textos)",
+    "Una que me ordene el dinero y las cuentas",
+    "Una que me ayude a decidir cuando estoy atascado",
+    "Por ninguna; no pagaría por una app"
+   ]
+  },
+  {
    "id": "c11",
    "type": "choice",
    "act": 3,
@@ -437,6 +453,21 @@ window.QER_CFG = {
     "Las personas que dependen de mí",
     "No creer que me lo merezco",
     "Esperar el momento perfecto"
+   ]
+  },
+  {
+   "id": "c_pay",
+   "type": "choice",
+   "act": 5,
+   "prompt": "Si una app te resolviera de verdad algo que hoy te pesa, ¿cuánto pagarías al mes?",
+   "options": [
+    "Nada; prefiero que sea gratis",
+    "Hasta $2",
+    "Entre $3 y $5",
+    "Entre $6 y $10",
+    "Más de $10",
+    "Prefiero pagar una sola vez, sin suscripción",
+    "Depende de lo que haga"
    ]
   },
   {
