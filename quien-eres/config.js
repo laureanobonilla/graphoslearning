@@ -19,7 +19,7 @@ window.QER_CFG = {
   "doc_title": "¿Quién eres en realidad?",
   "doc_desc": "Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.",
   "cover_title": "¿Quién eres en realidad?",
-  "cover_sub": "No es un test cualquiera. Son 28 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
+  "cover_sub": "No es un test cualquiera. Son 27 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
   "cover_meta": "Gratis para empezar · Sin registrarte",
   "btn_start": "Empezar",
   "btn_resume": "Continuar donde quedaste (pregunta {n} de {total})",
@@ -468,21 +468,6 @@ window.QER_CFG = {
     "Las personas que dependen de mí",
     "No creer que me lo merezco",
     "Esperar el momento perfecto"
-   ]
-  },
-  {
-   "id": "c_pay",
-   "type": "choice",
-   "act": 5,
-   "prompt": "Si una app te resolviera de verdad algo que hoy te pesa, ¿cuánto pagarías al mes?",
-   "options": [
-    "Nada; prefiero que sea gratis",
-    "Hasta $2",
-    "Entre $3 y $5",
-    "Entre $6 y $10",
-    "Más de $10",
-    "Prefiero pagar una sola vez, sin suscripción",
-    "Depende de lo que haga"
    ]
   },
   {
