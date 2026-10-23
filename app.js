@@ -702,6 +702,7 @@ function visitInfo() {
         let ref = ''; try { ref = document.referrer ? new URL(document.referrer).hostname : ''; } catch (_e) { ref = ''; }
         const info = { ref: ref.slice(0, 60), w: window.innerWidth, inapp: /FBAN|FBAV|Instagram/i.test(ua) ? 'facebook' : '', mobile: /Mobi|Android|iPhone/i.test(ua) };
         ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'fbclid'].forEach((k) => { const v = q.get(k); if (v) info[k === 'fbclid' ? 'fb_click' : k] = k === 'fbclid' ? true : v.slice(0, 60); });
+        if (q.get('gclid') || q.get('gbraid') || q.get('wbraid')) info.google_click = true;   // clic de un anuncio de Google (etiquetado automático)
         return info;
     } catch (_e) { return {}; }
 }

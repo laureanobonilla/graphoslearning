@@ -46,6 +46,7 @@
   const qp = new URLSearchParams(location.search);
   const ORIGIN = {};
   ['ref', 'utm_source', 'utm_medium', 'utm_campaign'].forEach((k) => { const v = qp.get(k); if (v) ORIGIN[k] = clip(v, 60); });
+  if (qp.get('gclid') || qp.get('gbraid') || qp.get('wbraid')) ORIGIN.google_click = true;
   try { if (Object.keys(ORIGIN).length) sessionStorage.setItem('gk_m_origin', JSON.stringify(ORIGIN)); else Object.assign(ORIGIN, JSON.parse(sessionStorage.getItem('gk_m_origin') || '{}')); } catch { /* nada */ }
   /* Llegada desde /aprender/ (anuncio): el código es el «boleto» de UN esquema de prueba (se verifica en el servidor). */
   let TICKET = '', APR_TOPIC = '', TICKET_P = Promise.resolve(), PEND_TEXT = null, QER = null;
