@@ -548,6 +548,13 @@
         #defsView .dv-below { font: 400 12.5px/1.45 'Inter', sans-serif; color: var(--p-mute); }
         #defsView .dv-foot { grid-column: 1 / -1; margin: 6px 0 0 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
         #defsView .dv-more { padding: 5px 13px; border-radius: 999px; border: 1px solid var(--p-acc); background: #fff; color: var(--p-acc); font: 600 12px 'Sora', sans-serif; cursor: pointer; }
+        #defsView .dv-act { grid-column: 1 / -1; margin: 8px 0 2px 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+        #defsView .dv-eval { padding: 7px 15px; border-radius: 999px; border: 1px solid var(--p-acc); background: var(--p-acc); color: #fff; font: 700 12.5px 'Sora', sans-serif; cursor: pointer; box-shadow: 0 0 0 0 rgba(79,209,197,.45); animation: dvEvalGlow 2.6s ease-in-out infinite; }
+        #defsView .dv-eval:hover { filter: brightness(1.1); }
+        #defsView .dv-prac { padding: 7px 14px; border-radius: 999px; border: 1px solid var(--p-acc); background: #fff; color: var(--p-acc); font: 600 12.5px 'Sora', sans-serif; cursor: pointer; }
+        #defsView .dv-prac:hover { background: var(--p-acc); color: #fff; }
+        @keyframes dvEvalGlow { 0%,100% { box-shadow: 0 0 0 0 rgba(79,209,197,.0); } 50% { box-shadow: 0 0 0 5px rgba(79,209,197,.25); } }
+        @media (prefers-reduced-motion: reduce) { #defsView .dv-eval { animation: none; } }
         #defsView .dv-more:hover { background: var(--p-acc); color: #fff; }
         #defsView .dv-skel { height: 12px; border-radius: 6px; margin: 6px 0 9px; background: linear-gradient(90deg,#e8e5da,#f3f1ea,#e8e5da); background-size: 200% 100%; animation: dvShim 1.2s linear infinite; }
         #defsView .dv-head { position: relative; }
@@ -1953,7 +1960,7 @@
     <script src="/gems.js?v=10"></script>
     <script src="/pptx-export.js?v=1"></script>
     <script src="/book.js?v=8"></script>
-    <script src="/cloze.js?v=1"></script>
+    <script src="/cloze.js?v=2"></script>
     <script src="/app.js"></script>
     <script src="/coach.js?v=3"></script>
     <script src="/lentes.js?v=18"></script>

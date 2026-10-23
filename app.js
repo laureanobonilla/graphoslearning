@@ -5713,17 +5713,20 @@ document.getElementById('btnMenuFullSchema')?.addEventListener('click', async ()
     await generateSubschemeFromNode(selectedNodeId);
 });
 
-document.getElementById('btnMenuPractice')?.addEventListener('click', () => {
-    actionMenu.style.visibility = 'hidden';
-    actionMenu.classList.add('hidden');
-    if (!selectedNodeId) return;
-    const nd = nodes.get(selectedNodeId); if (!nd) return;
+function openPracticeForNode(nodeId) {
+    const nd = nodes.get(nodeId); if (!nd) return;
     const clean = (t) => String(t || '').replace(/[*_`#]/g, '').replace(/^[^\p{L}\p{N}]+/u, '').replace(/\s+/g, ' ').trim();
     const t = clean(nd.label).slice(0, 100); if (!t) return;
     const ctx = clean(globalDocumentContext || '').slice(0, 60);
     const topic = (ctx && !t.toLowerCase().includes(ctx.toLowerCase()) ? ctx + ': ' : '') + t;
     track('node_to_practice', {});
     window.open('/escribir/?practicar=' + encodeURIComponent(topic.slice(0, 160)), '_blank', 'noopener');
+}
+document.getElementById('btnMenuPractice')?.addEventListener('click', () => {
+    actionMenu.style.visibility = 'hidden';
+    actionMenu.classList.add('hidden');
+    if (!selectedNodeId) return;
+    openPracticeForNode(selectedNodeId);
 });
 
 document.getElementById('btnMenuLocateText')?.addEventListener('click', () => {
@@ -9152,6 +9155,13 @@ async function exportReportRtf() {
             });
             const foot = document.createElement('div'); foot.className = 'dv-foot'; foot.appendChild(note); foot.appendChild(more); row.appendChild(foot);
         }
+        // Al final de cada definición: evaluarse (completar palabras) o practicar el tema en Escribir.
+        const act = document.createElement('div'); act.className = 'dv-act';
+        const bEval = document.createElement('button'); bEval.type = 'button'; bEval.className = 'dv-eval'; bEval.textContent = '\uD83E\uDDE0 ' + tr('cloze.eval_btn');
+        bEval.addEventListener('click', () => { track('cloze_from_definition', { where: 'defs_view', depth }); startQuiz([String(n.id)], { mode: 'cloze', single: true, from: 'defs_view' }); });
+        const bPrac = document.createElement('button'); bPrac.type = 'button'; bPrac.className = 'dv-prac'; bPrac.textContent = tr('ui.practicar_este_tema');
+        bPrac.addEventListener('click', () => { track('defs_practice_click', { depth }); openPracticeForNode(n.id); });
+        act.appendChild(bEval); act.appendChild(bPrac); row.appendChild(act);
         row._depth = depth; rowOf.set(String(n.id), row);
         return row;
     }

@@ -1,16 +1,15 @@
 /* Completar palabras: convierte el título de un nodo y su definición en un ejercicio de huecos, sin gastar gemas (todo local).
    El nivel decide cuántos huecos hay y cuánta ayuda se da:
-   principiante  → título 1 hueco con la 1.ª letra + definición 2 huecos, con banco de palabras (y 2 señuelos)
-   intermedio    → título 1 hueco + definición 4 huecos, banco de palabras solo con las respuestas
-   avanzado      → título completo + definición 8 huecos, sin banco ni pistas */
+   Sin banco de palabras ni pistas en ningún nivel: la persona debe pensar qué poner. Solo cambia cuántos huecos hay:
+   principiante → título 1 + definición 2 · intermedio → título 1 + definición 4 · avanzado → título hasta 3 + definición 8 */
 (function () {
   'use strict';
   var STOP = new Set(('de la que el en y a los del se las por un para con no una su al lo como más pero sus le ya o este sí porque esta entre cuando muy sin sobre también me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mí antes algunos qué unos yo otro otras otra él tanto esa estos mucho quienes nada muchos cual poco ella estar estas algunas algo nosotros ' +
     'cada cuyo cuya cuyos partir través ejemplo forma manera parte partes tipo tipos varios diferentes mismo misma mismos mismas puede pueden suele según donde cuyas hacia ' +
     'the and for that with from this which their there these those have been into than then them they were what when where while about also such other more most some each over under between through using used uses').split(/\s+/));
   var LEVELS = {
-    principiante: { titleBlanks: 1, defBlanks: 2, bank: true, decoys: 2, hint: true },
-    intermedio:   { titleBlanks: 1, defBlanks: 4, bank: true, decoys: 0, hint: true },
+    principiante: { titleBlanks: 1, defBlanks: 2, bank: false, decoys: 0, hint: false },
+    intermedio:   { titleBlanks: 1, defBlanks: 4, bank: false, decoys: 0, hint: false },
     avanzado:     { titleBlanks: 3, defBlanks: 8, bank: false, decoys: 0, hint: false }
   };
   var WORD = /[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu;
