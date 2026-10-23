@@ -19,7 +19,7 @@ window.QER_CFG = {
   "doc_title": "¿Quién eres en realidad?",
   "doc_desc": "Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.",
   "cover_title": "¿Quién eres en realidad?",
-  "cover_sub": "No es un test cualquiera. Son 27 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
+  "cover_sub": "No es un test cualquiera. Son 28 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
   "cover_meta": "Gratis para empezar · Sin registrarte",
   "btn_start": "Empezar",
   "btn_resume": "Continuar donde quedaste (pregunta {n} de {total})",
@@ -239,6 +239,21 @@ window.QER_CFG = {
    ]
   },
   {
+   "id": "c_viaje",
+   "type": "choice",
+   "act": 2,
+   "prompt": "Pagarías por un viaje a uno de estos lugares, tuyo y de nadie más. ¿A cuál y por qué?",
+   "options": [
+    "A la Luna, porque quiero ver todo desde lejos y que nada me alcance",
+    "A Marte, porque necesito empezar de cero donde nadie me conozca",
+    "Al fondo del mar, porque ahí por fin habría silencio",
+    "Al pasado, porque hay algo que quisiera hacer distinto",
+    "Al futuro, porque necesito saber que todo va a salir bien",
+    "A la casa de mi infancia, porque ahí me sentía a salvo",
+    "A ningún lado, porque lo que busco no está en un lugar"
+   ]
+  },
+  {
    "id": "q2",
    "type": "short",
    "act": 2,
@@ -285,16 +300,16 @@ window.QER_CFG = {
    "id": "c_app",
    "type": "choice",
    "act": 3,
-   "prompt": "Si existiera una app para el celular por la que pagarías sin pensarlo mucho, ¿cuál sería?",
+   "prompt": "Imagina una app para el celular que te quitara de encima algo que hoy te pesa. ¿Cuál pagarías, y por qué?",
    "options": [
-    "Una que convierta lo que estudio o leo en mapas mentales y definiciones",
-    "Una que me ayude a entender mis emociones y mis patrones",
-    "Una que me saque de la procrastinación y me devuelva tiempo",
-    "Una que me enseñe un idioma conversando conmigo",
-    "Una que me ayude a escribir mejor (mensajes, correos, textos)",
-    "Una que me ordene el dinero y las cuentas",
-    "Una que me ayude a decidir cuando estoy atascado",
-    "Por ninguna; no pagaría por una app"
+    "Una que convierta lo que estudio o leo en mapas mentales, porque me cuesta ordenar lo que sé",
+    "Una que me ayude a entender mis emociones, porque me repito sin darme cuenta",
+    "Una que me saque de la procrastinación, porque siento que se me va el tiempo postergando",
+    "Una que me enseñe un idioma conversando, porque quiero abrirme puertas",
+    "Una que me ayude a escribir mejor, porque no siempre sé decir lo que pienso",
+    "Una que me ordene el dinero, porque las cuentas me quitan el sueño",
+    "Una que me ayude a decidir, porque me atoro y no avanzo",
+    "Por ninguna, porque prefiero resolverlo yo solo"
    ]
   },
   {
