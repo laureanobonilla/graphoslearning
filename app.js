@@ -7624,7 +7624,7 @@ async function clozeCheck() {
             span.textContent = b.answer;   // siempre se muestra la palabra original
             if (r === 'syn') span.title = tr('cloze.synonym', { given: g, w: b.answer });
         } else {
-            span.innerHTML = `${g ? `<span class="text-rose-300 line-through mr-1">${escapeHtml(g)}</span>` : ''}<span class="text-amber-300 font-semibold border-b-2 border-amber-400/70 px-1">${escapeHtml(b.answer)}</span>`;
+            span.innerHTML = `${g ? `<span class="text-rose-400 line-through decoration-2 mr-1">${escapeHtml(g)}</span>` : ''}<span class="text-lime-300 font-bold bg-lime-400/15 rounded-md px-1.5 py-0.5">${escapeHtml(b.answer)}</span>`;
         }
         inp.replaceWith(span);
     });

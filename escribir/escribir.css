@@ -151,3 +151,9 @@ main:has(.view.wide:not([hidden])){max-width:none;padding:14px 16px 24px}
 #clozeBox .cz-bad s{color:#e58;margin-right:6px;font-weight:400}
 #clozeBox .cz-lv{display:flex;gap:6px;margin-bottom:6px}
 #clozeBox .row{padding-right:64px}
+
+#fAns.cz-fb{font-size:18px;line-height:2}
+#fAns .cz-ok{color:#8ee06a;font-weight:700;border-bottom:2px solid #8ee06a;padding:0 3px}
+#fAns .cz-x{color:#ff7a8a;text-decoration:line-through;text-decoration-thickness:2px;margin:0 4px 0 2px;opacity:.9}
+#fAns .cz-fix{color:#8ee06a;font-weight:700;background:rgba(142,224,106,.14);border-radius:6px;padding:1px 6px}
+#fAns .cz-empty{border:1px dashed #8ee06a}

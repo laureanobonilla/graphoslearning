@@ -245,7 +245,7 @@
     const fb = {
       summary: 'Completaste bien ' + good + ' de ' + total + ' palabras.' + (syn.length ? ' ' + syn.map((b) => '«' + given[b.id] + '» sirve como sinónimo de «' + b.answer + '».').join(' ') : ''),
       wrong: [], irrelevant: [], terms: [], synthesis: [], concepts: [], errors: [],
-      missing: missed.map((b) => 'Iba «' + b.answer + '»' + (given[b.id] ? ' (escribiste «' + given[b.id] + '»)' : '') + '.'),
+      missing: [],
       modelAnswer: q.model,
       criteria: {
         precision: { level: lvl, note: 'Palabras exactas en los huecos (los sinónimos válidos cuentan).' },
@@ -253,9 +253,17 @@
         claridad: { level: 'logrado', note: 'En el modo completar no se evalúa la redacción.' }
       }
     };
-    const filled = ex.def.map((sg) => sg.t === 'text' ? sg.s : sg.s).join('');
+    const filled = ex.def.map((sg) => sg.s).join('');
+    // Tu texto, corregido a la vista: lo malo tachado y lo bueno al lado; lo correcto (y los sinónimos válidos) en verde con la palabra original.
+    const ansHtml = ex.def.map((sg) => {
+      if (sg.t !== 'word' || !sg.blank) return esc(sg.s);
+      const b = ex.blanks.find((x) => x.id === sg.id), r = res[b.id], g = given[b.id];
+      if (r === 'ok') return '<span class="cz-ok">' + esc(b.answer) + '</span>';
+      if (r === 'syn') return '<span class="cz-ok" title="Escribiste «' + esc(g) + '» (sinónimo válido)">' + esc(b.answer) + '</span>';
+      return (g ? '<s class="cz-x">' + esc(g) + '</s>' : '') + '<span class="cz-fix' + (g ? '' : ' cz-empty') + '">' + esc(b.answer) + '</span>';
+    }).join('');
     const failed = ratio < 0.7;
-    S.results.push({ q, ans: filled, conf, fb, failed, cloze: true });
+    S.results.push({ q, ans: filled, ansHtml, conf, fb, failed, cloze: true });
     if (failed) registerFail(q); else clearFail(q);
     track('esc_cloze_checked', { level: czState.level, blanks: total, correct: good, synonyms: syn.length, failed });
     renderFb(S.results[S.results.length - 1]);
@@ -322,7 +330,8 @@
     show('Fb'); setProg();
     $('#fNum').textContent = 'Pregunta ' + (S.i + 1) + ' de ' + S.qs.length;
     $('#fQ').textContent = res.q.q;
-    $('#fAns').textContent = res.ans; $('#fAns').hidden = !!res.skipped;
+    if (res.ansHtml) { $('#fAns').innerHTML = res.ansHtml; $('#fAns').classList.add('cz-fb'); } else { $('#fAns').textContent = res.ans; $('#fAns').classList.remove('cz-fb'); }
+    $('#fAns').hidden = !!res.skipped;
     if (res.skipped) {
       let k = '';
       if (fb.summary) k += '<p>' + esc(fb.summary) + '</p>';
@@ -350,7 +359,7 @@
         (S.parent ? '' : '<button class="ghost" data-pract="concepts" type="button">Practicar estos conceptos</button>') +
         (S.parent ? '' : '<p class="small">Después podrás volver aquí, a la pregunta ' + (S.i + 2 <= S.qs.length ? (S.i + 2) : 'final') + '.</p>') + '</div>';
     }
-    h += '<div class="card"><h3>Respuesta modelo</h3><div class="model">' + esc(fb.modelAnswer) + '</div></div>';
+    if (!res.cloze) h += '<div class="card"><h3>Respuesta modelo</h3><div class="model">' + esc(fb.modelAnswer) + '</div></div>';   // en «completar» el texto corregido de arriba ya es la respuesta
     h += '<div class="card"><h3>Por criterios</h3>';   // la evaluación por criterios va al final del análisis
     Object.keys(CRIT).forEach((k) => { const c = fb.criteria[k]; h += '<div class="crit"><div><span class="lv ' + c.level + '">' + LVTXT[c.level] + '</span><br><small>' + CRIT[k] + '</small></div><p>' + esc(c.note) + '</p></div>'; });
     h += '</div>';
