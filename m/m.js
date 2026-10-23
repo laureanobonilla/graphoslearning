@@ -93,6 +93,12 @@
     } catch { /* nada */ }
   });
 
+  /* Señal de «hay una persona»: al abrir desde Facebook el aviso de salida casi nunca llega, así que se marca
+     el paso del tiempo con la página a la vista (5, 15, 30 y 60 s) y cuántos toques o desplazamientos hubo. */
+  let humanTouches = 0;
+  ['touchstart', 'pointerdown', 'scroll', 'keydown'].forEach((t) => window.addEventListener(t, () => { humanTouches++; }, { passive: true, capture: true }));
+  [5, 15, 30, 60].forEach((s) => setTimeout(() => { if (document.visibilityState === 'visible') track('m_alive', { s, touches: humanTouches }); }, s * 1000));
+
   /* ---------- Modelo ---------- */
   let G = emptyG();
   function emptyG() { return { rootId: null, nodes: {}, seq: 0, projectId: null }; }
