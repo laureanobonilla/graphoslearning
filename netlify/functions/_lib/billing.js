@@ -25,11 +25,13 @@ const KNOWN = new Set([
     // Oráculo del Caos (/oraculo/): 5 señales gratis al día con tono al azar; elegir el tono o pasar de 5 cuesta 1 nodo.
     'oracle',
     // Escribir (/escribir/): preguntas de desarrollo (gratis) y retroalimentación de una respuesta (1 nodo).
-    'esc_questions', 'esc_feedback', 'esc_analyze', 'lens', 'lens_step'
+    'esc_questions', 'esc_feedback', 'esc_analyze', 'lens', 'lens_step',
+    // Completar palabras (quiz): juzgar si lo escrito es un sinónimo válido (gratis).
+    'cloze_judge', 'esc_model'
 ]);
 
 // Acciones que hoy son gratis para el usuario (siguen contando para el límite por hora).
-const FREE = new Set(['key_concepts', 'define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome', 'esc_questions', 'esc_analyze']);
+const FREE = new Set(['cloze_judge', 'esc_model', 'key_concepts', 'define', 'simple_explanation', 'socratic_question', 'extract_key_terms', 'onboarding_text', 'welcome_schema', 'glossary', 'long_outline', 'lang_word', 'topic_text', 'views', 'rhizome', 'esc_questions', 'esc_analyze']);
 // Saldo mínimo para empezar (el costo real se calcula con la respuesta).
 // analyze_text usa el mismo mínimo que parse_text: genera un árbol de 3
 // niveles igual de completo, solo que analítico en vez de expositivo.
@@ -100,7 +102,7 @@ function json(statusCode, obj, extraHeaders, cookies) {
 // Política de prueba para invitados (ver _lib/trial.js). TRIAL_POLICY=off en el entorno la apaga sin redeploy de código.
 const TRIAL_POLICY = process.env.TRIAL_POLICY !== 'off';
 // Fuera de la política: otras apps que comparten este backend.
-const TRIAL_EXEMPT = new Set(['oracle', 'lang_map', 'lang_word', 'esc_questions', 'esc_feedback', 'esc_analyze']);
+const TRIAL_EXEMPT = new Set(['cloze_judge', 'esc_model', 'oracle', 'lang_map', 'lang_word', 'esc_questions', 'esc_feedback', 'esc_analyze']);
 // Practicar y Escribir (/escribir/): un invitado solo entra si llegó redirigido (anuncio o desde Graphikosmos: `entry` = 'ad'|'gk');
 // entrando directo debe tener cuenta. Con esa entrada tiene una prueba rápida de CADA modo (Practicar: 1 tanda de preguntas y 3 respuestas
 // evaluadas; Escribir: 6 párrafos analizados). Se cuenta en la tabla events (esc_trial_q / _fb / _an), por invitado.

@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/escribir/escribir.css?v=6">
+<link rel="stylesheet" href="/escribir/escribir.css?v=7">
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 </head>
 <body>
@@ -139,6 +139,11 @@
         <button type="button" data-c="1">Adivinaría</button>
       </div>
     </div>
+    <div class="seg" id="modeSeg" role="radiogroup" aria-label="Cómo responder">
+      <button type="button" data-m="write" class="on" role="radio" aria-checked="true">Escribir mi respuesta</button>
+      <button type="button" data-m="cloze" role="radio" aria-checked="false">Completar palabras</button>
+    </div>
+    <div id="clozeBox" hidden></div>
     <textarea id="ansIn" rows="8" placeholder="Escribe tu respuesta con tus palabras. No busques: primero inténtalo." disabled></textarea>
     <div class="row">
       <button class="ghost" id="btnSkip" type="button">No lo sé</button>
@@ -178,7 +183,8 @@
 </main>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=10"></script>
-<script src="/escribir/escribir.js?v=16"></script>
+<script src="/cloze.js?v=1"></script>
+<script src="/escribir/escribir.js?v=17"></script>
 <script src="/escribir/escribir-w.js?v=8"></script>
 <script src="/escribir/voz.js?v=1"></script>
 </body>

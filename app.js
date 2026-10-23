@@ -5517,6 +5517,18 @@ function showContentInFloatingPanel(nodeId, title, content) {
 // Pide (o reutiliza) la definición interactiva de un nodo y la muestra en su propio
 // panel flotante, sin tocar el nodo en el lienzo. Se usa desde el menú "Ver definición"
 // para conceptos normales (no para contenido ya generado, ver función anterior).
+
+// Botón «Evaluar mi conocimiento» al final de una definición: abre el quiz de completar palabras solo con ese nodo.
+function addEvaluateButton(panel, nodeId) {
+    if (!panel || !panel.contentEl || panel.contentEl.querySelector('.cloze-eval-btn')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cloze-eval-btn mt-4 w-full flex items-center justify-center gap-2 bg-[#4fd1c5]/15 border border-[#4fd1c5]/60 hover:bg-[#4fd1c5]/25 text-[#4fd1c5] px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-[0_0_14px_rgba(79,209,197,0.25)] active:scale-95';
+    b.textContent = '🧠 ' + tr('cloze.eval_btn');
+    b.addEventListener('click', () => { track('cloze_from_definition', {}); startQuiz([nodeId], { mode: 'cloze', single: true, from: 'definition' }); });
+    panel.contentEl.appendChild(b);
+}
+
 async function showDefinitionInFloatingPanel(nodeId) {
     const currentNode = nodes.get(nodeId);
     if (!currentNode) return;
@@ -5576,6 +5588,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
             <p class="leading-relaxed text-slate-200">${definitionText}</p>
             <p class="mt-3 text-[10px] text-slate-500">${tr('def.source')}: ${wikiUrl ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="underline hover:text-slate-300">Wikipedia</a>` : 'Wikipedia'}</p>
         `;
+        addEvaluateButton(panel, nodeId);
         return;
     }
 
@@ -5602,6 +5615,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
             e.currentTarget.innerText = `✓ ${term}`;
         });
     });
+    addEvaluateButton(panel, nodeId);
 }
 
 document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
@@ -7444,7 +7458,7 @@ function quizShowEndCard() {
         <p class="text-slate-300 text-center" style="font-size: clamp(1.1rem, 2vw, 1.4rem);">${tr('quiz.score', { ok: correctCount, total: answeredCount, pct })}</p>
         <button id="quizBtnRetry" class="mt-4 bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3.5 rounded-xl font-bold text-base shadow-[0_0_20px_rgba(79,209,197,0.25)] transition-all active:scale-95">${tr('quiz.retry')}</button>
     `;
-    document.getElementById('quizBtnRetry')?.addEventListener('click', () => startQuiz(quizState.order, { isRetry: true }));
+    document.getElementById('quizBtnRetry')?.addEventListener('click', () => startQuiz(quizState.order, { isRetry: true, mode: quizState.mode, level: quizState.level }));
     quizState.index = quizState.order.length;
     quizUpdateProgress();
     track('quiz_finished', { correctCount, answeredCount, pct });
@@ -7460,6 +7474,7 @@ function quizRunNode(index) {
 
     quizUpdateProgress();
     quizState.contentPromise = ensureNodeContent(nodeId); // se pide ya mismo, en paralelo a que piense la respuesta
+    if (quizState.mode === 'cloze') { quizShowClozePhase(nodeId); return; }
     quizShowQuestionPhase(node);
 }
 
@@ -7482,14 +7497,157 @@ function quizAnswer(knewIt) {
 }
 
 function startQuiz(nodeIds, opts = {}) {
-    const order = opts.isRetry ? nodeIds : buildTourOrder(nodeIds);
+    const order = (opts.isRetry || opts.single) ? nodeIds : buildTourOrder(nodeIds);
     if (!order.length) { appAlert(tr("js.no_hay_nada_para_el")); return; }
 
-    quizState = { order, index: -1, correctCount: 0, answeredCount: 0, revealed: false };
+    quizState = { order, index: -1, correctCount: 0, answeredCount: 0, revealed: false, mode: opts.mode || null, level: opts.level || null };
     document.getElementById('quizOverlay')?.classList.remove('hidden');
     document.getElementById('quizOverlay')?.classList.add('flex');
-    track('quiz_started', { nodeCount: order.length });
+    track('quiz_started', { nodeCount: order.length, mode: opts.mode || 'chooser', from: opts.from || 'menu' });
+    if (!quizState.mode) { quizShowChooser(); return; }
     quizRunNode(0);
+}
+
+// ---------- Elegir cómo evaluarse: tarjetas (recordar) o completar palabras ----------
+function quizShowChooser() {
+    const inner = document.getElementById('quizCardInner');
+    if (!inner || !quizState) return;
+    inner.innerHTML = `
+        <h1 class="font-heading font-bold text-[#eef1fb] text-center" style="font-size: clamp(1.6rem, 4vw, 2.6rem);">${tr('cloze.choose_title')}</h1>
+        <div class="flex flex-col sm:flex-row gap-3 w-full max-w-xl">
+            <button data-mode="cloze" class="flex-1 text-left bg-[#4fd1c5]/10 border border-[#4fd1c5]/50 hover:bg-[#4fd1c5]/20 rounded-2xl px-5 py-4 transition-colors active:scale-95">
+                <span class="block text-[#4fd1c5] font-bold text-base mb-1">${tr('cloze.mode_fill')}</span>
+                <span class="block text-slate-300 text-sm leading-snug">${tr('cloze.mode_fill_sub')}</span>
+            </button>
+            <button data-mode="cards" class="flex-1 text-left bg-slate-800/60 border border-slate-600 hover:bg-slate-800 rounded-2xl px-5 py-4 transition-colors active:scale-95">
+                <span class="block text-slate-100 font-bold text-base mb-1">${tr('cloze.mode_cards')}</span>
+                <span class="block text-slate-400 text-sm leading-snug">${tr('cloze.mode_cards_sub')}</span>
+            </button>
+        </div>`;
+    inner.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => { if (!quizState) return; quizState.mode = b.dataset.mode; track('quiz_mode_chosen', { mode: quizState.mode }); quizRunNode(0); }));
+}
+
+// ---------- Completar palabras (huecos en el título y en la definición; nivel = cuántos huecos) ----------
+function clozeLevel() { try { return quizState.level || localStorage.getItem('gk_cloze_level') || 'intermedio'; } catch { return 'intermedio'; } }
+async function quizShowClozePhase(nodeId, keepContent) {
+    const inner = document.getElementById('quizCardInner');
+    if (!inner || !quizState) return;
+    const node = nodes.get(nodeId); if (!node) { quizAnswerCloze(false, true); return; }
+    if (!keepContent) {
+        inner.innerHTML = `<div class="flex flex-col items-center gap-3 py-10"><div class="relative w-8 h-8"><div class="absolute inset-0 border-[3px] border-slate-700 rounded-full"></div><div class="absolute inset-0 border-[3px] border-[#4fd1c5] rounded-full border-t-transparent animate-spin"></div></div><p class="text-slate-400 text-sm italic">${tr('cloze.loading')}</p></div>`;
+        const content = await quizState.contentPromise;
+        if (!quizState || quizState.order[quizState.index] !== nodeId) return;
+        quizState.clozeContent = content;
+    }
+    const content = quizState.clozeContent;
+    const title = node.baseTitle || String(node.id);
+    const def = stripTourMarkup(content?.definition);
+    const level = clozeLevel();
+    const ex = window.GK_CLOZE && def ? GK_CLOZE.build(title, def, level) : null;
+    if (!ex) { quizShowQuestionPhase(node); return; }   // definición muy corta o sin texto: se usa la tarjeta de siempre
+    quizState.cloze = ex; quizState.clozeChecked = false;
+    const inputFor = (b) => {
+        const len = Math.max(4, b.answer.length);
+        return `<input data-b="${b.id}" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" size="${len}" placeholder="${escapeHtml(b.hint ? b.hint + '…' : '')}" class="cloze-in bg-transparent border-0 border-b-2 border-[#4fd1c5]/70 focus:border-[#4fd1c5] text-[#4fd1c5] font-semibold text-center outline-none px-1 mx-0.5 rounded-none" style="width:${len + 1.5}ch;min-width:4.5ch;font:inherit">`;
+    };
+    const render = (segs) => segs.map(sg => sg.t === 'text' ? escapeHtml(sg.s) : (sg.blank ? inputFor(ex.blanks.find(b => b.id === sg.id)) : escapeHtml(sg.s))).join('');
+    const lv = ['principiante', 'intermedio', 'avanzado'];
+    inner.innerHTML = `
+        <div class="flex items-center gap-1.5 bg-slate-900/80 border border-slate-700 rounded-full p-1" role="group" aria-label="${tr('cloze.level_label')}">
+            ${lv.map(l => `<button data-level="${l}" class="px-3.5 py-1.5 rounded-full text-xs font-bold transition-colors ${l === level ? 'bg-[#4fd1c5] text-[#0a0e1a]' : 'text-slate-300 hover:text-white'}">${tr('cloze.level_' + l)}</button>`).join('')}
+        </div>
+        <p class="text-slate-400 text-sm">${tr('cloze.instruction')}</p>
+        <h1 class="font-heading font-bold text-[#eef1fb] leading-[1.25] text-center" style="font-size: clamp(1.5rem, 4vw, 2.8rem);">${render(ex.title)}</h1>
+        <p class="text-[#eef1fb] leading-[2.1] font-medium text-center" style="font-size: clamp(1.1rem, 2.2vw, 1.7rem);">${render(ex.def)}</p>
+        ${ex.bank.length ? `<div class="w-full max-w-2xl"><p class="text-slate-500 text-[11px] uppercase tracking-wider mb-2">${tr('cloze.bank_label')}</p><div id="clozeBank" class="flex flex-wrap justify-center gap-2">${ex.bank.map((w, i) => `<button data-w="${escapeHtml(w)}" data-i="${i}" class="cloze-chip px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-100 text-sm font-semibold hover:border-[#4fd1c5] transition-colors">${escapeHtml(w)}</button>`).join('')}</div></div>` : ''}
+        <div id="clozeFeedback" class="w-full max-w-2xl text-sm"></div>
+        <div class="flex gap-2.5 mt-1">
+            <button id="clozeBtnCheck" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3 rounded-xl font-bold text-sm shadow-[0_0_20px_rgba(79,209,197,0.3)] active:scale-95">${tr('cloze.check')}</button>
+            <button id="clozeBtnSkip" class="border border-slate-600 text-slate-300 hover:text-white px-5 py-3 rounded-xl font-semibold text-sm active:scale-95">${tr('cloze.skip')}</button>
+        </div>`;
+    const inputs = () => [...inner.querySelectorAll('.cloze-in')];
+    const refreshBank = () => {
+        const used = inputs().map(i => i.value.trim().toLowerCase());
+        inner.querySelectorAll('.cloze-chip').forEach(c => { const isUsed = used.includes(c.dataset.w.toLowerCase()); c.disabled = isUsed; c.classList.toggle('opacity-30', isUsed); });
+    };
+    inputs().forEach((inp, i, all) => {
+        inp.addEventListener('input', refreshBank);
+        inp.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; e.preventDefault(); if (all[i + 1]) all[i + 1].focus(); else clozeCheck(); });
+    });
+    inner.querySelectorAll('.cloze-chip').forEach(ch => ch.addEventListener('click', () => {
+        const list = inputs(); const target = list.find(i => i === document.activeElement && !i.value) || list.find(i => !i.value.trim());
+        if (!target) return; target.value = ch.dataset.w; refreshBank(); (list.find(i => !i.value.trim()) || target).focus();
+    }));
+    inner.querySelectorAll('[data-level]').forEach(b => b.addEventListener('click', () => {
+        quizState.level = b.dataset.level; try { localStorage.setItem('gk_cloze_level', quizState.level); } catch { /* nada */ }
+        track('cloze_level', { level: quizState.level }); quizShowClozePhase(nodeId, true);
+    }));
+    document.getElementById('clozeBtnCheck')?.addEventListener('click', clozeCheck);
+    document.getElementById('clozeBtnSkip')?.addEventListener('click', () => quizAnswerCloze(false, true));
+    inputs()[0]?.focus();
+    track('cloze_shown', { level, blanks: ex.blanks.length });
+}
+
+async function clozeCheck() {
+    if (!quizState || !quizState.cloze || quizState.clozeChecked) return;
+    quizState.clozeChecked = true;
+    const inner = document.getElementById('quizCardInner'), ex = quizState.cloze;
+    const btn = document.getElementById('clozeBtnCheck'); if (btn) { btn.disabled = true; btn.textContent = tr('cloze.checking'); }
+    const given = {}; inner.querySelectorAll('.cloze-in').forEach(i => { given[i.dataset.b] = i.value.trim(); });
+    const res = {};   // id → 'ok' | 'syn' | 'wrong' | 'empty'
+    const pending = [];
+    ex.blanks.forEach(b => {
+        const g = given[b.id];
+        if (!g) res[b.id] = 'empty';
+        else if (GK_CLOZE.same(g, b.answer)) res[b.id] = 'ok';
+        else { res[b.id] = 'wrong'; pending.push(b); }
+    });
+    // Lo que no coincide se manda a juzgar: si es un sinónimo válido en esa frase, cuenta como correcto (y se muestra la palabra original).
+    if (pending.length) {
+        try {
+            const ctxOf = (b) => ex[b.part].map(sg => sg.t === 'text' ? sg.s : (sg.id === b.id ? '___' : sg.s)).join('').slice(0, 400);
+            const nodeTitle = nodes.get(quizState.order[quizState.index])?.baseTitle || '';
+            const { ok, data } = await apiFetch('/.netlify/functions/gemini', { method: 'POST', body: JSON.stringify({ action: 'cloze_judge', topic: nodeTitle, items: pending.map(b => ({ id: b.id, context: ctxOf(b), answer: b.answer, given: given[b.id] })) }) });
+            if (ok && Array.isArray(data?.valid)) data.valid.forEach(id => { if (res[id] === 'wrong') res[id] = 'syn'; });
+        } catch { /* sin conexión: queda como incorrecta, sin romper nada */ }
+    }
+    if (!quizState || !quizState.cloze) return;
+    const good = ex.blanks.filter(b => res[b.id] === 'ok' || res[b.id] === 'syn').length, total = ex.blanks.length;
+    inner.querySelectorAll('.cloze-in').forEach(inp => {
+        const b = ex.blanks.find(x => x.id === inp.dataset.b), r = res[b.id], g = given[b.id];
+        const span = document.createElement('span');
+        if (r === 'ok' || r === 'syn') {
+            span.className = 'text-lime-300 font-semibold border-b-2 border-lime-400/70 px-1';
+            span.textContent = b.answer;   // siempre se muestra la palabra original
+            if (r === 'syn') span.title = tr('cloze.synonym', { given: g, w: b.answer });
+        } else {
+            span.innerHTML = `${g ? `<span class="text-rose-300 line-through mr-1">${escapeHtml(g)}</span>` : ''}<span class="text-amber-300 font-semibold border-b-2 border-amber-400/70 px-1">${escapeHtml(b.answer)}</span>`;
+        }
+        inp.replaceWith(span);
+    });
+    inner.querySelector('#clozeBank')?.parentElement?.remove();
+    const syn = ex.blanks.filter(b => res[b.id] === 'syn');
+    const fb = document.getElementById('clozeFeedback');
+    const allGood = good === total;
+    fb.innerHTML = `<p class="text-base font-bold ${good / total >= 0.7 ? 'text-lime-300' : 'text-amber-300'} mb-1">${tr('cloze.result', { ok: good, total })}</p>${syn.map(b => `<p class="text-slate-300">${tr('cloze.synonym_line', { given: escapeHtml(given[b.id]), w: escapeHtml(b.answer) })}</p>`).join('')}`;
+    const actions = inner.querySelector('#clozeBtnCheck')?.parentElement;
+    const last = quizState.index >= quizState.order.length - 1;
+    if (actions) actions.innerHTML = `${allGood && ex.level !== 'avanzado' ? `<button id="clozeBtnMore" class="border border-[#4fd1c5]/60 text-[#4fd1c5] hover:bg-[#4fd1c5]/10 px-5 py-3 rounded-xl font-semibold text-sm active:scale-95">${tr('cloze.more')}</button>` : ''}<button id="clozeBtnNext" class="bg-[#4fd1c5] hover:bg-[#6fe0d6] text-[#0a0e1a] px-6 py-3 rounded-xl font-bold text-sm active:scale-95">${last ? tr('cloze.finish') : tr('cloze.next')}</button>`;
+    document.getElementById('clozeBtnNext')?.addEventListener('click', () => quizAnswerCloze(good / total >= 0.7, false));
+    document.getElementById('clozeBtnMore')?.addEventListener('click', () => {
+        quizState.level = ex.level === 'principiante' ? 'intermedio' : 'avanzado';
+        try { localStorage.setItem('gk_cloze_level', quizState.level); } catch { /* nada */ }
+        quizShowClozePhase(quizState.order[quizState.index], true);
+    });
+    track('cloze_checked', { level: ex.level, blanks: total, correct: good, synonyms: syn.length });
+}
+
+function quizAnswerCloze(knewIt, skipped) {
+    if (!quizState) return;
+    quizState.answeredCount++;
+    if (knewIt) quizState.correctCount++;
+    quizState.cloze = null;
+    quizRunNode(quizState.index + 1);
 }
 
 function exitQuiz() {

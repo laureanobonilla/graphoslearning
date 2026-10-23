@@ -137,3 +137,17 @@ main:has(.view.wide:not([hidden])){max-width:none;padding:14px 16px 24px}
 .gate{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--s1);border:1.5px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 16px}
 .gate p{margin:0;color:var(--mid);font-size:15px;flex:1 1 220px}
 .gate[hidden]{display:none}
+
+#modeSeg{margin:6px 0 10px}
+#clozeBox{margin:4px 0 8px}
+#clozeBox .cz-text{font-size:19px;line-height:2.1;margin:10px 0}
+#clozeBox .cz-in{background:transparent;border:0;border-bottom:2px solid var(--accent,#7aa7d9);color:inherit;font:inherit;font-weight:600;text-align:center;padding:0 4px;margin:0 2px;border-radius:0;outline:none;min-width:4.5ch}
+#clozeBox .cz-in:focus{border-bottom-color:#fff}
+#clozeBox .cz-bank{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+#clozeBox .cz-chip{padding:7px 12px;border-radius:10px;border:1px solid var(--line,#34415a);background:transparent;color:inherit;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
+#clozeBox .cz-chip:disabled{opacity:.3;cursor:default}
+#clozeBox .cz-ok{color:#9be37a;font-weight:600;border-bottom:2px solid #9be37a;padding:0 4px}
+#clozeBox .cz-bad{color:#e8b25a;font-weight:600;border-bottom:2px solid #e8b25a;padding:0 4px}
+#clozeBox .cz-bad s{color:#e58;margin-right:6px;font-weight:400}
+#clozeBox .cz-lv{display:flex;gap:6px;margin-bottom:6px}
+#clozeBox .row{padding-right:64px}

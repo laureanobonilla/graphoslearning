@@ -170,8 +170,10 @@
     document.querySelectorAll('#confSeg button').forEach((b) => b.classList.remove('on'));
     $('#ansIn').value = ''; $('#ansIn').disabled = false; $('#btnSend').disabled = true; $('#askMsg').textContent = ''; $('#askMsg').className = 'msg';
     $('#conf').hidden = false;
+    czSeq++; czState = null; setModeQuiet();
     syncBack();
   }
+  function setModeQuiet() { czMode = 'write'; document.querySelectorAll('#modeSeg button').forEach((b) => { const on = b.dataset.m === 'write'; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); $('#ansIn').hidden = false; $('#btnSend').hidden = false; $('#clozeBox').hidden = true; $('#clozeBox').innerHTML = ''; }
   $('#confSeg').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-c]'); if (!b) return;
     const c = Number(b.dataset.c);
@@ -182,6 +184,82 @@
   function wc(s) { return s.trim().split(/\s+/).filter(Boolean).length; }
   function updateSend() { $('#btnSend').disabled = wc($('#ansIn').value) < 3; }
   $('#ansIn').addEventListener('input', () => { updateSend(); snapSoon(); });
+
+  /* ---------- modo «completar»: en vez de escribir toda la respuesta, se rellenan los huecos de una respuesta modelo ---------- */
+  let czMode = 'write', czSeq = 0, czState = null;
+  function czLevelOf(q) { return ['principiante', 'intermedio', 'avanzado'][Math.min(3, Math.max(1, q.level || 2)) - 1]; }
+  function setMode(m) {
+    czMode = m;
+    document.querySelectorAll('#modeSeg button').forEach((b) => { const on = b.dataset.m === m; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+    const cz = m === 'cloze';
+    $('#ansIn').hidden = cz; $('#btnSend').hidden = cz; $('#clozeBox').hidden = !cz;
+    if (cz) czLoad(); else { czSeq++; updateSend(); }
+  }
+  $('#modeSeg').addEventListener('click', (e) => { const b = e.target.closest('button[data-m]'); if (!b || busyNow) return; track('esc_mode', { mode: b.dataset.m }); setMode(b.dataset.m); });
+  async function czLoad(level) {
+    const q = S.qs[S.i], box = $('#clozeBox'), my = ++czSeq;
+    box.innerHTML = '<p class="small">Preparando el ejercicio…</p>';
+    if (!q.model) {
+      const r = await callRetry({ action: 'esc_model', topic: q.topic || S.topic, question: q.q, focus: q.focus, level: q.level });
+      if (my !== czSeq) return;
+      if (!r.ok || !r.data || !r.data.answer) { box.innerHTML = '<p class="msg err">No se pudo preparar el ejercicio. Prueba de nuevo o escribe tu respuesta.</p><button class="ghost" type="button" id="czRetry">Reintentar</button>'; $('#czRetry').addEventListener('click', () => czLoad(level)); if (r.kind === 'login') afterFail(r.kind, 'cloze'); return; }
+      q.model = r.data.answer;
+    }
+    czRender(q, level || czLevelOf(q));
+  }
+  function czRender(q, level) {
+    const box = $('#clozeBox'), ex = window.GK_CLOZE ? GK_CLOZE.build('', q.model, level) : null;
+    if (!ex) { box.innerHTML = '<p class="small">Esta respuesta es muy corta para completarla. Escribe la tuya.</p>'; return; }
+    czState = { q, ex, level, checked: false };
+    const inp = (b) => { const n = Math.max(4, b.answer.length); return '<input class="cz-in" data-b="' + b.id + '" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" size="' + n + '" style="width:' + (n + 1.5) + 'ch">'; };
+    const html = ex.def.map((sg) => sg.t === 'text' ? esc(sg.s) : (sg.blank ? inp(ex.blanks.find((b) => b.id === sg.id)) : esc(sg.s))).join('');
+    const lv = ['principiante', 'intermedio', 'avanzado'], names = { principiante: 'Principiante', intermedio: 'Intermedio', avanzado: 'Avanzado' };
+    box.innerHTML = '<div class="seg cz-lv" id="czLv">' + lv.map((l) => '<button type="button" data-l="' + l + '" class="' + (l === level ? 'on' : '') + '">' + names[l] + '</button>').join('') + '</div>' +
+      '<div class="cz-text">' + html + '</div>' +
+      (ex.bank.length ? '<div class="cz-bank">' + ex.bank.map((w) => '<button type="button" class="cz-chip" data-w="' + esc(w) + '">' + esc(w) + '</button>').join('') + '</div>' : '') +
+      '<div class="row"><span class="sp"></span><button class="primary" id="czCheck" type="button">Comprobar</button></div>';
+    const ins = () => [...box.querySelectorAll('.cz-in')];
+    const refresh = () => { const used = ins().map((i) => i.value.trim().toLowerCase()); box.querySelectorAll('.cz-chip').forEach((c) => { c.disabled = used.includes(c.dataset.w.toLowerCase()); }); };
+    ins().forEach((i, k, all) => { i.addEventListener('input', () => { refresh(); snapSoon(); }); i.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; e.preventDefault(); if (all[k + 1]) all[k + 1].focus(); else czCheck(); }); });
+    box.querySelectorAll('.cz-chip').forEach((c) => c.addEventListener('click', () => { const l = ins(); const t = l.find((i) => i === document.activeElement && !i.value) || l.find((i) => !i.value.trim()); if (!t) return; t.value = c.dataset.w; refresh(); (l.find((i) => !i.value.trim()) || t).focus(); }));
+    box.querySelectorAll('#czLv button').forEach((b) => b.addEventListener('click', () => { track('esc_cloze_level', { level: b.dataset.l }); czRender(q, b.dataset.l); }));
+    $('#czCheck').addEventListener('click', czCheck);
+    ins()[0] && ins()[0].focus();
+  }
+  async function czCheck() {
+    if (!czState || czState.checked || busyNow) return;
+    const { q, ex } = czState, box = $('#clozeBox'); czState.checked = true; busyNow = true;
+    const btn = $('#czCheck'); if (btn) { btn.disabled = true; btn.textContent = 'Comprobando…'; }
+    const given = {}; box.querySelectorAll('.cz-in').forEach((i) => { given[i.dataset.b] = i.value.trim(); });
+    const res = {}, pend = [];
+    ex.blanks.forEach((b) => { const g = given[b.id]; if (!g) res[b.id] = 'empty'; else if (GK_CLOZE.same(g, b.answer)) res[b.id] = 'ok'; else { res[b.id] = 'wrong'; pend.push(b); } });
+    if (pend.length) {   // ¿es un sinónimo válido en esa frase? Si lo es, cuenta como correcto y se muestra la palabra original.
+      const ctx = (b) => ex.def.map((sg) => sg.t === 'text' ? sg.s : (sg.id === b.id ? '___' : sg.s)).join('').slice(0, 400);
+      const r = await callRetry({ action: 'cloze_judge', topic: q.topic || S.topic, items: pend.map((b) => ({ id: b.id, context: ctx(b), answer: b.answer, given: given[b.id] })) });
+      if (r.ok && r.data && Array.isArray(r.data.valid)) r.data.valid.forEach((id) => { if (res[id] === 'wrong') res[id] = 'syn'; });
+    }
+    busyNow = false;
+    const total = ex.blanks.length, good = ex.blanks.filter((b) => res[b.id] === 'ok' || res[b.id] === 'syn').length, ratio = good / total, syn = ex.blanks.filter((b) => res[b.id] === 'syn');
+    const lvl = ratio >= 0.85 ? 'logrado' : ratio >= 0.5 ? 'parcial' : 'falta';
+    const missed = ex.blanks.filter((b) => res[b.id] === 'wrong' || res[b.id] === 'empty');
+    const fb = {
+      summary: 'Completaste bien ' + good + ' de ' + total + ' palabras.' + (syn.length ? ' ' + syn.map((b) => '«' + given[b.id] + '» sirve como sinónimo de «' + b.answer + '».').join(' ') : ''),
+      wrong: [], irrelevant: [], terms: [], synthesis: [], concepts: [], errors: [],
+      missing: missed.map((b) => 'Iba «' + b.answer + '»' + (given[b.id] ? ' (escribiste «' + given[b.id] + '»)' : '') + '.'),
+      modelAnswer: q.model,
+      criteria: {
+        precision: { level: lvl, note: 'Palabras exactas en los huecos (los sinónimos válidos cuentan).' },
+        completitud: { level: lvl, note: 'Huecos resueltos: ' + good + ' de ' + total + '.' },
+        claridad: { level: 'logrado', note: 'En el modo completar no se evalúa la redacción.' }
+      }
+    };
+    const filled = ex.def.map((sg) => sg.t === 'text' ? sg.s : sg.s).join('');
+    const failed = ratio < 0.7;
+    S.results.push({ q, ans: filled, conf, fb, failed, cloze: true });
+    if (failed) registerFail(q); else clearFail(q);
+    track('esc_cloze_checked', { level: czState.level, blanks: total, correct: good, synonyms: syn.length, failed });
+    renderFb(S.results[S.results.length - 1]);
+  }
 
   let skipFailed = false;
   $('#btnSkip').addEventListener('click', async () => {
