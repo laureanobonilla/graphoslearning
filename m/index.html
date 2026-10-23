@@ -12,8 +12,8 @@
 <meta name="description" content="Escribe un tema y obtén un mapa mental con definiciones y ejemplos.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/m/m.css?v=3">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:wght@500;600&family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/m/m.css?v=4">
 <script>
 /* Si se abre en una pantalla ancha, lo normal es la versión de escritorio.
    ?force=1 (o ?m=1) lo deja aquí para poder probar en PC. */
@@ -100,6 +100,14 @@
     </div>
   </section>
 
+  <!-- LENTE: explicación paso a paso -->
+  <section id="viewLens" class="view" hidden>
+    <div id="lensbar">
+      <button id="btnLensBack" class="pill pill-back" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Mapa mental</button>
+    </div>
+    <div id="lensScroll"></div>
+  </section>
+
   <!-- PROYECTOS -->
   <section id="viewProjects" class="view" hidden>
     <div id="projbar">
@@ -117,6 +125,7 @@
   <h2 id="sheetTitle"></h2>
   <p id="sheetRel" class="sheet-rel"></p>
   <button id="btnExpand" class="btn-primary" type="button"><span class="btn-txt">Generar mapa mental de esto</span><span class="spin" aria-hidden="true"></span></button>
+  <button id="btnLens" class="btn-primary st-alt btn-lens" type="button"><span class="btn-txt">Explicarlo paso a paso · 6 gemas</span><span class="spin" aria-hidden="true"></span></button>
   <p id="sheetMsg" class="msg" role="status"></p>
 </div>
 
@@ -161,6 +170,6 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/gems.js?v=10"></script>
 <script src="/install.js?v=2"></script>
-<script src="/m/m.js?v=9"></script>
+<script src="/m/m.js?v=10"></script>
 </body>
 </html>

@@ -7,7 +7,7 @@
   const $ = (s) => document.querySelector(s);
   const FN = '/.netlify/functions/';
   const WA_NUMBER = '50687772993';
-  const PALETTE = ['#4fd1c5', '#8b7cf6', '#f6ad55', '#f687b3', '#63b3ed', '#9ae6b4', '#fc8181', '#ecc94b'];
+  const PALETTE = ['#7aa7d9', '#8fb0a4', '#c4a77d', '#b59aa8', '#8a9bb0', '#a7a0c4', '#9bb58a', '#c28f86'];
   const MAX_LOCAL_PROJECTS = 10;
   const MAX_NODES = 300;
 
@@ -110,12 +110,12 @@
   function countNodes() { return Object.keys(G.nodes).length; }
 
   /* ---------- Navegación entre pantallas ---------- */
-  const views = { home: $('#viewHome'), map: $('#viewMap'), defs: $('#viewDefs'), projects: $('#viewProjects') };
+  const views = { home: $('#viewHome'), map: $('#viewMap'), defs: $('#viewDefs'), lens: $('#viewLens'), projects: $('#viewProjects') };
   function show(v, id) {
     view = v;
     if (id) cur = id;
     Object.keys(views).forEach((k) => { views[k].hidden = k !== v; });
-    $('#appbar').hidden = (v === 'defs' || v === 'projects');
+    $('#appbar').hidden = (v === 'defs' || v === 'projects' || v === 'lens');
     $('#btnCapture').disabled = (v === 'home');
     $('#btnNew').hidden = (v === 'home');
     if (v === 'home') { $('#topicInput').value = ''; $('#homeMsg').textContent = ''; $('#homeMsg').className = 'msg'; }
@@ -135,6 +135,7 @@
     const s = e.state;
     if (s && s.v === 'map' && G.nodes[s.cur]) show('map', s.cur);
     else if (s && s.v === 'defs' && G.nodes[s.cur]) show('defs', s.cur);
+    else if (s && s.v === 'lens' && G.nodes[s.cur]) show('map', s.cur);
     else if (s && s.v === 'projects') show('projects');
     else show('home');
   });
@@ -351,11 +352,11 @@
     sheetNode = n.id;
     $('#sheetTitle').textContent = n.label; $('#sheetRel').textContent = n.rel || '';
     $('#sheetMsg').textContent = ''; $('#sheetMsg').className = 'msg';
-    busy($('#btnExpand'), false);
+    busy($('#btnExpand'), false); busy($('#btnLens'), false);
     $('#sheet').hidden = false; $('#sheetBackdrop').hidden = false;
   }
   function closeSheet() { $('#sheet').hidden = true; $('#sheetBackdrop').hidden = true; sheetNode = null; }
-  $('#sheetBackdrop').addEventListener('click', () => { if (!$('#btnExpand').disabled) closeSheet(); });
+  $('#sheetBackdrop').addEventListener('click', () => { if (!$('#btnExpand').disabled && !$('#btnLens').disabled) closeSheet(); });
   $('#btnExpand').addEventListener('click', async () => {
     const n = G.nodes[sheetNode]; if (!n) return;
     const btn = $('#btnExpand'), msg = $('#sheetMsg'); msg.className = 'msg'; msg.textContent = 'Armando el mapa…';
@@ -378,6 +379,55 @@
     closeSheet();
     go('map', n.id, true);
   });
+
+
+  /* ---------- Lente «Claridad»: el tema paso a paso, con metáfora, imagen y ejemplo ---------- */
+  const LENS_KEY = 'gk_m_lens_';
+  function lensKey(topic) { return LENS_KEY + topic.toLowerCase().replace(/\s+/g, ' ').slice(0, 80); }
+  function elx(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function renderLens(d) {
+    const box = $('#lensScroll'); box.textContent = '';
+    box.appendChild(elx('h1', '', d.topic));
+    box.appendChild(elx('div', 'ln-kind', 'Claridad: de la confusión a la claridad'));
+    if (d.essence) box.appendChild(elx('p', 'ln-essence', d.essence));
+    (d.steps || []).forEach((s, i) => {
+      const card = elx('div', 'ln-step'), h2 = elx('h2'); h2.appendChild(elx('b', '', String(i + 1))); h2.appendChild(document.createTextNode(s.title)); card.appendChild(h2);
+      card.appendChild(elx('p', '', s.explanation));
+      [['Metáfora', s.metaphor], ['Imagen para recordarlo', s.image], ['Ejemplo', s.example]].forEach(([k, v]) => { if (!v) return; const p = elx('p'); p.appendChild(elx('i', '', k)); p.appendChild(document.createTextNode(v)); card.appendChild(p); });
+      box.appendChild(card);
+    });
+    const sc = d.shortcut;
+    if (sc && sc.name) {
+      const c = elx('div', 'ln-short'); c.appendChild(elx('h2', '', sc.name)); c.appendChild(elx('div', 'ln-kind', 'Atajo para recordarlo todo'));
+      const ul = elx('ul'); (sc.parts || []).forEach((p) => { const li = elx('li'); li.appendChild(elx('b', '', p.key)); li.appendChild(document.createTextNode(p.meaning)); ul.appendChild(li); }); c.appendChild(ul);
+      if (sc.how_to_use) c.appendChild(elx('div', 'ln-caution', sc.how_to_use));
+      box.appendChild(c);
+    }
+    if (d.caution) box.appendChild(elx('div', 'ln-caution', d.caution));
+    box.scrollTop = 0;
+  }
+  $('#btnLens').addEventListener('click', async () => {
+    const n = G.nodes[sheetNode]; if (!n) return;
+    const btn = $('#btnLens'), msg = $('#sheetMsg'); msg.className = 'msg';
+    const topic = clip(n.label, 120), key = lensKey(topic);
+    const saved = store.get(key, null);
+    track('m_lens_clicked', { depth: depthOf(n.id), cached: !!saved });
+    if (saved && saved.steps) { closeSheet(); go('lens', n.id); renderLens(saved); return; }
+    msg.textContent = 'Preparando la explicación…'; busy(btn, true);
+    const root = G.nodes[G.rootId], mapCtx = root ? (root.label + ': ' + root.children.map((c) => G.nodes[c] && G.nodes[c].label).filter(Boolean).join(', ')).slice(0, 680) : '';
+    const started = Date.now();
+    const r = await callGemini({ action: 'lens', lens: 'claridad', level: 'intermedio', topic, contextPath: pathOf(n.id).join(' > ').slice(0, 380), mapContext: mapCtx });
+    busy(btn, false);
+    if (!r.ok) {
+      track('m_lens_error', { kind: r.kind });
+      if (handleBlocked(r.kind, 'lens')) { closeSheet(); return; }
+      msg.textContent = r.kind === 'network' ? failMessage('network') : 'No pudimos armar la explicación. No se cobró nada. Intenta de nuevo.'; msg.classList.add('err'); return;
+    }
+    store.set(key, r.data);
+    track('m_lens_ok', { steps: (r.data.steps || []).length, ms: Date.now() - started });
+    closeSheet(); go('lens', n.id); renderLens(r.data);
+  });
+  $('#btnLensBack').addEventListener('click', () => { try { history.back(); } catch { show('map', cur); } });
 
   /* ---------- Esquema a partir de un texto seleccionado (pantalla de definiciones) ---------- */
   let selText = '';
@@ -548,8 +598,8 @@
     const { W, H, boxes, kids, node } = layoutCache; const S = 2, PADT = 56;
     const cv = document.createElement('canvas'); cv.width = W * S; cv.height = (H + PADT) * S;
     const c = cv.getContext('2d'); c.scale(S, S);
-    c.fillStyle = '#0a0e1a'; c.fillRect(0, 0, W, H + PADT);
-    c.fillStyle = '#eef1fb'; c.font = '700 17px Sora, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(node.label, W / 2, 28);
+    c.fillStyle = '#0b1118'; c.fillRect(0, 0, W, H + PADT);
+    c.fillStyle = '#e8ebf0'; c.font = '700 17px Sora, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(node.label, W / 2, 28);
     c.translate(0, PADT);
     kids.forEach((k, i) => {
       const b = boxes[i + 1], x1 = W / 2, y1 = H / 2, x2 = b.x + b.w / 2, y2 = b.y + b.h / 2;
@@ -559,16 +609,16 @@
     });
     const drawBox = (b, label, color, isRoot, done) => {
       c.beginPath(); c.roundRect(b.x, b.y, b.w, b.h, 14);
-      if (isRoot) { const g = c.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h); g.addColorStop(0, '#4fd1c5'); g.addColorStop(1, '#8b7cf6'); c.fillStyle = g; c.fill(); }
-      else { c.fillStyle = '#0f1428'; c.fill(); c.fillStyle = color + (done ? '4d' : '29'); c.fill(); c.strokeStyle = color; c.lineWidth = 2; c.stroke(); }
-      c.fillStyle = isRoot ? '#071016' : '#eef1fb'; c.font = (isRoot ? '700 17px' : '600 15px') + ' Sora, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      if (isRoot) { const g = c.createLinearGradient(b.x, b.y, b.x + b.w, b.y + b.h); g.addColorStop(0, '#7aa7d9'); g.addColorStop(1, '#7aa7d9'); c.fillStyle = g; c.fill(); }
+      else { c.fillStyle = '#0e1520'; c.fill(); c.fillStyle = color + (done ? '4d' : '29'); c.fill(); c.strokeStyle = color; c.lineWidth = 2; c.stroke(); }
+      c.fillStyle = isRoot ? '#071016' : '#e8ebf0'; c.font = (isRoot ? '700 17px' : '600 15px') + ' Sora, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
       const lines = wrapText(c, label, b.w - 26), lh = isRoot ? 20 : 18, y0 = b.y + b.h / 2 - ((lines.length - 1) * lh) / 2;
       lines.forEach((l, i) => c.fillText(l, b.x + b.w / 2, y0 + i * lh));
-      if (done) { c.fillStyle = '#4fd1c5'; c.beginPath(); c.arc(b.x + b.w - 2, b.y + 2, 9, 0, 7); c.fill(); }
+      if (done) { c.fillStyle = '#7aa7d9'; c.beginPath(); c.arc(b.x + b.w - 2, b.y + 2, 9, 0, 7); c.fill(); }
     };
     kids.forEach((k, i) => drawBox(boxes[i + 1], k.label, k.color || PALETTE[0], false, k.children.length > 0));
-    drawBox(boxes[0], node.label, '#4fd1c5', true, false);
-    c.setTransform(S, 0, 0, S, 0, 0); c.fillStyle = '#8a92b2'; c.font = '500 12px Inter, sans-serif'; c.textAlign = 'center'; c.fillText('Graphikosmos', W / 2, H + PADT - 10);
+    drawBox(boxes[0], node.label, '#7aa7d9', true, false);
+    c.setTransform(S, 0, 0, S, 0, 0); c.fillStyle = '#8b94a5'; c.font = '500 12px Inter, sans-serif'; c.textAlign = 'center'; c.fillText('Graphikosmos', W / 2, H + PADT - 10);
     return new Promise((res) => cv.toBlob(res, 'image/png'));
   }
 
@@ -588,10 +638,10 @@
     })(root, 0, -Math.PI, Math.PI);
     const ids = Object.keys(G.nodes);
     const nodes = ids.map((id) => {
-      const n = G.nodes[id], d = depthOf(id), col = n.color || '#4fd1c5';
+      const n = G.nodes[id], d = depthOf(id), col = n.color || '#7aa7d9';
       return {
         id, label: '*' + n.label + '*', baseTitle: n.label, depthLevel: d, x: Math.round((pos[id] || { x: 0 }).x), y: Math.round((pos[id] || { y: 0 }).y),
-        color: { background: d === 0 ? '#4fd1c5' : col, border: col },
+        color: { background: d === 0 ? '#7aa7d9' : col, border: col },
         definition: n.def ? n.def.definition : undefined, simple: n.def ? n.def.simple : undefined, example: n.def ? n.def.example : undefined,
         relationship: n.rel || undefined
       };
