@@ -73,4 +73,4 @@ async function deliverReading({ view, format, to, link, ownerNote, skipOwner }) 
     return out;
 }
 
-module.exports = { deliverReading, render, isEmail, OWNER, LANG_OF, send, esc, FROM_OWNER };
+module.exports = { deliverReading, render, isEmail, OWNER, LANG_OF, send, esc, FROM_OWNER, FROM_CUSTOMER };
