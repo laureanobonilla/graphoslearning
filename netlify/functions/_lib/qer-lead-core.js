@@ -39,11 +39,11 @@ const SCHEMA = {
 const validate = (d) => d && d.app && d.app.name && d.app.whatItDoes && Array.isArray(d.pains) && d.pains.length && d.openingMessage;
 
 function prompt(transcript, archetype) {
-    return `Eres el asesor de producto de una sola persona (el dueño de un sitio de apps con IA). Una persona acaba de contestar un cuestionario de autoconocimiento («¿Quién eres en realidad?», 33 preguntas) y dejó su correo para recibir su resultado. Tu trabajo: leer sus respuestas y decirle al dueño en qué le duele a esta persona y qué app SIMPLE podría ofrecerle.
+    return `Eres el asesor de producto de una sola persona (el dueño de un sitio de apps con IA). Una persona acaba de contestar un cuestionario de autoconocimiento («¿Quién eres en realidad?», 32 preguntas) y dejó su correo para recibir su resultado. Tu trabajo: leer sus respuestas y decirle al dueño en qué le duele a esta persona y qué app SIMPLE podría ofrecerle.
 
 Cómo leer las respuestas:
 - Las respuestas abiertas pesan más que las opciones elegidas.
-- Las preguntas PRÁCTICAS (lo que posterga, lo que le quita tiempo, lo que olvida, lo tedioso de su semana, «alguien debería inventar algo para…», cómo aprende, qué le daría pereza de un negocio, qué hace cuando algo le funciona) son la señal MÁS directa de qué app necesita: busca lo que se repite entre ellas.
+- Las preguntas PRÁCTICAS (lo que posterga, lo que le quita tiempo, lo que olvida, lo tedioso de su semana, «alguien debería inventar algo para…», cómo aprende, qué le daría pereza de un negocio) son la señal MÁS directa de qué app necesita: busca lo que se repite entre ellas.
 - Hay una pregunta sobre un viaje por el que pagaría y otra sobre la app de celular por la que pagaría, cada una con su «porque»: son la mejor señal de qué valora y cuánto gasta.
 - Busca dolores prácticos y cotidianos (organización, tiempo, dinero, estudio, trabajo, relaciones, hábitos, ansiedad por decidir), no grandes temas existenciales. La app debe resolver UN problema concreto, no «mejorar su vida».
 - Prefiere lo simple. Si dos ideas empatan, la que tenga una sola pantalla y una llamada a la IA.

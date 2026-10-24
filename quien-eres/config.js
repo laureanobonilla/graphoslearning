@@ -31,7 +31,7 @@ window.QER_CFG = {
   "doc_title": "¿Quién eres en realidad?",
   "doc_desc": "Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.",
   "cover_title": "¿Quién eres en realidad?",
-  "cover_sub": "No es un test cualquiera. Son 33 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
+  "cover_sub": "No es un test cualquiera. Son 32 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
   "cover_meta": "Gratis · Recibes tu resultado por correo",
   "btn_start": "Empezar",
   "btn_resume": "Continuar donde quedaste (pregunta {n} de {total})",
@@ -575,23 +575,7 @@ window.QER_CFG = {
    "act": 5,
    "prompt": "Última pregunta: si esta lectura pudiera decirte una sola cosa que necesitas oír, ¿cuál sería?",
    "placeholder": "Lo que más necesitas escuchar"
-  },
-  {
-   "id": "n_confianza",
-   "type": "choice",
-   "act": 5,
-   "prompt": "Cuando algo te funciona de verdad (una herramienta, un servicio), ¿qué haces?",
-   "options": [
-    "Lo uso sin pensarlo y pago si hace falta",
-    "Se lo recomiendo a todos",
-    "Busco la versión gratis",
-    "Lo compro una vez y ya",
-    "Pago si veo que me ahorra tiempo o dinero",
-    "Me cuesta confiar en pagar por internet",
-    "Lo uso un tiempo y lo abandono",
-    "Depende de quién me lo recomiende"
-   ]
   }
  ],
- "finishEarlyAfter": 30
+ "finishEarlyAfter": 29
 };
