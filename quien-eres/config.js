@@ -31,7 +31,7 @@ window.QER_CFG = {
   "doc_title": "¿Quién eres en realidad?",
   "doc_desc": "Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.",
   "cover_title": "¿Quién eres en realidad?",
-  "cover_sub": "No es un test cualquiera. Son 27 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
+  "cover_sub": "No es un test cualquiera. Son 33 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
   "cover_meta": "Gratis · Recibes tu resultado por correo",
   "btn_start": "Empezar",
   "btn_resume": "Continuar donde quedaste (pregunta {n} de {total})",
@@ -107,41 +107,6 @@ window.QER_CFG = {
  },
  "questions": [
   {
-   "id": "c1",
-   "type": "choice",
-   "act": 1,
-   "prompt": "Cuando llegas a un lugar con mucha gente, ¿qué haces primero?",
-   "options": [
-    "Saludo a todos y animo el ambiente",
-    "Busco a alguien conocido y me pego a esa persona",
-    "Me voy a un rincón a observar",
-    "Reviso el celular para tener algo que hacer",
-    "Me ofrezco a ayudar en algo para tener una función",
-    "Hago un chiste para romper el hielo",
-    "Me quedo cerca de la puerta por si quiero irme",
-    "Aparento seguridad aunque por dentro me tiemble todo",
-    "Escucho primero y hablo cuando ya me ubiqué"
-   ]
-  },
-  {
-   "id": "c2",
-   "type": "choice",
-   "act": 1,
-   "prompt": "Si alguien que te conoce poco tuviera que describirte con una sola palabra, ¿cuál sería la más probable?",
-   "options": [
-    "Simpático",
-    "Serio",
-    "Tranquilo",
-    "Responsable",
-    "Reservado",
-    "Divertido",
-    "Amable",
-    "Intenso",
-    "Distante",
-    "Confiable"
-   ]
-  },
-  {
    "id": "c3",
    "type": "choice",
    "act": 1,
@@ -155,6 +120,22 @@ window.QER_CFG = {
     "Acepto, pero lo hago a medias",
     "Pregunto a otra persona qué haría en mi lugar",
     "Digo que sí y me lo cobro después en silencio"
+   ]
+  },
+  {
+   "id": "n_rato",
+   "type": "choice",
+   "act": 1,
+   "prompt": "¿Con qué pasas más rato en un día normal, aunque no quieras?",
+   "options": [
+    "Respondiendo mensajes y correos",
+    "Con hojas de cálculo, papeles o formularios",
+    "Estudiando o leyendo",
+    "En redes sociales",
+    "Atendiendo a otras personas (clientes, familia, compañeros)",
+    "Creando algo (escribir, diseñar, grabar)",
+    "Buscando información en internet",
+    "Moviéndome de un lado a otro haciendo trámites"
    ]
   },
   {
@@ -180,6 +161,22 @@ window.QER_CFG = {
    "act": 1,
    "prompt": "Termina la frase: «La gente cree que soy…, pero en realidad soy…»",
    "placeholder": "Las dos partes, aunque no calcen"
+  },
+  {
+   "id": "n_tiempo",
+   "type": "choice",
+   "act": 1,
+   "prompt": "¿Qué te quita más tiempo del que debería?",
+   "options": [
+    "Cosas repetitivas que hago siempre igual",
+    "Buscar información que está regada por todos lados",
+    "Dudar antes de decidir",
+    "Hacer cuentas y papeleo",
+    "Empezar cosas y no terminarlas",
+    "Atender pedidos de otros",
+    "El celular y las redes",
+    "Corregir y rehacer lo que ya había hecho"
+   ]
   },
   {
    "id": "c5",
@@ -213,6 +210,22 @@ window.QER_CFG = {
     "Que estoy enojado",
     "Que extraño a alguien",
     "Que me da vergüenza algo que hice"
+   ]
+  },
+  {
+   "id": "n_olvida",
+   "type": "choice",
+   "act": 2,
+   "prompt": "¿Qué se te olvida con más frecuencia?",
+   "options": [
+    "Fechas, citas y compromisos",
+    "Pagos y vencimientos",
+    "Lo que leí o aprendí",
+    "Tareas pequeñas que prometí",
+    "Lo que me dijeron que hiciera",
+    "Cuidarme (tomar agua, comer, descansar)",
+    "Dónde dejé las cosas",
+    "Casi nada, mi problema es el exceso de cosas por hacer"
    ]
   },
   {
@@ -266,6 +279,13 @@ window.QER_CFG = {
    ]
   },
   {
+   "id": "n_inventar",
+   "type": "short",
+   "act": 2,
+   "prompt": "¿Cuándo fue la última vez que pensaste «alguien debería inventar algo para esto»? ¿Qué era?",
+   "placeholder": "Aunque suene tonto"
+  },
+  {
    "id": "q2",
    "type": "short",
    "act": 2,
@@ -291,24 +311,6 @@ window.QER_CFG = {
    ]
   },
   {
-   "id": "c10",
-   "type": "choice",
-   "act": 3,
-   "prompt": "Por fin estás solo en casa. ¿Qué cambia en ti?",
-   "options": [
-    "Me relajo y me suelto",
-    "Pongo música alta y canto",
-    "Siento un vacío",
-    "Pienso en lo que pasó durante el día",
-    "Hablo conmigo en voz alta",
-    "Reviso el celular esperando mensajes",
-    "Me pongo a ordenar",
-    "No cambia nada, soy igual",
-    "Me siento más ligero",
-    "Me siento solo"
-   ]
-  },
-  {
    "id": "c_app",
    "type": "choice",
    "act": 3,
@@ -322,6 +324,22 @@ window.QER_CFG = {
     "Una que me ordene el dinero, porque las cuentas me quitan el sueño",
     "Una que me ayude a decidir, porque me atoro y no avanzo",
     "Por ninguna, porque prefiero resolverlo yo solo"
+   ]
+  },
+  {
+   "id": "n_posterga",
+   "type": "choice",
+   "act": 3,
+   "prompt": "¿Qué tarea postergas más de lo que te gustaría admitir?",
+   "options": [
+    "Los trámites y el papeleo",
+    "Estudiar o prepararme para algo",
+    "Ordenar mi casa o mis cosas",
+    "Contestar mensajes y correos pendientes",
+    "Llevar mis cuentas",
+    "Cuidar mi salud (citas, ejercicio, comida)",
+    "Avanzar en un proyecto propio",
+    "Cobrar o pedir lo que me deben"
    ]
   },
   {
@@ -343,6 +361,22 @@ window.QER_CFG = {
    ]
   },
   {
+   "id": "n_organizar",
+   "type": "choice",
+   "act": 3,
+   "prompt": "¿Qué has intentado organizar muchas veces y siempre se te vuelve a deshacer?",
+   "options": [
+    "Mis horarios",
+    "Mi dinero",
+    "Mis hábitos",
+    "Mis estudios",
+    "Mi casa",
+    "Mi trabajo o mi negocio",
+    "Mis archivos, fotos y documentos",
+    "Mis comidas y compras"
+   ]
+  },
+  {
    "id": "c12",
    "type": "choice",
    "act": 3,
@@ -359,6 +393,13 @@ window.QER_CFG = {
     "Si estoy haciendo bien mi vida",
     "Las preocupaciones de dinero"
    ]
+  },
+  {
+   "id": "n_tedioso",
+   "type": "short",
+   "act": 3,
+   "prompt": "¿Qué es lo más tedioso que haces cada semana y te encantaría no volver a hacer a mano?",
+   "placeholder": "Lo más aburrido o repetitivo"
   },
   {
    "id": "q3",
@@ -386,6 +427,22 @@ window.QER_CFG = {
    ]
   },
   {
+   "id": "n_asistente",
+   "type": "choice",
+   "act": 4,
+   "prompt": "Si tuvieras un asistente invisible una hora al día, ¿en qué lo pondrías?",
+   "options": [
+    "Ordenando mi agenda y mis pendientes",
+    "Resumiéndome lo que tengo que leer",
+    "Escribiendo por mí lo que no sé cómo decir",
+    "Buscando y comparando antes de que yo compre",
+    "Llevando mis cuentas",
+    "Preparándome para un examen o una entrevista",
+    "Haciendo el trabajo repetitivo",
+    "Ayudándome a pensar qué decidir"
+   ]
+  },
+  {
    "id": "c14",
    "type": "choice",
    "act": 4,
@@ -404,47 +461,27 @@ window.QER_CFG = {
    ]
   },
   {
-   "id": "c15",
-   "type": "choice",
-   "act": 4,
-   "prompt": "Alguien te cuida o te elogia de verdad. ¿Qué sientes?",
-   "options": [
-    "Incomodidad",
-    "Ganas de devolver el favor enseguida",
-    "Lo disfruto sin más",
-    "Pienso que se equivoca conmigo",
-    "Pena",
-    "Desconfianza, ¿qué querrá?",
-    "Quiero más",
-    "Cambio de tema",
-    "Me emociono, pero lo disimulo",
-    "Ganas de llorar"
-   ]
-  },
-  {
-   "id": "c16",
-   "type": "choice",
-   "act": 4,
-   "prompt": "¿Qué detalle te hace sentir que le importas a alguien?",
-   "options": [
-    "Que recuerde algo pequeño sobre mí",
-    "Que me busque sin motivo",
-    "Que me diga palabras claras de cariño",
-    "Que me ayude en algo concreto",
-    "Que me regale su tiempo",
-    "Que me abrace",
-    "Que me defienda",
-    "Que me deje ser como soy",
-    "Que me pregunte cómo estoy y espere la respuesta",
-    "Que me confíe un secreto"
-   ]
-  },
-  {
    "id": "q4",
    "type": "short",
    "act": 4,
    "prompt": "¿Qué haces por los demás que casi nadie te agradece?",
    "placeholder": "Algo que ya haces sin pensar"
+  },
+  {
+   "id": "n_formaprende",
+   "type": "choice",
+   "act": 4,
+   "prompt": "Cuando necesitas aprender algo nuevo, ¿qué haces de verdad?",
+   "options": [
+    "Busco videos",
+    "Leo y subrayo",
+    "Le pregunto a alguien que sepa",
+    "Pruebo hasta que me sale",
+    "Busco un curso",
+    "Lo voy dejando para después",
+    "Me cuesta saber por dónde empezar",
+    "Me da miedo hacerlo mal"
+   ]
   },
   {
    "id": "c17",
@@ -462,6 +499,22 @@ window.QER_CFG = {
     "Mis amistades",
     "Cómo uso mi tiempo libre",
     "Nada, estoy bien así"
+   ]
+  },
+  {
+   "id": "n_aprender",
+   "type": "choice",
+   "act": 5,
+   "prompt": "¿Qué tendrías que aprender o dominar para que tu vida o tu trabajo mejoraran?",
+   "options": [
+    "Un idioma",
+    "Manejar mejor mi dinero",
+    "Un programa o herramienta de mi trabajo",
+    "Escribir y comunicarme mejor",
+    "Vender o negociar",
+    "Organizarme",
+    "Un oficio nuevo",
+    "Prepararme para una prueba o un título"
    ]
   },
   {
@@ -483,6 +536,22 @@ window.QER_CFG = {
    ]
   },
   {
+   "id": "n_negocio",
+   "type": "choice",
+   "act": 5,
+   "prompt": "Si mañana tuvieras un negocio o proyecto propio, ¿qué te daría más pereza?",
+   "options": [
+    "Atender y responder a los clientes",
+    "Llevar las cuentas",
+    "Hacer publicaciones y promocionarme",
+    "Cotizar y cobrar",
+    "Organizar pedidos o citas",
+    "Aprender el programa para manejarlo",
+    "Escribir descripciones y textos",
+    "Ninguna, no me veo con un negocio"
+   ]
+  },
+  {
    "id": "c19",
    "type": "choice",
    "act": 5,
@@ -501,30 +570,28 @@ window.QER_CFG = {
    ]
   },
   {
-   "id": "c20",
-   "type": "choice",
-   "act": 5,
-   "prompt": "¿Qué te gustaría que digan de ti dentro de muchos años?",
-   "options": [
-    "Que ayudé a mucha gente",
-    "Que fui auténtico",
-    "Que fui valiente",
-    "Que hice reír a los demás",
-    "Que fui constante",
-    "Que cuidé a los míos",
-    "Que creé algo que duró",
-    "Que fui libre",
-    "Que dejé paz a mi alrededor",
-    "Que logré lo que quería"
-   ]
-  },
-  {
    "id": "q5",
    "type": "short",
    "act": 5,
    "prompt": "Última pregunta: si esta lectura pudiera decirte una sola cosa que necesitas oír, ¿cuál sería?",
    "placeholder": "Lo que más necesitas escuchar"
+  },
+  {
+   "id": "n_confianza",
+   "type": "choice",
+   "act": 5,
+   "prompt": "Cuando algo te funciona de verdad (una herramienta, un servicio), ¿qué haces?",
+   "options": [
+    "Lo uso sin pensarlo y pago si hace falta",
+    "Se lo recomiendo a todos",
+    "Busco la versión gratis",
+    "Lo compro una vez y ya",
+    "Pago si veo que me ahorra tiempo o dinero",
+    "Me cuesta confiar en pagar por internet",
+    "Lo uso un tiempo y lo abandono",
+    "Depende de quién me lo recomiende"
+   ]
   }
  ],
- "finishEarlyAfter": 15
+ "finishEarlyAfter": 30
 };
