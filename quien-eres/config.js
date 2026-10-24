@@ -31,7 +31,7 @@ window.QER_CFG = {
   "doc_title": "¿Quién eres en realidad?",
   "doc_desc": "Un cuestionario directo que no te deja escapar con respuestas fáciles. Al final, una lectura escrita para ti — no para cualquiera.",
   "cover_title": "¿Quién eres en realidad?",
-  "cover_sub": "No es un test cualquiera. Son 32 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
+  "cover_sub": "No es un test cualquiera. Son 31 preguntas, de una en una, que casi nadie se atreve a responder de verdad. Mientras más verdad pongas, más te va a sorprender lo que sigue.",
   "cover_meta": "Gratis · Recibes tu resultado por correo",
   "btn_start": "Empezar",
   "btn_resume": "Continuar donde quedaste (pregunta {n} de {total})",
@@ -311,22 +311,6 @@ window.QER_CFG = {
    ]
   },
   {
-   "id": "c_app",
-   "type": "choice",
-   "act": 3,
-   "prompt": "Imagina una app para el celular que te quitara de encima algo que hoy te pesa. ¿Cuál pagarías, y por qué?",
-   "options": [
-    "Una que convierta lo que estudio o leo en mapas mentales, porque me cuesta ordenar lo que sé",
-    "Una que me ayude a entender mis emociones, porque me repito sin darme cuenta",
-    "Una que me saque de la procrastinación, porque siento que se me va el tiempo postergando",
-    "Una que me enseñe un idioma conversando, porque quiero abrirme puertas",
-    "Una que me ayude a escribir mejor, porque no siempre sé decir lo que pienso",
-    "Una que me ordene el dinero, porque las cuentas me quitan el sueño",
-    "Una que me ayude a decidir, porque me atoro y no avanzo",
-    "Por ninguna, porque prefiero resolverlo yo solo"
-   ]
-  },
-  {
    "id": "n_posterga",
    "type": "choice",
    "act": 3,
@@ -577,5 +561,5 @@ window.QER_CFG = {
    "placeholder": "Lo que más necesitas escuchar"
   }
  ],
- "finishEarlyAfter": 29
+ "finishEarlyAfter": 28
 };

@@ -246,11 +246,11 @@ function cleanProfile(d) {
 }
 
 const PAID_ES_NOTE = '\n\nPREGUNTAS PRÁCTICAS (lo que posterga, lo que le quita tiempo, lo que olvida, lo tedioso, lo que alguien debería inventar, cómo aprende, qué le daría pereza de un negocio propio): cuéntalas como rasgos de su vida diaria —cargas, cansancios, hábitos, ambiciones—; jamás como encuesta ni como necesidad de «producto».'+
-  '\n\nDOS PREGUNTAS (la del viaje por el que pagaría y la de la app del celular que pagaría; el «porque» de cada una es lo que más dice de ella) cuéntalas como rasgos suyos: qué valora, qué busca resolver, cuánto cuida su dinero y su tiempo; nunca las menciones como encuesta ni como "preguntas sobre apps" ni cites las opciones tal cual.'+
+  '\n\nLA PREGUNTA DEL VIAJE por el que pagaría (y su «porque») cuéntala como rasgo suyo: qué valora, qué busca resolver, cuánto cuida su dinero y su tiempo; nunca la menciones como encuesta ni cites las opciones tal cual.'+
   '\n\nNOTA SOBRE LAS RESPUESTAS: la mayoría son opciones elegidas de una lista (a veces escritas por la persona) más 5 respuestas abiertas, que pesan más. No cites ni repitas literalmente las opciones como si fueran frases suyas (nada de «elegiste…»): lee los PATRONES entre ellas y conviértelos en imágenes y metáforas sorprendentes. Cuando cites, usa sobre todo lo que la persona escribió.';
 FORMATS['paid-self-es'] = {
     freeCount: PAID_FREE_COUNT, themes: READING_THEMES, transcriptOf, axisSchema: withProfile(AXIS_SCHEMA, 'es'),
-    axisPrompt: (t) => readingAxisPrompt(t).replace(/\b50 respuestas/g, '32 respuestas') + PAID_ES_NOTE + PROFILE_NOTE('es'), nodesSchema: READING_NODES_SCHEMA, minChars: paidMin,
+    axisPrompt: (t) => readingAxisPrompt(t).replace(/\b50 respuestas/g, '31 respuestas') + PAID_ES_NOTE + PROFILE_NOTE('es'), nodesSchema: READING_NODES_SCHEMA, minChars: paidMin,
     chunkPrompt: (t, a, i) => readingChunkPrompt(t, a, i, { freeCount: PAID_FREE_COUNT, paywall: true }) + PAID_ES_NOTE
 };
 // Versión GRATIS del examen de «¿Quién eres?» (sin muro): mismos prompts y perfil, pero los 10 capítulos salen abiertos.
