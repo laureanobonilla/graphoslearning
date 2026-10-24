@@ -61,15 +61,16 @@ async function send({ from, to, subject, html, text, replyTo }) {
 }
 
 // Manda la lectura a `to` (si hay) y una copia al dueño. Nunca lanza: devuelve el resultado de cada envío.
-async function deliverReading({ view, format, to, link, ownerNote }) {
+async function deliverReading({ view, format, to, link, ownerNote, skipOwner }) {
     const m = render(view, format, link);
     const out = { customer: null, owner: null };
     if (to && isEmail(to)) out.customer = await send({ from: FROM_CUSTOMER(), to: to.trim(), subject: m.subject, html: m.html, text: m.text, replyTo: OWNER() });
     const status = to ? `Destinatario: ${to} · entrega al cliente: ${out.customer && out.customer.ok ? 'OK' : 'NO SE PUDO (' + (out.customer ? out.customer.reason : 'correo no válido') + ') — reenvíale este correo'}` : 'Sin correo de cliente (solo copia para ti)';
     const note = [ownerNote, status].filter(Boolean).join(' · ');
     const noteHtml = note ? `<p style="background:#fff7e0;border:1px solid #e6cf8a;padding:8px 10px;font:13px sans-serif">${esc(note)}</p>` : '';
+    if (skipOwner) return out;
     out.owner = await send({ from: FROM_OWNER(), to: OWNER(), subject: `[copia] ${m.subject}`, html: noteHtml + m.html, text: (note ? note + '\n\n' : '') + m.text });
     return out;
 }
 
-module.exports = { deliverReading, render, isEmail, OWNER, LANG_OF };
+module.exports = { deliverReading, render, isEmail, OWNER, LANG_OF, send, esc, FROM_OWNER };

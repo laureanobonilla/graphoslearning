@@ -410,6 +410,20 @@
   .email-row input{ flex:1 1 auto; min-width:0; border:1px solid var(--line); background: rgba(0,0,0,.25); color: var(--parchment); border-radius:12px; padding:12px; font:1rem 'Work Sans',sans-serif; }
   .email-row .song-go{ width:auto; flex:0 0 auto; padding: 12px 16px; font-size:.9rem; }
   .email-msg{ margin: 8px 0 0; font-size:.82rem; color: var(--brass); }
+  /* correo antes del resultado (apps con CFG.leadGate) */
+  #screen-lead, #screen-sent{ justify-content:center; padding: 30px 0 40px; }
+  .lead{ text-align:left; }
+  .lead-title{ font-size:1.55rem; line-height:1.2; margin:0 0 14px; text-align:center; }
+  .lead-p{ font-size:1rem; line-height:1.6; margin:0 0 20px; color:#d9d0bd; }
+  .lead-label{ display:block; font-size:.86rem; color: var(--muted); margin:0 0 6px; }
+  .lead input[type=email]{ width:100%; border:1px solid var(--line); background: rgba(0,0,0,.25); color: var(--parchment); border-radius:12px; padding:14px; font:1rem 'Work Sans',sans-serif; margin:0 0 14px; }
+  .lead-check{ display:flex; gap:10px; align-items:flex-start; font-size:.84rem; line-height:1.45; color: var(--parchment); margin:0 0 16px; cursor:pointer; }
+  .lead-check input{ flex:0 0 auto; width:20px; height:20px; margin-top:2px; accent-color: var(--brass); }
+  .lead-check a{ color: var(--brass); }
+  .lead-msg{ margin:0 0 12px; font-size:.84rem; color: var(--brass); }
+  .lead-note{ margin:12px 0 0; font-size:.76rem; color: var(--muted); text-align:center; }
+  .sent-box{ text-align:center; }
+  .sent-box p{ color:#d9d0bd; line-height:1.6; margin:0 0 16px; }
   .test-banner{ position:fixed; left:0; right:0; top:0; z-index:50; text-align:center; font-size:.7rem; color:#c6a358; background: rgba(22,17,31,.94); padding:5px 8px; }
   #paypal-button-container{ min-height: 48px; margin: 0 0 8px; }
   #paypal-card-container{ min-height: 55px; margin: 0 0 4px; }
@@ -454,6 +468,27 @@
         <p data-t="finish_early_note"></p>
         <button type="button" id="btnFinishEarly" class="btn-ghost" data-t="finish_early_btn"></button>
       </div>
+    </div>
+  </section>
+
+  <section id="screen-lead" class="screen">
+    <form id="leadForm" class="lead" novalidate>
+      <h2 class="lead-title display" data-t="lead_title"></h2>
+      <p class="lead-p" data-t="lead_text"></p>
+      <label class="lead-label" for="leadEmail" data-t="lead_label"></label>
+      <input id="leadEmail" type="email" autocomplete="email" inputmode="email" maxlength="160">
+      <label class="lead-check"><input type="checkbox" id="leadConsent"><span id="leadConsentTxt"></span></label>
+      <p id="leadMsg" class="lead-msg is-hidden"></p>
+      <button type="submit" id="btnLeadGo" class="btn btn-primary" disabled data-t="lead_btn"></button>
+      <p class="lead-note" data-t="lead_note"></p>
+    </form>
+  </section>
+
+  <section id="screen-sent" class="screen">
+    <div class="sent-box">
+      <h2 class="lead-title display" data-t="sent_title"></h2>
+      <p id="sentText"></p>
+      <p class="lead-note" id="sentHelp"></p>
     </div>
   </section>
 

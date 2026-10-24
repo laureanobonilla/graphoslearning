@@ -68,6 +68,7 @@ exports.handler = async (event) => {
             format: base.format || 'map',
             archetypeName: base.archetypeName, hookLine: base.hookLine, closingLine: base.closingLine,
             profile: base.profile || null,
+            transcript: base.transcript || '',
             full: [], map: { nodes }
         });
         return json(200, payloadOf(readingId, base, nodes));

@@ -140,7 +140,7 @@ $('btnFinishEarly').addEventListener('click', () => {
   if (v && v.length >= 2) answers[currentIndex] = v;
   track('quiz_finished_early', { answered: answers.filter(Boolean).length, atIndex: currentIndex + 1 });
   saveQuizProgress();
-  submitQuiz();
+  finishQuiz();
 });
 
 let qShownAt = Date.now();
@@ -231,7 +231,7 @@ btnNext.addEventListener('click', () => {
   });
   saveQuizProgress();
   if (currentIndex < TOTAL - 1) { currentIndex++; renderQuestion(currentIndex); }
-  else { progressFill.style.width = '100%'; submitQuiz(); }
+  else { progressFill.style.width = '100%'; finishQuiz(); }
 });
 btnBack.addEventListener('click', () => {
   if (currentIndex === 0) return;
@@ -334,11 +334,51 @@ async function postWithOneRetry(name, payload) {
   try { return await postFn(name, payload); }
   catch (err) { if (err.status && err.status < 500 && err.status !== 409) throw err; return await postFn(name, payload); }
 }
+// --- correo antes del resultado (CFG.leadGate): el resultado se manda al correo y, además, el dueño recibe una propuesta de app ---
+// En la página de prueba solo se activa con «?lead=1» (las respuestas ya vienen cargadas).
+const LEAD_ON = !!CFG.leadGate && (!TEST || /[?&]lead=1/.test(location.search));
+let leadEmail = '', leadConsent = false;
+function finishQuiz() {
+  if (!LEAD_ON || leadEmail) { submitQuiz(); return; }
+  track('lead_gate_shown', { answered: answers.filter(Boolean).length });
+  showScreen('lead');
+  const inp = $('leadEmail'); try { inp.value = localStorage.getItem(`qer_email_${APP}`) || inp.value; } catch { /* ok */ }
+  syncLead();
+}
+function leadValid() { const v = $('leadEmail').value.trim(); return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) && $('leadConsent').checked; }
+function syncLead() { $('btnLeadGo').disabled = !leadValid(); }
+if (LEAD_ON) {
+  $('leadConsentTxt').innerHTML = tt('lead_consent');
+  $('leadEmail').addEventListener('input', syncLead); $('leadConsent').addEventListener('change', syncLead);
+  $('leadForm').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    if (!leadValid()) { const m = $('leadMsg'); m.textContent = tt('lead_invalid'); m.classList.remove('is-hidden'); return; }
+    leadEmail = $('leadEmail').value.trim(); leadConsent = true;
+    try { localStorage.setItem(`qer_email_${APP}`, leadEmail); } catch { /* ok */ }
+    track('lead_email_given', { answered: answers.filter(Boolean).length });
+    submitQuiz();
+  });
+}
+async function sendLead(data) {
+  const label = $('loadingLabel'); label.textContent = tt('lead_sending');
+  let d = null;
+  try { d = await postWithOneRetry('qer-lead', { readingId: data.readingId, email: leadEmail, consent: leadConsent, app: APP, anonId }); } catch (err) { d = { ok: false, reason: String(err.message).slice(0, 80) }; }
+  track('lead_delivery', { ok: !!(d && d.ok), reason: d && d.reason });
+  if (d && d.ok) {
+    clearQuizProgress();
+    $('sentText').textContent = tt('sent_text', { email: leadEmail });
+    $('sentHelp').textContent = tt('sent_help', { contact: (PAY && PAY.email) || '' });
+    showScreen('sent');
+  } else {   // si el correo no salió, la persona NO se queda sin resultado: se le muestra aquí, abierto
+    clearQuizProgress();
+    unlockReading({ readingId: data.readingId, archetypeName: data.archetypeName, hookLine: data.hookLine, closingLine: data.closingLine || '', profile: null, nodes: (data.nodes || []).map(n => ({ id: n.id, label: n.label, text: n.text || '' })) });
+  }
+}
 async function submitQuiz() {
   showScreen('loading');
   const label = $('loadingLabel'), steps = CFG.t.loading_steps;
   label.textContent = steps[0];
-  const payload = { format: CFG.toGraphikosmos ? 'free-self-es' : CFG.format, answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })) };
+  const payload = { format: (CFG.toGraphikosmos || LEAD_ON) ? 'free-self-es' : CFG.format, answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })) };
   const t0 = Date.now();
   try {
     const axis = await postWithOneRetry('qer-generate-map', payload);
@@ -349,6 +389,7 @@ async function submitQuiz() {
     label.textContent = steps[3];
     const data = await postWithOneRetry('qer-generate-map-finalize', { readingId: axis.readingId });
     track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000), answered: answers.filter(Boolean).length });
+    if (LEAD_ON && leadEmail) { await sendLead(data); return; }
     clearQuizProgress();
     if (!(CFG.toGraphikosmos && goToGraphikosmos(data))) renderReveal(data);
   } catch (err) {
