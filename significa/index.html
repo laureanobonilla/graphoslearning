@@ -39,9 +39,9 @@ body[data-s=speak] #mic::before{animation:ring 2s ease-out infinite}body[data-s=
 #typeIn{flex:1;min-width:0;background:#0d1226;border:1px solid #2a3355;color:var(--ink);border-radius:12px;padding:12px 14px;font:inherit;font-size:1rem}
 #typeGo{border:1px solid #2a3355;background:#141a35;color:var(--ink);border-radius:12px;padding:0 16px;font:600 .95rem system-ui,sans-serif;cursor:pointer}
 #acts{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px 0 0}
-#alt{display:none;min-height:52px;padding:0 22px;border-radius:999px;border:2px solid var(--a);background:rgba(45,212,191,.1);color:var(--ink);font:650 1.02rem system-ui,sans-serif;cursor:pointer;align-items:center;justify-content:center}
-#alt.on{display:inline-flex}#alt:active{transform:scale(.97)}#alt:focus-visible{outline:3px solid #fff;outline-offset:4px}#alt[aria-busy=true]{opacity:.7}
-.sense{margin:10px 0 0;font-size:.85rem;color:var(--mute)}
+#alt{display:none;margin:10px auto 0;min-height:38px;padding:0 14px;border-radius:999px;border:1px solid #3a4570;background:transparent;color:var(--mute);font:500 .85rem system-ui,sans-serif;cursor:pointer;align-items:center;justify-content:center;gap:6px}#alt::before{content:"↻";font-size:1rem;line-height:1}
+#alt.on{display:inline-flex}#alt:hover{color:var(--ink);border-color:var(--a)}#alt:active{transform:scale(.97)}#alt:focus-visible{outline:2px solid #fff;outline-offset:3px}#alt[aria-busy=true]{opacity:.7}
+.sense{margin:12px 0 0;font-size:.85rem;color:var(--mute)}
 #stop{display:none;margin:0;margin:14px auto 0;min-height:52px;min-width:170px;padding:0 26px;border-radius:999px;border:2px solid var(--ink);background:rgba(255,255,255,.08);color:var(--ink);font:650 1.05rem system-ui,sans-serif;cursor:pointer;align-items:center;justify-content:center;gap:10px}
 #stop::before{content:"";width:14px;height:14px;border-radius:3px;background:currentColor}
 body[data-s=speak] #stop{display:inline-flex}
@@ -51,8 +51,8 @@ body[data-s=speak] #stop{display:inline-flex}
 <body data-s="idle"><main>
 <div class="stage"><button id="mic" type="button" aria-label="Tocar para decir una palabra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor" stroke="none"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg></button></div>
 <p id="say" class="say" role="status" aria-live="polite">Toca el círculo y di una palabra</p>
-<div id="acts"><button id="stop" type="button" aria-label="Detener la lectura">Detener</button><button id="alt" type="button">Otro significado</button></div>
-<section id="res" class="res" hidden aria-live="polite"><h1 id="word" class="word"></h1><p id="def" class="def"></p><p id="sense" class="sense" hidden></p></section>
+<div id="acts"><button id="stop" type="button" aria-label="Detener la lectura">Detener</button></div>
+<section id="res" class="res" hidden aria-live="polite"><h1 id="word" class="word"></h1><p id="def" class="def"></p><p id="sense" class="sense" hidden></p><button id="alt" type="button" aria-label="Ver otro significado de la palabra">Otro significado</button></section>
 <div class="alt"><button id="typeLink" type="button" aria-expanded="false" aria-controls="typeForm">¿Prefieres escribirla?</button>
 <form id="typeForm" hidden autocomplete="off"><input id="typeIn" type="text" maxlength="80" placeholder="Escribe una palabra" aria-label="Escribe la palabra" enterkeyhint="search" autocapitalize="off" spellcheck="false"><button id="typeGo" type="submit">Buscar</button></form></div>
 </main>
