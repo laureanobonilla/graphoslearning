@@ -235,7 +235,12 @@ function withBilling(raw, overrides = {}) {
                     else if (TRIAL_FB && !isWelcome && !hasTrial && FB_TRIAL_ACTIONS.has(action) && deps.trial.guestFromFacebook) {
                         let fromFb = false;
                         try { fromFb = await deps.trial.guestFromFacebook(identity.guestId); } catch (e2) { console.error('[billing] guestFromFacebook:', e2.message); }
-                        if (fromFb) { allowed = true; fbTrial = true; }
+                        if (fromFb === 'google') {
+                            // Google: una prueba por invitado Y como máximo IP_TRIAL_MAX_PER_DAY por red al día (si no se puede comprobar, no se regala).
+                            try { if (deps.trial.ipTrialsToday && await deps.trial.ipTrialsToday(identity.ip) < deps.trial.IP_TRIAL_MAX_PER_DAY) { allowed = true; fbTrial = true; fbVia = 'google'; } }
+                            catch (e3) { console.error('[billing] ipTrialsToday:', e3.message); }
+                        }
+                        else if (fromFb) { allowed = true; fbTrial = true; }
                         else if (fbHint) { allowed = true; fbTrial = true; fbVia = 'facebook_claimed'; console.warn('[billing] prueba FB aceptada por aviso del navegador (no se halló su visita en events)'); }
                     }
                 } catch (err) { console.error('[billing] verificación de prueba:', err.message); }
@@ -330,7 +335,7 @@ function withBilling(raw, overrides = {}) {
         }
 
         if (fbTrial && !identity.isAdmin && data && !data.error && computeCost(action, data) > 0) {   // solo se gasta la prueba si de verdad se generó algo
-            try { await deps.store.logEvent(identity.id, 'guest', null, 'trial_used', { guest: identity.guestId, action, via: fbVia }, null, 'graphikosmos'); }
+            try { await deps.store.logEvent(identity.id, 'guest', null, 'trial_used', { guest: identity.guestId, action, via: fbVia, iph: (deps.trial.ipHash && identity.ip) ? deps.trial.ipHash(identity.ip) : undefined }, null, 'graphikosmos'); }
             catch (err) { console.error('[billing] no se pudo registrar la prueba de Facebook:', err.message); }
         }
 
