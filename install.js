@@ -2,20 +2,20 @@
    Uso: GK_INSTALL.maybe() desde cada app, justo después de que el usuario logra su primer resultado. */
 (function () {
   'use strict';
-  var KEY = 'gk_install_seen2', deferred = null, shown = false;
+  var KEY = window.GK_INSTALL_KEY || 'gk_install_seen2', deferred = null, shown = false, OPTS = {};
   var EN = /^en/i.test(navigator.language || '');
   var T = EN ? {
     title: 'Keep this app on your phone', sub: 'Open it in one tap, like any other app.',
     ios: ['Tap the Share button', 'Choose “Add to Home Screen”', 'Tap “Add”'],
     android: ['Tap the ⋮ menu in your browser', 'Choose “Install app” or “Add to Home screen”', 'Tap “Install”'],
     inapp: 'You are inside another app’s browser. Tap ⋯ and choose “Open in browser” (Chrome or Safari), then add it from there.',
-    install: 'Install', ok: 'Got it', never: 'Don’t show again'
+    install: 'Install', ok: 'Got it', never: 'Don’t show again', titleNamed: 'Install {name}'
   } : {
     title: 'Deja esta app en tu celular', sub: 'Ábrela con un toque, como cualquier otra app.',
     ios: ['Toca el botón Compartir', 'Elige «Agregar a pantalla de inicio»', 'Toca «Agregar»'],
     android: ['Toca el menú ⋮ del navegador', 'Elige «Instalar app» o «Agregar a la pantalla de inicio»', 'Toca «Instalar»'],
     inapp: 'Estás dentro del navegador de otra app. Toca ⋯ y elige «Abrir en el navegador» (Chrome o Safari); desde ahí la agregas.',
-    install: 'Instalar', ok: 'Entendido', never: 'No mostrar más'
+    install: 'Instalar', ok: 'Entendido', never: 'No mostrar más', titleNamed: 'Instala {name}'
   };
   var ua = navigator.userAgent || '';
   var isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -47,16 +47,16 @@
   function close(forever) { var e = document.getElementById('gkInst'); if (e) e.remove(); mark(forever); }
   function show() {
     if (shown) return; shown = true; css();
-    var steps = isIOS ? T.ios : T.android;
+    var steps = isIOS ? T.ios : T.android, desk = !mobile();
     var box = document.createElement('div'); box.id = 'gkInst'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', T.title);
     var h = '<h3></h3><p class="s"></p>';
     if (inApp) h += '<div class="warn"></div>';
-    else { h += '<ol>'; steps.forEach(function (t, i) { h += '<li><b>' + (i + 1) + '</b><div></div></li>'; }); h += '</ol>'; }
+    else if (!desk) { h += '<ol>'; steps.forEach(function (t, i) { h += '<li><b>' + (i + 1) + '</b><div></div></li>'; }); h += '</ol>'; }
     h += '<div class="row">' + (deferred && !inApp ? '<button class="go" id="gkInstGo" type="button"></button>' : '') + '<button class="' + (deferred && !inApp ? 'no' : 'go') + '" id="gkInstOk" type="button"></button></div><button class="never" id="gkInstNever" type="button"></button>';
     box.innerHTML = h;
-    box.querySelector('h3').textContent = T.title; box.querySelector('.s').textContent = T.sub;
+    box.querySelector('h3').textContent = OPTS.name ? T.titleNamed.replace('{name}', OPTS.name) : T.title; box.querySelector('.s').textContent = T.sub;
     if (inApp) box.querySelector('.warn').textContent = T.inapp;
-    else box.querySelectorAll('li div').forEach(function (d, i) { d.textContent = steps[i]; if (isIOS && i === 0) { var sp = document.createElement('span'); sp.innerHTML = SHARE; d.appendChild(document.createTextNode(' ')); d.appendChild(sp); } });
+    else if (!desk) box.querySelectorAll('li div').forEach(function (d, i) { d.textContent = steps[i]; if (isIOS && i === 0) { var sp = document.createElement('span'); sp.innerHTML = SHARE; d.appendChild(document.createTextNode(' ')); d.appendChild(sp); } });
     box.querySelector('#gkInstOk').textContent = T.ok; box.querySelector('#gkInstNever').textContent = T.never;
     var go = box.querySelector('#gkInstGo'); if (go) { go.textContent = T.install; go.addEventListener('click', function () { var d = deferred; deferred = null; close(true); try { d.prompt(); } catch (e) { /* nada */ } }); }
     box.querySelector('#gkInstOk').addEventListener('click', function () { close(false); });
@@ -66,8 +66,15 @@
   }
   window.GK_INSTALL = {
     // Muestra la guía si corresponde. force=true solo para pruebas (?instalar=1).
-    maybe: function (force) {
-      if (!force && (shown || standalone() || !mobile() || seen())) return;
+    // opts.name = nombre de la app en el título; opts.desktop = también en computadora (solo si el navegador deja instalar).
+    maybe: function (force, opts) {
+      OPTS = opts || {};
+      if (!force && (shown || standalone() || seen())) return;
+      if (!force && !mobile()) {
+        if (!OPTS.desktop) return;
+        var tries = 0, iv = setInterval(function () { if (deferred) { clearInterval(iv); show(); } else if (++tries > 12) clearInterval(iv); }, 500);
+        return;
+      }
       setTimeout(show, 1200);
     }
   };

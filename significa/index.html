@@ -4,6 +4,8 @@
 <title>Significa</title>
 <meta name="description" content="Di una palabra y te cuenta qué significa, en voz alta y por escrito.">
 <meta name="theme-color" content="#0a0e1a">
+<link rel="manifest" href="/significa/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/significa/apple-touch-icon.png">
 <style>
 :root{--bg:#0a0e1a;--ink:#eef1fa;--mute:#98a3c2;--a:#2dd4bf;--b:#8b5cf6;--lvl:0}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -30,6 +32,12 @@ body[data-s=speak] #mic::before{animation:ring 2s ease-out infinite}body[data-s=
 .def{font-size:clamp(1.1rem,4.4vw,1.35rem);line-height:1.55;margin:0;color:var(--ink)}
 .res.fade{animation:in .35s ease}@keyframes in{from{opacity:0;transform:translateY(8px)}}
 .err{color:#fbbf24}
+.alt{margin-top:auto;padding-top:26px;width:100%;max-width:420px;text-align:center}
+#typeLink{background:none;border:0;color:var(--mute);font:inherit;font-size:.92rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:10px}
+#typeLink:focus-visible,#typeGo:focus-visible{outline:2px solid #fff;outline-offset:3px}
+#typeForm{display:flex;gap:8px}#typeForm[hidden]{display:none}
+#typeIn{flex:1;min-width:0;background:#0d1226;border:1px solid #2a3355;color:var(--ink);border-radius:12px;padding:12px 14px;font:inherit;font-size:1rem}
+#typeGo{border:1px solid #2a3355;background:#141a35;color:var(--ink);border-radius:12px;padding:0 16px;font:600 .95rem system-ui,sans-serif;cursor:pointer}
 #stop{display:none;margin:14px auto 0;min-height:52px;min-width:170px;padding:0 26px;border-radius:999px;border:2px solid var(--ink);background:rgba(255,255,255,.08);color:var(--ink);font:650 1.05rem system-ui,sans-serif;cursor:pointer;align-items:center;justify-content:center;gap:10px}
 #stop::before{content:"";width:14px;height:14px;border-radius:3px;background:currentColor}
 body[data-s=speak] #stop{display:inline-flex}
@@ -41,7 +49,11 @@ body[data-s=speak] #stop{display:inline-flex}
 <p id="say" class="say" role="status" aria-live="polite">Toca el círculo y di una palabra</p>
 <button id="stop" type="button" aria-label="Detener la lectura">Detener</button>
 <section id="res" class="res" hidden aria-live="polite"><h1 id="word" class="word"></h1><p id="def" class="def"></p></section>
+<div class="alt"><button id="typeLink" type="button" aria-expanded="false" aria-controls="typeForm">¿Prefieres escribirla?</button>
+<form id="typeForm" hidden autocomplete="off"><input id="typeIn" type="text" maxlength="80" placeholder="Escribe una palabra" aria-label="Escribe la palabra" enterkeyhint="search" autocapitalize="off" spellcheck="false"><button id="typeGo" type="submit">Buscar</button></form></div>
 </main>
+<script>window.GK_INSTALL_KEY='sig_install_seen'</script>
+<script src="/install.js?v=2"></script>
 <script>
 (function(){
 'use strict';
@@ -116,13 +128,13 @@ async function startRecording(){
     document.documentElement.style.setProperty('--lvl','0');
     if(!send||my!==token)return;
     if(!started||speechMs<MIN_SPEECH_MS){setState('idle');say('No alcancé a escucharte. Toca el círculo e inténtalo otra vez.');track('no_speech');return}
-    lookup(wavB64(chunks,rate),my);
+    lookup({audio:wavB64(chunks,rate)},my);
   }
 }
-async function lookup(b64,my){
+async function lookup(payload,my){
   setState('think','Buscando qué significa…');var t0=Date.now();
   try{
-    var r=await fetch('/.netlify/functions/significa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audio:b64,anonId:anon})});
+    var r=await fetch('/.netlify/functions/significa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({anonId:anon},payload))});
     var d=await r.json().catch(function(){return {}});
     if(my!==token)return;
     if(r.status===429){setState('idle');say('Vas muy rápido. Espera un momento y vuelve a intentar.',true);return}
@@ -139,6 +151,11 @@ function show(d){var s=$('res');s.hidden=false;$('word').textContent=d.word;$('d
 function stopNow(){if(state!=='speak')return;stopSpeaking();setState('idle','Toca el círculo para otra palabra');track('stopped')}
 $('stop').addEventListener('click',stopNow);
 document.addEventListener('keydown',function(e){if(e.key==='Escape')stopNow()});
+// ---- escribir la palabra (opción secundaria)
+$('typeLink').addEventListener('click',function(){var f=$('typeForm'),open=f.hidden;f.hidden=!open;this.setAttribute('aria-expanded',String(open));if(open){this.hidden=true;setTimeout(function(){$('typeIn').focus()},30);track('type_opened')}});
+$('typeForm').addEventListener('submit',function(ev){ev.preventDefault();var t=$('typeIn').value.trim();if(!t)return;
+  unlock();token++;if(rec)rec.cancel();stopSpeaking();$('say').classList.remove('err');$('typeIn').blur();
+  track('typed_lookup');lookup({text:t},token)});
 // ---- un solo botón: grande, siempre activo
 $('mic').addEventListener('click',function(){
   unlock();
@@ -147,6 +164,9 @@ $('mic').addEventListener('click',function(){
   startRecording();track('record_start');
 });
 if(synth&&synth.addEventListener)synth.addEventListener('voiceschanged',function(){});
-if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){say('Este navegador no deja usar el micrófono. Prueba con Chrome, Safari o Edge.',true);$('mic').disabled=true}
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){say('Este navegador no deja usar el micrófono. Puedes escribir la palabra aquí abajo.',true);$('mic').disabled=true;$('typeLink').click()}
+if('serviceWorker' in navigator){try{navigator.serviceWorker.register('/significa/sw.js',{scope:'/significa/'}).catch(function(){})}catch(e){}}
+// ofrece instalarla al entrar (solo si aún no está instalada)
+if(window.GK_INSTALL)window.GK_INSTALL.maybe(false,{name:'Significa',desktop:true});
 })();
 </script></body></html>
