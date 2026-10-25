@@ -30,11 +30,16 @@ body[data-s=speak] #mic::before{animation:ring 2s ease-out infinite}body[data-s=
 .def{font-size:clamp(1.1rem,4.4vw,1.35rem);line-height:1.55;margin:0;color:var(--ink)}
 .res.fade{animation:in .35s ease}@keyframes in{from{opacity:0;transform:translateY(8px)}}
 .err{color:#fbbf24}
+#stop{display:none;margin:14px auto 0;min-height:52px;min-width:170px;padding:0 26px;border-radius:999px;border:2px solid var(--ink);background:rgba(255,255,255,.08);color:var(--ink);font:650 1.05rem system-ui,sans-serif;cursor:pointer;align-items:center;justify-content:center;gap:10px}
+#stop::before{content:"";width:14px;height:14px;border-radius:3px;background:currentColor}
+body[data-s=speak] #stop{display:inline-flex}
+#stop:active{transform:scale(.97)}#stop:focus-visible{outline:3px solid #fff;outline-offset:4px}
 @media (prefers-reduced-motion:reduce){#mic,#mic::before,#mic::after,.res.fade{animation:none!important}}
 </style></head>
 <body data-s="idle"><main>
 <div class="stage"><button id="mic" type="button" aria-label="Tocar para decir una palabra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor" stroke="none"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg></button></div>
 <p id="say" class="say" role="status" aria-live="polite">Toca el círculo y di una palabra</p>
+<button id="stop" type="button" aria-label="Detener la lectura">Detener</button>
 <section id="res" class="res" hidden aria-live="polite"><h1 id="word" class="word"></h1><p id="def" class="def"></p></section>
 </main>
 <script>
@@ -51,7 +56,7 @@ function track(ev,md){try{fetch('/.netlify/functions/qer-track-event',{method:'P
 track('opened');
 
 // ---- voz del dispositivo (se "desbloquea" con el primer toque: iOS no deja hablar sin un gesto previo)
-var synth=window.speechSynthesis, unlocked=false;
+var synth=window.speechSynthesis, unlocked=false, speakTok=0;
 function unlock(){if(!synth||unlocked)return;unlocked=true;try{var u=new SpeechSynthesisUtterance(' ');u.volume=0;synth.speak(u)}catch(e){}}
 function pickVoice(lang){var vs=synth?synth.getVoices():[];var p=String(lang||'es').toLowerCase();var base=p.split('-')[0];
   return vs.filter(function(v){return v.lang&&v.lang.toLowerCase().replace('_','-')===p})[0]||vs.filter(function(v){return v.lang&&v.lang.toLowerCase().indexOf(base)===0})[0]||null}
@@ -64,10 +69,11 @@ function say1(text,lang,done){
 function speak(word,wordLang,def,done){
   if(!synth){done();return}
   try{synth.cancel()}catch(e){}
-  var same=String(wordLang||'es').toLowerCase().split('-')[0]==='es';
-  if(same)say1(word+'. '+def,'es',done);else say1(word,wordLang,function(){say1(def,'es',done)});
+  var tok=++speakTok,same=String(wordLang||'es').toLowerCase().split('-')[0]==='es';
+  if(same)say1(word+'. '+def,'es',function(){if(tok===speakTok)done()});
+  else say1(word,wordLang,function(){if(tok!==speakTok)return;say1(def,'es',function(){if(tok===speakTok)done()})});
 }
-function stopSpeaking(){try{synth&&synth.cancel()}catch(e){}}
+function stopSpeaking(){speakTok++;try{synth&&synth.cancel()}catch(e){}}
 
 // ---- grabación: se queda con la voz en PCM, detecta cuándo dejas de hablar y la manda como WAV de 16 kHz
 function wavB64(chunks,inRate){
@@ -129,6 +135,10 @@ async function lookup(b64,my){
 }
 function show(d){var s=$('res');s.hidden=false;$('word').textContent=d.word;$('def').textContent=d.definition;s.classList.remove('fade');void s.offsetWidth;s.classList.add('fade');$('say').classList.remove('err')}
 
+// ---- detener la lectura al instante (botón, tecla Esc o Espacio)
+function stopNow(){if(state!=='speak')return;stopSpeaking();setState('idle','Toca el círculo para otra palabra');track('stopped')}
+$('stop').addEventListener('click',stopNow);
+document.addEventListener('keydown',function(e){if(e.key==='Escape')stopNow()});
 // ---- un solo botón: grande, siempre activo
 $('mic').addEventListener('click',function(){
   unlock();
