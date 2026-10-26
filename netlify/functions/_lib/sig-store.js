@@ -2,8 +2,8 @@
 // está pagada). Reutiliza las tablas que ya existen (qer_readings y qer_orders) con ids prefijados: no hace falta SQL nuevo.
 //   qer_readings.id = 'sig:<anonId>'  → reading = { count, price, paidUntil, seen, paidAt }
 //   qer_orders.order_id = <orden de PayPal> → reading_id = 'sig:<anonId>'
-const FREE = Number(process.env.SIG_FREE || 50);
-const PRICES = [2.99, 5.99, 8.99, 11.99, 14.99, 17.99, 20.99];   // 7 precios, de $3 en $3
+const FREE = Number(process.env.SIG_FREE || 15);
+const PRICES = [2.99, 5.99, 8.99];   // 3 precios para probar (con poco tráfico, más precios no dan datos útiles)
 const DAYS = Number(process.env.SIG_DAYS || 30);
 
 function cfg() {
