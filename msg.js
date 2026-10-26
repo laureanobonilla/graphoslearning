@@ -87,16 +87,17 @@
   }
   async function renderAdmin() {
     box.appendChild(head('Bandeja del Equipo', true));
-    var tabs = el('div', 'tabs'), a = el('button', tab === 'team' ? 'on' : '', 'Para el Equipo'), b = el('button', tab === 'users' ? 'on' : '', 'Entre usuarios');
+    var tabs = el('div', 'tabs'), a = el('button', tab === 'team' ? 'on' : '', 'Mi bandeja'), b = el('button', tab === 'users' ? 'on' : '', 'Entre usuarios');
     a.onclick = function () { tab = 'team'; render(); }; b.onclick = function () { tab = 'users'; render(); }; if (tab !== 'team' && tab !== 'users') tab = 'team'; tabs.append(a, b); box.appendChild(tabs);
     var body = el('div', 'body'); box.appendChild(body); body.appendChild(el('div', 'empty', 'Cargando…'));
     if (tab === 'users') { var r = await api('?a=between'); body.textContent = ''; if (!r.ok) return body.appendChild(el('div', 'empty', 'No se pudo cargar.')); if (!r.data.messages.length) body.appendChild(el('div', 'empty', 'Todavía no hay mensajes entre usuarios.')); r.data.messages.forEach(function (m) { var d = el('div', 'm'); d.style.margin = '6px 12px'; d.style.maxWidth = 'none'; d.appendChild(el('b', '', m.from + ' → ' + m.to + (m.image ? ' 🖼' : ''))); d.appendChild(el('span', '', '\n' + m.body)); body.appendChild(d); }); return; }
     var r2 = await api('?a=inbox'); body.textContent = ''; if (!r2.ok) return body.appendChild(el('div', 'empty', 'No se pudo cargar.'));
     if (!r2.data.conversations.length) body.appendChild(el('div', 'empty', 'Nadie ha escrito al Equipo todavía.'));
     r2.data.conversations.forEach(function (c) {
-      var w = el('div'); w.style.cssText = 'margin:8px 12px;border:1px solid #2c3458;border-radius:12px;padding:8px'; w.appendChild(el('div', 'sec', c.name + ' → ' + (c.aliasName || c.alias))); w.firstChild.style.padding = '0 0 6px';
-      c.msgs.slice(-6).forEach(function (m) { var d = bubble({ fromTeam: m.fromTeam, body: m.body, image: m.image, at: m.at }); d.style.maxWidth = '100%'; d.style.marginBottom = '4px'; w.appendChild(d); });
-      var f = composer(async function (t) { if (!t) return false; var r = await api('', { a: 'reply', as: c.alias, to: c.person, body: t }); if (!r.ok) { alert('No se pudo enviar.'); return false; } render(); return true; }); f.style.padding = '6px 0 0'; f.style.border = '0'; f.querySelector('button.g').hidden = true; w.appendChild(f); body.appendChild(w);
+      var w = el('div'); w.style.cssText = 'margin:8px 12px;border:1px solid #2c3458;border-radius:12px;padding:8px'; w.appendChild(el('div', 'sec', c.name)); w.firstChild.style.padding = '0 0 6px';
+      c.msgs.slice(-6).forEach(function (m) { var d = bubble({ fromTeam: m.fromTeam, body: m.body, image: m.image, at: m.at }); d.style.maxWidth = '100%'; d.style.marginBottom = '4px'; if (m.via && m.via !== 'tu cuenta') d.firstChild && d.insertBefore(el('small', '', (m.fromTeam ? 'Respondido como ' : 'Escrito a ') + m.via), d.firstChild); w.appendChild(d); });
+      var sel = document.createElement('select'); sel.setAttribute('aria-label', 'Responder como'); sel.style.cssText = 'width:100%;margin-top:6px;background:#0b1022;color:inherit;border:1px solid #2c3458;border-radius:10px;padding:6px'; (r2.data.identities || []).forEach(function (i) { var o = el('option', '', 'Responder como: ' + i.name); o.value = i.id; if (i.id === c.lastAlias) o.selected = true; sel.appendChild(o); });
+      var f = composer(async function (t) { if (!t) return false; var r = await api('', { a: 'reply', as: sel.value, to: c.person, body: t }); if (!r.ok) { alert('No se pudo enviar.'); return false; } refreshList(); render(); return true; }); f.style.padding = '6px 0 0'; f.style.border = '0'; f.querySelector('button.g').hidden = true; w.appendChild(sel); w.appendChild(f); body.appendChild(w);
     });
   }
   function toggle() { open = !open; box.classList.toggle('on', open); fab.setAttribute('aria-expanded', String(open)); if (open) { view = 'list'; cur = null; render(); refreshList(); } else clearInterval(timer); }

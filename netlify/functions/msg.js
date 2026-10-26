@@ -44,11 +44,13 @@ exports.handler = async (event, context) => {
                 ownerOnline()
             ]);
             const unread = {}; (unreadRows || []).forEach((r) => { unread[r.from_id] = (unread[r.from_id] || 0) + 1; });
+            let teamUnread = 0;
+            if (user.isAdmin) { const tu = await T(`msg_messages?to_id=like.staff:*&read_at=is.null&select=id&limit=500`).catch(() => []); teamUnread = (tu || []).length; }
             const staff = Object.entries(STAFF).map(([id, s]) => ({ id, name: s.name, badge: s.role, online, unread: unread[id] || 0 }));
             const ow = (await T(`msg_users?handle=eq.${q('\u200badmin')}&select=user_id,last_seen&limit=1`).catch(() => []))[0];
             const withOwner = (users || []).concat(ow && ow.user_id !== me ? [{ user_id: ow.user_id, handle: OWNER_NAME(), last_seen: ow.last_seen }] : []).sort((x, y) => (y.last_seen > x.last_seen ? 1 : -1));
             const list = withOwner.map((u) => ({ id: u.user_id, name: u.handle, online: Date.now() - new Date(u.last_seen).getTime() < ONLINE_MS, unread: unread[u.user_id] || 0 }));
-            return json(200, { staff, users: list, totalUnread: Object.values(unread).reduce((x, y) => x + y, 0), isAdmin: !!user.isAdmin });
+            return json(200, { staff, users: list, totalUnread: Object.values(unread).reduce((x, y) => x + y, 0) + teamUnread, isAdmin: !!user.isAdmin });
         }
         if (a === 'thread') {
             const w = String(qs.with || '').slice(0, 120); if (!w) return json(400, { error: 'falta' });
@@ -76,14 +78,19 @@ exports.handler = async (event, context) => {
         }
         // ---- solo el dueño (admin) ----
         if (!user.isAdmin) return json(403, { error: 'admin' });
-        if (a === 'inbox') {          // conversaciones dirigidas al Equipo, agrupadas por persona
-            const rows = await T(`msg_messages?or=(to_id.like.staff:*,from_id.like.staff:*)&select=id,from_id,to_id,body,image,created_at&order=created_at.desc&limit=300`);
+        if (a === 'inbox') {          // TODO lo que le llega al dueño: a su cuenta, al Creador y al Equipo, agrupado por persona
             const names = {}; (await T('msg_users?select=user_id,handle&limit=1000')).forEach((u) => { names[u.user_id] = u.handle; });
+            const [teamRows, dm] = await Promise.all([
+                T(`msg_messages?or=(to_id.like.staff:*,from_id.like.staff:*)&select=from_id,to_id,body,image,created_at&order=created_at.desc&limit=300`),
+                T(`msg_messages?or=(to_id.eq.${q(me)},from_id.eq.${q(me)})&select=from_id,to_id,body,image,created_at&order=created_at.desc&limit=200`)
+            ]);
             const convs = {};
-            (rows || []).forEach((m) => { const person = m.from_id.startsWith('staff:') ? m.to_id : m.from_id, alias = m.from_id.startsWith('staff:') ? m.from_id : m.to_id, k = person + '|' + alias; (convs[k] = convs[k] || { person, name: names[person] || 'usuario', alias, aliasName: (STAFF[alias] || {}).name, last: m.created_at, msgs: [] }).msgs.unshift({ fromTeam: m.from_id.startsWith('staff:'), body: m.body, image: m.image, at: m.created_at }); });
-            const dm = await T(`msg_messages?or=(to_id.eq.${q(me)},from_id.eq.${q(me)})&select=from_id,to_id,body,image,created_at&order=created_at.desc&limit=200`);
-            (dm || []).forEach((m) => { if (m.from_id.startsWith('staff:') || m.to_id.startsWith('staff:')) return; const mine = m.from_id === me, person = mine ? m.to_id : m.from_id, k = person + '|me'; (convs[k] = convs[k] || { person, name: names[person] || 'usuario', alias: 'me', aliasName: 'tu cuenta', last: m.created_at, msgs: [] }).msgs.unshift({ fromTeam: mine, body: m.body, image: m.image, at: m.created_at }); });
-            return json(200, { conversations: Object.values(convs).sort((x, y) => (y.last > x.last ? 1 : -1)) });
+            const add = (person, m, fromTeam, via) => { const c = (convs[person] = convs[person] || { person, name: names[person] || 'usuario', last: m.created_at, lastAlias: 'me', msgs: [] }); c.msgs.push({ fromTeam, via, body: m.body, image: m.image, at: m.created_at }); if (m.created_at > c.last) c.last = m.created_at; };
+            (teamRows || []).forEach((m) => { const out = m.from_id.startsWith('staff:'); add(out ? m.to_id : m.from_id, m, out, (STAFF[out ? m.from_id : m.to_id] || {}).name || 'Equipo'); });
+            (dm || []).forEach((m) => { if (m.from_id.startsWith('staff:') || m.to_id.startsWith('staff:')) return; const mine = m.from_id === me; add(mine ? m.to_id : m.from_id, m, mine, 'tu cuenta'); });
+            Object.values(convs).forEach((c) => { c.msgs.sort((x, y) => (x.at > y.at ? 1 : -1)); const lastIn = [...c.msgs].reverse().find((m) => !m.fromTeam); if (lastIn) c.lastAlias = Object.keys(STAFF).find((k) => STAFF[k].name === lastIn.via) || 'me'; });
+            T(`msg_messages?to_id=like.staff:*&read_at=is.null`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ read_at: now }) }).catch(() => {});
+            return json(200, { conversations: Object.values(convs).sort((x, y) => (y.last > x.last ? 1 : -1)), identities: [{ id: 'me', name: 'Tu cuenta (' + OWNER_NAME() + ')' }].concat(Object.entries(STAFF).map(([id, s]) => ({ id, name: s.name }))) });
         }
         if (a === 'reply') {
             const as = String(body.as || ''), to = String(body.to || '').slice(0, 120), text = String(body.body || '').trim().slice(0, MAX_BODY);
