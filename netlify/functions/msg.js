@@ -57,7 +57,7 @@ async function run(event, user) {
             const ow = (await T(`msg_users?handle=eq.${q('\u200badmin')}&select=user_id,last_seen&limit=1`).catch(() => []))[0];
             const withOwner = (users || []).concat(ow && ow.user_id !== me ? [{ user_id: ow.user_id, handle: OWNER_NAME(), last_seen: ow.last_seen }] : []).sort((x, y) => (y.last_seen > x.last_seen ? 1 : -1));
             const list = withOwner.map((u) => ({ id: u.user_id, name: u.handle, online: Date.now() - new Date(u.last_seen).getTime() < ONLINE_MS, unread: unread[u.user_id] || 0 }));
-            return json(200, { staff, users: list, totalUnread: Object.values(unread).reduce((x, y) => x + y, 0) + teamUnread, isAdmin: !!user.isAdmin });
+            return json(200, { staff, users: list, totalUnread: Object.values(unread).reduce((x, y) => x + y, 0) + teamUnread, isAdmin: !!user.isAdmin, teamUnread });
         }
         if (a === 'thread') {
             const w = String(qs.with || '').slice(0, 120); if (!w) return json(400, { error: 'falta' });

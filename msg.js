@@ -19,7 +19,7 @@
   var fab = document.createElement('button'); fab.id = 'gkm-fab'; fab.type = 'button'; fab.setAttribute('aria-label', 'Chatear con otros usuarios'); fab.innerHTML = '<span aria-hidden="true">💬</span> Chatear con otros usuarios <b hidden>0</b>';
   var box = document.createElement('div'); box.id = 'gkm'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Chatear con otros usuarios');
   document.body.appendChild(fab); document.body.appendChild(box);
-  var failed = false, badge = fab.querySelector('b'), open = false, view = 'list', cur = null, tab = 'users', timer = 0, data = null;
+  var failed = false, badge = fab.querySelector('b'), open = false, view = 'list', cur = null, tab = 'team', timer = 0, data = null;
   var el = function (t, c, tx) { var e = document.createElement(t); if (c) e.className = c; if (tx != null) e.textContent = tx; return e; };
   var logged = function () { try { return !!(window.netlifyIdentity && netlifyIdentity.currentUser()); } catch (e) { return false; } };
   async function api(q, body) {
@@ -49,7 +49,7 @@
     box.appendChild(head('Chatear con otros usuarios'));
     var body = el('div', 'body'); box.appendChild(body);
     if (!data) { if (failed) { var fe = el('div', 'empty', 'El chat no está disponible en este momento. Intenta de nuevo en unos minutos.'); var rb = el('button', '', 'Reintentar'); rb.style.cssText = 'display:block;margin:12px auto 0;border:0;border-radius:12px;padding:9px 18px;font:700 14px system-ui;background:#2dd4bf;color:#05121a;cursor:pointer'; rb.onclick = function () { failed = false; render(); }; fe.appendChild(rb); body.appendChild(fe); } else { body.appendChild(el('div', 'empty', 'Cargando…')); refreshList(); } return; }
-    if (data.isAdmin) { var ad = el('button', 'row'); ad.type = 'button'; ad.appendChild(el('span', 'nm', '🛠 Bandeja del Equipo (solo tú)')); ad.onclick = function () { view = 'admin'; render(); }; body.appendChild(ad); }
+    if (data.isAdmin) { var ad = el('button', 'row'); ad.type = 'button'; ad.appendChild(el('span', 'nm', '🛠 Mi bandeja (Equipo y mensajes para mí)')); if (data.teamUnread) ad.appendChild(el('span', 'un', data.teamUnread)); ad.onclick = function () { view = 'admin'; render(); }; body.appendChild(ad); }
     body.appendChild(el('div', 'sec', 'Equipo de Graphikosmos'));
     data.staff.forEach(function (p) { body.appendChild(person(p, true)); });
     if (!data.staff[0].online) body.appendChild(el('div', 'sub', 'Responden en cuanto se conectan.'));
@@ -86,7 +86,7 @@
   }
   async function renderAdmin() {
     box.appendChild(head('Bandeja del Equipo', true));
-    var tabs = el('div', 'tabs'), a = el('button', tab === 'team' ? 'on' : '', 'Mi bandeja'), b = el('button', tab === 'users' ? 'on' : '', 'Entre usuarios');
+    if (tab !== 'team' && tab !== 'users') tab = 'team'; var tabs = el('div', 'tabs'), a = el('button', tab === 'team' ? 'on' : '', 'Mi bandeja'), b = el('button', tab === 'users' ? 'on' : '', 'Entre usuarios');
     a.onclick = function () { tab = 'team'; render(); }; b.onclick = function () { tab = 'users'; render(); }; if (tab !== 'team' && tab !== 'users') tab = 'team'; tabs.append(a, b); box.appendChild(tabs);
     var body = el('div', 'body'); box.appendChild(body); body.appendChild(el('div', 'empty', 'Cargando…'));
     if (tab === 'users') { var r = await api('?a=between'); body.textContent = ''; if (!r.ok) return body.appendChild(el('div', 'empty', 'No se pudo cargar.')); if (!r.data.messages.length) body.appendChild(el('div', 'empty', 'Todavía no hay mensajes entre usuarios.')); r.data.messages.forEach(function (m) { var d = el('div', 'm'); d.style.margin = '6px 12px'; d.style.maxWidth = 'none'; d.appendChild(el('b', '', m.from + ' → ' + m.to + (m.image ? ' 🖼' : ''))); d.appendChild(el('span', '', '\n' + m.body)); body.appendChild(d); }); return; }
