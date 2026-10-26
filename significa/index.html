@@ -46,6 +46,11 @@ body[data-s=speak] #mic::before{animation:ring 2s ease-out infinite}body[data-s=
 #stop::before{content:"";width:14px;height:14px;border-radius:3px;background:currentColor}
 body[data-s=speak] #stop{display:inline-flex}
 #stop:active{transform:scale(.97)}#stop:focus-visible{outline:3px solid #fff;outline-offset:4px}
+#pay{position:fixed;inset:0;z-index:20;background:rgba(5,8,18,.88);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}#pay[hidden]{display:none}
+#pay .box{width:100%;max-width:400px;background:#10152b;border:1px solid #2a3355;border-radius:20px;padding:26px 22px;text-align:center}
+#pay h2{margin:0 0 8px;font-size:1.35rem;line-height:1.25}#pay p{margin:0 0 14px;color:var(--mute);font-size:1rem}
+#pay .price{font-size:2.6rem;font-weight:780;color:var(--ink);margin:6px 0 2px;letter-spacing:-.02em}#pay .per{margin:0 0 16px;font-size:.9rem}
+#payMsg{min-height:1.3em;font-size:.9rem;color:#fbbf24;margin:10px 0 0}
 @media (prefers-reduced-motion:reduce){#mic,#mic::before,#mic::after,.res.fade{animation:none!important}}
 </style></head>
 <body data-s="idle"><main>
@@ -56,6 +61,7 @@ body[data-s=speak] #stop{display:inline-flex}
 <div class="alt"><button id="typeLink" type="button" aria-expanded="false" aria-controls="typeForm">¿Prefieres escribirla?</button>
 <form id="typeForm" hidden autocomplete="off"><input id="typeIn" type="text" maxlength="80" placeholder="Escribe una palabra" aria-label="Escribe la palabra" enterkeyhint="search" autocapitalize="off" spellcheck="false"><button id="typeGo" type="submit">Buscar</button></form></div>
 </main>
+<div id="pay" hidden role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box"><h2 id="payT">Ya usaste tus palabras gratis</h2><p>Sigue consultando todo lo que quieras con la membresía.</p><div class="price" id="payPrice"></div><p class="per" id="payPer"></p><div id="pp-box"></div><div id="payMsg" role="status"></div></div></div>
 <script>window.GK_INSTALL_KEY='sig_install_seen'</script>
 <script src="/install.js?v=2"></script>
 <script>
@@ -141,6 +147,7 @@ async function lookup(payload,my){
     var r=await fetch('/.netlify/functions/significa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({anonId:anon},payload))});
     var d=await r.json().catch(function(){return {}});
     if(my!==token)return;
+    if(r.status===402&&d.paywall){setState('idle','');showPay(d);return}
     if(r.status===429){setState('idle');say('Vas muy rápido. Espera un momento y vuelve a intentar.',true);return}
     if(!r.ok)throw new Error(d.error||('e'+r.status));
     if(!d.understood){setState('idle');say('No entendí la palabra. Toca el círculo e inténtalo otra vez.');track('not_understood');return}
@@ -149,6 +156,27 @@ async function lookup(payload,my){
     speak(d.word,d.wordLang,d.definition,function(){if(state==='speak'&&my===token)setState('idle','Toca el círculo para otra palabra')});
     if(cur&&cur.more)fetchAlts(cur);   // en segundo plano, ya con el primero mostrándose y sonando
   }catch(e){if(my!==token)return;setState('idle');say('No pude buscarlo ahora. Toca el círculo e inténtalo otra vez.',true);track('lookup_error',{reason:String(e.message).slice(0,80)})}
+}
+// ---- membresía (prueba de precios): el precio lo decide el servidor; el pago se verifica en el servidor
+var payOn=false;
+function money(n){return 'US$'+Number(n).toFixed(2)}
+function payMsg(t){$('payMsg').textContent=t||''}
+function loadPP(id){return new Promise(function(ok,no){if(window.paypal&&window.paypal.Buttons)return ok();var sc=document.createElement('script');sc.src='https://www.paypal.com/sdk/js?client-id='+encodeURIComponent(id)+'&currency=USD&intent=capture&components=buttons';sc.onload=function(){window.paypal&&window.paypal.Buttons?ok():no()};sc.onerror=no;document.head.appendChild(sc)})}
+async function showPay(d){
+  stopSpeaking();$('pay').hidden=false;$('payPrice').textContent=money(d.price);$('payPer').textContent='Pago único · '+d.days+' días de acceso sin límite';payMsg('');
+  track('paywall_shown',{price:d.price});
+  if(payOn)return;payOn=true;
+  try{
+    var c=await (await fetch('/.netlify/functions/qer-paypal-config',{cache:'no-store'})).json();if(!c.clientId)throw 0;await loadPP(c.clientId);
+    window.paypal.Buttons({style:{layout:'vertical',color:'gold',shape:'pill',label:'pay',height:48},
+      createOrder:async function(){track('paypal_clicked',{price:d.price});var r=await fetch('/.netlify/functions/significa-pay-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anonId:anon})});var j=await r.json();if(!r.ok||!j.orderID)throw new Error(j.error||'e');return j.orderID},
+      onApprove:async function(data){payMsg('Confirmando el pago…');var r=await fetch('/.netlify/functions/significa-pay-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anonId:anon,orderID:data.orderID})});var j=await r.json().catch(function(){return {}});
+        if(!r.ok||!j.ok){payMsg(j.error||'No se pudo confirmar el pago.');return}
+        track('paid',{price:d.price});$('pay').hidden=true;say('¡Listo! Tu membresía está activa. Toca el círculo y di una palabra.')},
+      onCancel:function(){track('paypal_cancelled')},
+      onError:function(){payMsg('No se pudo completar el pago. Intenta de nuevo.')}
+    }).render('#pp-box');
+  }catch(e){payOn=false;payMsg('No se pudo cargar PayPal. Recarga la página e intenta de nuevo.')}
 }
 var cur=null,curId=0;
 function renderSense(){if(!cur)return;$('def').textContent=cur.senses[cur.idx];var n=cur.senses.length,el=$('sense');el.hidden=n<2;if(n>=2)el.textContent='Significado '+(cur.idx+1)+' de '+n;

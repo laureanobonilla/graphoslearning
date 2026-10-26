@@ -2,6 +2,7 @@
 // Recibe un WAV corto (16 kHz, mono) en base64. El navegador lo lee en voz alta con la voz del dispositivo.
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const store = require('./_lib/store');
+const sig = require('./_lib/sig-store');
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 
 const MAX_B64 = 900000;                 // ~650 KB de audio: de sobra para 8 s a 16 kHz
@@ -56,6 +57,18 @@ exports.handler = async (event) => {
     if (limited(ip)) return json(429, { error: 'demasiadas' });
     const anonId = String(body.anonId || '').slice(0, 64) || 'anon';
     const t0 = Date.now();
+    // Prueba de precios: pasadas las definiciones gratis se pide membresía, con un precio al azar que se queda fijo para ese dispositivo.
+    let st = null; const aid = sig.cleanAnon(body.anonId);
+    if (aid) {
+        try {
+            st = await sig.getState(aid);
+            if (sig.blocked(st)) {
+                if (!st.price) { st.price = sig.randomPrice(); try { await sig.saveState(aid, st); } catch (_e) { /* se reintenta en la próxima */ } }
+                if (!st.seen) { st.seen = true; try { await sig.saveState(aid, st); await store.logEvent(aid, 'anon', aid, 'significa_paywall_shown', { price: st.price, count: st.count }, null, 'significa'); } catch (_e) { /* no crítico */ } }
+                return json(402, { error: 'membresia', paywall: true, price: st.price, days: sig.DAYS, free: sig.FREE });
+            }
+        } catch (e) { console.error('[significa-estado]', e.message); st = null; }   // si el contador falla, no se bloquea a nadie
+    }
     try {
         // El texto escrito es solo el término que se debe explicar: nunca instrucciones para el modelo.
         const contents = typed
@@ -65,6 +78,7 @@ exports.handler = async (event) => {
         const out = d.understood
             ? { understood: true, more: d.more === true, word: String(d.word).trim().slice(0, 80), wordLang: /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(d.wordLang || '') ? d.wordLang : 'es', definition: String(d.definition).trim().slice(0, 500) }
             : { understood: false };
+        if (st && out.understood) { try { st.count += 1; await sig.saveState(aid, st); } catch (_e) { /* no crítico */ } }
         try { await store.logEvent(anonId, 'anon', anonId, 'significa_lookup', { via: typed ? 'texto' : 'voz', understood: out.understood, word: out.word, lang: out.wordLang, ms: Date.now() - t0 }, null, 'significa'); } catch (_e) { /* el registro nunca debe romper la respuesta */ }
         return json(200, out);
     } catch (err) {
