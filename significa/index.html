@@ -75,7 +75,14 @@ function say(msg,err){var e=$('say');e.textContent=msg;e.classList.toggle('err',
 // ---- registro de uso (misma tabla de eventos, app = significa)
 var anon=(function(){try{var k='sig_anon',v=localStorage.getItem(k);if(!v){v=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2));localStorage.setItem(k,v)}return v}catch(e){return 'x'+Date.now()}})();
 function track(ev,md){try{fetch('/.netlify/functions/qer-track-event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:ev,anonId:anon,app:'significa',metadata:md||{}}),keepalive:true}).catch(function(){})}catch(e){}}
-track('opened');
+(function(){var q=new URLSearchParams(location.search),m={},ua=navigator.userAgent||'';
+  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){var v=q.get(k);if(v)m[k.slice(4)]=v.slice(0,80)});
+  if(q.get('fbclid'))m.fbclid=1;if(q.get('gclid'))m.gclid=1;
+  try{if(document.referrer)m.ref=new URL(document.referrer).hostname.slice(0,60)}catch(e){}
+  m.inapp=/FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(ua)?(/Instagram/i.test(ua)?'instagram':'facebook'):'';
+  m.mobile=/Mobi|Android|iPhone|iPad/i.test(ua);m.os=/iPhone|iPad|iPod/i.test(ua)?'ios':(/Android/i.test(ua)?'android':'otro');m.w=window.innerWidth;m.lang=(navigator.language||'').slice(0,8);
+  m.mic=!!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);
+  track('opened',m)})();
 
 // ---- voz del dispositivo (se "desbloquea" con el primer toque: iOS no deja hablar sin un gesto previo)
 var synth=window.speechSynthesis, unlocked=false, speakTok=0;
