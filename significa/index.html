@@ -171,12 +171,12 @@ async function showPay(d){
     window.paypal.Buttons({style:{layout:'vertical',color:'gold',shape:'pill',label:'pay',height:48},
       createOrder:async function(){track('paypal_clicked',{price:d.price});var r=await fetch('/.netlify/functions/significa-pay-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anonId:anon})});var j=await r.json();if(!r.ok||!j.orderID)throw new Error(j.error||'e');return j.orderID},
       onApprove:async function(data){payMsg('Confirmando el pago…');var r=await fetch('/.netlify/functions/significa-pay-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anonId:anon,orderID:data.orderID})});var j=await r.json().catch(function(){return {}});
-        if(!r.ok||!j.ok){payMsg(j.error||'No se pudo confirmar el pago.');return}
+        if(!r.ok||!j.ok){track('pay_capture_failed',{status:r.status,error:String(j.error||'').slice(0,120)});payMsg(j.error||'No se pudo confirmar el pago.');return}
         track('paid',{price:d.price});$('pay').hidden=true;say('¡Listo! Tu membresía está activa. Toca el círculo y di una palabra.')},
       onCancel:function(){track('paypal_cancelled')},
-      onError:function(){payMsg('No se pudo completar el pago. Intenta de nuevo.')}
+      onError:function(e){track('paypal_error',{reason:String(e&&e.message||e).slice(0,120)});payMsg('No se pudo completar el pago. Intenta de nuevo.')}
     }).render('#pp-box');
-  }catch(e){payOn=false;payMsg('No se pudo cargar PayPal. Recarga la página e intenta de nuevo.')}
+  }catch(e){payOn=false;track('paypal_load_failed');payMsg('No se pudo cargar PayPal. Recarga la página e intenta de nuevo.')}
 }
 var cur=null,curId=0;
 function renderSense(){if(!cur)return;$('def').textContent=cur.senses[cur.idx];var n=cur.senses.length,el=$('sense');el.hidden=n<2;if(n>=2)el.textContent='Significado '+(cur.idx+1)+' de '+n;

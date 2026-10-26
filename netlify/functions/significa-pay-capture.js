@@ -24,7 +24,7 @@ exports.handler = async (event) => {
         try { await store.logEvent(aid, 'anon', aid, 'significa_paid', { price: st.price, amount: cap.amount.value, count: st.count, payerEmail: order.payer?.email_address || null, orderID }, null, 'significa'); } catch (_e) { /* no crítico */ }
         return json(200, { ok: true, days: sig.DAYS });
     } catch (err) {
-        console.error('[significa-pay-capture]', err.message);
+        console.error('[significa-pay-capture]', err.message); try { await store.logEvent(aid, 'anon', aid, 'significa_pay_error', { stage: 'capture', message: String(err.message).slice(0, 160) }, null, 'significa'); } catch (_e) { /* no crítico */ }
         return json(502, { error: 'No se pudo confirmar el pago. Si el cargo sí se hizo, escríbenos y te lo resolvemos.' });
     }
 };

@@ -18,7 +18,7 @@ exports.handler = async (event) => {
         try { await store.logEvent(aid, 'anon', aid, 'significa_pay_click', { price: st.price }, null, 'significa'); } catch (_e) { /* no crítico */ }
         return json(200, { orderID, price: st.price });
     } catch (err) {
-        console.error('[significa-pay-create]', err.message);
+        console.error('[significa-pay-create]', err.message); try { await store.logEvent(aid, 'anon', aid, 'significa_pay_error', { stage: 'create', message: String(err.message).slice(0, 160) }, null, 'significa'); } catch (_e) { /* no crítico */ }
         return json(502, { error: 'No se pudo iniciar el pago. Intenta de nuevo en un momento.' });
     }
 };
