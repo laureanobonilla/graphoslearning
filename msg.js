@@ -16,10 +16,10 @@
   '#gkm .tabs{display:flex;gap:6px;padding:8px 14px}#gkm .tabs button{flex:1;border:1px solid #2c3458;background:none;color:#98a3c2;border-radius:10px;padding:6px;cursor:pointer;font:600 12px system-ui}#gkm .tabs button.on{background:#1d2442;color:#fff}' +
   '#gkm .empty{padding:24px 18px;color:#98a3c2;text-align:center}@media(max-width:780px){#gkm{right:8px;bottom:70px}#gkm-fab{right:12px;bottom:12px}}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
-  var fab = document.createElement('button'); fab.id = 'gkm-fab'; fab.type = 'button'; fab.setAttribute('aria-label', 'Mensajes'); fab.innerHTML = '<span aria-hidden="true">💬</span> Mensajes <b hidden>0</b>';
-  var box = document.createElement('div'); box.id = 'gkm'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Mensajes');
+  var fab = document.createElement('button'); fab.id = 'gkm-fab'; fab.type = 'button'; fab.setAttribute('aria-label', 'Chatear con otros usuarios'); fab.innerHTML = '<span aria-hidden="true">💬</span> Chatear con otros usuarios <b hidden>0</b>';
+  var box = document.createElement('div'); box.id = 'gkm'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Chatear con otros usuarios');
   document.body.appendChild(fab); document.body.appendChild(box);
-  var badge = fab.querySelector('b'), open = false, view = 'list', cur = null, tab = 'users', timer = 0, data = null;
+  var failed = false, badge = fab.querySelector('b'), open = false, view = 'list', cur = null, tab = 'users', timer = 0, data = null;
   var el = function (t, c, tx) { var e = document.createElement(t); if (c) e.className = c; if (tx != null) e.textContent = tx; return e; };
   var logged = function () { try { return !!(window.netlifyIdentity && netlifyIdentity.currentUser()); } catch (e) { return false; } };
   async function api(q, body) {
@@ -27,7 +27,7 @@
     var r = await apiFetch('/.netlify/functions/msg' + (q || ''), o); return r;
   }
   function setBadge(n) { badge.hidden = !n; badge.textContent = n > 99 ? '99+' : n; }
-  async function refreshList() { if (!logged()) return; var r = await api('?a=list'); if (r.ok) { data = r.data; setBadge(data.totalUnread); if (open && view === 'list') render(); } }
+  async function refreshList() { if (!logged()) return; var r = await api('?a=list'); if (r.ok) { data = r.data; failed = false; setBadge(data.totalUnread); if (open && view === 'list') render(); } else if (!data) { failed = true; if (open && view === 'list') render(); } }
   async function beat() { if (logged() && !document.hidden) { await api('', { a: 'ping' }); refreshList(); } }
   setInterval(beat, 30000); setTimeout(beat, 2500);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) beat(); });
@@ -44,12 +44,12 @@
   }
   function render() {
     clearInterval(timer); box.textContent = '';
-    if (!logged()) { box.appendChild(head('Mensajes')); var e = el('div', 'empty'); e.appendChild(el('p', '', 'Entra a tu cuenta para escribirle al equipo y a otros usuarios.')); var g = el('button', '', 'Entrar'); g.style.cssText = 'border:0;border-radius:12px;padding:10px 20px;font:700 14px system-ui;background:#2dd4bf;color:#05121a;cursor:pointer'; g.onclick = function () { toggle(); var l = document.getElementById('btnLogin'); if (l) l.click(); }; e.appendChild(g); box.appendChild(e); return; }
+    if (!logged()) { box.appendChild(head('Chatear con otros usuarios')); var e = el('div', 'empty'); e.appendChild(el('p', '', 'Entra a tu cuenta para escribirle al equipo y a otros usuarios.')); var g = el('button', '', 'Entrar'); g.style.cssText = 'border:0;border-radius:12px;padding:10px 20px;font:700 14px system-ui;background:#2dd4bf;color:#05121a;cursor:pointer'; g.onclick = function () { toggle(); var l = document.getElementById('btnLogin'); if (l) l.click(); }; e.appendChild(g); box.appendChild(e); return; }
     if (view === 'thread') return renderThread();
     if (view === 'admin') return renderAdmin();
-    box.appendChild(head('Mensajes'));
+    box.appendChild(head('Chatear con otros usuarios'));
     var body = el('div', 'body'); box.appendChild(body);
-    if (!data) { body.appendChild(el('div', 'empty', 'Cargando…')); refreshList(); return; }
+    if (!data) { if (failed) { var fe = el('div', 'empty', 'El chat no está disponible en este momento. Intenta de nuevo en unos minutos.'); var rb = el('button', '', 'Reintentar'); rb.style.cssText = 'display:block;margin:12px auto 0;border:0;border-radius:12px;padding:9px 18px;font:700 14px system-ui;background:#2dd4bf;color:#05121a;cursor:pointer'; rb.onclick = function () { failed = false; render(); }; fe.appendChild(rb); body.appendChild(fe); } else { body.appendChild(el('div', 'empty', 'Cargando…')); refreshList(); } return; }
     if (data.isAdmin) { var ad = el('button', 'row'); ad.type = 'button'; ad.appendChild(el('span', 'nm', '🛠 Bandeja del Equipo (solo tú)')); ad.onclick = function () { view = 'admin'; render(); }; body.appendChild(ad); }
     body.appendChild(el('div', 'sec', 'Equipo de Graphikosmos'));
     data.staff.forEach(function (p) { body.appendChild(person(p, true)); });
