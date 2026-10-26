@@ -2,7 +2,7 @@
 with e as (
   select coalesce(anon_id, actor_id) as quien, event_name as ev, metadata as m, created_at,
          (created_at at time zone 'America/Costa_Rica')::date as dia
-  from public.events where app = 'significa'
+  from public.events where app = 'significa' and created_at >= timestamptz '2026-10-26 13:00:00-06'   -- desde hoy 1:00 pm, hora de Costa Rica
 ),
 p as (   -- una fila por persona (dispositivo)
   select quien, min(created_at) as primera, count(distinct dia) as dias,
