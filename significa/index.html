@@ -66,7 +66,7 @@ body[data-s=speak] #stop{display:inline-flex}
 <form id="typeForm" hidden autocomplete="off"><input id="typeIn" type="text" maxlength="80" placeholder="Escribe una palabra, en cualquier idioma" aria-label="Escribe la palabra" enterkeyhint="search" autocapitalize="off" spellcheck="false"><button id="typeGo" type="submit">Buscar</button></form></div>
 </main>
 <div id="gate" role="dialog" aria-modal="true" aria-labelledby="gateT" hidden><div class="box"><h1 id="gateT">Crea tu cuenta para usar Significa</h1><p>Es gratis. Tienes 15 consultas para probarla y, si no te sirve, no hay ningún compromiso.</p><button class="cta" id="gateSignup" type="button">Crear mi cuenta</button><button class="cta2" id="gateLogin" type="button">Ya tengo cuenta</button></div></div>
-<div id="pay" hidden role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box"><h2 id="payT">Terminó tu prueba gratis</h2><p>Gracias por probar Significa. Para seguir usándola, escríbeme por WhatsApp y te cuento cómo activarla.</p><a class="cta" id="payWa" target="_blank" rel="noopener" href="#">Escribirme por WhatsApp</a><div id="payMsg" role="status"></div></div></div>
+<div id="pay" hidden role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box"><h2 id="payT">Terminó tu prueba gratis</h2><p>Gracias por probar Significa. Para seguir usándola, contacta al administrador.</p><div id="payMsg" role="status"></div></div></div>
 <script>window.GK_INSTALL_KEY='sig_install_seen'</script>
 <script src="/install.js?v=2"></script>
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
@@ -186,14 +186,12 @@ async function lookup(payload,my){
   }catch(e){if(my!==token)return;setState('idle');say('No pude buscarlo ahora. Toca el círculo e inténtalo otra vez.',true);track('lookup_error',{reason:String(e.message).slice(0,80)})}
 }
 // ---- fin de la prueba: por ahora no se cobra en la app; se invita a contactar por WhatsApp
-var WA='50687772993';
 function showPay(d){
   stopSpeaking();$('pay').hidden=false;
   var me=(window.netlifyIdentity&&netlifyIdentity.currentUser())||null,mail=(d&&d.email)||(me&&me.email)||'';
-  $('payWa').href='https://wa.me/'+WA+'?text='+encodeURIComponent('Hola, ya probé Significa y quiero seguir usándola.'+(mail?' Mi correo es '+mail+'.':''));
   track('paywall_shown');
 }
-$('payWa').addEventListener('click',function(){track('contact_clicked')});
+
 var cur=null,curId=0;
 function renderSense(){if(!cur)return;$('def').textContent=cur.senses[cur.idx];var n=cur.senses.length,el=$('sense');el.hidden=n<2;if(n>=2)el.textContent='Significado '+(cur.idx+1)+' de '+n;
   var b=$('alt');b.classList.toggle('on',!!cur.more&&(n>1||!cur.altsDone));b.textContent=cur.altsDone?'Otro significado':'Otro significado';}
