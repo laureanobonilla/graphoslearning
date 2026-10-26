@@ -36,6 +36,7 @@ async function table(path, options = {}) {
 }
 
 module.exports = {
+    table,
     ensureProfile: (id, email) =>
         rpc('ensure_profile', { p_user: id, p_email: email, p_initial: require('./packages').freeUserNodes() }),
     spendNodes: (id, cost, action) => rpc('spend_nodes', { p_user: id, p_cost: cost, p_action: action }),
