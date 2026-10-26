@@ -2,6 +2,7 @@
 // El Equipo son nombres de rol (Soporte, Guía de estudio, Creador): los mensajes que se les escriben le llegan al dueño
 // (usuario admin), que responde en nombre del rol. Solo se muestra «en línea» cuando el dueño de verdad está conectado.
 const { getUser } = require('./_lib/auth');
+const { getOrCreateGuestId, getExistingGuestId, buildSetCookie } = require('./_lib/guest');
 const { send, esc, OWNER, FROM_OWNER } = require('./_lib/qer-email');
 const store = require('./_lib/store');
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(obj) });
@@ -23,8 +24,14 @@ async function ownerOnline() {          // el dueño = alguna cuenta admin con l
 }
 
 exports.handler = async (event, context) => {
-    const user = getUser(context);
-    if (!user) return json(401, { error: 'login' });
+    // Sin registrarse también se puede conversar: el invitado se identifica con su cookie (gk_guest), y si luego se registra sus conversaciones pasan a su cuenta.
+    let user = getUser(context), cookie = null;
+    if (!user) { const g = getOrCreateGuestId(event); if (g.isNew) cookie = buildSetCookie(g.guestId); user = { id: 'g:' + g.guestId, email: null, isAdmin: false, guest: true }; }
+    const out = (r) => (cookie ? { ...r, headers: { ...r.headers, 'Set-Cookie': cookie } } : r);
+    return out(await run(event, user));
+};
+
+async function run(event, user) {
     const qs = event.queryStringParameters || {};
     let body = {}; if (event.httpMethod === 'POST') { try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); } }
     const a = qs.a || body.a;
@@ -60,12 +67,12 @@ exports.handler = async (event, context) => {
         }
         if (a === 'send') {
             const to = String(body.to || '').slice(0, 120), text = String(body.body || '').trim().slice(0, MAX_BODY);
-            const image = typeof body.image === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(body.image) && body.image.length <= MAX_IMG ? body.image : null;
+            const image = !user.guest && typeof body.image === 'string' && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(body.image) && body.image.length <= MAX_IMG ? body.image : null;
             if (!to || (!text && !image) || to === me) return json(400, { error: 'vacío' });
             if (to.startsWith('staff:')) { if (!STAFF[to]) return json(400, { error: 'destino' }); }
             else if (!(await T(`msg_users?user_id=eq.${q(to)}&select=user_id`))[0]) return json(404, { error: 'destino' });
             const recent = await T(`msg_messages?from_id=eq.${q(me)}&created_at=gte.${q(new Date(Date.now() - 10 * 60000).toISOString())}&select=id&limit=40`);
-            if ((recent || []).length >= 30) return json(429, { error: 'demasiados' });
+            if ((recent || []).length >= (user.guest ? 15 : 30)) return json(429, { error: 'demasiados' });
             await T('msg_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ from_id: me, to_id: to, body: text, image }) });
             const toOwner = !to.startsWith('staff:') && ((await T(`msg_users?user_id=eq.${q(to)}&handle=eq.${q('\u200badmin')}&select=user_id`).catch(() => []))[0]);
             if (toOwner) send({ from: FROM_OWNER(), to: OWNER(), subject: 'Mensaje nuevo en el chat', text: `${user.email || me} te escribió:\n\n${text}${image ? '\n\n[incluye imagen]' : ''}\n\nResponde desde Graphikosmos → Chatear → Bandeja.` }).catch(() => {});
@@ -108,4 +115,4 @@ exports.handler = async (event, context) => {
         console.error('[msg]', err.message);
         return json(503, { error: 'no_disponible' });
     }
-};
+}

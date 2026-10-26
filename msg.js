@@ -27,8 +27,8 @@
     var r = await apiFetch('/.netlify/functions/msg' + (q || ''), o); return r;
   }
   function setBadge(n) { badge.hidden = !n; badge.textContent = n > 99 ? '99+' : n; }
-  async function refreshList() { if (!logged()) return; var r = await api('?a=list'); if (r.ok) { data = r.data; failed = false; setBadge(data.totalUnread); if (open && view === 'list') render(); } else if (!data) { failed = true; if (open && view === 'list') render(); } }
-  async function beat() { if (logged() && !document.hidden) { await api('', { a: 'ping' }); refreshList(); } }
+  async function refreshList() { var r = await api('?a=list'); if (r.ok) { data = r.data; failed = false; setBadge(data.totalUnread); if (open && view === 'list') render(); } else if (!data) { failed = true; if (open && view === 'list') render(); } }
+  async function beat() { if (!document.hidden) { await api('', { a: 'ping' }); refreshList(); } }
   setInterval(beat, 30000); setTimeout(beat, 2500);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) beat(); });
 
@@ -44,7 +44,6 @@
   }
   function render() {
     clearInterval(timer); box.textContent = '';
-    if (!logged()) { box.appendChild(head('Chatear con otros usuarios')); var e = el('div', 'empty'); e.appendChild(el('p', '', 'Entra a tu cuenta para escribirle al equipo y a otros usuarios.')); var g = el('button', '', 'Entrar'); g.style.cssText = 'border:0;border-radius:12px;padding:10px 20px;font:700 14px system-ui;background:#2dd4bf;color:#05121a;cursor:pointer'; g.onclick = function () { toggle(); var l = document.getElementById('btnLogin'); if (l) l.click(); }; e.appendChild(g); box.appendChild(e); return; }
     if (view === 'thread') return renderThread();
     if (view === 'admin') return renderAdmin();
     box.appendChild(head('Chatear con otros usuarios'));
