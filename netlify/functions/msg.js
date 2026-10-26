@@ -14,6 +14,7 @@ const STAFF = {
 const ONLINE_MS = 75 * 1000, MAX_BODY = 1000, MAX_IMG = 260000;
 const T = (path, opt) => store.table(path, opt);
 const q = encodeURIComponent;
+const OWNER_NAME = () => process.env.MSG_OWNER_NAME || 'Bonilla';
 const handleOf = (user) => { const base = String(user.email || 'usuario').split('@')[0].replace(/[^\p{L}\p{N}_.-]/gu, '').slice(0, 14) || 'usuario'; return base; };
 
 async function ownerOnline() {          // el dueño = alguna cuenta admin con latido reciente
@@ -44,7 +45,9 @@ exports.handler = async (event, context) => {
             ]);
             const unread = {}; (unreadRows || []).forEach((r) => { unread[r.from_id] = (unread[r.from_id] || 0) + 1; });
             const staff = Object.entries(STAFF).map(([id, s]) => ({ id, name: s.name, badge: s.role, online, unread: unread[id] || 0 }));
-            const list = (users || []).map((u) => ({ id: u.user_id, name: u.handle, online: Date.now() - new Date(u.last_seen).getTime() < ONLINE_MS, unread: unread[u.user_id] || 0 }));
+            const ow = (await T(`msg_users?handle=eq.${q('\u200badmin')}&select=user_id,last_seen&limit=1`).catch(() => []))[0];
+            const withOwner = (users || []).concat(ow && ow.user_id !== me ? [{ user_id: ow.user_id, handle: OWNER_NAME(), last_seen: ow.last_seen }] : []).sort((x, y) => (y.last_seen > x.last_seen ? 1 : -1));
+            const list = withOwner.map((u) => ({ id: u.user_id, name: u.handle, online: Date.now() - new Date(u.last_seen).getTime() < ONLINE_MS, unread: unread[u.user_id] || 0 }));
             return json(200, { staff, users: list, totalUnread: Object.values(unread).reduce((x, y) => x + y, 0), isAdmin: !!user.isAdmin });
         }
         if (a === 'thread') {
@@ -62,6 +65,8 @@ exports.handler = async (event, context) => {
             const recent = await T(`msg_messages?from_id=eq.${q(me)}&created_at=gte.${q(new Date(Date.now() - 10 * 60000).toISOString())}&select=id&limit=40`);
             if ((recent || []).length >= 30) return json(429, { error: 'demasiados' });
             await T('msg_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ from_id: me, to_id: to, body: text, image }) });
+            const toOwner = !to.startsWith('staff:') && ((await T(`msg_users?user_id=eq.${q(to)}&handle=eq.${q('\u200badmin')}&select=user_id`).catch(() => []))[0]);
+            if (toOwner) send({ from: FROM_OWNER(), to: OWNER(), subject: 'Mensaje nuevo en el chat', text: `${user.email || me} te escribió:\n\n${text}${image ? '\n\n[incluye imagen]' : ''}\n\nResponde desde Graphikosmos → Chatear → Bandeja.` }).catch(() => {});
             if (to.startsWith('staff:')) {            // al dueño le llega también por correo
                 const who = (await T(`msg_users?user_id=eq.${q(me)}&select=handle`))[0];
                 send({ from: FROM_OWNER(), to: OWNER(), subject: `Mensaje para ${STAFF[to].name}`, text: `${who ? who.handle : 'Un usuario'} (${user.email || me}) escribió a «${STAFF[to].name}»:\n\n${text}${image ? '\n\n[incluye imagen]' : ''}\n\nResponde desde Graphikosmos → Mensajes.`, html: `<p><b>${esc(who ? who.handle : 'Un usuario')}</b> (${esc(user.email || me)}) escribió a «${esc(STAFF[to].name)}»:</p><p>${esc(text).replace(/\n/g, '<br>')}</p>${image ? '<p>[incluye imagen]</p>' : ''}<p>Responde desde Graphikosmos → Mensajes.</p>` }).catch(() => {});
@@ -76,12 +81,14 @@ exports.handler = async (event, context) => {
             const names = {}; (await T('msg_users?select=user_id,handle&limit=1000')).forEach((u) => { names[u.user_id] = u.handle; });
             const convs = {};
             (rows || []).forEach((m) => { const person = m.from_id.startsWith('staff:') ? m.to_id : m.from_id, alias = m.from_id.startsWith('staff:') ? m.from_id : m.to_id, k = person + '|' + alias; (convs[k] = convs[k] || { person, name: names[person] || 'usuario', alias, aliasName: (STAFF[alias] || {}).name, last: m.created_at, msgs: [] }).msgs.unshift({ fromTeam: m.from_id.startsWith('staff:'), body: m.body, image: m.image, at: m.created_at }); });
+            const dm = await T(`msg_messages?or=(to_id.eq.${q(me)},from_id.eq.${q(me)})&select=from_id,to_id,body,image,created_at&order=created_at.desc&limit=200`);
+            (dm || []).forEach((m) => { if (m.from_id.startsWith('staff:') || m.to_id.startsWith('staff:')) return; const mine = m.from_id === me, person = mine ? m.to_id : m.from_id, k = person + '|me'; (convs[k] = convs[k] || { person, name: names[person] || 'usuario', alias: 'me', aliasName: 'tu cuenta', last: m.created_at, msgs: [] }).msgs.unshift({ fromTeam: mine, body: m.body, image: m.image, at: m.created_at }); });
             return json(200, { conversations: Object.values(convs).sort((x, y) => (y.last > x.last ? 1 : -1)) });
         }
         if (a === 'reply') {
             const as = String(body.as || ''), to = String(body.to || '').slice(0, 120), text = String(body.body || '').trim().slice(0, MAX_BODY);
-            if (!STAFF[as] || !to || !text) return json(400, { error: 'datos' });
-            await T('msg_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ from_id: as, to_id: to, body: text }) });
+            if ((as !== 'me' && !STAFF[as]) || !to || !text) return json(400, { error: 'datos' });
+            await T('msg_messages', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ from_id: as === 'me' ? me : as, to_id: to, body: text }) });
             return json(200, { ok: true });
         }
         if (a === 'between') {        // mensajes entre usuarios (se avisa a todos en el chat que pueden revisarse)

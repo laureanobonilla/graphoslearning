@@ -51,9 +51,6 @@
     var body = el('div', 'body'); box.appendChild(body);
     if (!data) { if (failed) { var fe = el('div', 'empty', 'El chat no está disponible en este momento. Intenta de nuevo en unos minutos.'); var rb = el('button', '', 'Reintentar'); rb.style.cssText = 'display:block;margin:12px auto 0;border:0;border-radius:12px;padding:9px 18px;font:700 14px system-ui;background:#2dd4bf;color:#05121a;cursor:pointer'; rb.onclick = function () { failed = false; render(); }; fe.appendChild(rb); body.appendChild(fe); } else { body.appendChild(el('div', 'empty', 'Cargando…')); refreshList(); } return; }
     if (data.isAdmin) { var ad = el('button', 'row'); ad.type = 'button'; ad.appendChild(el('span', 'nm', '🛠 Bandeja del Equipo (solo tú)')); ad.onclick = function () { view = 'admin'; render(); }; body.appendChild(ad); }
-    var inv = el('button', 'row'); inv.type = 'button'; inv.style.cssText = 'margin:4px 12px 8px;width:calc(100% - 24px);border:1px solid #2dd4bf;border-radius:12px;display:block;background:#12203a';
-    inv.appendChild(el('div', '', 'Soy quien hizo Graphikosmos y también lo uso como cualquiera.')); inv.appendChild(el('div', 'sub', 'Dime sin filtro qué no sirve, qué te falla o qué te falta. Lo leo yo y lo mejoro. Toca aquí para escribirme.')); inv.lastChild.style.padding = '4px 0 0';
-    inv.onclick = function () { cur = { id: 'staff:creador', name: 'Creador de Graphikosmos', intro: true }; view = 'thread'; render(); }; body.appendChild(inv);
     body.appendChild(el('div', 'sec', 'Equipo de Graphikosmos'));
     data.staff.forEach(function (p) { body.appendChild(person(p, true)); });
     if (!data.staff[0].online) body.appendChild(el('div', 'sub', 'Responden en cuanto se conectan.'));
@@ -73,7 +70,7 @@
   function bubble(m) { var d = el('div', 'm' + (m.mine || m.fromTeam ? ' me' : '')); if (m.body) d.appendChild(el('span', '', m.body)); if (m.image) { var i = document.createElement('img'); i.src = m.image; i.alt = 'Imagen enviada'; d.appendChild(i); } d.appendChild(el('small', '', new Date(m.at).toLocaleString([], { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }))); return d; }
   function composer(onSend) {
     var f = document.createElement('form'), ta = document.createElement('textarea'), pic = el('button', 'g', '🖼'), fi = document.createElement('input'), go = el('button', '', 'Enviar'), img = null;
-    ta.rows = 1; ta.maxLength = 1000; ta.placeholder = (cur && cur.intro) ? 'Cuéntame con confianza qué no te sirve' : 'Escribe un mensaje'; ta.setAttribute('aria-label', 'Mensaje'); fi.type = 'file'; fi.accept = 'image/*'; fi.hidden = true; pic.type = 'button'; pic.setAttribute('aria-label', 'Adjuntar imagen'); go.type = 'submit';
+    ta.rows = 1; ta.maxLength = 1000; ta.placeholder = 'Escribe un mensaje'; ta.setAttribute('aria-label', 'Mensaje'); fi.type = 'file'; fi.accept = 'image/*'; fi.hidden = true; pic.type = 'button'; pic.setAttribute('aria-label', 'Adjuntar imagen'); go.type = 'submit';
     pic.onclick = function () { fi.click(); };
     fi.onchange = async function () { if (!fi.files[0]) return; try { img = await shrink(fi.files[0]); pic.textContent = '✔'; } catch (e) { img = null; pic.textContent = '🖼'; alert('No pude usar esa imagen. Prueba con otra.'); } };
     ta.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); f.requestSubmit(); } });
@@ -85,7 +82,7 @@
     var list = el('div', 'msgs'); box.appendChild(list);
     box.appendChild(composer(async function (t, img) { var r = await api('', { a: 'send', to: cur.id, body: t, image: img }); if (!r.ok) { alert(r.status === 429 ? 'Vas muy rápido. Espera un momento.' : 'No se pudo enviar. Intenta de nuevo.'); return false; } await load(true); return true; }));
     var last = '';
-    async function load(force) { var r = await api('?a=thread&with=' + encodeURIComponent(cur.id)); if (!r.ok || view !== 'thread') return; var sig = JSON.stringify(r.data.messages.map(function (m) { return m.id; })); if (sig === last && !force) return; last = sig; list.textContent = ''; if (!r.data.messages.length) list.appendChild(el('div', 'empty', (cur.id === 'staff:creador' ? 'Hola, soy el creador. ¿Qué es lo que más te cuesta o lo que menos te sirve de la app? Puedes ser tan directo como quieras.' : 'Escribe el primer mensaje. Lo recibirá aunque no esté conectado.'))); r.data.messages.forEach(function (m) { list.appendChild(bubble(m)); }); list.scrollTop = list.scrollHeight; refreshList(); }
+    async function load(force) { var r = await api('?a=thread&with=' + encodeURIComponent(cur.id)); if (!r.ok || view !== 'thread') return; var sig = JSON.stringify(r.data.messages.map(function (m) { return m.id; })); if (sig === last && !force) return; last = sig; list.textContent = ''; if (!r.data.messages.length) list.appendChild(el('div', 'empty', 'Escribe el primer mensaje. Lo recibirá aunque no esté conectado.')); r.data.messages.forEach(function (m) { list.appendChild(bubble(m)); }); list.scrollTop = list.scrollHeight; refreshList(); }
     await load(true); timer = setInterval(load, 6000);
   }
   async function renderAdmin() {
