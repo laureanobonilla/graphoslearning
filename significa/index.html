@@ -32,7 +32,7 @@ body[data-s=speak] #mic::before{animation:ring 2s ease-out infinite}body[data-s=
 .def{font-size:clamp(1.1rem,4.4vw,1.35rem);line-height:1.55;margin:0;color:var(--ink)}
 .res.fade{animation:in .35s ease}@keyframes in{from{opacity:0;transform:translateY(8px)}}
 .err{color:#fbbf24}
-.alt{margin-top:auto;padding-top:26px;width:100%;max-width:420px;text-align:center}
+.langs{margin:0 0 6px;color:#5f6b8f;font-size:.85rem;letter-spacing:.02em}.alt{margin-top:auto;padding-top:26px;width:100%;max-width:420px;text-align:center}
 #typeLink{background:none;border:0;color:var(--mute);font:inherit;font-size:.92rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:10px}
 #typeLink:focus-visible,#typeGo:focus-visible{outline:2px solid #fff;outline-offset:3px}
 #typeForm{display:flex;gap:8px}#typeForm[hidden]{display:none}
@@ -55,11 +55,11 @@ body[data-s=speak] #stop{display:inline-flex}
 </style></head>
 <body data-s="idle"><main>
 <div class="stage"><button id="mic" type="button" aria-label="Tocar para decir una palabra"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor" stroke="none"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg></button></div>
-<p id="say" class="say" role="status" aria-live="polite">Toca el círculo y di una palabra</p>
+<p id="say" class="say" role="status" aria-live="polite">Toca el círculo y di una palabra, en cualquier idioma</p>
 <div id="acts"><button id="stop" type="button" aria-label="Detener la lectura">Detener</button></div>
 <section id="res" class="res" hidden aria-live="polite"><h1 id="word" class="word"></h1><p id="def" class="def"></p><p id="sense" class="sense" hidden></p><button id="alt" type="button" aria-label="Ver otro significado de la palabra">Otro significado</button></section>
-<div class="alt"><button id="typeLink" type="button" aria-expanded="false" aria-controls="typeForm">¿Prefieres escribirla?</button>
-<form id="typeForm" hidden autocomplete="off"><input id="typeIn" type="text" maxlength="80" placeholder="Escribe una palabra" aria-label="Escribe la palabra" enterkeyhint="search" autocapitalize="off" spellcheck="false"><button id="typeGo" type="submit">Buscar</button></form></div>
+<div class="alt"><p class="langs" aria-hidden="true">casa · house · maison · 家 · Haus · きれい · بيت</p><button id="typeLink" type="button" aria-expanded="false" aria-controls="typeForm">¿Prefieres escribirla?</button>
+<form id="typeForm" hidden autocomplete="off"><input id="typeIn" type="text" maxlength="80" placeholder="Escribe una palabra, en cualquier idioma" aria-label="Escribe la palabra" enterkeyhint="search" autocapitalize="off" spellcheck="false"><button id="typeGo" type="submit">Buscar</button></form></div>
 </main>
 <div id="pay" hidden role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box"><h2 id="payT">Ya usaste tus palabras gratis</h2><p>Sigue consultando todo lo que quieras con la membresía.</p><div class="price" id="payPrice"></div><p class="per" id="payPer"></p><div id="pp-box"></div><div id="payMsg" role="status"></div></div></div>
 <script>window.GK_INSTALL_KEY='sig_install_seen'</script>

@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Desahogo</title>
+<meta name="description" content="Un espacio para hablar y desahogarte, en cualquier idioma. Tu primera sesión es gratis.">
+<meta name="theme-color" content="#0d1b22">
+<link rel="manifest" href="/desahogo/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/desahogo/apple-touch-icon.png">
+<style>
+:root{--bg:#0d1b22;--ink:#eaf3f1;--mute:#9db5b4;--a:#7dd3c0;--b:#9bb8f0;--card:#12262e;--line:#24424a;--lvl:0}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(120% 70% at 50% 0%,#17313a 0%,var(--bg) 62%);color:var(--ink);font:17px/1.6 Georgia,"Iowan Old Style","Palatino Linotype",serif;overflow-x:hidden}
+main{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:max(22px,env(safe-area-inset-top)) 20px max(26px,env(safe-area-inset-bottom))}
+h1{font-size:clamp(2rem,8vw,2.7rem);margin:.4em 0 .1em;font-weight:600;letter-spacing:-.01em;text-align:center}
+.sub{color:var(--mute);text-align:center;margin:0 0 18px;max-width:30em}
+.ui{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.screen{width:100%;max-width:520px;display:none;flex-direction:column;align-items:center}.screen.on{display:flex}
+.card{width:100%;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 18px;margin:10px 0}
+.ai{font-size:.85rem;color:var(--mute);text-align:center;margin:6px 0 14px}
+.moods{display:flex;gap:8px;justify-content:center;margin:8px 0 4px}
+.moods button{width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:#0f2128;color:var(--ink);font-size:1.6rem;cursor:pointer}
+.moods button:hover,.moods button:focus-visible{border-color:var(--a);outline:none;transform:scale(1.06)}
+.moods button.on{background:var(--a);border-color:var(--a)}
+.lbl{display:flex;justify-content:space-between;color:var(--mute);font-size:.8rem;width:100%;max-width:300px;margin:0 auto 6px}
+.btn{border:0;border-radius:999px;padding:14px 26px;font:650 1rem system-ui,sans-serif;cursor:pointer;color:#06201b;background:linear-gradient(135deg,var(--a),var(--b));margin-top:14px}
+.btn.ghost{background:transparent;color:var(--mute);border:1px solid var(--line);font-weight:500;padding:10px 18px;font-size:.9rem}
+.btn:focus-visible,.link:focus-visible,#mic:focus-visible,#stop:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.btn[disabled]{opacity:.5}
+.link{background:none;border:0;color:var(--mute);font:inherit;font-size:.88rem;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:10px}
+.stage{display:flex;align-items:center;justify-content:center;width:100%;height:clamp(210px,36vh,320px)}
+#mic{position:relative;width:min(58vw,240px);height:min(58vw,240px);aspect-ratio:1;border-radius:50%;border:0;cursor:pointer;color:#06201b;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 14px 50px rgba(125,211,192,.22);display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .3s}
+#mic svg{width:34%;height:34%}#mic::before{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--a);opacity:0;pointer-events:none}
+body[data-s=idle] #mic{animation:breathe 4.2s ease-in-out infinite}
+body[data-s=listen] #mic{transform:scale(calc(1 + var(--lvl)*.2));box-shadow:0 0 0 calc(var(--lvl)*40px) rgba(125,211,192,.16),0 14px 60px rgba(155,184,240,.4)}
+body[data-s=listen] #mic::before,body[data-s=speak] #mic::before{animation:ring 2s ease-out infinite}
+body[data-s=think] #mic{animation:think 1.4s ease-in-out infinite;filter:saturate(.7)}
+@keyframes breathe{50%{box-shadow:0 0 0 14px rgba(125,211,192,.07),0 14px 50px rgba(125,211,192,.3)}}
+@keyframes ring{0%{opacity:.6;transform:scale(1)}100%{opacity:0;transform:scale(1.45)}}@keyframes think{50%{transform:scale(.95)}}
+.say{min-height:1.6em;text-align:center;color:var(--mute);font:1rem system-ui,sans-serif;margin:4px 0 0}.err{color:#f2c46d}
+.heard{color:var(--mute);font-size:.95rem;text-align:center;font-style:italic;margin:10px 0 0;max-width:30em}
+.reply{font-size:clamp(1.15rem,4.6vw,1.4rem);line-height:1.6;text-align:center;margin:10px 0 0;max-width:30em}
+.bar{width:100%;max-width:320px;height:4px;background:var(--line);border-radius:4px;margin:12px 0 0;overflow:hidden}.bar i{display:block;height:100%;background:var(--a);width:0;transition:width .4s}
+#stop{display:none;margin:12px auto 0;min-height:48px;padding:0 22px;border-radius:999px;border:2px solid var(--ink);background:rgba(255,255,255,.07);color:var(--ink);font:650 1rem system-ui,sans-serif;cursor:pointer;align-items:center;gap:9px}
+#stop::before{content:"";width:13px;height:13px;border-radius:3px;background:currentColor}body[data-s=speak] #stop{display:inline-flex}
+#typeForm{display:flex;gap:8px;width:100%}#typeForm[hidden]{display:none}
+#typeIn{flex:1;min-width:0;background:#0f2128;border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px 14px;font:inherit;font-size:1rem;resize:none}
+#typeGo{border:1px solid var(--line);background:#12262e;color:var(--ink);border-radius:12px;padding:0 16px;font:600 .95rem system-ui,sans-serif;cursor:pointer}
+.crisis{position:sticky;top:8px;z-index:5;width:100%;max-width:520px;background:#3a2a14;border:1px solid #c9923a;border-radius:14px;padding:12px 16px;margin:8px 0;font:.95rem/1.5 system-ui,sans-serif}.crisis[hidden]{display:none}.crisis a{color:#ffd9a0}
+.sumt{font-weight:650;margin:0 0 4px;font:650 .8rem system-ui;color:var(--a)}.sumx{margin:0 0 12px}
+#pay{position:fixed;inset:0;z-index:20;background:rgba(5,12,16,.9);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}#pay[hidden]{display:none}
+#pay .box{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px 22px;text-align:center}
+#pay h2{margin:0 0 8px;font-size:1.3rem}#pay p{margin:0 0 12px;color:var(--mute);font:.98rem/1.5 system-ui,sans-serif}.price{font:760 2.4rem system-ui;margin:4px 0}#payMsg{min-height:1.3em;font:.9rem system-ui;color:#f2c46d;margin-top:10px}
+.dots{display:flex;gap:6px;justify-content:center;margin-top:8px}.dots span{font-size:1.15rem}
+.foot{margin-top:auto;padding-top:22px;text-align:center}
+@media (prefers-reduced-motion:reduce){#mic,#mic::before{animation:none!important}}
+</style></head>
+<body data-s="idle"><main>
+<div id="crisis" class="crisis" hidden role="alert"></div>
+
+<section id="s-home" class="screen on">
+<h1>Desahogo</h1>
+<p class="sub">Un lugar para soltar lo que traes. Habla o escribe, en el idioma que quieras, y te escucho.</p>
+<p class="ai ui">Soy una inteligencia artificial: no soy una persona ni un profesional de salud, y no sustituyo una terapia.</p>
+<div class="card ui" style="text-align:center"><p style="margin:0 0 6px" id="homeInfo">Tu primera sesión es gratis.</p><p style="margin:0;color:var(--mute);font-size:.92rem" id="homeMem"></p>
+<div class="lbl" style="margin-top:14px"><span>Muy mal</span><span>Muy bien</span></div>
+<div class="moods" id="moodStart" role="group" aria-label="¿Cómo llegas hoy?"></div><div style="text-align:center;font-size:.85rem;color:var(--mute)">¿Cómo llegas hoy?</div>
+<button class="btn" id="begin" type="button" disabled>Empezar sesión</button></div>
+<div class="foot ui"><button class="link" id="delHist" type="button" hidden>Borrar mi historial</button></div>
+</section>
+
+<section id="s-talk" class="screen">
+<div class="stage"><button id="mic" type="button" aria-label="Tocar para hablar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3" fill="currentColor" stroke="none"/><path d="M5 11.5a7 7 0 0 0 14 0M12 18.5V22"/></svg></button></div>
+<p id="say" class="say" role="status" aria-live="polite">Toca el círculo y cuéntame lo que traes</p>
+<div class="bar" aria-hidden="true"><i id="bar"></i></div>
+<div id="heard" class="heard" hidden></div><div id="reply" class="reply" aria-live="polite"></div>
+<button id="stop" type="button" aria-label="Detener la voz">Detener</button>
+<div style="width:100%;max-width:420px;margin-top:18px;text-align:center" class="ui"><button class="link" id="typeLink" type="button" aria-expanded="false">¿Prefieres escribir?</button>
+<form id="typeForm" hidden autocomplete="off"><textarea id="typeIn" rows="2" maxlength="1500" placeholder="Escribe lo que quieras contar" aria-label="Escribe lo que quieras contar"></textarea><button id="typeGo" type="submit">Enviar</button></form></div>
+<button class="btn ghost ui" id="finish" type="button">Terminar la sesión</button>
+</section>
+
+<section id="s-end" class="screen">
+<h1>Gracias por contarme</h1>
+<div class="lbl ui" style="margin-top:6px"><span>Muy mal</span><span>Muy bien</span></div>
+<div class="moods" id="moodEnd" role="group" aria-label="¿Cómo te vas?"></div><div class="ui" style="font-size:.85rem;color:var(--mute);text-align:center">¿Cómo te vas?</div>
+<button class="btn" id="endGo" type="button" disabled>Ver mi cierre</button>
+</section>
+
+<section id="s-sum" class="screen">
+<h1>Tu cierre de hoy</h1>
+<div class="card"><p class="sumt ui">LO QUE ME LLEVO DE HOY</p><p class="sumx" id="sum"></p><p class="sumt ui">PARA HOY O ESTA SEMANA</p><p class="sumx" id="ex"></p>
+<p class="sumt ui">TU ÁNIMO</p><div class="dots" id="dots"></div></div>
+<p class="ai ui" id="nextInfo"></p>
+<button class="btn" id="again" type="button">Volver al inicio</button>
+</section>
+</main>
+
+<div id="pay" hidden role="dialog" aria-modal="true" aria-labelledby="payT"><div class="box"><h2 id="payT">Continuar con más sesiones</h2><p>Tu primera sesión fue gratis. Con el paquete sigues con las sesiones completas, y yo recuerdo lo que me contaste.</p><div class="price" id="payPrice"></div><p id="payPer"></p><div id="pp-box"></div><div id="payMsg" role="status"></div><button class="link ui" id="payClose" type="button">Ahora no</button></div></div>
+
+<script>window.GK_INSTALL_KEY='acp_install_seen'</script>
+<script src="/install.js?v=2"></script>
+<script>
+(function(){
+'use strict';
+var $=function(i){return document.getElementById(i)};
+var SR=16000, MAX_MS=45000, WAIT_MS=9000, SIL_MS=2300, MIN_SPEECH_MS=250;
+var state='idle', rec=null, token=0, mood0=null, mood1=null, info=null, sessionOn=false, lastLang='es';
+var FACES=['😞','😕','😐','🙂','😊'];
+function setState(s,msg){state=s;document.body.dataset.s=s;if(msg!=null)$('say').textContent=msg;}
+function say(msg,err){var e=$('say');e.textContent=msg;e.classList.toggle('err',!!err);}
+function show(id){['s-home','s-talk','s-end','s-sum'].forEach(function(x){$(x).classList.toggle('on',x===id)});window.scrollTo(0,0)}
+var anon=(function(){try{var k='acp_anon',v=localStorage.getItem(k);if(!v){v=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2));localStorage.setItem(k,v)}return v}catch(e){return 'x'+Date.now()+'anon'}})();
+// registro de uso: solo conteos, nunca lo que la persona dice
+function track(ev,md){try{fetch('/.netlify/functions/qer-track-event',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:ev,anonId:anon,app:'desahogo',metadata:md||{}}),keepalive:true}).catch(function(){})}catch(e){}}
+function api(body){return fetch('/.netlify/functions/acompanar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({anonId:anon},body))}).then(function(r){return r.json().catch(function(){return {}}).then(function(d){return {ok:r.ok,status:r.status,d:d}})})}
+track('opened');
+// ---- ánimo (1 a 5)
+function moodRow(id,cb){var box=$(id);FACES.forEach(function(f,i){var b=document.createElement('button');b.type='button';b.textContent=f;b.setAttribute('aria-label','Ánimo '+(i+1)+' de 5');b.onclick=function(){[].forEach.call(box.children,function(c){c.classList.remove('on')});b.classList.add('on');cb(i+1)};box.appendChild(b)})}
+moodRow('moodStart',function(n){mood0=n;$('begin').disabled=false});
+moodRow('moodEnd',function(n){mood1=n;$('endGo').disabled=false});
+// ---- ayuda en crisis: según el país del navegador (verifica los números); siempre un directorio internacional
+function helpText(){
+  var tz='',lg=(navigator.language||'es').toLowerCase();try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||''}catch(e){}
+  var nat='Llama ahora al número de emergencias de tu país';
+  if(/Costa_Rica/.test(tz))nat='Llama al 911 (Costa Rica)';else if(/^(America\/(New_York|Chicago|Denver|Los_Angeles|Phoenix|Anchorage))|Pacific\/Honolulu/.test(tz))nat='En Estados Unidos, llama o escribe al 988';else if(/Madrid|Canary/.test(tz))nat='En España, llama al 024 (o al 112 si es urgente)';
+  return nat+'. También puedes hablar ahora mismo con alguien de confianza que esté cerca.';}
+function showCrisis(){var c=$('crisis');c.hidden=false;c.innerHTML='';var b=document.createElement('b');b.textContent='No estás sola ni solo. ';c.appendChild(b);c.appendChild(document.createTextNode(helpText()+' Otras líneas de ayuda en tu país: '));var a=document.createElement('a');a.href='https://findahelpline.com';a.target='_blank';a.rel='noopener';a.textContent='findahelpline.com';c.appendChild(a);c.appendChild(document.createTextNode('.'))}
+// ---- voz del dispositivo
+var synth=window.speechSynthesis, unlocked=false, speakTok=0;
+function unlock(){if(!synth||unlocked)return;unlocked=true;try{var u=new SpeechSynthesisUtterance(' ');u.volume=0;synth.speak(u)}catch(e){}}
+function pickVoice(lang){var vs=synth?synth.getVoices():[];var p=String(lang||'es').toLowerCase(),base=p.split('-')[0];return vs.filter(function(v){return v.lang&&v.lang.toLowerCase().replace('_','-')===p})[0]||vs.filter(function(v){return v.lang&&v.lang.toLowerCase().indexOf(base)===0})[0]||null}
+function speakText(text,lang,done){if(!synth){done();return}try{synth.cancel()}catch(e){}var tok=++speakTok,fin=false,end=function(){if(!fin){fin=true;if(tok===speakTok)done()}};
+  try{var u=new SpeechSynthesisUtterance(text);u.lang=lang||'es';var v=pickVoice(lang);if(v)u.voice=v;u.rate=.96;u.onend=end;u.onerror=end;setTimeout(end,Math.max(4000,text.length*120));synth.speak(u)}catch(e){end()}}
+function stopSpeaking(){speakTok++;try{synth&&synth.cancel()}catch(e){}}
+function wavB64(chunks,inRate){
+  var n=0;chunks.forEach(function(c){n+=c.length});var all=new Float32Array(n),o=0;chunks.forEach(function(c){all.set(c,o);o+=c.length});
+  var ratio=inRate/SR,len=Math.floor(all.length/ratio),pcm=new Int16Array(len);
+  for(var i=0;i<len;i++){var a=Math.floor(i*ratio),b=Math.min(all.length,Math.floor((i+1)*ratio)),s=0,c=0;for(var j=a;j<b;j++){s+=all[j];c++}var v=c?s/c:0;v=Math.max(-1,Math.min(1,v));pcm[i]=v<0?v*0x8000:v*0x7fff}
+  var buf=new ArrayBuffer(44+len*2),dv=new DataView(buf);
+  function w(off,str){for(var k=0;k<str.length;k++)dv.setUint8(off+k,str.charCodeAt(k))}
+  w(0,'RIFF');dv.setUint32(4,36+len*2,true);w(8,'WAVE');w(12,'fmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,SR,true);dv.setUint32(28,SR*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,len*2,true);
+  new Int16Array(buf,44).set(pcm);
+  var bytes=new Uint8Array(buf),bin='',CH=0x8000;for(var p=0;p<bytes.length;p+=CH)bin+=String.fromCharCode.apply(null,bytes.subarray(p,p+CH));
+  return btoa(bin);
+}
+async function startRecording(){
+  var my=++token;
+  var stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}})}
+  catch(e){setState('idle');say(e&&e.name==='NotAllowedError'?'Necesito permiso para usar el micrófono. Actívalo en el navegador y toca de nuevo.':'No encontré un micrófono para usar.',true);track('mic_error',{name:e&&e.name});return}
+  if(my!==token){stream.getTracks().forEach(function(t){t.stop()});return}
+  var AC=window.AudioContext||window.webkitAudioContext,ctx=new AC(),src=ctx.createMediaStreamSource(stream),proc=ctx.createScriptProcessor(4096,1,1),mute=ctx.createGain();mute.gain.value=0;
+  var chunks=[],t0=performance.now(),speechMs=0,lastVoice=0,started=false,noise=0.008,calib=0,done=false,smooth=0;
+  rec={stop:function(){finish(true)},cancel:function(){finish(false)}};
+  setState('listen','Te escucho… toca el círculo cuando termines');
+  proc.onaudioprocess=function(ev){
+    if(done)return;var d=ev.inputBuffer.getChannelData(0);chunks.push(new Float32Array(d));
+    var s=0;for(var i=0;i<d.length;i++)s+=d[i]*d[i];var rms=Math.sqrt(s/d.length),now=performance.now(),el=now-t0;
+    smooth=smooth*.6+rms*.4;document.documentElement.style.setProperty('--lvl',Math.min(1,smooth*9).toFixed(2));
+    if(el<350){noise=Math.max(noise,Math.min(rms*1.5,0.03));calib++;return}      // aprende el ruido de fondo al inicio
+    var thr=Math.max(0.018,noise*3);
+    if(rms>thr){if(!started){started=true}lastVoice=now;speechMs+=d.length/ctx.sampleRate*1000}
+    if(started&&now-lastVoice>SIL_MS)finish(true);
+    else if(!started&&el>WAIT_MS)finish(true);
+    else if(el>MAX_MS)finish(true);
+  };
+  src.connect(proc);proc.connect(mute);mute.connect(ctx.destination);
+  function finish(send){
+    if(done)return;done=true;rec=null;
+    try{proc.disconnect();src.disconnect()}catch(e){}stream.getTracks().forEach(function(t){t.stop()});
+    var rate=ctx.sampleRate;try{ctx.close()}catch(e){}
+    document.documentElement.style.setProperty('--lvl','0');
+    if(!send||my!==token)return;
+    if(!started||speechMs<MIN_SPEECH_MS){setState('idle');say('No alcancé a escucharte. Toca el círculo cuando quieras hablar.');track('no_speech');return}
+    turn({audio:wavB64(chunks,rate)},my);
+  }
+}
+
+// ---- turno de conversación
+async function turn(payload,my){
+  setState('think','Te estoy escuchando…');
+  try{
+    var r=await api(Object.assign({action:'turn'},payload));if(my!==token)return;
+    if(r.status===429){setState('idle');say('Vamos con calma: espera un momento y sigue.',true);return}
+    if(r.status===409){await beginSession(true);setState('idle');say('Continuemos. Toca el círculo.');return}
+    if(!r.ok)throw new Error(r.d.error||('e'+r.status));
+    var d=r.d;
+    if(!d.understood){setState('idle');say('No alcancé a entenderte. Toca el círculo e inténtalo otra vez.');return}
+    lastLang=d.lang||'es';$('heard').hidden=!d.heard;$('heard').textContent=d.heard?('“'+d.heard+'”'):'';$('reply').textContent=d.reply;$('bar').style.width=Math.min(100,Math.round(d.turns/d.max*100))+'%';
+    if(d.crisis){showCrisis();track('crisis_shown')}
+    setState('speak','Toca el círculo para seguir hablando');
+    speakText(d.reply,lastLang,function(){if(state==='speak'&&my===token)setState('idle','Toca el círculo para seguir hablando')});
+    if(d.end){setTimeout(function(){finishFlow()},1500)}
+  }catch(e){if(my!==token)return;setState('idle');say('No pude responder ahora. Toca el círculo para intentar otra vez.',true)}
+}
+// ---- sesión
+async function beginSession(silent){
+  var r=await api({action:'start',mood:mood0});
+  if(r.status===402&&r.d.paywall){openPay(r.d);return false}
+  if(!r.ok){say('No se pudo iniciar. Intenta de nuevo en un momento.',true);return false}
+  sessionOn=true;info=r.d;
+  if(!silent){$('reply').textContent=r.d.greetMemory?'Qué bueno verte de nuevo. Cuéntame cómo has estado, o lo que quieras soltar hoy.':'Estoy aquí para escucharte. Cuéntame lo que traes, con calma y sin orden.';$('heard').hidden=true;$('bar').style.width='0';setState('idle','Toca el círculo y habla');show('s-talk');track('session_start');
+    var intro=$('reply').textContent;speakText(intro,'es',function(){})}
+  return true;
+}
+$('begin').onclick=async function(){unlock();this.disabled=true;await beginSession(false);this.disabled=mood0==null};
+function finishFlow(){token++;if(rec)rec.cancel();stopSpeaking();setState('idle');mood1=null;$('endGo').disabled=true;[].forEach.call($('moodEnd').children,function(c){c.classList.remove('on')});show('s-end')}
+$('finish').onclick=finishFlow;
+$('endGo').onclick=async function(){this.disabled=true;this.textContent='Preparando tu cierre…';
+  var r=await api({action:'end',mood:mood1});this.textContent='Ver mi cierre';sessionOn=false;
+  var d=r.d||{};$('sum').textContent=d.summary||'Gracias por tomarte este rato para ti.';$('ex').textContent=d.exercise||'Toma un vaso de agua y respira lento tres veces.';
+  var dots=$('dots');dots.textContent='';(d.moods||[]).slice(-8).forEach(function(m){var s=document.createElement('span');s.textContent=FACES[(m.e||m.s||3)-1];s.title='Al terminar';dots.appendChild(s)});
+  $('nextInfo').textContent=(d.credits>0)?('Te quedan '+d.credits+' sesiones.'):(d.free>0?'Tienes una sesión gratis disponible.':'Para otra sesión, puedes sacar un paquete cuando quieras.');
+  show('s-sum');track('session_end',{moodStart:mood0,moodEnd:mood1});};
+$('again').onclick=function(){loadHome();show('s-home')};
+$('payClose').onclick=function(){$('pay').hidden=true;$('begin').disabled=mood0==null};
+// ---- grabar / escribir
+$('mic').addEventListener('click',function(){unlock();
+  if(state==='listen'&&rec){rec.stop();return}
+  token++;if(rec)rec.cancel();stopSpeaking();$('say').classList.remove('err');startRecording();});
+$('stop').addEventListener('click',function(){if(state!=='speak')return;stopSpeaking();setState('idle','Toca el círculo para seguir hablando')});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&state==='speak'){stopSpeaking();setState('idle','Toca el círculo para seguir hablando')}});
+$('typeLink').addEventListener('click',function(){var f=$('typeForm'),o=f.hidden;f.hidden=!o;this.setAttribute('aria-expanded',String(o));if(o){this.hidden=true;setTimeout(function(){$('typeIn').focus()},30)}});
+$('typeForm').addEventListener('submit',function(ev){ev.preventDefault();var t=$('typeIn').value.trim();if(!t)return;unlock();token++;if(rec)rec.cancel();stopSpeaking();$('typeIn').value='';turn({text:t},token)});
+$('typeIn').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('typeForm').requestSubmit()}});
+if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('mic').disabled=true;setTimeout(function(){$('typeLink').click()},0)}
+// ---- pago (paquete de sesiones; el precio y el cobro los decide y verifica el servidor)
+var ppOn=false;
+function loadPP(id){return new Promise(function(ok,no){if(window.paypal&&window.paypal.Buttons)return ok();var sc=document.createElement('script');sc.src='https://www.paypal.com/sdk/js?client-id='+encodeURIComponent(id)+'&currency=USD&intent=capture&components=buttons';sc.onload=function(){window.paypal&&window.paypal.Buttons?ok():no()};sc.onerror=no;document.head.appendChild(sc)})}
+async function openPay(d){
+  $('pay').hidden=false;$('payPrice').textContent='US$'+Number(d.price).toFixed(2);$('payPer').textContent='Paquete de '+d.pack+' sesiones completas · pago único';$('payMsg').textContent='';track('paywall_shown');
+  if(ppOn)return;ppOn=true;
+  try{var c=await (await fetch('/.netlify/functions/qer-paypal-config',{cache:'no-store'})).json();if(!c.clientId)throw 0;await loadPP(c.clientId);
+    window.paypal.Buttons({style:{layout:'vertical',color:'gold',shape:'pill',label:'pay',height:48},
+      createOrder:async function(){track('paypal_clicked');var r=await fetch('/.netlify/functions/acompanar-pay-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anonId:anon})});var j=await r.json();if(!r.ok||!j.orderID)throw new Error(j.error||'e');return j.orderID},
+      onApprove:async function(data){$('payMsg').textContent='Confirmando el pago…';var r=await fetch('/.netlify/functions/acompanar-pay-capture',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anonId:anon,orderID:data.orderID})});var j=await r.json().catch(function(){return {}});
+        if(!r.ok||!j.ok){$('payMsg').textContent=j.error||'No se pudo confirmar el pago.';return}
+        track('paid');$('pay').hidden=true;await loadHome();$('begin').disabled=mood0==null;say('Listo. Ya puedes empezar tu sesión.')},
+      onCancel:function(){track('paypal_cancelled')},onError:function(){$('payMsg').textContent='No se pudo completar el pago. Intenta de nuevo.'}
+    }).render('#pp-box');
+  }catch(e){ppOn=false;$('payMsg').textContent='No se pudo cargar PayPal. Recarga la página e intenta de nuevo.'}
+}
+// ---- inicio
+async function loadHome(){
+  var r=await api({action:'state'});if(!r.ok)return;info=r.d;
+  $('homeInfo').textContent=r.d.free>0?'Tu primera sesión es gratis.':(r.d.credits>0?'Te quedan '+r.d.credits+' sesiones.':'Tu primera sesión ya la usaste. Para seguir, puedes sacar un paquete.');
+  $('homeMem').textContent=r.d.hasMemory?'Recuerdo lo que hablamos antes, para continuar donde quedamos.':'';
+  $('delHist').hidden=!(r.d.hasMemory||(r.d.moods&&r.d.moods.length));
+  if(r.d.inSession){sessionOn=true}
+}
+$('delHist').onclick=async function(){if(!confirm('Voy a borrar lo que recuerdo de tus sesiones y tu historial de ánimo. ¿Seguro?'))return;await api({action:'delete'});track('history_deleted');loadHome()};
+loadHome();
+if('serviceWorker' in navigator){try{navigator.serviceWorker.register('/desahogo/sw.js',{scope:'/desahogo/'}).catch(function(){})}catch(e){}}
+if(window.GK_INSTALL)window.GK_INSTALL.maybe(false,{name:'Desahogo',desktop:true});
+})();
+</script></body></html>
