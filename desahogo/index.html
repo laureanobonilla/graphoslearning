@@ -212,7 +212,7 @@ $('endGo').onclick=async function(){this.disabled=true;this.textContent='Prepara
   var dots=$('dots');dots.textContent='';(d.moods||[]).slice(-8).forEach(function(m){var s=document.createElement('span');s.textContent=FACES[(m.e||m.s||3)-1];s.title='Al terminar';dots.appendChild(s)});
   $('nextInfo').textContent=(d.credits>0)?('Te quedan '+d.credits+' sesiones.'):(d.free>0?'Tienes una sesión gratis disponible.':'Para otra sesión, puedes sacar un paquete cuando quieras.');
   show('s-sum');track('session_end',{moodStart:mood0,moodEnd:mood1});};
-$('again').onclick=function(){loadHome();show('s-home')};
+$('again').onclick=function(){loadHome();show('s-home');if(FROMAD)setTimeout(window.__acpOffer,1500)};
 $('payClose').onclick=function(){$('pay').hidden=true;$('begin').disabled=mood0==null};
 // ---- grabar / escribir
 $('mic').addEventListener('click',function(){unlock();
@@ -253,6 +253,8 @@ $('helpBtn').onclick=function(){$('help').hidden=false;$('helpBody').textContent
 $('helpClose').onclick=function(){$('help').hidden=true};
 loadHome();
 if('serviceWorker' in navigator){try{navigator.serviceWorker.register('/desahogo/sw.js',{scope:'/desahogo/'}).catch(function(){})}catch(e){}}
-if(window.GK_INSTALL)window.GK_INSTALL.maybe(false,{name:'Desahogo',desktop:true});
+var UA=navigator.userAgent||'',INAPP=/FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(UA),FROMAD=/[?&](fbclid|gclid|utm_source)=/.test(location.search);
+window.__acpOffer=function(){if(INAPP||!window.GK_INSTALL||window.__acpOffered)return;window.__acpOffered=1;window.GK_INSTALL.maybe(false,{name:'Desahogo',desktop:true})};
+if(!INAPP&&!FROMAD)window.__acpOffer();
 })();
 </script></body></html>

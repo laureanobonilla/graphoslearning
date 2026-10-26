@@ -160,6 +160,7 @@ async function lookup(payload,my){
     if(!d.understood){setState('idle');say('No entendí la palabra. Toca el círculo e inténtalo otra vez.');track('not_understood');return}
     show(d);track('result',{word:d.word,lang:d.wordLang,seconds:Math.round((Date.now()-t0)/100)/10});
     setState('speak','Toca el círculo para otra palabra');
+    if(FROMAD)setTimeout(window.__sigOffer,4000);
     speak(d.word,d.wordLang,d.definition,function(){if(state==='speak'&&my===token)setState('idle','Toca el círculo para otra palabra')});
     if(cur&&cur.more)fetchAlts(cur);   // en segundo plano, ya con el primero mostrándose y sonando
   }catch(e){if(my!==token)return;setState('idle');say('No pude buscarlo ahora. Toca el círculo e inténtalo otra vez.',true);track('lookup_error',{reason:String(e.message).slice(0,80)})}
@@ -226,6 +227,9 @@ if(synth&&synth.addEventListener)synth.addEventListener('voiceschanged',function
 if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){say('Este navegador no deja usar el micrófono. Puedes escribir la palabra aquí abajo.',true);$('mic').disabled=true;$('typeLink').click()}
 if('serviceWorker' in navigator){try{navigator.serviceWorker.register('/significa/sw.js',{scope:'/significa/'}).catch(function(){})}catch(e){}}
 // ofrece instalarla al entrar (solo si aún no está instalada)
-if(window.GK_INSTALL)window.GK_INSTALL.maybe(false,{name:'Significa',desktop:true});
+// Instalar: dentro del navegador de Facebook/Instagram NUNCA (no se puede y confunde); si viene de un anuncio, solo después de su primera palabra; el resto, al entrar.
+var UA=navigator.userAgent||'',INAPP=/FBAN|FBAV|FB_IAB|Instagram|Messenger/i.test(UA),FROMAD=/[?&](fbclid|gclid|utm_source)=/.test(location.search);
+window.__sigOffer=function(){if(INAPP||!window.GK_INSTALL||window.__sigOffered)return;window.__sigOffered=1;window.GK_INSTALL.maybe(false,{name:'Significa',desktop:true})};
+if(!INAPP&&!FROMAD)window.__sigOffer();
 })();
 </script></body></html>
