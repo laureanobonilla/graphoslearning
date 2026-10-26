@@ -6,6 +6,7 @@ const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'app
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+    if (process.env.SIG_PAYPAL !== '1') return json(403, { error: 'El cobro en la app está desactivado por ahora.' });
     let body; try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
     const aid = sig.cleanAnon(body.anonId);
     if (!aid) return json(400, { error: 'Solicitud inválida' });

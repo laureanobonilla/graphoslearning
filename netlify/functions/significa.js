@@ -3,6 +3,7 @@
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const store = require('./_lib/store');
 const sig = require('./_lib/sig-store');
+const { getUser } = require('./_lib/auth');
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 
 const MAX_B64 = 900000;                 // ~650 KB de audio: de sobra para 8 s a 16 kHz
@@ -32,10 +33,13 @@ const altPrompt = (word, lang, first) => `La palabra o término es ${JSON.string
 const PROMPT_TEXT = 'Una persona escribió una palabra o un término (puede estar en cualquier idioma, o ser un nombre propio, un concepto o una expresión corta; corrige la ortografía si es evidente). Explica qué significa SIEMPRE EN ESPAÑOL, aunque sea de otro idioma, y devuelve wordLang con el idioma del término. Habla de forma sencilla, como a alguien curioso. Si no es un término con significado (texto sin sentido), devuelve understood=false.';
 const valid = (d) => d && typeof d.understood === 'boolean' && (!d.understood || (d.word && d.definition));
 
-exports.handler = async (event) => {
+exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
     let body;
     try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
+    // Sin cuenta no funciona: cada persona (id de Netlify Identity) tiene su propio contador de consultas.
+    const user = getUser(context);
+    if (!user) return json(401, { error: 'login' });
     const ip0 = (event.headers && (event.headers['x-nf-client-connection-ip'] || (event.headers['x-forwarded-for'] || '').split(',')[0].trim())) || 'unknown';
     if (body.mode === 'alts') {                       // otros significados: se piden aparte para no atrasar la primera definición
         const word = String(body.word || '').replace(/\s+/g, ' ').trim().slice(0, 80), first = String(body.first || '').slice(0, 500);
@@ -46,7 +50,7 @@ exports.handler = async (event) => {
         try {
             const d = await generateWithRetries(altPrompt(word, lang, first), ALT_SCHEMA, (x) => x && Array.isArray(x.meanings), { tag: 'significa-alts', maxOutputTokens: 700, deadline: t1 + 20000, attemptMs: 10000 });
             const meanings = d.meanings.map((m) => String(m || '').trim().slice(0, 400)).filter(Boolean).slice(0, 3);
-            try { const a0 = String(body.anonId || '').slice(0, 64) || 'anon'; await store.logEvent(a0, 'anon', a0, 'significa_alts', { word, n: meanings.length, ms: Date.now() - t1 }, null, 'significa'); } catch (_e) { /* nunca rompe la respuesta */ }
+            try { const a0 = String(body.anonId || '').slice(0, 64) || 'anon'; await store.logEvent(user.id, 'user', a0, 'significa_alts', { word, n: meanings.length, ms: Date.now() - t1 }, null, 'significa'); } catch (_e) { /* nunca rompe la respuesta */ }
             return json(200, { meanings });
         } catch (err) { console.error('[significa-alts]', err.message); return json(502, { error: 'no_disponible' }); }
     }
@@ -58,14 +62,14 @@ exports.handler = async (event) => {
     const anonId = String(body.anonId || '').slice(0, 64) || 'anon';
     const t0 = Date.now();
     // Prueba de precios: pasadas las definiciones gratis se pide membresía, con un precio al azar que se queda fijo para ese dispositivo.
-    let st = null; const aid = sig.cleanAnon(body.anonId);
+    let st = null; const aid = sig.cleanAnon(user.id);
     if (aid) {
         try {
             st = await sig.getState(aid);
-            if (sig.blocked(st)) {
-                if (!st.price) { st.price = sig.randomPrice(); try { await sig.saveState(aid, st); } catch (_e) { /* se reintenta en la próxima */ } }
-                if (!st.seen) { st.seen = true; try { await sig.saveState(aid, st); await store.logEvent(aid, 'anon', aid, 'significa_paywall_shown', { price: st.price, count: st.count }, null, 'significa'); } catch (_e) { /* no crítico */ } }
-                return json(402, { error: 'membresia', paywall: true, price: st.price, days: sig.DAYS, free: sig.FREE });
+            if (user.email && st.email !== user.email) st.email = user.email;
+            if (sig.blocked(st)) {         // se acabó la prueba: por ahora no se cobra en la app, se pide contactar
+                if (!st.seen) { st.seen = true; try { await sig.saveState(aid, st); await store.logEvent(user.id, 'user', anonId, 'significa_paywall_shown', { count: st.count, contact: true }, user.email || null, 'significa'); } catch (_e) { /* no crítico */ } }
+                return json(402, { error: 'membresia', paywall: true, contact: true, free: sig.FREE, email: user.email || '' });
             }
         } catch (e) { console.error('[significa-estado]', e.message); st = null; }   // si el contador falla, no se bloquea a nadie
     }
@@ -79,7 +83,7 @@ exports.handler = async (event) => {
             ? { understood: true, more: d.more === true, word: String(d.word).trim().slice(0, 80), wordLang: /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/.test(d.wordLang || '') ? d.wordLang : 'es', definition: String(d.definition).trim().slice(0, 500) }
             : { understood: false };
         if (st && out.understood) { try { st.count += 1; await sig.saveState(aid, st); } catch (_e) { /* no crítico */ } }
-        try { await store.logEvent(anonId, 'anon', anonId, 'significa_lookup', { via: typed ? 'texto' : 'voz', understood: out.understood, word: out.word, lang: out.wordLang, ms: Date.now() - t0 }, null, 'significa'); } catch (_e) { /* el registro nunca debe romper la respuesta */ }
+        try { await store.logEvent(user.id, 'user', anonId, 'significa_lookup', { via: typed ? 'texto' : 'voz', understood: out.understood, word: out.word, lang: out.wordLang, ms: Date.now() - t0 }, user.email || null, 'significa'); } catch (_e) { /* el registro nunca debe romper la respuesta */ }
         return json(200, out);
     } catch (err) {
         console.error('[significa]', err.message);
