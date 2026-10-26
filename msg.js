@@ -36,7 +36,6 @@
     var h = el('div', 'h'); if (back) { var b = el('button', '', '←'); b.setAttribute('aria-label', 'Volver'); b.onclick = function () { view = 'list'; cur = null; render(); }; h.appendChild(b); }
     h.appendChild(el('div', 't', title)); var x = el('button', '', '✕'); x.setAttribute('aria-label', 'Cerrar'); x.onclick = toggle; h.appendChild(x); return h;
   }
-  var NOTE = 'Los mensajes pueden ser revisados por el equipo para atender dudas, mejorar el servicio y cuidar la seguridad.';
   function person(p, isStaff) {
     var b = el('button', 'row'); b.type = 'button'; b.appendChild(el('span', 'dot' + (p.online ? ' on' : ''))); b.appendChild(el('span', 'nm', p.name));
     if (isStaff) b.appendChild(el('span', 'bd', p.badge)); if (p.unread) b.appendChild(el('span', 'un', p.unread));
@@ -48,7 +47,7 @@
     if (!logged()) { box.appendChild(head('Mensajes')); var e = el('div', 'empty'); e.appendChild(el('p', '', 'Entra a tu cuenta para escribirle al equipo y a otros usuarios.')); var g = el('button', '', 'Entrar'); g.style.cssText = 'border:0;border-radius:12px;padding:10px 20px;font:700 14px system-ui;background:#2dd4bf;color:#05121a;cursor:pointer'; g.onclick = function () { toggle(); var l = document.getElementById('btnLogin'); if (l) l.click(); }; e.appendChild(g); box.appendChild(e); return; }
     if (view === 'thread') return renderThread();
     if (view === 'admin') return renderAdmin();
-    box.appendChild(head('Mensajes')); box.appendChild(el('div', 'note', NOTE));
+    box.appendChild(head('Mensajes'));
     var body = el('div', 'body'); box.appendChild(body);
     if (!data) { body.appendChild(el('div', 'empty', 'Cargando…')); refreshList(); return; }
     if (data.isAdmin) { var ad = el('button', 'row'); ad.type = 'button'; ad.appendChild(el('span', 'nm', '🛠 Bandeja del Equipo (solo tú)')); ad.onclick = function () { view = 'admin'; render(); }; body.appendChild(ad); }
@@ -79,7 +78,7 @@
     f.append(pic, fi, ta, go); return f;
   }
   async function renderThread() {
-    box.appendChild(head(cur.name, true)); box.appendChild(el('div', 'note', NOTE));
+    box.appendChild(head(cur.name, true));
     var list = el('div', 'msgs'); box.appendChild(list);
     box.appendChild(composer(async function (t, img) { var r = await api('', { a: 'send', to: cur.id, body: t, image: img }); if (!r.ok) { alert(r.status === 429 ? 'Vas muy rápido. Espera un momento.' : 'No se pudo enviar. Intenta de nuevo.'); return false; } await load(true); return true; }));
     var last = '';
