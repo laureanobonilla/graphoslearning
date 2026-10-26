@@ -241,7 +241,12 @@ function withBilling(raw, overrides = {}) {
                             catch (e3) { console.error('[billing] ipTrialsToday:', e3.message); }
                         }
                         else if (fromFb) { allowed = true; fbTrial = true; }
-                        else if (fbHint) { allowed = true; fbTrial = true; fbVia = 'facebook_claimed'; console.warn('[billing] prueba FB aceptada por aviso del navegador (no se halló su visita en events)'); }
+                        else if (fbHint) {
+                            // El aviso del navegador no se verifica: por eso también lleva el tope por red (solo se consulta si hay hash disponible).
+                            let capOk = true;
+                            try { if (deps.trial.ipTrialsToday) capOk = await deps.trial.ipTrialsToday(identity.ip) < deps.trial.IP_TRIAL_MAX_PER_DAY; } catch (e4) { capOk = false; console.error('[billing] ipTrialsToday (aviso):', e4.message); }
+                            if (capOk) { allowed = true; fbTrial = true; fbVia = 'facebook_claimed'; console.warn('[billing] prueba FB aceptada por aviso del navegador (no se halló su visita en events)');  }
+                        }
                     }
                 } catch (err) { console.error('[billing] verificación de prueba:', err.message); }
                 if (!allowed) {

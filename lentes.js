@@ -683,7 +683,18 @@ function fbNow() {
 }
 function isGuestNow() { try { return !(typeof currentUser !== 'undefined' && currentUser) && !(typeof isAdmin !== 'undefined' && isAdmin) && !(window.netlifyIdentity && netlifyIdentity.currentUser && netlifyIdentity.currentUser()); } catch (_e) { return true; } }
 // ¿Le toca saltarse el muro de registro y el aviso de saldo? El servidor decide de verdad (solo deja UN ejemplo por invitado que llegó de Facebook).
-function fbTrialOk() { return isGuestNow() && fbNow(); }
+// Visitantes de un ANUNCIO DE GOOGLE (2026-10-25): también prueban una vez sin registrarse. Se reconoce por el clic (gclid/gbraid/wbraid o utm_source=google
+// con utm_medium=cpc), se recuerda 7 días en este navegador y el servidor lo confirma de verdad (ver _lib/trial.js). La búsqueda orgánica de Google NO cuenta.
+function googleNow() {
+  try {
+    const q = new URLSearchParams(location.search), src = String(q.get('utm_source') || '').toLowerCase(), med = String(q.get('utm_medium') || '').toLowerCase();
+    const now = q.has('gclid') || q.has('gbraid') || q.has('wbraid') || (src === 'google' && /^(cpc|ppc|paid)/.test(med));
+    if (now) { try { localStorage.setItem('gk_g_ad', String(Date.now())); } catch (_e) { /* nada */ } return true; }
+    const t = Number(localStorage.getItem('gk_g_ad') || 0);
+    return !!t && Date.now() - t < 7 * 24 * 3600 * 1000;
+  } catch (_e) { return false; }
+}
+function fbTrialOk() { return isGuestNow() && (fbNow() || googleNow()); }
 function fbEntryWanted() {
   try { return cardsOn() && fbTrialOk() && !hasMap() && localStorage.getItem('gk_fb_trial_used') !== '1' && !localStorage.getItem('gk_lens_pending'); } catch (_e) { return false; }
 }
