@@ -45,7 +45,8 @@ exports.handler = async (event) => {
             ? generateWithRetries(letterLib.prompt(transcript, reading.archetypeName), letterLib.SCHEMA, letterLib.validate, { tag: 'qer-letter', maxOutputTokens: 2048, deadline, attemptMs: 15000 }).then(letterLib.clean).catch(err => { console.error('[qer-lead] carta falló:', err.message); return null; })
             : Promise.resolve(null);
         // El análisis para el dueño y la carta se piden a la vez; el correo sale en cuanto está la carta.
-        const analysisP = transcript
+        // El análisis de «qué app ofrecerle» queda APAGADO (lo importante es que el informe llegue). Para volver a encenderlo: QER_LEAD_ANALYSIS=1 en Netlify.
+        const analysisP = (transcript && process.env.QER_LEAD_ANALYSIS === '1')
             ? generateWithRetries(lead.prompt(transcript, reading.archetypeName), lead.SCHEMA, lead.validate, { tag: 'qer-lead', maxOutputTokens: 3072, deadline, attemptMs: 15000 }).catch(err => { console.error('[qer-lead] análisis falló:', err.message); return null; })
             : Promise.resolve(null);
         const letter = await letterP;

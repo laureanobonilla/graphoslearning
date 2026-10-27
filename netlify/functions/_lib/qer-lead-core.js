@@ -74,11 +74,11 @@ function renderOwnerEmail({ email, consent, delivered, deliveryReason, archetype
         parts.push(`<p style="margin:10px 0 0"><b>Versión más pequeña para probar primero:</b> ${esc(a.simplerIdea.name)} — ${esc(a.simplerIdea.promise)}</p>`);
         parts.push(`<p style="margin:10px 0 0"><b>Señal de pago:</b> ${esc(a.payingSignal)} — ${esc(a.payingReason)}</p>`);
         parts.push(`<h3 style="margin:16px 0 4px">Primer mensaje (cámbialo [ENLACE])</h3><div style="${box};white-space:pre-wrap">${esc(a.openingMessage)}</div>`);
-    } else parts.push('<p style="background:#fff7e0;border:1px solid #e6cf8a;border-radius:8px;padding:10px 12px">La IA no pudo analizar sus respuestas esta vez. Abajo están todas, léelas tú o vuelve a correr el análisis.</p>');
+    } else parts.push('<p style="background:#fff7e0;border:1px solid #e6cf8a;border-radius:8px;padding:10px 12px">Sin análisis automático (está apagado para que el informe salga rápido). Abajo están sus respuestas completas.</p>');
     parts.push(`<h3 style="margin:18px 0 4px">Sus respuestas completas</h3><div style="${box};white-space:pre-wrap;font-size:13px">${esc(transcript || '(no disponible)')}</div>`);
     parts.push(`<p style="color:#999;font-size:12px">Lectura ${esc(readingId)}. Todo queda también en la tabla events (event_name = 'qer_lead').</p></div>`);
     const text = a ? `${email}\nApp: ${a.app.name} — ${a.app.promise}\nComplejidad: ${a.app.complexity}\n\nMensaje:\n${a.openingMessage}\n\n${warn.join('\n')}` : `${email}\n(sin análisis)\n\n${transcript || ''}`;
-    return { subject: `[Lead] ${a ? a.app.name : 'sin análisis'} · ${email}${warn.length ? ' · OJO' : ''}`, html: parts.join(''), text };
+    return { subject: `[Informe] ${a ? a.app.name : 'enviado'} · ${email}${warn.length ? ' · OJO' : ''}`, html: parts.join(''), text };
 }
 
 module.exports = { SCHEMA, validate, prompt, renderOwnerEmail };
