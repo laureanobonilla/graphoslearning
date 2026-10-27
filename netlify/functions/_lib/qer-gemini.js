@@ -7,7 +7,7 @@ const { GoogleGenAI } = require('@google/genai');
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 // Se alternan modelos con intentos cortos: si el primero se cuelga (pasó el 26/10 a las 22:00: tres generaciones seguidas
 // agotaron 24 s con gemini-3.8-flash), el segundo y el tercero sí tienen tiempo de responder dentro del presupuesto.
-const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.8-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash-lite'];
+const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
 
 // Los modelos "flash" recientes "piensan" antes de responder, y ese pensamiento
 // cuenta como tiempo (y como tokens de salida) aunque no se vea: en una tarea
@@ -63,7 +63,7 @@ async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini
         } catch (err) {
             lastError = err;
             const msg = (err.message || '').toLowerCase();
-            const retryable = err.isTimeout || ['503', 'unavailable', '429', 'high demand', 'overloaded', 'internal'].some(s => msg.includes(s));
+            const retryable = err.isTimeout || ['503', 'unavailable', '429', 'high demand', 'overloaded', 'internal', 'not found', 'not_found'].some(s => msg.includes(s));
             console.error(`[${tag}] intento ${attempt + 1} (${FALLBACK_MODELS[attempt]}, ${Date.now() - t0} ms): llamada falló (${retryable ? 'reintentable' : 'NO reintentable'}): ${err.message}`);
             if (!retryable) throw err;
             if (!err.isTimeout && attempt < FALLBACK_MODELS.length - 1) await new Promise(r => setTimeout(r, 600));
