@@ -5,7 +5,9 @@
 const { GoogleGenAI } = require('@google/genai');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.8-flash', 'gemini-3.6-flash'];
+// Se alternan modelos con intentos cortos: si el primero se cuelga (pasó el 26/10 a las 22:00: tres generaciones seguidas
+// agotaron 24 s con gemini-3.8-flash), el segundo y el tercero sí tienen tiempo de responder dentro del presupuesto.
+const FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.8-flash-lite', 'gemini-3.6-flash', 'gemini-3.8-flash-lite'];
 
 // Los modelos "flash" recientes "piensan" antes de responder, y ese pensamiento
 // cuenta como tiempo (y como tokens de salida) aunque no se vea: en una tarea
@@ -43,7 +45,7 @@ async function callOnce(model, prompt, schema, maxOutputTokens, timeoutMs) {
     throw new Error('Ninguna configuración de pensamiento fue aceptada');
 }
 
-async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, deadline = null, attemptMs = 24000 } = {}) {
+async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, deadline = null, attemptMs = 10000 } = {}) {
     let lastError = null;
     for (let attempt = 0; attempt < FALLBACK_MODELS.length; attempt++) {
         // `deadline` (ms epoch): Netlify corta la función a los ~26 s y devuelve un
