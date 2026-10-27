@@ -60,6 +60,7 @@ select
   count(distinct actor_id) filter (where event_name='contrib_amount_selected')  as eligieron_monto,
   count(distinct actor_id) filter (where event_name in ('sinpe_number_copied','paypal_clicked')) as copiaron_sinpe_o_fueron_a_paypal,
   count(distinct actor_id) filter (where event_name='contrib_claimed')          as dicen_que_aportaron,
+  count(distinct actor_id) filter (where event_name in ('contrib_problem','contrib_problem_opened')) as tuvieron_problema_al_aportar,
   count(distinct actor_id) filter (where event_name='share_clicked')            as compartieron
 from public.events
 where app='quien-eres' and created_at >= '2026-10-27 10:00:00-06';
@@ -76,3 +77,10 @@ select metadata->>'score' as carita, count(distinct actor_id) as personas
 from public.events
 where app='quien-eres' and event_name='gracias_viewed' and (metadata->>'score') is not null and created_at >= '2026-10-27 10:00:00-06'
 group by 1 order by 1;
+
+-- 9) PROBLEMAS AL APORTAR (lo que contaron) -------------------------------------------------------------------
+select created_at at time zone 'America/Costa_Rica' as hora_cr, metadata->>'country' as pais, metadata->>'mode' as via,
+       metadata->>'amount' as monto, metadata->>'text' as que_paso
+from public.events
+where app='quien-eres' and event_name='contrib_problem' and created_at >= '2026-10-27 10:00:00-06'
+order by created_at desc;

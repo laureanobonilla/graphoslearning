@@ -64,6 +64,17 @@
       <p class="soft" id="worldNote"></p>
       <div class="row"><a class="btn" id="paypal" href="https://www.paypal.com/ncp/payment/XP9KHRHF325KS" target="_blank" rel="noopener">Continuar a PayPal</a><button class="btn ghost" id="claimW" type="button">Ya aporté</button></div>
     </div>
+    <div class="pay" id="back" hidden>
+      <p style="margin-bottom:8px"><b>¿Pudiste completar el aporte?</b></p>
+      <div class="row"><button class="btn" id="backYes" type="button">Sí, listo</button><button class="btn ghost" id="backNo" type="button">Tuve un problema</button></div>
+    </div>
+    <p class="soft" id="probLink" hidden style="margin-top:12px"><button class="small-link" id="probOpen" type="button">¿Algo no funcionó?</button></p>
+    <div class="pay" id="prob" hidden>
+      <p style="margin-bottom:8px"><b>Cuéntame qué pasó</b> y lo resuelvo yo.</p>
+      <textarea id="probText" maxlength="500" placeholder="Por ejemplo: el enlace no abrió, PayPal rechazó la tarjeta, no sé cómo hacer el SINPE…"></textarea>
+      <div class="row"><button class="btn" id="probSend" type="button">Enviar</button></div>
+      <p class="done" id="probDone" hidden>Gracias. Lo reviso y te escribo si me dejaste forma de hacerlo; si no, intenta de nuevo en un rato. 🤍</p>
+    </div>
     <p class="done" id="thanks" hidden>Gracias de corazón. Aportar a esto significa que alguien más podrá leerse como tú lo hiciste. 🤍</p>
   </section>
 
@@ -144,20 +155,32 @@
         Array.prototype.forEach.call(box.children, function(x){ x.setAttribute('aria-pressed','false'); });
         b.setAttribute('aria-pressed','true'); picked = o;
         track('contrib_amount_selected', { amount: o.k, label: o.l, mode: C === 'CR' ? 'sinpe' : 'paypal' });
+        $('probLink').hidden = false;
         if (C === 'CR') { $('payCR').hidden = false; $('payWorld').hidden = true; }
         else { $('payWorld').hidden = false; $('payCR').hidden = true; $('worldNote').textContent = 'En PayPal escribe el monto en dólares: ' + (LOCAL[C] ? 'US$' + o.k : o.l.replace('US$','US$ ')) + '.'; }
       });
       box.appendChild(b);
     });
   }
-  function thanks(){ $('thanks').hidden = false; $('payCR').hidden = true; $('payWorld').hidden = true; revealShare(); }
+  function thanks(){ $('thanks').hidden = false; $('payCR').hidden = true; $('payWorld').hidden = true; $('back').hidden = true; $('probLink').hidden = true; $('prob').hidden = true; revealShare(); }
+  function mode(){ return C === 'CR' ? 'sinpe' : 'paypal'; }
+  function openProb(src){ $('prob').hidden = false; $('probLink').hidden = true; $('back').hidden = true; track('contrib_problem_opened', { mode: mode(), from: src }); $('probText').focus(); }
+  $('probOpen').addEventListener('click', function(){ openProb('link'); });
+  $('backNo').addEventListener('click', function(){ openProb('return'); });
+  $('backYes').addEventListener('click', function(){ track('contrib_claimed', { amount: picked && picked.k, mode:'paypal', via:'return' }); thanks(); });
+  $('probSend').addEventListener('click', function(){
+    var t = $('probText').value.trim(); track('contrib_problem', { mode: mode(), amount: picked && picked.k, text: t.slice(0, 500) });
+    $('probSend').disabled = true; $('probText').disabled = true; $('probDone').hidden = false;
+  });
+  var wentToPaypal = false;
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible' && wentToPaypal && $('thanks').hidden && $('prob').hidden) { $('back').hidden = false; } });
   $('copy').addEventListener('click', function(){
     var n = $('sinpe').textContent.replace(/\D/g,''); track('sinpe_number_copied', {});
     (navigator.clipboard ? navigator.clipboard.writeText(n) : Promise.reject()).then(function(){ $('copy').textContent = 'Copiado ✓'; }).catch(function(){ $('copy').textContent = 'Copia: ' + n; });
   });
   $('claimCR').addEventListener('click', function(){ track('contrib_claimed', { amount: picked && picked.k, mode:'sinpe' }); thanks(); });
   $('claimW').addEventListener('click', function(){ track('contrib_claimed', { amount: picked && picked.k, mode:'paypal' }); thanks(); });
-  $('paypal').addEventListener('click', function(){ track('paypal_clicked', { amount: picked && picked.k }); });
+  $('paypal').addEventListener('click', function(){ wentToPaypal = true; track('paypal_clicked', { amount: picked && picked.k }); $('probLink').hidden = false; });
 
   // 4) Compartir
   var shareUrl = location.origin + '/quien-eres/?utm_source=share&utm_medium=whatsapp';
