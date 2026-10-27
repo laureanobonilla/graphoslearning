@@ -47,3 +47,32 @@ select created_at at time zone 'America/Costa_Rica' as hora_cr,
 from public.events
 where app='quien-eres' and event_name='qer_lead' and created_at >= '2026-10-26 21:48:00-06'
 order by created_at desc limit 50;
+
+-- =====================================================================================================
+-- 6) EMBUDO DEL APORTE (caritas → página de gracias → monto → «ya aporté»). Una persona = un informe (readingId).
+--    «ya aporté» es lo que la persona dice; la plata real la confirmas en PayPal / SINPE.
+-- =====================================================================================================
+select
+  count(distinct actor_id) filter (where event_name='qer_lead' and metadata->>'delivered'='true') as informes_entregados,
+  count(distinct actor_id) filter (where event_name='gracias_viewed')           as abrieron_la_pagina,
+  count(distinct actor_id) filter (where event_name='gracias_viewed' and (metadata->>'score') is not null) as tocaron_una_carita,
+  count(distinct actor_id) filter (where event_name='feedback_text_sent')       as dejaron_comentario,
+  count(distinct actor_id) filter (where event_name='contrib_amount_selected')  as eligieron_monto,
+  count(distinct actor_id) filter (where event_name in ('sinpe_number_copied','paypal_clicked')) as copiaron_sinpe_o_fueron_a_paypal,
+  count(distinct actor_id) filter (where event_name='contrib_claimed')          as dicen_que_aportaron,
+  count(distinct actor_id) filter (where event_name='share_clicked')            as compartieron
+from public.events
+where app='quien-eres' and created_at >= '2026-10-27 10:00:00-06';
+
+-- 7) QUÉ SINTIERON Y QUÉ ESCRIBIERON (una fila por respuesta) ----------------------------------------------
+select created_at at time zone 'America/Costa_Rica' as hora_cr, metadata->>'country' as pais,
+       metadata->>'score' as carita_1_a_5, metadata->>'text' as comentario
+from public.events
+where app='quien-eres' and event_name='feedback_text_sent' and created_at >= '2026-10-27 10:00:00-06'
+order by created_at desc;
+
+-- 8) DISTRIBUCIÓN DE CARITAS (1 = nada … 5 = mucho) ---------------------------------------------------------
+select metadata->>'score' as carita, count(distinct actor_id) as personas
+from public.events
+where app='quien-eres' and event_name='gracias_viewed' and (metadata->>'score') is not null and created_at >= '2026-10-27 10:00:00-06'
+group by 1 order by 1;

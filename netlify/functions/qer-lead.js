@@ -50,7 +50,7 @@ exports.handler = async (event) => {
             ? generateWithRetries(lead.prompt(transcript, reading.archetypeName), lead.SCHEMA, lead.validate, { tag: 'qer-lead', maxOutputTokens: 3072, deadline, attemptMs: 15000 }).catch(err => { console.error('[qer-lead] análisis falló:', err.message); return null; })
             : Promise.resolve(null);
         const letter = await letterP;
-        view.designed = true; view.letter = letter;
+        view.designed = true; view.letter = letter; view.readingId = readingId;
         try { const raw = (event.headers || {})['x-nf-geo']; view.country = raw ? String((JSON.parse(Buffer.from(raw, 'base64').toString('utf8')).country || {}).code || '').toUpperCase() : ''; } catch (_e) { view.country = ''; }
         const mail = await deliverReading({ view, format: reading.format, to: email, link: '', skipOwner: true });
         const analysis = await analysisP;

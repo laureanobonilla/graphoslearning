@@ -94,6 +94,21 @@ ${intro}${body}
 </td></tr></table></td></tr>`;
 }
 
+// Cierre pensado en cuatro pasos: una pregunta de un solo toque («¿qué tanto te sentiste visto/a?»). Cada carita abre una página
+// de agradecimiento (quien-eres/gracias) que responde según lo que sintió y es donde está el aporte. Sin botones de pago aquí.
+const FACES = [['😕', 'Nada', 1], ['😐', 'Poco', 2], ['🙂', 'Algo', 3], ['😊', 'Bastante', 4], ['🥹', 'Mucho', 5]];
+function feedbackHtml(base, readingId, country) {
+    const href = (n) => `${base}/quien-eres/gracias/?r=${encodeURIComponent(readingId)}${n ? '&s=' + n : ''}${country ? '&c=' + encodeURIComponent(country) : ''}`;
+    const cells = FACES.map(([e, l, n]) => `<td align="center" style="padding:0 3px"><a href="${esc(href(n))}" style="display:block;text-decoration:none;background:#ffffff;border:1px solid #e8d3b3;border-radius:16px;padding:10px 0;width:100%"><span style="font-size:28px;line-height:34px;display:block">${e}</span><span style="font-family:${SANS};font-size:12px;color:#6b4a3f;display:block;padding-top:2px">${l}</span></a></td>`).join('');
+    return `<tr><td style="padding:12px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff8ef;border:1px solid #ecd9bd;border-radius:18px"><tr><td style="padding:26px 18px;text-align:center;font-family:${FONT}">
+<div style="font-size:24px">🤍</div>
+<h2 style="font-size:21px;margin:6px 0 8px;color:#5a2a2f;font-weight:normal">¿Qué tanto te sentiste visto/a al leerlo?</h2>
+<p style="font-size:15.5px;line-height:1.6;color:#6b5a55;margin:0 0 14px">Toca una carita. Es un solo toque y me ayuda a saber si esto de verdad sirve.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>${cells}</tr></table>
+<p style="font-size:14.5px;line-height:1.6;color:#6b5a55;margin:16px 0 0">Si lo que leíste te sirvió y quieres ayudar a que más personas reciban un informe así, <a href="${esc(href(0))}" style="color:#7c2d37">aquí puedes aportar lo que sientas justo</a>. No es un cobro: el informe es tuyo igual.</p>
+</td></tr></table></td></tr>`;
+}
+
 function renderReport(view, link, opts) {
     const o = opts || {};
     const name = view.archetypeName || 'Tu informe';
@@ -151,7 +166,7 @@ ${letter.farewell ? `<p style="font-size:17px;line-height:1.7;color:#5a2a2f;font
     }
 
     // Contribución
-    rows.push(contributionHtml(o.contribUrl, o.country, { number: o.sinpeNumber, name: o.sinpeName }));
+    rows.push(o.feedbackBase && o.readingId ? feedbackHtml(o.feedbackBase, o.readingId, o.country) : contributionHtml(o.contribUrl, o.country, { number: o.sinpeNumber, name: o.sinpeName }));
 
     // Pie
     rows.push(`<tr><td style="padding:18px 28px 36px;text-align:center;font-family:${SANS};font-size:12px;line-height:1.6;color:#948680">${link ? `<a href="${esc(link)}" style="color:#7c2d37">Volver a abrir tu informe</a><br>` : ''}Es una interpretación simbólica hecha con IA a partir de tus respuestas, para autoconocimiento y reflexión; no es un diagnóstico ni reemplaza a un profesional de la salud mental.<br>Puedes responder este correo cuando quieras.</td></tr>`);
@@ -165,9 +180,14 @@ ${letter.farewell ? `<p style="font-size:17px;line-height:1.7;color:#5a2a2f;font
     nodes.forEach((n, i) => { t.push(`${i + 1}. ${n.label}`, '', ...paras(n.text).flatMap(x => [x, ''])); });
     if (letter) { t.push('— Una carta, para ti —', '', ...letter.paragraphs.flatMap(x => [x, '']), letter.farewell || '', ''); }
     if (view.closingLine) t.push(view.closingLine, '');
+    if (o.feedbackBase && o.readingId) {
+        const h = (n) => `${o.feedbackBase}/quien-eres/gracias/?r=${o.readingId}${n ? '&s=' + n : ''}${o.country ? '&c=' + o.country : ''}`;
+        t.push('¿Qué tanto te sentiste visto/a al leerlo? Un toque:', ...FACES.map(([e, l, n]) => `${e} ${l}: ${h(n)}`), '', `Si te sirvió y quieres aportar lo que sientas justo (no es un cobro): ${h(0)}`);
+    } else {
     t.push(`Su valor real es de ${o.country === 'CR' ? '₡' + money(SUGGESTED_CRC) : '$' + SUGGESTED}, pero no lo cobramos: si te sirvió, puedes hacer una contribución del monto que prefieras, y eso ayuda a que otras personas reciban un informe como este. Si no, no hay compromiso.`);
-    if (o.country === 'CR') t.push(`SINPE Móvil${o.sinpeNumber ? ' al ' + o.sinpeNumber : ''}: ${AMOUNTS_CRC.map(a => '₡' + money(a)).join(' / ')}`);
-    else { const lo = localOptions(o.country); if (lo) t.push(lo.map(x => `${x.label} (US$${x.usd})`).join(' / ')); const cl = contribLinks(o.contribUrl); if (cl.length) t.push(...cl.slice(0, lo ? 1 : 3).map(l => `${l.amount && !lo ? '$' + l.amount : 'Contribuir'}: ${l.href}`)); }
+        if (o.country === 'CR') t.push(`SINPE Móvil${o.sinpeNumber ? ' al ' + o.sinpeNumber : ''}: ${AMOUNTS_CRC.map(a => '₡' + money(a)).join(' / ')}`);
+        else { const lo = localOptions(o.country); if (lo) t.push(lo.map(x => `${x.label} (US$${x.usd})`).join(' / ')); const cl = contribLinks(o.contribUrl); if (cl.length) t.push(...cl.slice(0, lo ? 1 : 3).map(l => `${l.amount && !lo ? '$' + l.amount : 'Contribuir'}: ${l.href}`)); }
+    }
     if (link) t.push('', `Volver a abrir tu informe: ${link}`);
     return { subject: `${name}: tu informe, escrito para ti`, html, text: t.join('\n') };
 }
