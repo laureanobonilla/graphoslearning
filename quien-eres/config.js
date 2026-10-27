@@ -22,7 +22,7 @@ window.QER_CFG = {
   "lead_label": "¿A qué correo te lo enviamos?",
   "lead_consent": "Acepto recibir mi resultado y que Graphikosmos me escriba una vez con una propuesta relacionada con mis respuestas. Puedo pedir que no me escriban más. <a href=\"/privacidad/\" target=\"_blank\" rel=\"noopener\">Privacidad</a>.",
   "lead_btn": "Enviarme mi resultado",
-  "lead_note": "Solo usamos tu correo para esto. Sin suscripciones ni cobros.",
+  "lead_note": "Solo usamos tu correo para esto. Sin suscripciones. Tu informe es gratis; al final, si te sirvió, podrás hacer una contribución voluntaria.",
   "lead_invalid": "Escribe un correo válido y marca la casilla para continuar.",
   "lead_sending": "Enviando tu resultado…",
   "sent_title": "Te lo acabamos de enviar",

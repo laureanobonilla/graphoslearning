@@ -9,6 +9,7 @@ const { fullView } = require('./_lib/qer-reading-view');
 const { deliverReading, isEmail, send, OWNER, FROM_OWNER } = require('./_lib/qer-email');
 const { generateWithRetries } = require('./_lib/qer-gemini');
 const lead = require('./_lib/qer-lead-core');
+const letterLib = require('./_lib/qer-letter');
 const store = require('./_lib/store');
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,10 +40,18 @@ exports.handler = async (event) => {
         const transcript = String(reading.transcript || '').slice(0, 9000);
         const deadline = t0 + 22000;
 
-        const [mail, analysis] = await Promise.all([
-            deliverReading({ view, format: reading.format, to: email, link: '', skipOwner: true }),
-            transcript ? generateWithRetries(lead.prompt(transcript, reading.archetypeName), lead.SCHEMA, lead.validate, { tag: 'qer-lead', maxOutputTokens: 3072, deadline, attemptMs: 15000 }).catch(err => { console.error('[qer-lead] análisis falló:', err.message); return null; }) : Promise.resolve(null)
-        ]);
+        // Carta final (si la IA no alcanza, el informe sale igual, sin carta).
+        const letterP = transcript
+            ? generateWithRetries(letterLib.prompt(transcript, reading.archetypeName), letterLib.SCHEMA, letterLib.validate, { tag: 'qer-letter', maxOutputTokens: 2048, deadline, attemptMs: 15000 }).then(letterLib.clean).catch(err => { console.error('[qer-lead] carta falló:', err.message); return null; })
+            : Promise.resolve(null);
+        // El análisis para el dueño y la carta se piden a la vez; el correo sale en cuanto está la carta.
+        const analysisP = transcript
+            ? generateWithRetries(lead.prompt(transcript, reading.archetypeName), lead.SCHEMA, lead.validate, { tag: 'qer-lead', maxOutputTokens: 3072, deadline, attemptMs: 15000 }).catch(err => { console.error('[qer-lead] análisis falló:', err.message); return null; })
+            : Promise.resolve(null);
+        const letter = await letterP;
+        view.designed = true; view.letter = letter;
+        const mail = await deliverReading({ view, format: reading.format, to: email, link: '', skipOwner: true });
+        const analysis = await analysisP;
         const delivered = !!(mail.customer && mail.customer.ok);
         const reason = delivered ? undefined : (mail.customer ? mail.customer.reason : 'correo no válido');
 
