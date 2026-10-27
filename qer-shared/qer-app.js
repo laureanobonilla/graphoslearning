@@ -334,6 +334,16 @@ async function postWithOneRetry(name, payload) {
   try { return await postFn(name, payload); }
   catch (err) { if (err.status && err.status < 500 && err.status !== 409) throw err; return await postFn(name, payload); }
 }
+// Reintenta hasta `tries` veces con pausa creciente: cuando Google responde «mucha demanda» (503) casi siempre se libera en segundos,
+// y cada parte ya hecha queda guardada, así que repetir una parte no repite lo demás.
+async function postWithRetries(name, payload, tries) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await postFn(name, payload); }
+    catch (err) { last = err; if (err.status && err.status < 500 && err.status !== 409) throw err; if (i < tries - 1) await new Promise(r => setTimeout(r, 1500 * (i + 1))); }
+  }
+  throw last;
+}
 // --- correo antes del resultado (CFG.leadGate): el resultado se manda al correo y, además, el dueño recibe una propuesta de app ---
 // En la página de prueba solo se activa con «?lead=1» (las respuestas ya vienen cargadas).
 const LEAD_ON = !!CFG.leadGate && (!TEST || /[?&]lead=1/.test(location.search));
@@ -381,20 +391,21 @@ async function submitQuiz() {
   const payload = { format: (CFG.toGraphikosmos || LEAD_ON) ? 'free-self-es' : CFG.format, answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })) };
   const t0 = Date.now();
   try {
-    const axis = await postWithOneRetry('qer-generate-map', payload);
+    const axis = await postWithRetries('qer-generate-map', payload, 3);
     label.textContent = steps[2];
     const rotate = setInterval(() => { label.textContent = steps[1 + Math.floor((Date.now() - t0) / 7000) % 2]; }, 7000);
-    try { await Promise.all([0, 1, 2, 3, 4].map(part => postWithOneRetry('qer-generate-map-part', { readingId: axis.readingId, part }))); }
+    try { await Promise.all([0, 1, 2, 3, 4].map(part => postWithRetries('qer-generate-map-part', { readingId: axis.readingId, part }, 4))); }
     finally { clearInterval(rotate); }
     label.textContent = steps[3];
-    const data = await postWithOneRetry('qer-generate-map-finalize', { readingId: axis.readingId });
+    const data = await postWithRetries('qer-generate-map-finalize', { readingId: axis.readingId }, 3);
     track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000), answered: answers.filter(Boolean).length });
     if (LEAD_ON && leadEmail) { await sendLead(data); return; }
     clearQuizProgress();
     if (!(CFG.toGraphikosmos && goToGraphikosmos(data))) renderReveal(data);
   } catch (err) {
     track('reading_generated_error', { reason: String(err.message).slice(0, 200), seconds: Math.round((Date.now() - t0) / 1000) });
-    showError(tt('err_title'), err.message, submitQuiz);
+    const busy = /high demand|UNAVAILABLE|503|tiempo agotado|overloaded/i.test(String(err.message));
+    showError(tt('err_title'), busy ? 'El servicio de inteligencia artificial está con mucha demanda en este momento. Tus respuestas siguen aquí: intenta de nuevo en un minuto.' : err.message, submitQuiz);
   }
 }
 // «¿Quién eres?» gratis: al terminar la última pregunta, las conclusiones pasan a Graphikosmos (móvil) y allí se arma el mapa mental.
