@@ -19,7 +19,7 @@ const TXT = {
 // Examen de aptitudes (/aptitud/): otro vocabulario («informe», no «lectura») y otro color de títulos.
 TXT.apt = { subject: (a) => `Tu informe de aptitudes${a ? ': ' + a : ''}`, intro: 'Aquí está tu informe completo. Guarda este correo para volver a él cuando lo necesites.', profile: 'Tus aptitudes', word: 'Tu palabra profesional', phrase: 'La frase que te define', open: 'Abrir tu informe en la página', foot: 'Este informe es una orientación basada en tus respuestas; no es una prueba psicométrica oficial ni garantiza ingresos.', color: '#0f766e' };
 function render(view, format, link) {
-    if (view && view.designed) return require('./qer-report').renderReport(view, link, { contribUrl: process.env.QER_CONTRIB_URL || '', country: view.country || '', sinpeNumber: process.env.QER_SINPE_NUMBER || '', sinpeName: process.env.QER_SINPE_NAME || '' });
+    if (view && view.designed) return require('./qer-report').renderReport(view, link, { contribUrl: process.env.QER_CONTRIB_URL || 'https://www.paypal.com/ncp/payment/XP9KHRHF325KS', country: view.country || '', sinpeNumber: process.env.QER_SINPE_NUMBER || '8777-2993', sinpeName: process.env.QER_SINPE_NAME || 'Laureano Bonilla' });
     const t = format === 'paid-aptitud-es' ? TXT.apt : TXT[LANG_OF(format)];
     const accent = t.color || '#7c2d37';
     const p = view.profile;
