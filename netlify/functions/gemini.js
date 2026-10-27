@@ -9,23 +9,63 @@ const FALLBACK_MODELS = [
     'gemini-3.8-flash',
     'gemini-3.6-flash'
 ];
+// Respaldo con Claude (Anthropic): si Gemini falla o se cuelga, se prueba con Claude (solo si hay ANTHROPIC_API_KEY y el pedido es de texto/imagen/PDF).
+const CLAUDE = 'claude';
+let curAction = null;   // acción en curso (para el registro de qué sistema respondió)
+// Guarda qué sistema respondió al final (evento ai_call): proveedor, modelo, intento, milisegundos y, si todo falló, el error.
+async function logAiCall(trace) {
+    try {
+        const store = require('./_lib/store');
+        const meta = { action: curAction, provider: trace.provider || 'none', model: trace.model || null, attempt: trace.attempt || null, ok: !!trace.ok, ms: trace.ms, fallback: trace.provider === 'anthropic' };
+        if (trace.error) meta.error = trace.error;
+        if (trace.claudeError) meta.claude_error = trace.claudeError;
+        await Promise.race([store.logEvent('gk-ai', 'anon', 'gk-ai', 'ai_call', meta, null, 'graphikosmos'), new Promise((r) => setTimeout(r, 1500))]);
+    } catch (e) { console.warn('[ai_call] no se pudo registrar:', e && e.message); }
+}
 
 // opts (solo para las lentes): { attemptMs, budgetMs, lite } — corta los intentos colgados, respeta un presupuesto total de tiempo
 // y, como último recurso, prueba un modelo más ligero. Sin opts el comportamiento es el de siempre.
 let lensThinkOk = true;
 const LITE_MODEL = process.env.GEMINI_LITE_MODEL || 'gemini-3.8-flash-lite';
 async function generateWithFallbackBase(payload, opts) {
+    const trace = { provider: null, model: null, attempt: null, ok: false };
+    const t0 = Date.now();
+    try { const r = await generateWithFallbackInner(payload, opts, trace); trace.ok = true; return r; }
+    catch (e) { trace.error = String((e && e.message) || e).slice(0, 160); throw e; }
+    finally { trace.ms = Date.now() - t0; await logAiCall(trace); }
+}
+async function generateWithFallbackInner(payload, opts, trace) {
     let lastError = null;
     const t0 = Date.now();
-    const models = opts && opts.lite ? [FALLBACK_MODELS[0], FALLBACK_MODELS[1], LITE_MODEL] : FALLBACK_MODELS;
+    const hasClaude = !!process.env.ANTHROPIC_API_KEY;
+    const models = opts && opts.lite
+        ? (hasClaude ? [FALLBACK_MODELS[0], FALLBACK_MODELS[1], CLAUDE, LITE_MODEL] : [FALLBACK_MODELS[0], FALLBACK_MODELS[1], LITE_MODEL])
+        : (hasClaude ? [FALLBACK_MODELS[0], CLAUDE, FALLBACK_MODELS[1], FALLBACK_MODELS[2], FALLBACK_MODELS[3]] : FALLBACK_MODELS);
 
     for (let i = 0; i < models.length; i++) {
         const modelName = models[i];
+        if (modelName === CLAUDE) {
+            const left = ((opts && opts.budgetMs) || 25000) - (Date.now() - t0);
+            if (left < 4500) continue;   // ya no hay tiempo para que Claude responda
+            try {
+                const r = await require('./_lib/ai-fallback').callClaudeForPayload(payload, Math.min(14000, left - 1000));
+                trace.provider = 'anthropic'; trace.model = r._model; trace.attempt = i + 1;
+                console.warn(`[respaldo] respondió Claude (${r._model}) tras fallar Gemini`);
+                return r;
+            } catch (ce) {
+                if (!ce.skip) { trace.claudeError = String(ce.message || ce).slice(0, 160); console.warn('[respaldo] Claude también falló:', ce.message); }
+                continue;
+            }
+        }
         const isLite = opts && opts.lite && modelName === LITE_MODEL;
         let timer = null;
         try {
             let p = { ...payload, model: modelName };
-            if (opts && opts.attemptMs) {
+            if (hasClaude && i === 0 && !(opts && opts.attemptMs)) {   // sin tope, un Gemini colgado se comía los ~26 s de la función y Claude no llegaba a entrar
+                const ac0 = new AbortController();
+                timer = setTimeout(() => ac0.abort(), 17000);
+                p = { ...p, config: { ...(p.config || {}), abortSignal: ac0.signal } };
+            } else if (opts && opts.attemptMs) {
                 const left = (opts.budgetMs || 24000) - (Date.now() - t0);
                 if (left < (isLite ? 6000 : 3000)) break;   // ya no hay tiempo para otro intento útil
                 const ac = new AbortController();
@@ -33,10 +73,12 @@ async function generateWithFallbackBase(payload, opts) {
                 p = { ...p, config: { ...(p.config || {}), abortSignal: ac.signal } };
             }
             if (opts && opts.thinking && lensThinkOk) {   // razonamiento acotado (cuenta como tiempo); si el modelo lo rechaza (400), se recuerda y se sigue sin él
-                try { return await ai.models.generateContent({ ...p, config: { ...p.config, thinkingConfig: opts.thinking } }); }
+                try { const r = await ai.models.generateContent({ ...p, config: { ...p.config, thinkingConfig: opts.thinking } }); trace.provider = 'google'; trace.model = modelName; trace.attempt = i + 1; return r; }
                 catch (te) { const tm = (te && te.message) || ''; if (/thinking|budget|level/i.test(tm) && /(400|invalid|not supported|unsupported)/i.test(tm)) { lensThinkOk = false; console.error('[lens] thinkingConfig rechazado:', tm); } else throw te; }
             }
-            return await ai.models.generateContent(p);
+            const r = await ai.models.generateContent(p);
+            trace.provider = 'google'; trace.model = modelName; trace.attempt = i + 1;
+            return r;
         } catch (err) {
             if (!isLite) lastError = err;
             if (isLite) { console.warn(`[lite] ${modelName} falló:`, err && err.message); break; }   // el respaldo ligero nunca oculta el error original
@@ -48,7 +90,11 @@ async function generateWithFallbackBase(payload, opts) {
                 errMsg.includes('429') || 
                 errMsg.includes('high demand') || 
                 errMsg.includes('overloaded') ||
-                errMsg.includes('internal');
+                errMsg.includes('internal') ||
+                errMsg.includes('not found') ||
+                errMsg.includes('fetch failed') ||
+                errMsg.includes('econnreset') ||
+                errMsg.includes('timeout');
 
             console.warn(`[Intento ${i + 1}/${models.length}] Modelo ${modelName} ${timedOut ? 'tardó demasiado' : 'ocupado'} (${err.status || '503'}). Reintentando...`);
 
@@ -57,7 +103,7 @@ async function generateWithFallbackBase(payload, opts) {
             }
 
             // Pausa de 800ms antes del siguiente intento para dejar pasar el pico de demanda (no tras un timeout: ya se perdió el tiempo)
-            if (timedOut && opts && opts.lite && i < models.length - 2) { i = models.length - 2; continue; }   // si se colgó, el siguiente Flash probablemente también: salta al ligero
+            if (timedOut && opts && opts.lite && i < models.length - (hasClaude ? 3 : 2)) { i = models.length - (hasClaude ? 3 : 2); continue; }   // si se colgó, el siguiente Flash probablemente también: salta al ligero
             if (i < models.length - 1 && !timedOut) {
                 await new Promise(resolve => setTimeout(resolve, 800));
             }
@@ -89,6 +135,7 @@ async function rawHandler(event, context) {
     try {
         const { action, topic, contextPath, maxNodes = 3, topicB, text, density = 'medium', documentContext, bookMode, bookName, lang: rawLang } = JSON.parse(event.body);
         const lang = normalizeLang(rawLang);
+        curAction = action || null;
         // Todas las llamadas de abajo pasan por aquí: añade la instrucción de idioma.
         const generateWithFallback = (payload, opts) => generateWithFallbackBase(localizePayload(payload, lang), opts);
         const LENS_OPTS = { attemptMs: 19000, budgetMs: 25000, lite: true, thinking: { thinkingLevel: 'low' } };
