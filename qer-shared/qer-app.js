@@ -384,10 +384,15 @@ async function sendLead(data) {
     unlockReading({ readingId: data.readingId, archetypeName: data.archetypeName, hookLine: data.hookLine, closingLine: data.closingLine || '', profile: null, nodes: (data.nodes || []).map(n => ({ id: n.id, label: n.label, text: n.text || '' })) });
   }
 }
-async function submitQuiz() {
+// Si la IA falla, la app reintenta sola hasta AUTO_RETRIES veces más (con pausa) antes de mostrar el error. Cada reintento y cada
+// recuperación quedan registrados (reading_auto_retry · reading_retry_clicked · reading_generated_success con retries/afterError).
+const AUTO_RETRIES = 2;
+let hadGenError = false;
+async function submitQuiz(attempt) {
+  attempt = Number.isInteger(attempt) ? attempt : 0;
   showScreen('loading');
   const label = $('loadingLabel'), steps = CFG.t.loading_steps;
-  label.textContent = steps[0];
+  label.textContent = attempt ? 'Está tardando más de lo normal. Seguimos intentándolo, no cierres esta pantalla…' : steps[0];
   const payload = { format: (CFG.toGraphikosmos || LEAD_ON) ? 'free-self-es' : CFG.format, answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })) };
   const t0 = Date.now();
   try {
@@ -398,14 +403,20 @@ async function submitQuiz() {
     finally { clearInterval(rotate); }
     label.textContent = steps[3];
     const data = await postWithRetries('qer-generate-map-finalize', { readingId: axis.readingId }, 3);
-    track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000), answered: answers.filter(Boolean).length });
+    track('reading_generated_success', { seconds: Math.round((Date.now() - t0) / 1000), answered: answers.filter(Boolean).length, retries: attempt, afterError: hadGenError });
     if (LEAD_ON && leadEmail) { await sendLead(data); return; }
     clearQuizProgress();
     if (!(CFG.toGraphikosmos && goToGraphikosmos(data))) renderReveal(data);
   } catch (err) {
-    track('reading_generated_error', { reason: String(err.message).slice(0, 200), seconds: Math.round((Date.now() - t0) / 1000) });
+    hadGenError = true;
+    track('reading_generated_error', { reason: String(err.message).slice(0, 200), seconds: Math.round((Date.now() - t0) / 1000), attempt, willRetry: attempt < AUTO_RETRIES });
+    if (attempt < AUTO_RETRIES) {
+      track('reading_auto_retry', { attempt: attempt + 1 });
+      await new Promise(r => setTimeout(r, 6000 * (attempt + 1)));
+      return submitQuiz(attempt + 1);
+    }
     const busy = /high demand|UNAVAILABLE|503|tiempo agotado|overloaded/i.test(String(err.message));
-    showError(tt('err_title'), busy ? 'El servicio de inteligencia artificial está con mucha demanda en este momento. Tus respuestas siguen aquí: intenta de nuevo en un minuto.' : err.message, submitQuiz);
+    showError(tt('err_title'), busy ? 'El servicio de inteligencia artificial está con mucha demanda en este momento. Tus respuestas siguen aquí: intenta de nuevo en un minuto.' : err.message, () => { track('reading_retry_clicked', {}); submitQuiz(0); });
   }
 }
 // «¿Quién eres?» gratis: al terminar la última pregunta, las conclusiones pasan a Graphikosmos (móvil) y allí se arma el mapa mental.
