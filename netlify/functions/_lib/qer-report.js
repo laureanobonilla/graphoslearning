@@ -119,6 +119,8 @@ function renderReport(view, link, opts) {
 
     // Portada
     rows.push(`<tr><td style="background:#3b1d2e;background-image:linear-gradient(135deg,#3b1d2e,#7c2d37 60%,#c0653f);padding:44px 28px 38px;text-align:center;font-family:${FONT}">
+<img src="${esc((o.feedbackBase || 'https://graphoslearning.netlify.app') + '/quien-eres/laureano.jpg')}" width="132" height="132" alt="Laureano, quien hace Graphikosmos" style="display:block;margin:0 auto 10px;width:132px;height:132px;border-radius:66px;object-fit:cover;border:3px solid rgba(255,255,255,.85)">
+<div style="font-size:14px;color:#f3d9c4;font-style:italic;margin:0 0 18px">Soy Laureano, quien hace esto. Esto es para ti.</div>
 <div style="font-size:13px;letter-spacing:2px;color:#f3d9c4;font-family:${SANS}">TU INFORME PERSONAL</div>
 <h1 style="font-size:34px;line-height:1.2;margin:14px 0 12px;color:#ffffff;font-weight:normal">${esc(name)}</h1>
 ${view.hookLine ? `<p style="font-size:18px;line-height:1.55;font-style:italic;color:#fbe6d6;margin:0 auto;max-width:440px">${esc(view.hookLine)}</p>` : ''}
