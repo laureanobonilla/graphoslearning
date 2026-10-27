@@ -47,7 +47,12 @@ function systemOf(si) {
 }
 
 // payload: lo mismo que se le manda a ai.models.generateContent ({ contents, config }). Devuelve { text, candidates, _provider, _model }.
-async function callClaudeForPayload(payload, timeoutMs) {
+// Acciones cuya respuesta es muy larga: a Claude se le pide una versión compacta para que llegue a tiempo (la función de Netlify corta a ~26 s).
+const CONCISE = {
+    parse_text: 'MODO RESPALDO: responde de forma compacta para que llegue a tiempo: como máximo 6 ramas y 3 sub-ramas por rama; "sourceQuote" solo si es corta; como máximo 3 huecos (gaps). Omite los campos opcionales que no aporten.',
+    welcome_schema: 'MODO RESPALDO: responde de forma compacta para que llegue a tiempo: como máximo 6 ramas y 3 sub-ramas por rama; omite los campos opcionales que no aporten.'
+};
+async function callClaudeForPayload(payload, timeoutMs, action) {
     const key = process.env.ANTHROPIC_API_KEY;
     if (!key) throw skip('Sin ANTHROPIC_API_KEY');
     const cfg = (payload && payload.config) || {};
@@ -62,6 +67,7 @@ async function callClaudeForPayload(payload, timeoutMs) {
     } else if (wantsJson) {
         system = (system ? system + '\n\n' : '') + 'Responde SOLO con un JSON válido, sin texto antes ni después ni bloques de código.';
     }
+    if (action && CONCISE[action]) system = (system ? system + '\n\n' : '') + CONCISE[action];
     if (system) body.system = system;
     const ac = new AbortController();
     const timer = timeoutMs ? setTimeout(() => ac.abort(), timeoutMs) : null;

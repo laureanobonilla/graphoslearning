@@ -41,36 +41,58 @@ async function hedgedFirst(payload, trace, t0) {
     const ac = new AbortController();
     const killer = setTimeout(() => ac.abort(), BUDGET_MS - 500);
     const tag = (pr, extra) => pr.then((r) => ({ ok: true, r, ...extra }), (e) => ({ ok: false, e, ...extra }));
-    const gem = tag(ai.models.generateContent({ ...payload, model: FALLBACK_MODELS[0], config: { ...(payload.config || {}), abortSignal: ac.signal } }), { provider: 'google' });
+    let stop = false, onFirstFail = () => {};
+    // Cadena de Gemini: si un modelo responde «alta demanda» (503), se prueba enseguida el otro, y así hasta agotar el presupuesto.
+    // Los 503 de Google son picos cortos: reintentar rápido suele pegar con un momento libre.
+    const chain = (async () => {
+        let lastErr = null;
+        for (let k = 0; k < 30 && !stop; k++) {
+            if (BUDGET_MS - (Date.now() - t0) < 3000) break;
+            const model = k === 0 ? FALLBACK_MODELS[0] : FALLBACK_MODELS[k % 2];   // 3.8, 3.6, 3.8, 3.6…
+            try {
+                const r = await ai.models.generateContent({ ...payload, model, config: { ...(payload.config || {}), abortSignal: ac.signal } });
+                return { ok: true, r, provider: 'google', model, attempt: k + 1 };
+            } catch (e) {
+                lastErr = e;
+                if (!retryableMsg(e)) return { ok: false, e, fatal: true };
+                if (k === 0) onFirstFail();
+                if (stop) break;
+                await new Promise((res) => setTimeout(res, 800));
+            }
+        }
+        return { ok: false, e: lastErr || new Error('timeout') };
+    })();
     let claude = null;
     const startClaude = () => {
         if (claude) return claude;
         const left = BUDGET_MS - (Date.now() - t0);
         claude = left < 4000
             ? Promise.resolve({ ok: false, e: Object.assign(new Error('sin tiempo para Claude'), { skip: true }), provider: 'anthropic' })
-            : tag(require('./_lib/ai-fallback').callClaudeForPayload(payload, left - 1000), { provider: 'anthropic' });
+            : tag(require('./_lib/ai-fallback').callClaudeForPayload(payload, left - 1000, curAction), { provider: 'anthropic' });
         return claude;
     };
     try {
         const wait = Date.now() < geminiBadUntil ? 0 : HEDGE_MS;
-        const early = await Promise.race([gem, new Promise((res) => setTimeout(() => res(null), wait))]);
-        if (!(early && early.ok)) geminiBadUntil = Date.now() + 5 * 60 * 1000; else geminiBadUntil = 0;
-        if (early && early.ok) { trace.provider = 'google'; trace.model = FALLBACK_MODELS[0]; trace.attempt = 1; return early.r; }
-        if (early && !early.ok && !retryableMsg(early.e)) throw early.e;   // error de verdad (p. ej. 400): no tiene sentido reintentar
-        startClaude();
         const winner = await new Promise((resolve) => {
-            const list = [gem, claude]; let n = 0;
-            list.forEach((pr) => pr.then((x) => { n++; if (x.ok) resolve(x); else if (n === list.length) resolve(null); }));
+            let chainRes = null, claudeRes = null, claudeStarted = false, finished = false;
+            const finish = (w) => { if (finished) return; finished = true; stop = true; resolve(w); };
+            const check = () => { if (chainRes && !chainRes.ok && claudeRes && !claudeRes.ok) finish(null); };
+            const launchClaude = () => { if (claudeStarted || finished) return; claudeStarted = true; startClaude().then((x) => { claudeRes = x; if (x.ok) finish(x); else check(); }); };
+            onFirstFail = launchClaude;
+            chain.then((x) => { chainRes = x; if (x.ok || x.fatal) finish(x); else { launchClaude(); check(); } });
+            setTimeout(launchClaude, wait);
         });
-        if (winner) {
-            if (winner.provider === 'anthropic') { trace.provider = 'anthropic'; trace.model = winner.r._model; trace.attempt = 2; console.warn(`[respaldo] respondió Claude (${winner.r._model}) antes que Gemini`); try { ac.abort(); } catch (_e) { /* ok */ } }
-            else { trace.provider = 'google'; trace.model = FALLBACK_MODELS[0]; trace.attempt = 1; }
+        if (winner && winner.ok) {
+            if (winner.provider === 'anthropic') { trace.provider = 'anthropic'; trace.model = winner.r._model; trace.attempt = 2; geminiBadUntil = Date.now() + 5 * 60 * 1000; console.warn(`[respaldo] respondió Claude (${winner.r._model}) antes que Gemini`); }
+            else { trace.provider = 'google'; trace.model = winner.model; trace.attempt = winner.attempt; if (winner.attempt === 1 && Date.now() - t0 < HEDGE_MS) geminiBadUntil = 0; else geminiBadUntil = Date.now() + 5 * 60 * 1000; }
             return winner.r;
         }
-        const g = await gem, c = await claude;
+        geminiBadUntil = Date.now() + 5 * 60 * 1000;
+        if (winner && winner.fatal) throw winner.e;
+        const g = await chain, c = claude ? await claude : null;
         if (c && !c.ok && !(c.e && c.e.skip)) { trace.claudeError = String((c.e && c.e.message) || c.e).slice(0, 160); console.warn('[respaldo] Claude también falló:', trace.claudeError); }
         throw g.e || new Error('timeout');
-    } finally { clearTimeout(killer); }
+    } finally { stop = true; clearTimeout(killer); try { ac.abort(); } catch (_e) { /* ok */ } }
 }
 async function generateWithFallbackBase(payload, opts) {
     const trace = { provider: null, model: null, attempt: null, ok: false };
