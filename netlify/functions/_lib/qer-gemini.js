@@ -45,7 +45,7 @@ async function callOnce(model, prompt, schema, maxOutputTokens, timeoutMs) {
     throw new Error('Ninguna configuración de pensamiento fue aceptada');
 }
 
-async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, deadline = null, attemptMs = 10000 } = {}) {
+async function generateWithRetries(prompt, schema, validate, { tag = 'qer-gemini', maxOutputTokens = 4096, deadline = null, attemptMs = 24000 } = {}) {
     let lastError = null;
     for (let attempt = 0; attempt < FALLBACK_MODELS.length; attempt++) {
         // `deadline` (ms epoch): Netlify corta la función a los ~26 s y devuelve un
