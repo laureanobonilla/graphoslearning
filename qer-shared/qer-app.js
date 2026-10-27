@@ -840,7 +840,7 @@ if (TEST) {
   });
   $('btnTestReal').addEventListener('click', () => showPay(true));
   (TEST.answers || []).forEach((a, i) => { if (i < TOTAL) answers[i] = a; });
-  submitQuiz();
+  if (LEAD_ON) finishQuiz(); else submitQuiz(); // con ?lead=1 se prueba lo mismo que ve la gente: primero el correo, luego se arma y se envía
 } else {
   resumePendingIfAny();
 }
