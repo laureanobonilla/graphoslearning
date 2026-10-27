@@ -1985,6 +1985,8 @@ async function attachTopicText(ownerId, topic, data) {
     }
 }
 
+// Si la generación falla, lo que la persona escribió vuelve a su campo (la barra de abajo, el campo de la cabecera): nunca se pierde.
+function notifyGenFailed(text) { try { window.dispatchEvent(new CustomEvent('gk:genfailed', { detail: { text: String(text || '') } })); } catch (_e) { /* nada */ } }
 async function generateFullSchemaFromTopic(topicText, opts = {}) {
     if (!topicText) return;
     const { originPanelId = null, attachToNodeId = null, welcome = false, ticket = '' } = opts;
@@ -2027,6 +2029,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         if (!ok) {
             const handled = handleBillingError(status, data);
             // Lo que la persona escribió NO se pierde: si no se pudo generar (también por el muro de registro), el tema vuelve al campo.
+            if (!attachToNodeId) notifyGenFailed(topicText);
             if (!isLong && !attachToNodeId) {
                 const back = topicText.trim().slice(0, 160);
                 const st = document.getElementById('startTopic'); if (st && !st.value) st.value = back;
@@ -2061,6 +2064,7 @@ async function generateFullSchemaFromTopic(topicText, opts = {}) {
         console.error(err);
         track('schema_generate_error', { mode: isLong ? 'text' : 'topic', message: String(err?.message || '').slice(0, 120), layoutMode: schemaLayoutMode, topicPreview });
         // 'billing_blocked' ya mostró su propio aviso (muro de login / tienda): no se apila además un «intenta de nuevo».
+        if (!attachToNodeId) notifyGenFailed(topicText);
         if (err?.message !== 'billing_blocked') { appAlert(tr("js.intenta_de_nuevo_en_unos")); clearPendingGen(); }
     } finally {
         hideLoader();

@@ -129,6 +129,14 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
   }
 
   const looksLink = (t) => /^(https?:\/\/|www\.)\S+$/i.test(t) && t.length <= 2000;
+  // Si la generación falla, lo que la persona había escrito vuelve a la barra (solo si sigue vacía: no pisa lo que ya esté escribiendo).
+  window.addEventListener('gk:genfailed', (e) => {
+    try {
+      const t = e && e.detail && e.detail.text; if (!t || !input || input.value.trim()) return;
+      input.value = t.slice(0, 20000); input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 168) + 'px'; measure();
+      trk('chat_text_restored', { len: t.length });
+    } catch (_e) { /* nada */ }
+  });
   async function submit(preset) {
     if (busy) return;
     const raw = String(preset != null ? preset : input.value).trim();
