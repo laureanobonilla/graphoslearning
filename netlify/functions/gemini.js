@@ -34,7 +34,9 @@ const retryableMsg = (err, timedOut) => {
 // Pedidos sin tope propio (casi todas las acciones): Gemini corre con TODO el presupuesto de la función (24 s, para no pasar los ~26 s de Netlify y
 // evitar el 504), pero si a los 11 s aún no responde —o si falla antes— arranca Claude en paralelo y gana el que responda primero con éxito.
 // Así una respuesta lenta pero válida de Gemini no se pierde, y un Gemini colgado ya no deja a la persona con un 504.
-const BUDGET_MS = 24000, HEDGE_MS = 11000;
+const BUDGET_MS = 24000, HEDGE_MS = 8000;
+// Si Gemini acaba de fallar o de pasar el tiempo de espera, durante unos minutos Claude arranca de inmediato junto con Gemini (sin esperar los 8 s).
+let geminiBadUntil = 0;
 async function hedgedFirst(payload, trace, t0) {
     const ac = new AbortController();
     const killer = setTimeout(() => ac.abort(), BUDGET_MS - 500);
@@ -50,7 +52,9 @@ async function hedgedFirst(payload, trace, t0) {
         return claude;
     };
     try {
-        const early = await Promise.race([gem, new Promise((res) => setTimeout(() => res(null), HEDGE_MS))]);
+        const wait = Date.now() < geminiBadUntil ? 0 : HEDGE_MS;
+        const early = await Promise.race([gem, new Promise((res) => setTimeout(() => res(null), wait))]);
+        if (!(early && early.ok)) geminiBadUntil = Date.now() + 5 * 60 * 1000; else geminiBadUntil = 0;
         if (early && early.ok) { trace.provider = 'google'; trace.model = FALLBACK_MODELS[0]; trace.attempt = 1; return early.r; }
         if (early && !early.ok && !retryableMsg(early.e)) throw early.e;   // error de verdad (p. ej. 400): no tiene sentido reintentar
         startClaude();
