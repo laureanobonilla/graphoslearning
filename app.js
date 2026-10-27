@@ -5531,6 +5531,45 @@ function addEvaluateButton(panel, nodeId) {
     panel.contentEl.appendChild(b);
 }
 
+// «Editar definición»: la persona reescribe la definición de un concepto y queda guardada en su proyecto (definitionSource: 'user').
+// Una definición editada nunca se vuelve a pedir a la IA ni se pisa sola; los [[conceptos]] entre dobles corchetes siguen siendo botones.
+function addEditDefinitionButton(panel, nodeId) {
+    if (!panel || !panel.contentEl || panel.contentEl.querySelector('.def-edit-btn')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'def-edit-btn mt-2 w-full flex items-center justify-center gap-2 bg-slate-800 border border-slate-600 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl font-semibold text-sm transition-colors active:scale-95';
+    b.textContent = '✏️ ' + tr('def.edit_btn');
+    b.addEventListener('click', () => {
+        const n = nodes.get(nodeId);
+        if (!n) return;
+        const current = String(n.definition || '');
+        const title = n.baseTitle || nodeId;
+        panel.contentEl.innerHTML = `
+            <p class="text-[11px] text-slate-400 mb-2">${tr('def.edit_hint')}</p>
+            <textarea class="def-edit-area w-full min-h-[170px] bg-slate-950 border border-slate-600 rounded-lg p-2.5 text-sm text-slate-100 leading-relaxed focus:outline-none focus:border-[#4fd1c5]" maxlength="6000"></textarea>
+            <p class="def-edit-err hidden text-rose-400 text-xs mt-1"></p>
+            <div class="flex gap-2 mt-3">
+                <button type="button" class="def-edit-save flex-1 bg-[#4fd1c5] text-slate-900 font-bold text-sm px-3 py-2 rounded-xl active:scale-95">${tr('def.edit_save')}</button>
+                <button type="button" class="def-edit-cancel flex-1 bg-slate-800 border border-slate-600 text-slate-200 text-sm px-3 py-2 rounded-xl active:scale-95">${tr('def.edit_cancel')}</button>
+            </div>`;
+        const area = panel.contentEl.querySelector('.def-edit-area');
+        area.value = current;
+        area.focus();
+        panel.contentEl.querySelector('.def-edit-cancel').addEventListener('click', () => showDefinitionInFloatingPanel(nodeId));
+        panel.contentEl.querySelector('.def-edit-save').addEventListener('click', () => {
+            const text = area.value.replace(/\r\n/g, '\n').trim().slice(0, 6000);
+            if (!text) { const er = panel.contentEl.querySelector('.def-edit-err'); er.textContent = tr('def.edit_empty'); er.classList.remove('hidden'); return; }
+            if (text !== current.trim()) {
+                // Se conserva la fuente anterior solo si no cambió el texto; si cambió, ya no es de Wikipedia ni de la IA.
+                nodes.update({ id: nodeId, baseTitle: title, definition: text, definitionSource: 'user', wikiImage: null, wikiUrl: null });
+                try { track('definition_edited', { chars: text.length, was: n.definitionSource || 'gemini' }); } catch (_e) { /* no crítico */ }
+            }
+            showDefinitionInFloatingPanel(nodeId);
+        });
+    });
+    panel.contentEl.appendChild(b);
+}
+
 async function showDefinitionInFloatingPanel(nodeId) {
     const currentNode = nodes.get(nodeId);
     if (!currentNode) return;
@@ -5546,7 +5585,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
     panel.el.dataset.nodeId = nodeId;
     panel.meta = { kind: 'definition' };
 
-    const cacheIsUsable = definitionText && (defSource === 'wikipedia' || defSource === 'pregenerated' || definitionText.includes('[['));
+    const cacheIsUsable = definitionText && (defSource === 'wikipedia' || defSource === 'pregenerated' || defSource === 'user' || definitionText.includes('[['));
     if (!cacheIsUsable) {
         panel.contentEl.innerHTML = `
             <div class="flex flex-col items-center justify-center gap-3 py-6">
@@ -5591,13 +5630,17 @@ async function showDefinitionInFloatingPanel(nodeId) {
             <p class="mt-3 text-[10px] text-slate-500">${tr('def.source')}: ${wikiUrl ? `<a href="${wikiUrl}" target="_blank" rel="noopener" class="underline hover:text-slate-300">Wikipedia</a>` : 'Wikipedia'}</p>
         `;
         addEvaluateButton(panel, nodeId);
+        addEditDefinitionButton(panel, nodeId);
         return;
     }
 
     const hasInteractiveHints = definitionText.includes('[[');
+    // Una definición escrita por la persona nunca se interpreta como HTML (solo sus [[conceptos]] se vuelven botones).
+    const defForHtml = defSource === 'user' ? escapeHtml(definitionText) : definitionText;
     panel.contentEl.innerHTML = `
         ${hasInteractiveHints ? `<p class="text-[11px] text-slate-400 mb-3">${tr('def.hint')}</p>` : ''}
-        <div class="leading-relaxed text-slate-200">${formatInteractiveDefinition(definitionText, nodeId)}</div>
+        <div class="leading-relaxed text-slate-200">${formatInteractiveDefinition(defForHtml, nodeId)}</div>
+        ${defSource === 'user' ? `<p class="mt-3 text-[10px] text-slate-500">✏️ ${tr('def.edited_by_you')}</p>` : ''}
     `;
 
     panel.contentEl.querySelectorAll('.btn-inline-concept').forEach(btn => {
@@ -5618,6 +5661,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
         });
     });
     addEvaluateButton(panel, nodeId);
+    addEditDefinitionButton(panel, nodeId);
 }
 
 document.getElementById('btnMenuOpenPanel')?.addEventListener('click', () => {
