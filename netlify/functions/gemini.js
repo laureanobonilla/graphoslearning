@@ -27,6 +27,47 @@ async function logAiCall(trace) {
 // y, como último recurso, prueba un modelo más ligero. Sin opts el comportamiento es el de siempre.
 let lensThinkOk = true;
 const LITE_MODEL = process.env.GEMINI_LITE_MODEL || 'gemini-3.8-flash-lite';
+const retryableMsg = (err, timedOut) => {
+    const m = String((err && err.message) || JSON.stringify(err) || '').toLowerCase();
+    return !!timedOut || (err && err.name === 'AbortError') || ['503', 'unavailable', '429', 'high demand', 'overloaded', 'internal', 'not found', 'fetch failed', 'econnreset', 'timeout', 'abort'].some((x) => m.includes(x));
+};
+// Pedidos sin tope propio (casi todas las acciones): Gemini corre con TODO el presupuesto de la función (24 s, para no pasar los ~26 s de Netlify y
+// evitar el 504), pero si a los 11 s aún no responde —o si falla antes— arranca Claude en paralelo y gana el que responda primero con éxito.
+// Así una respuesta lenta pero válida de Gemini no se pierde, y un Gemini colgado ya no deja a la persona con un 504.
+const BUDGET_MS = 24000, HEDGE_MS = 11000;
+async function hedgedFirst(payload, trace, t0) {
+    const ac = new AbortController();
+    const killer = setTimeout(() => ac.abort(), BUDGET_MS - 500);
+    const tag = (pr, extra) => pr.then((r) => ({ ok: true, r, ...extra }), (e) => ({ ok: false, e, ...extra }));
+    const gem = tag(ai.models.generateContent({ ...payload, model: FALLBACK_MODELS[0], config: { ...(payload.config || {}), abortSignal: ac.signal } }), { provider: 'google' });
+    let claude = null;
+    const startClaude = () => {
+        if (claude) return claude;
+        const left = BUDGET_MS - (Date.now() - t0);
+        claude = left < 4000
+            ? Promise.resolve({ ok: false, e: Object.assign(new Error('sin tiempo para Claude'), { skip: true }), provider: 'anthropic' })
+            : tag(require('./_lib/ai-fallback').callClaudeForPayload(payload, left - 1000), { provider: 'anthropic' });
+        return claude;
+    };
+    try {
+        const early = await Promise.race([gem, new Promise((res) => setTimeout(() => res(null), HEDGE_MS))]);
+        if (early && early.ok) { trace.provider = 'google'; trace.model = FALLBACK_MODELS[0]; trace.attempt = 1; return early.r; }
+        if (early && !early.ok && !retryableMsg(early.e)) throw early.e;   // error de verdad (p. ej. 400): no tiene sentido reintentar
+        startClaude();
+        const winner = await new Promise((resolve) => {
+            const list = [gem, claude]; let n = 0;
+            list.forEach((pr) => pr.then((x) => { n++; if (x.ok) resolve(x); else if (n === list.length) resolve(null); }));
+        });
+        if (winner) {
+            if (winner.provider === 'anthropic') { trace.provider = 'anthropic'; trace.model = winner.r._model; trace.attempt = 2; console.warn(`[respaldo] respondió Claude (${winner.r._model}) antes que Gemini`); try { ac.abort(); } catch (_e) { /* ok */ } }
+            else { trace.provider = 'google'; trace.model = FALLBACK_MODELS[0]; trace.attempt = 1; }
+            return winner.r;
+        }
+        const g = await gem, c = await claude;
+        if (c && !c.ok && !(c.e && c.e.skip)) { trace.claudeError = String((c.e && c.e.message) || c.e).slice(0, 160); console.warn('[respaldo] Claude también falló:', trace.claudeError); }
+        throw g.e || new Error('timeout');
+    } finally { clearTimeout(killer); }
+}
 async function generateWithFallbackBase(payload, opts) {
     const trace = { provider: null, model: null, attempt: null, ok: false };
     const t0 = Date.now();
@@ -38,9 +79,14 @@ async function generateWithFallbackInner(payload, opts, trace) {
     let lastError = null;
     const t0 = Date.now();
     const hasClaude = !!process.env.ANTHROPIC_API_KEY;
+    const hedged = hasClaude && !(opts && opts.attemptMs);
     const models = opts && opts.lite
         ? (hasClaude ? [FALLBACK_MODELS[0], FALLBACK_MODELS[1], CLAUDE, LITE_MODEL] : [FALLBACK_MODELS[0], FALLBACK_MODELS[1], LITE_MODEL])
-        : (hasClaude ? [FALLBACK_MODELS[0], CLAUDE, FALLBACK_MODELS[1], FALLBACK_MODELS[2], FALLBACK_MODELS[3]] : FALLBACK_MODELS);
+        : (hedged ? [FALLBACK_MODELS[1], FALLBACK_MODELS[2]] : FALLBACK_MODELS);   // con respaldo: el primer intento (Gemini + Claude en paralelo) va aparte
+    if (hedged) {
+        try { return await hedgedFirst(payload, trace, t0); }
+        catch (e) { lastError = e; if (!retryableMsg(e)) throw e; }
+    }
 
     for (let i = 0; i < models.length; i++) {
         const modelName = models[i];
@@ -61,9 +107,11 @@ async function generateWithFallbackInner(payload, opts, trace) {
         let timer = null;
         try {
             let p = { ...payload, model: modelName };
-            if (hasClaude && i === 0 && !(opts && opts.attemptMs)) {   // sin tope, un Gemini colgado se comía los ~26 s de la función y Claude no llegaba a entrar
+            if (hedged) {   // intentos de reserva: nunca pasan del presupuesto total (así no se llega al 504 de Netlify)
+                const left = BUDGET_MS - (Date.now() - t0);
+                if (left < 5000) break;
                 const ac0 = new AbortController();
-                timer = setTimeout(() => ac0.abort(), 17000);
+                timer = setTimeout(() => ac0.abort(), left - 1000);
                 p = { ...p, config: { ...(p.config || {}), abortSignal: ac0.signal } };
             } else if (opts && opts.attemptMs) {
                 const left = (opts.budgetMs || 24000) - (Date.now() - t0);
@@ -77,7 +125,7 @@ async function generateWithFallbackInner(payload, opts, trace) {
                 catch (te) { const tm = (te && te.message) || ''; if (/thinking|budget|level/i.test(tm) && /(400|invalid|not supported|unsupported)/i.test(tm)) { lensThinkOk = false; console.error('[lens] thinkingConfig rechazado:', tm); } else throw te; }
             }
             const r = await ai.models.generateContent(p);
-            trace.provider = 'google'; trace.model = modelName; trace.attempt = i + 1;
+            trace.provider = 'google'; trace.model = modelName; trace.attempt = i + (hedged ? 3 : 1);
             return r;
         } catch (err) {
             if (!isLite) lastError = err;
