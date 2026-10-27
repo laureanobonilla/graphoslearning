@@ -434,6 +434,8 @@
   "def.err_simple_generic": "Error al generar la explicación.",
   "def.source": "Fuente",
   "def.hint": "💡 Haz clic en los conceptos resaltados con ⚡ para agregarlos al mapa.",
+  "def.more": "Ver más",
+  "def.less": "Ver menos",
   "def.edit_btn": "Editar definición",
   "def.edit_hint": "✏️ Puedes reescribirla con tus palabras. Lo que pongas entre [[dobles corchetes]] se vuelve un botón ⚡ para agregarlo al mapa.",
   "def.edit_save": "Guardar",

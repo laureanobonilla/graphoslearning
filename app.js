@@ -828,7 +828,7 @@ if (window.netlifyIdentity) {
     refreshBalanceFromServer();
     updateAuthUI();
 
-    netlifyIdentity.on('init', user => { currentUser = user; refreshBalanceFromServer(); updateAuthUI(); if (user) setTimeout(() => resumePendingGen('init'), 600); });
+    netlifyIdentity.on('init', user => { currentUser = user; refreshBalanceFromServer(); updateAuthUI(); if (user) setTimeout(() => resumePendingGen('init'), 600); else enforceLogin(); });
     netlifyIdentity.on('login', user => {
         currentUser = user;
         authWallModal?.classList.add('hidden');
@@ -838,7 +838,24 @@ if (window.netlifyIdentity) {
         resumePendingGen('login');
     });
     netlifyIdentity.on('login', () => { document.getElementById('saveBanner')?.classList.remove('on'); });
-    netlifyIdentity.on('logout', () => { currentUser = null; refreshBalanceFromServer(); updateAuthUI(); });
+    netlifyIdentity.on('logout', () => { currentUser = null; refreshBalanceFromServer(); updateAuthUI(); enforceLogin(); });
+}
+
+// Registro obligatorio (2026-10-27, escritorio): sin cuenta no se puede usar Graphikosmos. Todo el uso se controla por gemas.
+// El muro no se puede cerrar; se quita solo al iniciar sesión. En el celular no cambia nada. Si el widget de cuentas no carga, no se bloquea
+// a nadie aquí (el servidor sigue exigiendo cuenta para generar).
+function enforceLogin() {
+    try {
+        if (!window.netlifyIdentity || currentUser || isAdmin || !isDesktopFolding() || !authWallModal) return;
+        const en = (typeof I18N !== 'undefined' && I18N.lang === 'en');
+        authWallModal.dataset.required = '1';
+        authWallModal.style.zIndex = '90000';   // por debajo del widget de cuentas (99999), para que se pueda iniciar sesión
+        const rs = document.getElementById('authWallReason'); if (rs) rs.textContent = en ? 'use Graphikosmos' : 'usar Graphikosmos';
+        const h = authWallModal.querySelector('h3'); if (h) h.textContent = en ? 'Create your account to start' : 'Crea tu cuenta para empezar';
+        document.getElementById('closeAuthWall')?.classList.add('hidden');
+        authWallModal.classList.remove('hidden'); authWallModal.classList.add('flex');
+        track('login_required_shown', {});
+    } catch (_e) { /* nunca debe romper la app */ }
 }
 
 // Pide el saldo real al servidor. No gasta nodos: solo consulta.
@@ -1600,7 +1617,7 @@ async function renderThreeLevelTree(data, opts = {}) {
         // Escritorio: el mapa muestra un solo nivel; las sub-ramas ya vienen preparadas pero plegadas dentro de su rama
         // (se despliegan con la burbuja "+N"). En móvil todo sigue como siempre.
         const foldable = isDesktopFolding() && subs.length > 0;
-        const foldSubs = foldable && idx !== openBranchIdx;
+        const foldSubs = false;   // 2026-10-27: los 3 niveles nacen desplegados (la burbuja «+N» sigue sirviendo para plegar una rama a mano)
         if (foldable) nodes.update({ id: branch.id, foldable: true });
         const subSpread = isSolarMode && subs.length > 1 ? Math.min(maxSubSpread, (subs.length - 1) * 0.55) : 0;
         const subCols = !isSolarMode ? (subs.length <= 1 ? 1 : 2) : null;
@@ -1845,7 +1862,8 @@ const topicUI = (() => {
         if (!render(owner)) return;
         // Igual que las definiciones: aparece abierto junto al esquema; si lo cierras tú, queda cerrado hasta que lo abras.
         let closedByUser = false; try { const tc = localStorage.getItem('gk_topic_closed'); closedByUser = tc === '1' || ((!/[?&]chat=0/.test(location.search) && window.innerWidth >= 781 && (() => { try { return localStorage.getItem('gk_chat') !== '0'; } catch (_e) { return true; } })()) && tc !== '0'); } catch (_e) { /* ok */ }   // pantalla tipo chat: el texto empieza cerrado, con el botón «Ver texto»
-        if (!closedByUser) { open = true; if (isDesktopFolding() && typeof closeReaderPanel === 'function' && readerPanel && !readerPanel.classList.contains('hidden')) closeReaderPanel(); }
+        // 2026-10-27: el texto de la izquierda ya no se abre solo; queda la pestaña «Ver texto» (con un destello) para quien quiera leerlo.
+        void closedByUser;
         paint();
         if (fresh && !open) { tab.classList.add('fresh'); setTimeout(() => tab.classList.remove('fresh'), 5200); }
     }
@@ -4262,6 +4280,45 @@ function focusFloatingPanel(nodeId) {
 // ver showSimpleExplanationInFloatingPanel/btnMenuChallenge). anchorNodeId,
 // si se pasa, es el nodo real del mapa al que debe apuntar la flecha cuando
 // difiere de nodeId — por defecto es el mismo nodeId (caso normal).
+// Paneles de definición compactos (2026-10-27): nacen a la mitad de alto y traen al pie un botón claro «Ver más ▾ / Ver menos ▴»
+// (también con doble clic en la cabecera). El botón solo aparece si el texto no cabe, o si el panel está ampliado (para poder volver a contraerlo).
+const FP_COMPACT_H = 230, FP_FULL_H = 420;
+function makePanelCompact(panel) {
+    if (!panel || panel.compactReady || !panel.el) return;
+    panel.compactReady = true;
+    const el = panel.el, content = panel.contentEl;
+    el.style.height = FP_COMPACT_H + 'px';
+    const foot = document.createElement('div');
+    foot.className = 'fp-foot shrink-0 border-t border-slate-800 bg-slate-950';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fp-more w-full flex items-center justify-center gap-1.5 text-xs font-bold text-[#4fd1c5] hover:bg-slate-800 py-2 transition-colors';
+    foot.appendChild(btn);
+    el.appendChild(foot);
+    const isCompact = () => el.offsetHeight < FP_FULL_H - 40;
+    const sync = () => {
+        if (content.classList.contains('hidden')) { foot.classList.add('hidden'); return; }   // minimizado: solo la cabecera
+        const over = content.scrollHeight > content.clientHeight + 4, c = isCompact();
+        foot.classList.toggle('hidden', !(over || !c));
+        btn.textContent = c ? '▾ ' + tr('def.more') : '▴ ' + tr('def.less');
+        btn.setAttribute('aria-expanded', c ? 'false' : 'true');
+    };
+    const expand = () => {
+        const want = Math.min(Math.round(window.innerHeight * 0.8), Math.max(FP_FULL_H, content.scrollHeight + 100));
+        el.style.height = want + 'px';
+    };
+    panel.expand = () => { expand(); sync(); };
+    const toggle = () => { if (isCompact()) expand(); else el.style.height = FP_COMPACT_H + 'px'; sync(); try { track('def_panel_' + (isCompact() ? 'less' : 'more'), {}); } catch (_e) { /* ok */ } if (typeof network !== 'undefined' && network) network.redraw(); triggerAutoSave(); };
+    btn.addEventListener('click', toggle);
+    el.querySelector('.fp-header')?.addEventListener('dblclick', (e) => { if (!e.target.closest('button') && !foot.classList.contains('hidden')) toggle(); });
+    try {
+        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(sync).observe(el);
+        if (typeof MutationObserver !== 'undefined') new MutationObserver(sync).observe(content, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    } catch (_e) { /* ok */ }
+    el.querySelector('.fp-minimize')?.addEventListener('click', () => setTimeout(sync, 0));
+    sync();
+}
+
 function openFloatingPanel(nodeId, title, anchorNodeId) {
     const existing = openFloatingPanels.get(nodeId);
     if (existing) { focusFloatingPanel(nodeId); return existing; }
@@ -5542,6 +5599,7 @@ function addEditDefinitionButton(panel, nodeId) {
     b.addEventListener('click', () => {
         const n = nodes.get(nodeId);
         if (!n) return;
+        if (typeof panel.expand === 'function') panel.expand();   // para escribir hace falta espacio
         const current = String(n.definition || '');
         const title = n.baseTitle || nodeId;
         panel.contentEl.innerHTML = `
@@ -5584,6 +5642,7 @@ async function showDefinitionInFloatingPanel(nodeId) {
     const panel = openFloatingPanel(nodeId, title);
     panel.el.dataset.nodeId = nodeId;
     panel.meta = { kind: 'definition' };
+    makePanelCompact(panel);
 
     const cacheIsUsable = definitionText && (defSource === 'wikipedia' || defSource === 'pregenerated' || defSource === 'user' || definitionText.includes('[['));
     if (!cacheIsUsable) {
@@ -5832,6 +5891,7 @@ async function showSimpleExplanationInFloatingPanel(nodeId) {
     const panel = openFloatingPanel(panelKey, `💡 ${title}`, nodeId);
     panel.el.dataset.nodeId = nodeId;
     panel.meta = { kind: 'simple' };
+    makePanelCompact(panel);
     // Acento visual distinto (verde-lima) para diferenciarlo del panel de
     // definición normal (teal) con solo mirar el borde/título.
     panel.el.classList.add('border-lime-600/40');

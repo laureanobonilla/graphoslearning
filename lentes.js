@@ -701,7 +701,8 @@ function fbEntryWanted() {
 window.GK_FB = { now: fbNow, ok: fbTrialOk, entry: fbEntryWanted };
 
 /* ---------- tarjetas del tema: elegir cómo explorarlo antes de armar nada ---------- */
-function cardsOn() { try { if (/[?&]tarjetas=0/.test(location.search)) return false; return localStorage.getItem('gk_cards') !== '0'; } catch (_e) { return true; } }
+// Apagadas por defecto (2026-10-27): «Crear esquema» arma el mapa mental directamente. Se pueden volver a encender con ?tarjetas=1 o localStorage gk_cards=1.
+function cardsOn() { try { if (/[?&]tarjetas=0/.test(location.search)) return false; if (/[?&]tarjetas=1/.test(location.search)) return true; return localStorage.getItem('gk_cards') === '1'; } catch (_e) { return false; } }
 let cardsEl = null, cardsSt = null;
 function onCardsKey(e) { if (e.key === 'Escape' && cardsEl && !cardsEl.hidden && !(cardsSt && cardsSt.entry)) { e.stopPropagation(); closeCards(true); } }
 function closeCards(restore) {
