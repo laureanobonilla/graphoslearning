@@ -25,6 +25,8 @@ window.QER_CFG = {
   "lead_note": "Solo usamos tu correo para esto. Sin suscripciones. Tu informe es gratis; al final, si te sirvió, podrás hacer una contribución voluntaria.",
   "lead_invalid": "Escribe un correo válido y marca la casilla para continuar.",
   "lead_sending": "Enviando tu resultado…",
+  "queued_title": "Estamos escribiendo tu informe",
+  "queued_text": "Lo hacemos con calma, pensando en tus respuestas. Te llegará a {email} en unos minutos y puedes cerrar esta pantalla. Si no lo ves, mira en spam o en promociones.",
   "sent_title": "Te lo acabamos de enviar",
   "sent_text": "Revisa tu correo ({email}). Si no lo ves en un par de minutos, mira en spam o en promociones.",
   "sent_help": "¿No llegó? Escríbenos a {contact} y te lo reenviamos.",

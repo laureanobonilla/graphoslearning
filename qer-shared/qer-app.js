@@ -366,8 +366,29 @@ if (LEAD_ON) {
     leadEmail = $('leadEmail').value.trim(); leadConsent = true;
     try { localStorage.setItem(`qer_email_${APP}`, leadEmail); } catch { /* ok */ }
     track('lead_email_given', { answered: answers.filter(Boolean).length });
-    submitQuiz();
+    queueReport();
   });
+}
+// El informe se arma en el servidor (función «-background»): la persona puede cerrar la pantalla y le llega por correo.
+// Si el servidor no acepta el pedido (404, red caída…), se vuelve a la forma de siempre: esperar aquí y mostrarlo.
+let queuing = false;
+async function queueReport() {
+  if (queuing) return; queuing = true;
+  const payload = { format: (CFG.toGraphikosmos || LEAD_ON) ? 'free-self-es' : CFG.format, answers: QUESTIONS.map((q, i) => ({ question: q.prompt, answer: answers[i] || '' })) };
+  try {
+    const res = await fetch('/.netlify/functions/qer-start-background', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, email: leadEmail, consent: leadConsent, app: APP, anonId }) });
+    if (res.status !== 202 && res.status !== 200) throw new Error('status ' + res.status);
+    track('report_queued_client', {});
+    clearQuizProgress();
+    const t = CFG.t || {};
+    const h = document.querySelector('#screen-sent h2'); if (h) h.textContent = t.queued_title || 'Estamos escribiendo tu informe';
+    $('sentText').textContent = (t.queued_text || 'Lo hacemos con calma, pensando en tus respuestas. Te llegará a {email} en unos minutos y puedes cerrar esta pantalla. Si no lo ves, mira en spam o en promociones.').replace('{email}', leadEmail);
+    $('sentHelp').textContent = tt('sent_help', { contact: (PAY && PAY.email) || '' });
+    showScreen('sent');
+  } catch (err) {
+    track('report_queue_failed', { reason: String(err.message).slice(0, 100) });
+    queuing = false; submitQuiz();
+  }
 }
 async function sendLead(data) {
   const label = $('loadingLabel'); label.textContent = tt('lead_sending');
