@@ -91,6 +91,7 @@ function contributionHtml(url, country, sinpe) {
 <div style="font-size:26px">🤍</div>
 <h2 style="font-size:21px;margin:6px 0 10px;color:#5a2a2f;font-weight:normal">Si esto te ayudó, puedes devolver el abrazo</h2>
 ${intro}${body}
+<p style="font-size:14.5px;line-height:1.6;color:#6b5a55;margin:16px 0 0">Y si quieres contarme cómo te cayó, solo responde este correo. Yo leo todo.</p>
 </td></tr></table></td></tr>`;
 }
 
@@ -168,7 +169,7 @@ ${letter.farewell ? `<p style="font-size:17px;line-height:1.7;color:#5a2a2f;font
     }
 
     // Contribución
-    rows.push(o.feedbackBase && o.readingId ? feedbackHtml(o.feedbackBase, o.readingId, o.country) : contributionHtml(o.contribUrl, o.country, { number: o.sinpeNumber, name: o.sinpeName }));
+    rows.push(contributionHtml(o.contribUrl, o.country, { number: o.sinpeNumber, name: o.sinpeName }));
 
     // Pie
     rows.push(`<tr><td style="padding:18px 28px 36px;text-align:center;font-family:${SANS};font-size:12px;line-height:1.6;color:#948680">${link ? `<a href="${esc(link)}" style="color:#7c2d37">Volver a abrir tu informe</a><br>` : ''}Es una interpretación simbólica hecha con IA a partir de tus respuestas, para autoconocimiento y reflexión; no es un diagnóstico ni reemplaza a un profesional de la salud mental.<br>Puedes responder este correo cuando quieras.</td></tr>`);
@@ -182,7 +183,7 @@ ${letter.farewell ? `<p style="font-size:17px;line-height:1.7;color:#5a2a2f;font
     nodes.forEach((n, i) => { t.push(`${i + 1}. ${n.label}`, '', ...paras(n.text).flatMap(x => [x, ''])); });
     if (letter) { t.push('— Una carta, para ti —', '', ...letter.paragraphs.flatMap(x => [x, '']), letter.farewell || '', ''); }
     if (view.closingLine) t.push(view.closingLine, '');
-    if (o.feedbackBase && o.readingId) {
+    if (false) {
         const h = (n) => `${o.feedbackBase}/quien-eres/gracias/?r=${o.readingId}${n ? '&s=' + n : ''}${o.country ? '&c=' + o.country : ''}`;
         t.push('¿Qué tanto te sentiste visto/a al leerlo? Un toque:', ...FACES.map(([e, l, n]) => `${e} ${l}: ${h(n)}`), '', `Si te sirvió y quieres aportar lo que sientas justo (no es un cobro): ${h(0)}`);
     } else {
