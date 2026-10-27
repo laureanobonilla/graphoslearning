@@ -4,7 +4,7 @@
 //    escribirle a clientes hay que verificar un dominio en Resend y poner p. ej. QER_FROM_EMAIL="Quién eres <hola@tudominio.com>".
 //  · el dueño (FEEDBACK_TO_EMAIL, por defecto bonillapretiz@gmail.com): copia con todo, para no perder nunca una entrega.
 const OWNER = () => process.env.FEEDBACK_TO_EMAIL || 'bonillapretiz@gmail.com';
-const FROM_CUSTOMER = () => process.env.QER_FROM_EMAIL || 'Graphikosmos <onboarding@resend.dev>';
+const FROM_CUSTOMER = () => process.env.QER_FROM_EMAIL || 'Quién eres <hola@graphikosmos.com>';
 const FROM_OWNER = () => 'Graphikosmos <onboarding@resend.dev>';
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]{2,}$/;
