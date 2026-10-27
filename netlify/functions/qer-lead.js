@@ -50,6 +50,7 @@ exports.handler = async (event) => {
             : Promise.resolve(null);
         const letter = await letterP;
         view.designed = true; view.letter = letter;
+        try { const raw = (event.headers || {})['x-nf-geo']; view.country = raw ? String((JSON.parse(Buffer.from(raw, 'base64').toString('utf8')).country || {}).code || '').toUpperCase() : ''; } catch (_e) { view.country = ''; }
         const mail = await deliverReading({ view, format: reading.format, to: email, link: '', skipOwner: true });
         const analysis = await analysisP;
         const delivered = !!(mail.customer && mail.customer.ok);

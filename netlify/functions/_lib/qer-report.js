@@ -34,6 +34,25 @@ function pullQuote(text) {
     return m ? m[1] : '';
 }
 
+// Costa Rica: solo SINPE Móvil (₡10 000 / ₡5 000 / ₡2 500). Resto del mundo: se muestra el monto en la moneda del país y,
+// entre paréntesis, los USD exactos que debe escribir en PayPal (el enlace cobra en USD). Las tasas son aproximadas.
+const SUGGESTED_CRC = 10000, AMOUNTS_CRC = [10000, 5000, 2500];
+const LOCAL = { // país: [código de moneda, unidades locales por 1 USD, redondeo]
+    MX: ['MXN', 18, 10], CO: ['COP', 4000, 1000], CL: ['CLP', 950, 100], PE: ['PEN', 3.7, 1], AR: ['ARS', 1200, 500],
+    UY: ['UYU', 40, 10], BO: ['BOB', 6.9, 1], PY: ['PYG', 7500, 1000], GT: ['GTQ', 7.7, 1], HN: ['HNL', 25, 5],
+    NI: ['NIO', 36.5, 5], DO: ['DOP', 60, 10], ES: ['EUR', 0.92, 1]
+};
+const money = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+function localOptions(country) {
+    const c = LOCAL[country];
+    if (!c) return null;
+    return AMOUNTS.map(usd => {
+        const step = c[2];
+        const local = Math.max(step, Math.round(usd * c[1] / step) * step);
+        return { usd, label: `${c[0]} ${money(local)}`, main: usd === SUGGESTED };
+    });
+}
+
 function contribLinks(url) {
     if (!url) return [];
     if (/paypal\.me\//i.test(url)) {
@@ -43,21 +62,35 @@ function contribLinks(url) {
     return [{ amount: null, href: url, main: true }];
 }
 
-function contributionHtml(url) {
-    const links = contribLinks(url);
-    const buttons = links.map(l => {
-        const label = l.amount ? `$${l.amount}` : 'Contribuir';
-        const style = l.main
-            ? 'background:#7c2d37;color:#ffffff;font-size:17px;padding:13px 28px;'
-            : 'background:#ffffff;color:#7c2d37;border:2px solid #7c2d37;font-size:15px;padding:11px 20px;';
-        return `<a href="${esc(l.href)}" style="display:inline-block;margin:5px 4px;border-radius:999px;font-family:${SANS};font-weight:700;text-decoration:none;${style}">${label}${l.amount && l.main ? ' · valor sugerido' : ''}</a>`;
-    }).join('');
+function contributionHtml(url, country, sinpe) {
+    const pill = (txt, main, href) => {
+        const style = main ? 'background:#7c2d37;color:#ffffff;font-size:17px;padding:13px 26px;' : 'background:#ffffff;color:#7c2d37;border:2px solid #7c2d37;font-size:15px;padding:11px 20px;';
+        const tag = href ? 'a' : 'span';
+        return `<${tag}${href ? ` href="${esc(href)}"` : ''} style="display:inline-block;margin:5px 4px;border-radius:999px;font-family:${SANS};font-weight:700;text-decoration:none;${style}">${txt}</${tag}>`;
+    };
+    const intro = `<p style="font-size:16px;line-height:1.65;color:#4a3a36;margin:0 0 10px">Este informe lo escribimos solo para ti. Su valor real es de <b>${country === 'CR' ? '₡' + money(SUGGESTED_CRC) : '$' + SUGGESTED}</b>, pero no lo cobramos: <b>léelo primero</b>, y si sientes que te sirvió, puedes hacer una contribución del monto que prefieras.</p>
+<p style="font-size:16px;line-height:1.65;color:#4a3a36;margin:0 0 14px">Lo que aportes también ayuda a que otras personas puedan recibir un informe como este. Y si hoy no te es posible o no te dijo nada útil, no hay ningún compromiso: el informe es tuyo igual.</p>`;
+    let body;
+    if (country === 'CR') {
+        const num = sinpe && sinpe.number;
+        body = `<div style="margin:6px 0 8px">${AMOUNTS_CRC.map(a => pill('₡' + money(a), a === SUGGESTED_CRC)).join('')}</div>
+<p style="font-size:15.5px;line-height:1.6;color:#4a3a36;margin:0">${num ? `Por <b>SINPE Móvil</b> al <b>${esc(num)}</b>${sinpe.name ? ` (a nombre de ${esc(sinpe.name)})` : ''}. Si quieres, responde este correo con el comprobante para darte las gracias.` : 'Si quieres contribuir, responde este correo y te damos los datos del SINPE Móvil.'}</p>`;
+    } else {
+        const opts = localOptions(country);
+        const links = contribLinks(url);
+        if (opts && url) {
+            body = `<p style="font-size:15px;line-height:1.6;color:#4a3a36;margin:0 0 6px">Elige un monto (el pago se hace en dólares; escribe la cifra en USD que ves entre paréntesis):</p>
+<div style="margin:6px 0 8px">${opts.map(o => pill(`${esc(o.label)} <span style="font-weight:400">(US$${o.usd})</span>`, o.main)).join('')}</div>
+<div style="margin:4px 0 6px">${pill('Contribuir con PayPal', true, links[0].href)}</div>`;
+        } else {
+            const btns = links.map(l => pill(l.amount ? '$' + l.amount : 'Contribuir', l.main, l.href)).join('');
+            body = btns ? `<div style="margin:6px 0 4px">${btns}</div>` : `<p style="font-size:15px;color:#7c2d37;margin:6px 0 0">Si quieres contribuir, responde este correo y te decimos cómo.</p>`;
+        }
+    }
     return `<tr><td style="padding:8px 24px 8px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff8ef;border:1px solid #ecd9bd;border-radius:18px"><tr><td style="padding:26px 24px;text-align:center;font-family:${FONT}">
 <div style="font-size:26px">🤍</div>
 <h2 style="font-size:21px;margin:6px 0 10px;color:#5a2a2f;font-weight:normal">Si esto te ayudó, puedes devolver el abrazo</h2>
-<p style="font-size:16px;line-height:1.65;color:#4a3a36;margin:0 0 10px">Este informe lo escribimos solo para ti. Su valor real es de <b>$${SUGGESTED}</b>, pero no lo cobramos: <b>léelo primero</b>, y si sientes que te sirvió, puedes hacer una contribución del monto que prefieras.</p>
-<p style="font-size:16px;line-height:1.65;color:#4a3a36;margin:0 0 14px">Lo que aportes también ayuda a que otras personas puedan recibir un informe como este. Y si hoy no te es posible o no te dijo nada útil, no hay ningún compromiso: el informe es tuyo igual.</p>
-${buttons ? `<div style="margin:6px 0 4px">${buttons}</div>` : `<p style="font-size:15px;color:#7c2d37;margin:6px 0 0">Si quieres contribuir, responde este correo y te decimos cómo.</p>`}
+${intro}${body}
 </td></tr></table></td></tr>`;
 }
 
@@ -118,7 +151,7 @@ ${letter.farewell ? `<p style="font-size:17px;line-height:1.7;color:#5a2a2f;font
     }
 
     // Contribución
-    rows.push(contributionHtml(o.contribUrl));
+    rows.push(contributionHtml(o.contribUrl, o.country, { number: o.sinpeNumber, name: o.sinpeName }));
 
     // Pie
     rows.push(`<tr><td style="padding:18px 28px 36px;text-align:center;font-family:${SANS};font-size:12px;line-height:1.6;color:#948680">${link ? `<a href="${esc(link)}" style="color:#7c2d37">Volver a abrir tu informe</a><br>` : ''}Es una interpretación simbólica hecha con IA a partir de tus respuestas, para autoconocimiento y reflexión; no es un diagnóstico ni reemplaza a un profesional de la salud mental.<br>Puedes responder este correo cuando quieras.</td></tr>`);
@@ -132,11 +165,11 @@ ${letter.farewell ? `<p style="font-size:17px;line-height:1.7;color:#5a2a2f;font
     nodes.forEach((n, i) => { t.push(`${i + 1}. ${n.label}`, '', ...paras(n.text).flatMap(x => [x, ''])); });
     if (letter) { t.push('— Una carta, para ti —', '', ...letter.paragraphs.flatMap(x => [x, '']), letter.farewell || '', ''); }
     if (view.closingLine) t.push(view.closingLine, '');
-    t.push(`Su valor real es de $${SUGGESTED}, pero no lo cobramos: si te sirvió, puedes hacer una contribución del monto que prefieras, y eso ayuda a que otras personas reciban un informe como este. Si no, no hay compromiso.`);
-    const cl = contribLinks(o.contribUrl);
-    if (cl.length) t.push(...cl.map(l => `${l.amount ? '$' + l.amount : 'Contribuir'}: ${l.href}`));
+    t.push(`Su valor real es de ${o.country === 'CR' ? '₡' + money(SUGGESTED_CRC) : '$' + SUGGESTED}, pero no lo cobramos: si te sirvió, puedes hacer una contribución del monto que prefieras, y eso ayuda a que otras personas reciban un informe como este. Si no, no hay compromiso.`);
+    if (o.country === 'CR') t.push(`SINPE Móvil${o.sinpeNumber ? ' al ' + o.sinpeNumber : ''}: ${AMOUNTS_CRC.map(a => '₡' + money(a)).join(' / ')}`);
+    else { const lo = localOptions(o.country); if (lo) t.push(lo.map(x => `${x.label} (US$${x.usd})`).join(' / ')); const cl = contribLinks(o.contribUrl); if (cl.length) t.push(...cl.slice(0, lo ? 1 : 3).map(l => `${l.amount && !lo ? '$' + l.amount : 'Contribuir'}: ${l.href}`)); }
     if (link) t.push('', `Volver a abrir tu informe: ${link}`);
     return { subject: `${name}: tu informe, escrito para ti`, html, text: t.join('\n') };
 }
 
-module.exports = { renderReport, contribLinks };
+module.exports = { renderReport, contribLinks, localOptions };
