@@ -45,7 +45,7 @@
     var list = [], byId = new Map();
     nodes.get().forEach(function (n) {
       if (n.hidden) return; var bb; try { bb = network.getBoundingBox(n.id); } catch (e) { return; } if (!bb) return;
-      var o = { id: String(n.id), n: n, bb: bb, x: bb.left, y: bb.top, w: bb.right - bb.left, h: bb.bottom - bb.top, cx: (bb.left + bb.right) / 2, cy: (bb.top + bb.bottom) / 2, lv: S.level.has(String(n.id)) ? S.level.get(String(n.id)) : 3, c: nodeCol(n) };
+      var o = { id: String(n.id), label: String(n.label == null ? '' : n.label), n: n, bb: bb, x: bb.left, y: bb.top, w: bb.right - bb.left, h: bb.bottom - bb.top, cx: (bb.left + bb.right) / 2, cy: (bb.top + bb.bottom) / 2, lv: S.level.has(String(n.id)) ? S.level.get(String(n.id)) : 3, c: nodeCol(n) };
       list.push(o); byId.set(o.id, o);
     });
     var links = [];
@@ -295,8 +295,8 @@
       } catch (e) { try { ctx.restore(); } catch (_e) { /* ok */ } fail(e); }
     };
   }
-  network.on('beforeDrawing', run('before'));
-  network.on('afterDrawing', run('after'));
+  var HAS = (typeof network !== 'undefined' && typeof container !== 'undefined' && typeof nodes !== 'undefined');
+  if (HAS) { network.on('beforeDrawing', run('before')); network.on('afterDrawing', run('after')); }
 
   function loop() {
     S.raf = 0; if (S.mode === 'flat' || reduce()) return;
@@ -316,15 +316,91 @@
     if (mode !== 'flat' && !S.raf) S.raf = requestAnimationFrame(loop);
   }
 
+
+  /* ---------- «Foto»: imagen bonita para publicar (misma vista que se ve, con título y dirección) ----------
+   * opts: { mode, list:[{id,label,x,y,w,h,cx,cy,lv,c:{bg,bd}}], links:[{a,b,key}], title, url, scale } — coordenadas del mapa. */
+  function snapshot(o) {
+    var list = o.list, links = o.links || [], mode = o.mode && IMPL[o.mode] ? o.mode : 'flat', sc = o.scale || 2;
+    if (!list.length) return Promise.resolve(null);
+    var x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    list.forEach(function (n) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x + n.w); y1 = Math.max(y1, n.y + n.h); });
+    var PAD = mode === 'city' ? 70 : 56, HEAD = 78, FOOT = 40;
+    var Wc = Math.round(x1 - x0 + PAD * 2), Hc = Math.round(y1 - y0 + PAD * 2 + HEAD + FOOT);
+    var maxPx = 4096; if (Wc * sc > maxPx || Hc * sc > maxPx) sc = Math.max(0.5, Math.min(maxPx / Wc, maxPx / Hc));
+    var cv = document.createElement('canvas'); cv.width = Math.round(Wc * sc); cv.height = Math.round(Hc * sc);
+    var ctx = cv.getContext('2d'), ox = x0 - PAD, oy = y0 - PAD - HEAD;
+    var V = { x0: ox, y0: oy, x1: ox + Wc, y1: oy + Hc, W: Wc, H: Hc, sc: 1 };
+    var byId = {}; list.forEach(function (n) { byId[n.id] = n; });
+    var F = { list: list, byId: byId, links: links };
+    function world() { ctx.setTransform(sc, 0, 0, sc, 0, 0); ctx.translate(-ox, -oy); }
+    var t = 2.4;
+    ctx.save();
+    if (mode === 'flat') { ctx.fillStyle = '#0b1118'; ctx.fillRect(0, 0, cv.width, cv.height); } else { world(); IMPL[mode].before.call(IMPL[mode], ctx, F, V, sc, t); }
+    ctx.restore();
+    // ramas (en Plana y Bloques; Ciudad y Orgánico dibujan las suyas)
+    if (mode === 'flat' || mode === 'blocks') {
+      ctx.save(); world(); ctx.lineWidth = 2; ctx.lineCap = 'round';
+      links.forEach(function (L) { var a = L.a, b = L.b, horiz = Math.abs(b.cx - a.cx) > Math.abs(b.cy - a.cy), sx = horiz ? (b.cx > a.cx ? a.x + a.w : a.x) : a.cx, sy = horiz ? a.cy : (b.cy > a.cy ? a.y + a.h : a.y), ex = horiz ? (b.cx > a.cx ? b.x : b.x + b.w) : b.cx, ey = horiz ? b.cy : (b.cy > a.cy ? b.y : b.y + b.h);
+        ctx.strokeStyle = rgba(b.c.bd, 0.7); ctx.beginPath(); ctx.moveTo(sx, sy);
+        if (horiz) ctx.bezierCurveTo((sx + ex) / 2, sy, (sx + ex) / 2, ey, ex, ey); else ctx.bezierCurveTo(sx, (sy + ey) / 2, ex, (sy + ey) / 2, ex, ey); ctx.stroke(); });
+      ctx.restore();
+    }
+    // nodos
+    ctx.save(); world();
+    list.forEach(function (n) {
+      var r = mode === 'organic' ? Math.min(n.h / 2, 28) : 12;
+      ctx.save();
+      if (mode === 'flat') { ctx.shadowColor = 'rgba(79,209,197,0.18)'; ctx.shadowBlur = 14; }
+      rr(ctx, n.x, n.y, n.w, n.h, r); ctx.fillStyle = rgba(n.c.bg, 1); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = rgba(n.c.bd, 1); ctx.lineWidth = 1.5; rr(ctx, n.x, n.y, n.w, n.h, r); ctx.stroke();
+      var fs = n.lv === 0 ? 17 : 15; ctx.font = (n.lv === 0 ? '700 ' : '600 ') + fs + 'px system-ui, -apple-system, Segoe UI, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#eef1fb';
+      var txt = String(n.label || '').replace(/[*_`#]/g, '').replace(/\s+/g, ' ').trim(), words = txt.split(' '), lines = [], line = '', maxW = n.w - 18;
+      words.forEach(function (w) { var tt = line ? line + ' ' + w : w; if (ctx.measureText(tt).width > maxW && line) { lines.push(line); line = w; } else line = tt; }); if (line) lines.push(line);
+      var lh = fs * 1.2, ys = n.cy - ((lines.length - 1) * lh) / 2; lines.slice(0, 4).forEach(function (l, i) { ctx.fillText(l, n.cx, ys + i * lh); });
+    });
+    ctx.restore();
+    if (mode !== 'flat') { ctx.save(); world(); IMPL[mode].after.call(IMPL[mode], ctx, F, V, sc, t); ctx.restore(); }
+    // título y dirección
+    ctx.save(); ctx.setTransform(sc, 0, 0, sc, 0, 0);
+    var hg = ctx.createLinearGradient(0, 0, 0, HEAD); hg.addColorStop(0, 'rgba(0,0,10,0.55)'); hg.addColorStop(1, 'rgba(0,0,10,0)'); ctx.fillStyle = hg; ctx.fillRect(0, 0, Wc, HEAD);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#f4f7ff'; ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 8;
+    var title = String(o.title || '').replace(/[*_`#]/g, ''), tf = 26; ctx.font = '700 ' + tf + 'px system-ui, -apple-system, Segoe UI, sans-serif'; while (ctx.measureText(title).width > Wc - 40 && tf > 14) { tf -= 2; ctx.font = '700 ' + tf + 'px system-ui, sans-serif'; }
+    ctx.fillText(title, Wc / 2, 38); ctx.shadowBlur = 0; ctx.fillStyle = 'rgba(190,205,235,0.85)'; ctx.font = '500 13px system-ui, sans-serif'; ctx.fillText(o.url || 'graphoslearning.netlify.app', Wc / 2, Hc - FOOT / 2 + 4);
+    ctx.restore();
+    return new Promise(function (res) { cv.toBlob(res, 'image/png'); });
+  }
+  function shareBlob(blob, name, title) {
+    if (!blob) return Promise.resolve(false);
+    var file = null; try { file = new File([blob], name, { type: 'image/png' }); } catch (e) { /* ok */ }
+    var p = Promise.resolve(false);
+    if (file && navigator.canShare && navigator.canShare({ files: [file] }) && /Android|iPhone|iPad/i.test(navigator.userAgent)) p = navigator.share({ files: [file], title: title || 'Mapa' }).then(function () { return true; }, function (e) { return e && e.name === 'AbortError' ? true : false; });
+    return p.then(function (done) { if (done) return true; var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); return true; });
+  }
+  function photo() {
+    var F = frame(); if (!F.list.length) return;
+    var root = F.list.filter(function (o) { return o.lv === 0; })[0], title = (root && root.label) || (document.title || 'Mapa');
+    var m = S.mode === 'flat' ? 'flat' : S.mode;
+    try { track('map_photo', { mode: m, nodes: F.list.length }); } catch (e) { /* ok */ }
+    return snapshot({ mode: m, list: F.list, links: F.links, title: title, scale: 2 }).then(function (b) { return shareBlob(b, 'graphikosmos-' + m + '.png', title); });
+  }
+  function wirePhoto() {
+    var host = document.getElementById('viewMode'); if (!host || document.getElementById('gkPhotoBtn')) return;
+    var b = document.createElement('button'); b.type = 'button'; b.id = 'gkPhotoBtn'; b.textContent = EN ? '📸 Photo' : '📸 Foto'; b.title = EN ? 'Save the map as a nice image to post' : 'Guarda el mapa como una imagen bonita para publicar';
+    b.className = host.className.replace(/focus:\S+/g, '') + ' cursor-pointer hover:border-[#4fd1c5]'; b.addEventListener('click', function () { b.disabled = true; Promise.resolve(photo()).catch(function (e) { console.error(e); }).then(function () { b.disabled = false; }); });
+    host.parentNode.insertBefore(b, host.nextSibling);
+  }
+
   /* ---------- selector «Vista» ---------- */
   function wire() {
     sel = document.getElementById('viewMode'); if (!sel) return;
     MODES.forEach(function (m) { if (!sel.querySelector('option[value="' + m + '"]')) { var o = document.createElement('option'); o.value = m; o.textContent = LABELS[m]; sel.appendChild(o); } });
     // en fase de captura para correr antes que el manejador de «Profundidad»
     sel.addEventListener('change', function (e) { var v = e.target.value; if (MODES.indexOf(v) >= 0) set(v, true); else if (S.mode !== 'flat') set('flat', false); }, true);
+    wirePhoto();
     var saved = 'flat'; try { saved = localStorage.getItem('gk_view_mode3') || 'flat'; } catch (e) { /* ok */ }
     if (MODES.indexOf(saved) >= 0) setTimeout(function () { set(saved, false); }, 300);
   }
-  window.__gkV3 = { set: function (m) { set(m, true); }, owns: function (v) { return MODES.indexOf(v) >= 0; }, mode: function () { return S.mode; }, modes: MODES, labels: LABELS, _impl: IMPL };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire();
+  window.__gkV3 = { snapshot: snapshot, shareBlob: shareBlob, photo: photo, set: function (m) { set(m, true); }, owns: function (v) { return MODES.indexOf(v) >= 0; }, mode: function () { return S.mode; }, modes: MODES, labels: LABELS, _impl: IMPL };
+  if (HAS) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire(); }
 })();

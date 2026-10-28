@@ -142,6 +142,7 @@
     $('#btnCapture').disabled = (v === 'home');
     $('#btnNew').hidden = (v === 'home');
     if (v === 'home') { $('#topicInput').value = ''; $('#homeMsg').textContent = ''; $('#homeMsg').className = 'msg'; }
+    { const mb = document.getElementById('mvBar'); if (mb) mb.hidden = v !== 'map'; }
     if (v === 'map') renderMap(!!show.animate);
     if (v === 'map') armFeedback();
     if (v === 'defs') renderDefs();
@@ -288,10 +289,31 @@
   /* ---------- Mapa (diseño radial "Cerebro") ---------- */
   let renderToken = 0;
   let layoutCache = null;
+  function onNodeTap(id) {
+    const n = G.nodes[id]; if (!n || n.id === cur) return;
+    track('m_node_tapped', { expanded: n.children.length > 0, depth: depthOf(n.id) });
+    if (n.children.length) { go('map', n.id, false); return; }
+    openSheet(n);
+  }
   function renderMap(animate) {
     const node = G.nodes[cur]; if (!node) { show('home'); return; }
     const token = ++renderToken;
     const stage = $('#mapStage');
+    const MV = window.GK_MV;
+    if (MV && MV.mode() !== 'radial' && MV.ready()) {
+      try {
+        $('#mapTitle').textContent = node.label;
+        $('#btnBack').setAttribute('aria-label', node.parent ? 'Volver al mapa anterior' : 'Nuevo tema');
+        stage.classList.add('mv-on');
+        if (MV.render({ stage, G, cur, animate, palette: PALETTE, onTap: onNodeTap, onMode: (m) => { track('m_view_mode', { mode: m }); renderMap(false); } })) {
+          layoutCache = null;
+          $('#mapHint').textContent = 'Toca un tema para ampliarlo. Arrastra para moverte; con dos dedos haces zoom.';
+          return;
+        }
+      } catch (e) { try { console.error(e); } catch (_e) { /* ok */ } }
+    }
+    stage.classList.remove('mv-on'); stage.className = ''; stage.removeAttribute('class');
+    if (MV) MV.bar((m) => { track('m_view_mode', { mode: m }); renderMap(false); });
     stage.innerHTML = '';
     $('#mapTitle').textContent = node.label;
     $('#btnBack').setAttribute('aria-label', node.parent ? 'Volver al mapa anterior' : 'Nuevo tema');
@@ -625,6 +647,7 @@
 
   /* ---------- Captura ---------- */
   $('#btnCapture').addEventListener('click', async () => {
+    if (view === 'map' && !layoutCache && window.GK_MV && $('#mapStage').classList.contains('mv-on')) { track('m_capture', { mode: GK_MV.mode() }); try { await GK_MV.photo(G.nodes[cur].label); } catch { toast('No se pudo capturar el mapa.'); } return; }
     if (view !== 'map' || !layoutCache) { toast('Genera un mapa para poder capturarlo.'); return; }
     track('m_capture');
     try {
