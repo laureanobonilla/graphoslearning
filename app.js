@@ -1343,7 +1343,7 @@ const depthView = (() => {
     function set(mode, byUser) {
         const on = mode === 'depth'; if (on === S.on && !byUser) return;
         S.on = on; container.classList.toggle('depth-view', on);
-        if (sel) sel.value = on ? 'depth' : 'flat';
+        if (sel && !(window.__gkV3 && window.__gkV3.owns(sel.value))) sel.value = on ? 'depth' : 'flat';
         if (on) S.k = reduce() ? 1 : 0.0001;
         if (byUser) { try { localStorage.setItem('gk_view_mode2', on ? 'depth' : 'flat'); } catch (_e) { /* ok */ } }   // solo se recuerda lo que la persona eligió
         if (byUser) track('view_mode', { mode: on ? 'depth' : 'flat', nodes: nodes.length });
