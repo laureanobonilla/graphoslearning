@@ -45,7 +45,7 @@
     var list = [], byId = new Map();
     nodes.get().forEach(function (n) {
       if (n.hidden) return; var bb; try { bb = network.getBoundingBox(n.id); } catch (e) { return; } if (!bb) return;
-      var o = { id: String(n.id), label: String(n.label == null ? '' : n.label), n: n, bb: bb, x: bb.left, y: bb.top, w: bb.right - bb.left, h: bb.bottom - bb.top, cx: (bb.left + bb.right) / 2, cy: (bb.top + bb.bottom) / 2, lv: S.level.has(String(n.id)) ? S.level.get(String(n.id)) : 3, c: nodeCol(n) };
+      var o = { id: String(n.id), label: String(n.label == null ? '' : n.label), n: n, bb: bb, x: bb.left, y: bb.top, w: bb.right - bb.left, h: bb.bottom - bb.top, cx: (bb.left + bb.right) / 2, cy: (bb.top + bb.bottom) / 2, lv: S.level.has(String(n.id)) ? S.level.get(String(n.id)) : 3, nk: (S.kids.get(String(n.id)) || []).length, c: nodeCol(n) };
       list.push(o); byId.set(o.id, o);
     });
     var links = [];
@@ -274,12 +274,29 @@
   var BASE_EDGES = { color: { color: '#4a5178', highlight: '#4fd1c5', hover: '#8b7cf6', inherit: false }, width: 1.5, selectionWidth: 1, hoverWidth: 1, arrows: { to: { enabled: true, scaleFactor: 0.8 } } };
   var BASE_NODES = { shadow: { enabled: true, color: 'rgba(79, 209, 197, 0.18)', size: 14, x: 0, y: 0 }, shapeProperties: { borderRadius: 12 } };
   var HIDE_EDGES = { color: { color: 'rgba(0,0,0,0)', highlight: 'rgba(0,0,0,0)', hover: 'rgba(0,0,0,0)', inherit: false }, width: 0.01, selectionWidth: 0, hoverWidth: 0, arrows: { to: { enabled: false } } };
+  var BASE_MARGIN = { top: 16, bottom: 16, left: 20, right: 20 };
+  var TR = 'rgba(0,0,0,0)';
+  // Modos con formas propias (se registran desde fuera): la caja de vis se vuelve transparente solo al dibujar (no se toca el dato guardado).
+  function patchNodes(on) {
+    var bn = network && network.body && network.body.nodes; if (!bn) return;
+    Object.keys(bn).forEach(function (id) {
+      var o = bn[id] && bn[id].options; if (!o || !o.color || typeof o.color !== 'object') return;
+      var c = o.color, vis = c.background !== TR;
+      var copy = function () { return { background: c.background, border: c.border, hb: c.highlight && c.highlight.background, hd: c.highlight && c.highlight.border, ob: c.hover && c.hover.background, od: c.hover && c.hover.border }; };
+      var put = function (v) { c.background = v.background; c.border = v.border; if (c.highlight && typeof c.highlight === 'object') { c.highlight.background = v.hb; c.highlight.border = v.hd; } if (c.hover && typeof c.hover === 'object') { c.hover.background = v.ob; c.hover.border = v.od; } };
+      if (on) { if (!vis && o.__gkSv) return; if (vis) o.__gkSv = copy(); put({ background: TR, border: TR, hb: TR, hd: TR, ob: TR, od: TR }); }
+      else if (o.__gkSv) { if (!vis) put(o.__gkSv); delete o.__gkSv; }
+    });
+  }
   function applyOptions(mode) {
     try {
-      if (mode === 'flat') network.setOptions({ edges: BASE_EDGES, nodes: BASE_NODES });
-      else if (mode === 'blocks') network.setOptions({ edges: BASE_EDGES, nodes: { shadow: { enabled: false }, shapeProperties: { borderRadius: 12 } } });
-      else if (mode === 'city') network.setOptions({ edges: HIDE_EDGES, nodes: { shadow: { enabled: false }, shapeProperties: { borderRadius: 12 } } });
-      else if (mode === 'organic') network.setOptions({ edges: HIDE_EDGES, nodes: { shadow: { enabled: false }, shapeProperties: { borderRadius: 28 } } });
+      var X = IMPL[mode];
+      if (X && X.transparent) { network.setOptions({ edges: BASE_EDGES, nodes: { shadow: { enabled: false }, margin: X.margin || BASE_MARGIN, shapeProperties: { borderRadius: 12 } } }); patchNodes(true); return; }
+      patchNodes(false);
+      if (mode === 'flat') network.setOptions({ edges: BASE_EDGES, nodes: Object.assign({ margin: BASE_MARGIN }, BASE_NODES) });
+      else if (mode === 'blocks') network.setOptions({ edges: BASE_EDGES, nodes: { shadow: { enabled: false }, margin: BASE_MARGIN, shapeProperties: { borderRadius: 12 } } });
+      else if (mode === 'city') network.setOptions({ edges: HIDE_EDGES, nodes: { shadow: { enabled: false }, margin: BASE_MARGIN, shapeProperties: { borderRadius: 12 } } });
+      else if (mode === 'organic') network.setOptions({ edges: HIDE_EDGES, nodes: { shadow: { enabled: false }, margin: BASE_MARGIN, shapeProperties: { borderRadius: 28 } } });
     } catch (e) { /* no crítico */ }
   }
 
@@ -290,6 +307,7 @@
       if (S.mode === 'flat' || !IMPL[S.mode]) return;
       try {
         S.t = reduce() ? 0 : performance.now() / 1000;
+        if (which === 'before' && IMPL[S.mode].transparent) patchNodes(true);
         var F = which === 'before' ? frame() : (S.frame || frame()), V = view(), pr = dpr();
         ctx.save(); IMPL[S.mode][which].call(IMPL[S.mode], ctx, F, V, pr, S.t); ctx.restore();
       } catch (e) { try { ctx.restore(); } catch (_e) { /* ok */ } fail(e); }
@@ -299,7 +317,7 @@
   if (HAS) { network.on('beforeDrawing', run('before')); network.on('afterDrawing', run('after')); }
 
   function loop() {
-    S.raf = 0; if (S.mode === 'flat' || reduce()) return;
+    S.raf = 0; if (S.mode === 'flat' || reduce() || (IMPL[S.mode] && IMPL[S.mode].static)) return;
     var now = performance.now();
     if (!document.hidden && now - S.last >= 40) { S.last = now; try { network.redraw(); } catch (e) { /* ok */ } }
     S.raf = requestAnimationFrame(loop);
@@ -313,12 +331,20 @@
     if (sel) sel.value = mode === 'flat' ? (was === 'flat' ? sel.value : 'flat') : mode;
     if (byUser) { try { localStorage.setItem('gk_view_mode3', mode); } catch (e) { /* ok */ } try { track('view_mode', { mode: mode, nodes: nodes.length }); } catch (e) { /* ok */ } }
     try { network.redraw(); } catch (e) { /* ok */ }
-    if (mode !== 'flat' && !S.raf) S.raf = requestAnimationFrame(loop);
+    if (mode !== 'flat' && !S.raf && !(IMPL[mode] && IMPL[mode].static)) S.raf = requestAnimationFrame(loop);
   }
 
 
   /* ---------- «Foto»: imagen bonita para publicar (misma vista que se ve, con título y dirección) ----------
    * opts: { mode, list:[{id,label,x,y,w,h,cx,cy,lv,c:{bg,bd}}], links:[{a,b,key}], title, url, scale } — coordenadas del mapa. */
+  function drawText(n, ctx, mode) {
+    var fs = n.lv === 0 ? 17 : 15; ctx.save(); ctx.font = (n.lv === 0 ? '700 ' : '600 ') + fs + 'px system-ui, -apple-system, Segoe UI, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#eef1fb';
+    var txt = String(n.label || '').replace(/[*_`#]/g, '').replace(/\s+/g, ' ').trim(), words = txt.split(' '), lines = [], line = '', maxW = n.w - 18;
+    words.forEach(function (w) { var tt = line ? line + ' ' + w : w; if (ctx.measureText(tt).width > maxW && line) { lines.push(line); line = w; } else line = tt; }); if (line) lines.push(line);
+    var lh = fs * 1.2, ys = n.cy - ((lines.length - 1) * lh) / 2; lines.slice(0, 4).forEach(function (l, i) { ctx.fillText(l, n.cx, ys + i * lh); });
+    ctx.restore();
+  }
   function snapshot(o) {
     var list = o.list, links = o.links || [], mode = o.mode && IMPL[o.mode] ? o.mode : 'flat', sc = o.scale || 2;
     if (!list.length) return Promise.resolve(null);
@@ -338,7 +364,7 @@
     if (mode === 'flat') { ctx.fillStyle = '#0b1118'; ctx.fillRect(0, 0, cv.width, cv.height); } else { world(); IMPL[mode].before.call(IMPL[mode], ctx, F, V, sc, t); }
     ctx.restore();
     // ramas (en Plana y Bloques; Ciudad y Orgánico dibujan las suyas)
-    if (mode === 'flat' || mode === 'blocks') {
+    if (mode === 'flat' || mode === 'blocks' || IMPL[mode].edges) {
       ctx.save(); world(); ctx.lineWidth = 2; ctx.lineCap = 'round';
       links.forEach(function (L) { var a = L.a, b = L.b, horiz = Math.abs(b.cx - a.cx) > Math.abs(b.cy - a.cy), sx = horiz ? (b.cx > a.cx ? a.x + a.w : a.x) : a.cx, sy = horiz ? a.cy : (b.cy > a.cy ? a.y + a.h : a.y), ex = horiz ? (b.cx > a.cx ? b.x : b.x + b.w) : b.cx, ey = horiz ? b.cy : (b.cy > a.cy ? b.y : b.y + b.h);
         ctx.strokeStyle = rgba(b.c.bd, 0.7); ctx.beginPath(); ctx.moveTo(sx, sy);
@@ -349,15 +375,12 @@
     ctx.save(); world();
     list.forEach(function (n) {
       var r = mode === 'organic' ? Math.min(n.h / 2, 28) : 12;
+      if (IMPL[mode] && IMPL[mode].transparent) { drawText(n, ctx, mode); return; }
       ctx.save();
       if (mode === 'flat') { ctx.shadowColor = 'rgba(79,209,197,0.18)'; ctx.shadowBlur = 14; }
       rr(ctx, n.x, n.y, n.w, n.h, r); ctx.fillStyle = rgba(n.c.bg, 1); ctx.fill(); ctx.restore();
       ctx.strokeStyle = rgba(n.c.bd, 1); ctx.lineWidth = 1.5; rr(ctx, n.x, n.y, n.w, n.h, r); ctx.stroke();
-      var fs = n.lv === 0 ? 17 : 15; ctx.font = (n.lv === 0 ? '700 ' : '600 ') + fs + 'px system-ui, -apple-system, Segoe UI, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#eef1fb';
-      var txt = String(n.label || '').replace(/[*_`#]/g, '').replace(/\s+/g, ' ').trim(), words = txt.split(' '), lines = [], line = '', maxW = n.w - 18;
-      words.forEach(function (w) { var tt = line ? line + ' ' + w : w; if (ctx.measureText(tt).width > maxW && line) { lines.push(line); line = w; } else line = tt; }); if (line) lines.push(line);
-      var lh = fs * 1.2, ys = n.cy - ((lines.length - 1) * lh) / 2; lines.slice(0, 4).forEach(function (l, i) { ctx.fillText(l, n.cx, ys + i * lh); });
+      drawText(n, ctx, mode);
     });
     ctx.restore();
     if (mode !== 'flat') { ctx.save(); world(); IMPL[mode].after.call(IMPL[mode], ctx, F, V, sc, t); ctx.restore(); }
@@ -401,6 +424,10 @@
     var saved = 'flat'; try { saved = localStorage.getItem('gk_view_mode3') || 'flat'; } catch (e) { /* ok */ }
     if (MODES.indexOf(saved) >= 0) setTimeout(function () { set(saved, false); }, 300);
   }
-  window.__gkV3 = { snapshot: snapshot, shareBlob: shareBlob, photo: photo, set: function (m) { set(m, true); }, owns: function (v) { return MODES.indexOf(v) >= 0; }, mode: function () { return S.mode; }, modes: MODES, labels: LABELS, _impl: IMPL };
+  function register(name, label, impl) {
+    if (!impl || MODES.indexOf(name) >= 0) return; IMPL[name] = impl; MODES.push(name); LABELS[name] = label;
+    if (sel && !sel.querySelector('option[value="' + name + '"]')) { var o = document.createElement('option'); o.value = name; o.textContent = label; sel.appendChild(o); }
+  }
+  window.__gkV3 = { register: register, rr: rr, rgba: rgba, hex: hex, mix: mix, lighten: lighten, darken: darken, hash: hash, reduce: reduce, snapshot: snapshot, shareBlob: shareBlob, photo: photo, set: function (m) { set(m, true); }, owns: function (v) { return MODES.indexOf(v) >= 0; }, mode: function () { return S.mode; }, modes: MODES, labels: LABELS, _impl: IMPL };
   if (HAS) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire(); }
 })();
