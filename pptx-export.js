@@ -50,7 +50,7 @@
         o = o || {}; const id = ++_id;
         const fill = o.fill ? `<a:solidFill><a:srgbClr val="${o.fill}"/></a:solidFill>` : '<a:noFill/>';
         const ln = o.line ? `<a:ln w="${o.lineW || 12700}"><a:solidFill><a:srgbClr val="${o.line}"/></a:solidFill></a:ln>` : '<a:ln><a:noFill/></a:ln>';
-        const geom = o.round ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${o.round}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+        const geom = o.ellipse ? '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>' : o.round ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${o.round}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
         const ins = o.ins == null ? 0.1 : o.ins;
         const body = `<p:txBody><a:bodyPr wrap="square" lIns="${e(ins)}" tIns="${e(o.tIns == null ? 0.05 : o.tIns)}" rIns="${e(ins)}" bIns="${e(0.05)}" anchor="${o.anchor || 't'}" rtlCol="0"><a:noAutofit/></a:bodyPr><a:lstStyle/>${o.paras || '<a:p><a:endParaRPr lang="es-ES"/></a:p>'}</p:txBody>`;
         return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(o.name || 'Forma ' + id)}"/><p:cNvSpPr${o.paras ? ' txBox="1"' : ''}/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${e(x)}" y="${e(y)}"/><a:ext cx="${e(w)}" cy="${e(h)}"/></a:xfrm>${geom}${fill}${ln}</p:spPr>${body}</p:sp>`;
@@ -63,10 +63,71 @@
     }
     const slideXml = (shapes, bg) => `${HDR}<p:sld ${NS}><p:cSld>${bg ? `<p:bg><p:bgPr><a:solidFill><a:srgbClr val="${bg}"/></a:solidFill><a:effectLst/></p:bgPr></p:bg>` : ''}<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>${shapes.join('')}</p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>`;
 
+
+    // ---------- mapa mental: líneas, disposición en árbol y minimapa «dónde estás» ----------
+    function lineShape(x1, y1, x2, y2, color, wpt) {
+        const id = ++_id, x = Math.min(x1, x2), y = Math.min(y1, y2), w = Math.abs(x2 - x1), h = Math.abs(y2 - y1), flip = (x2 - x1) * (y2 - y1) < 0 ? ' flipV="1"' : '';
+        return `<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="${id}" name="Conexión ${id}"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr><a:xfrm${flip}><a:off x="${e(x)}" y="${e(y)}"/><a:ext cx="${e(w)}" cy="${e(h)}"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom><a:ln w="${Math.round((wpt || 1) * 12700)}" cap="rnd"><a:solidFill><a:srgbClr val="${color}"/></a:solidFill></a:ln></p:spPr></p:cxnSp>`;
+    }
+    const tint = (hex, t) => { const c = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16)); return c.map(v => Math.round(v + (255 - v) * t).toString(16).padStart(2, '0')).join('').toUpperCase(); };
+    // Marca cada nodo con un número (uid), su padre y su rama; devuelve la lista plana.
+    function annotate(model) {
+        const flat = []; let k = 0;
+        const walk = (n, parent, branch, depth, idx) => { n._uid = ++k; n._parent = parent; n._depth = depth; n._branch = depth === 0 ? -1 : (depth === 1 ? idx : branch); flat.push(n); (n.children || []).forEach((c, i) => walk(c, n, n._branch, depth + 1, i)); };
+        walk(model.root, null, -1, 0, 0); return flat;
+    }
+    const pathSet = (n) => { const s = new Set(); for (let x = n; x; x = x._parent) s.add(x._uid); return s; };
+    const leavesOf = (n, maxD, keep, d) => { const kids = (d < maxD || keep.has(n._uid)) ? (n.children || []) : []; return kids.length ? kids.reduce((t, c) => t + leavesOf(c, maxD, keep, d + 1), 0) : 1; };
+    // Árbol de izquierda a derecha: x por profundidad, y por orden de hojas. Devuelve nodos con coordenadas 0..1.
+    function layoutTree(top, maxD, keep) {
+        const out = [], total = leavesOf(top, maxD, keep, 0); let slot = 0, deepest = 0;
+        const rec = (n, d, parent) => {
+            const kids = (d < maxD || keep.has(n._uid)) ? (n.children || []) : [];
+            const item = { n, d, parent, hidden: (n.children || []).length - kids.length }; deepest = Math.max(deepest, d);
+            if (!kids.length) item.y = (slot++ + 0.5) / total; else { const ys = kids.map(c => rec(c, d + 1, item)); item.y = (ys[0] + ys[ys.length - 1]) / 2; }
+            out.push(item); return item.y;
+        };
+        rec(top, 0, null); out.forEach(i => { i.x = deepest ? i.d / deepest : 0; }); return { items: out, leaves: total, depth: deepest };
+    }
+    // Hasta qué profundidad cabe el mapa grande: se baja la profundidad hasta que no pase de maxLeaves hojas.
+    function fitDepth(top, from, maxLeaves) { for (let d = from; d > 1; d--) if (leavesOf(top, d, new Set(), 0) <= maxLeaves) return d; return 1; }
+    function bigMap(model, top, box, colorOfBranch, maxLeaves, cur) {
+        const D = fitDepth(top, 4, maxLeaves), L = layoutTree(top, D, new Set()), sh = [], nodeW = Math.min(2.1, box.w / (L.depth + 1) * 0.82), nodeH = Math.min(0.34, box.h / Math.max(L.leaves, 1) * 0.8), byItem = new Map();
+        const px = (it) => box.x + nodeW / 2 + it.x * (box.w - nodeW), py = (it) => box.y + nodeH / 2 + it.y * (box.h - nodeH);
+        L.items.forEach(it => byItem.set(it.n._uid, it));
+        L.items.forEach(it => { if (it.parent) { const col = it.n._branch >= 0 ? colorOfBranch(it.n._branch) : C.mute; sh.push(lineShape(px(it.parent) + nodeW / 2, py(it.parent), px(it) - nodeW / 2, py(it), tint(col, 0.15), 1.25)); } });
+        L.items.forEach(it => {
+            const col = it.n._branch >= 0 ? colorOfBranch(it.n._branch) : C.night, isTop = it === L.items[L.items.length - 1], rootTop = isTop && top === model.root, suffix = it.hidden ? ` (+${it.hidden})` : '';
+            const txt = clip(it.n.label, it.d >= 3 ? 22 : 30) + suffix, sz = Math.max(8, Math.min(13, Math.round(nodeH * 72 * 0.42)));
+            sh.push(shape(px(it) - nodeW / 2, py(it) - nodeH / 2, nodeW, nodeH, { name: 'Nodo ' + it.n._uid, fill: rootTop ? C.night : (isTop || it.d === 1 ? col : tint(col, 0.82)), line: col, lineW: 9525, round: 30000, ins: 0.05, tIns: 0.01, anchor: 'ctr', paras: para(txt, { sz, b: it.d <= 1, color: isTop || it.d === 1 ? 'FFFFFF' : C.ink, algn: 'ctr' }) }));
+        });
+        return sh;
+    }
+    // Minimapa de todo el esquema en una esquina: lo más cercano a la posición actual se ve completo; el resto, atenuado.
+    function miniMap(model, cur, colorOfBranch, tx) {
+        const x0 = 10.75, y0 = 0.22, w = 2.3, h = 1.36, keep = pathSet(cur), sh = [];
+        let D = 3; while (D > 1 && leavesOf(model.root, D, keep, 0) > 56) D--;
+        const L = layoutTree(model.root, D, keep), pad = 0.14, px = (it) => x0 + pad + it.x * (w - pad * 2), py = (it) => y0 + pad + it.y * (h - pad * 2);
+        sh.push(shape(x0, y0, w, h, { name: 'Minimapa', fill: C.card, line: C.rule, round: 6000 }));
+        L.items.forEach(it => { if (it.parent) { const on = keep.has(it.n._uid); sh.push(lineShape(px(it.parent), py(it.parent), px(it), py(it), on ? colorOfBranch(Math.max(it.n._branch, 0)) : 'CFCBBE', on ? 1.75 : 0.5)); } });
+        L.items.forEach(it => {
+            const on = keep.has(it.n._uid), isCur = it.n._uid === cur._uid, col = it.n._branch >= 0 ? colorOfBranch(it.n._branch) : C.night, r = isCur ? 0.085 : on ? 0.05 : 0.032;
+            if (isCur) sh.push(shape(px(it) - r * 1.9, py(it) - r * 1.9, r * 3.8, r * 3.8, { name: 'Estás aquí (halo)', ellipse: true, line: col, lineW: 15875 }));
+            sh.push(shape(px(it) - r, py(it) - r, r * 2, r * 2, { name: 'Punto ' + it.n._uid, ellipse: true, fill: on ? col : 'B9B5A6' }));
+        });
+        sh.push(shape(x0, y0 + h + 0.02, w, 0.22, { name: 'Dónde estás', ins: 0, paras: para(tx.where, { sz: 9, color: C.mute, algn: 'ctr' }) }));
+        return sh;
+    }
+
     // ---------- contenido ----------
     const T = (lang) => lang === 'en'
-        ? { overview: 'Overview', def: 'Definition', simple: 'In simple words', ex: 'Example', cont: 'cont.', concepts: (n) => `${n} concept${n === 1 ? '' : 's'}`, subtitle: (n, d) => `Concept map · ${n} concepts · ${d}`, brand: 'Graphikosmos', notesSimple: 'In simple words', notesEx: 'Example', more: 'more' }
-        : { overview: 'Panorama', def: 'Definición', simple: 'En palabras simples', ex: 'Ejemplo', cont: 'cont.', concepts: (n) => `${n} concepto${n === 1 ? '' : 's'}`, subtitle: (n, d) => `Esquema conceptual · ${n} conceptos · ${d}`, brand: 'Graphikosmos', notesSimple: 'Explicación sencilla', notesEx: 'Ejemplo', more: 'más' };
+        ? { where: 'You are here in the map', map: 'Mind map', overview: 'Overview', def: 'Definition', simple: 'In simple words', ex: 'Example', cont: 'cont.', concepts: (n) => `${n} concept${n === 1 ? '' : 's'}`, subtitle: (n, d) => `Concept map · ${n} concepts · ${d}`, brand: 'Graphikosmos', notesSimple: 'In simple words', notesEx: 'Example', more: 'more' }
+        : { where: 'Dónde estás en el mapa', map: 'Mapa mental', overview: 'Panorama', def: 'Definición', simple: 'En palabras simples', ex: 'Ejemplo', cont: 'cont.', concepts: (n) => `${n} concepto${n === 1 ? '' : 's'}`, subtitle: (n, d) => `Esquema conceptual · ${n} conceptos · ${d}`, brand: 'Graphikosmos', notesSimple: 'Explicación sencilla', notesEx: 'Ejemplo', more: 'más' };
+    const cob = (i) => BRANCH[((i % BRANCH.length) + BRANCH.length) % BRANCH.length];
+    function mapSlide(model, top, title, tx, maxLeaves) {
+        _id = 1; const sh = [shape(0, 0, 0.18, 7.5, { name: 'Color', fill: top === model.root ? C.night : cob(top._branch) }), titleShape(clip(title, 80), 0.7, 0.4, 12, 0.85, { max: 34, min: 22 })];
+        sh.push(...bigMap(model, top, { x: 0.6, y: 1.5, w: 12.1, h: 5.3 }, cob, maxLeaves)); sh.push(...footer(model, tx)); return { xml: slideXml(sh), notes: '' };
+    }
     const countAll = (n) => 1 + (n.children || []).reduce((t, c) => t + countAll(c), 0);
     const hasContent = (n) => !!(String(n.def || '').trim() || String(n.simple || '').trim());
 
@@ -93,16 +154,17 @@
         for (let s = 0; s < branches.length; s += per) {
             _id = 1; const chunk = branches.slice(s, s + per); const shapes = [];
             const t = tx.overview + (s ? ` (${Math.floor(s / per) + 1})` : '');
-            shapes.push(titleShape(t, 0.66, 0.55, 12, 0.9, { max: 36 }));
+            shapes.push(titleShape(t, 0.66, 0.55, 9.8, 0.9, { max: 36 }));
             chunk.forEach((b, i) => {
-                const col = i % 4, row = Math.floor(i / 4), x = 0.66 + col * 3.05, y = 1.75 + row * 2.6, color = BRANCH[(s + i) % BRANCH.length];
+                const col = i % 4, row = Math.floor(i / 4), x = 0.66 + col * 3.05, y = 1.95 + row * 2.5, color = BRANCH[(s + i) % BRANCH.length];
                 const kids = (b.children || []).slice(0, 4).map(k => clip(k.label, 34));
                 const more = (b.children || []).length - kids.length;
-                shapes.push(shape(x, y, 2.85, 2.4, { name: 'Rama ' + (s + i + 1), fill: C.card, line: C.rule, round: 6000 }));
+                shapes.push(shape(x, y, 2.85, 2.35, { name: 'Rama ' + (s + i + 1), fill: C.card, line: C.rule, round: 6000 }));
                 shapes.push(shape(x, y, 2.85, 0.12, { name: 'Color de rama', fill: color }));
                 shapes.push(shape(x + 0.05, y + 0.2, 2.75, 0.75, { name: 'Nombre de rama', anchor: 't', paras: para(clip(b.label, 60), { sz: fit(b.label, 2.75, 0.75, 20, 14), b: true, color: C.ink }) }));
                 shapes.push(shape(x + 0.05, y + 0.95, 2.75, 1.4, { name: 'Ideas', paras: kids.map(k => para(k, { sz: 12, color: C.ink2, bullet: '•', buColor: color, marL: 0.22, before: 2 })).join('') + (more > 0 ? para(`+ ${more} ${tx.more}`, { sz: 11, color: C.mute, before: 3 }) : '') }));
             });
+            shapes.push(...miniMap(model, model.root, cob, tx));
             shapes.push(...footer(model, tx));
             out.push({ xml: slideXml(shapes), notes: '' });
         }
@@ -117,7 +179,7 @@
     const LINE = [{ sz: 22, cost: 0.5, b: true }, { sz: 18, cost: 0.4 }, { sz: 16, cost: 0.35 }, { sz: 14, cost: 0.32 }];
     function branchSlides(model, b, color, tx) {
         const lines = branchLines(b); if (!lines.length) return [];
-        const pages = []; let cur = [], used = 0; const budget = 4.9;
+        const pages = []; let cur = [], used = 0; const budget = 4.6;
         lines.forEach(l => { const c = LINE[l.lvl].cost; if (used + c > budget && cur.length) { pages.push(cur); cur = []; used = 0; } cur.push(l); used += c; });
         if (cur.length) pages.push(cur);
         return pages.map((pg, i) => {
@@ -125,8 +187,9 @@
             const paras = pg.map(l => { const st = LINE[l.lvl]; return para(l.t, { sz: st.sz, b: st.b, color: l.lvl ? C.ink2 : C.ink, bullet: l.lvl ? '–' : '•', buColor: color, marL: 0.3 + l.lvl * 0.4, before: l.lvl ? 3 : 9 }); }).join('');
             return { xml: slideXml([
                 shape(0, 0, 0.18, 7.5, { name: 'Color de rama', fill: color }),
-                titleShape(title, 0.7, 0.45, 12, 1.0, { max: 38, min: 24 }),
-                shape(0.7, 1.7, 11.9, 5.1, { name: 'Ideas', paras }),
+                titleShape(title, 0.7, 0.45, 9.8, 1.0, { max: 38, min: 24 }),
+                shape(0.7, 1.95, 11.9, 4.9, { name: 'Ideas', paras }),
+                ...miniMap(model, b, cob, tx),
                 ...footer(model, tx)
             ]), notes: '' };
         });
@@ -134,8 +197,8 @@
 
     function conceptSlide(model, n, path, color, tx) {
         _id = 1; const def = String(n.def || '').trim(), simple = String(n.simple || '').trim(), ex = String(n.example || '').trim();
-        const shapes = [shape(0, 0, 0.18, 7.5, { name: 'Color de rama', fill: color }), titleShape(clip(n.label, 90), 0.7, 0.4, 12, 0.85, { max: 38, min: 24 })];
-        if (path.length) shapes.push(shape(0.7, 1.3, 11.9, 0.4, { name: 'Ruta', paras: para(clip(path.join(' › '), 140), { sz: 14, color: C.mute }) }));
+        const shapes = [shape(0, 0, 0.18, 7.5, { name: 'Color de rama', fill: color }), titleShape(clip(n.label, 90), 0.7, 0.4, 9.8, 0.85, { max: 38, min: 24 })];
+        if (path.length) shapes.push(shape(0.7, 1.3, 9.8, 0.4, { name: 'Ruta', paras: para(clip(path.join(' › '), 140), { sz: 14, color: C.mute }) }));
         const second = [];
         if (simple) second.push({ label: tx.simple, text: simple });
         if (ex) second.push({ label: tx.ex, text: ex });
@@ -151,6 +214,7 @@
                 shapes.push(shape(x, y, w, h, { name: s.label, fill: C.card, line: C.rule, round: 5000, ins: 0.2, tIns: 0.15, paras: para(s.label, { sz: 13, b: true, color }) + textParas(s.text, { sz: fit(s.text, w - 0.2, h - 0.6, def ? 22 : 28, 13), color: C.ink2, before: 4 }) }));
             });
         }
+        shapes.push(...miniMap(model, n, cob, tx));
         shapes.push(...footer(model, tx));
         const notes = [simple && `${tx.notesSimple}: ${simple}`, ex && `${tx.notesEx}: ${ex}`].filter(Boolean).join('\n\n');
         return { xml: slideXml(shapes), notes };
@@ -158,11 +222,14 @@
 
     function planSlides(model) {
         const tx = T(model.lang); const slides = [coverSlide(model, tx)];
+        annotate(model);
         const root = model.root, branches = root.children || [];
+        if (branches.length) slides.push(mapSlide(model, root, tx.map, tx, 30));
         if (hasContent(root)) slides.push(conceptSlide(model, root, [], BRANCH[0], tx));
         if (branches.length) overviewSlides(model, branches, tx).forEach(s => slides.push(s));
         branches.forEach((b, bi) => {
             const color = BRANCH[bi % BRANCH.length];
+            if ((b.children || []).length) slides.push(mapSlide(model, b, `${b.label} · ${tx.map.toLowerCase()}`, tx, 22));
             branchSlides(model, b, color, tx).forEach(s => slides.push(s));
             const walk = (n, path) => { if (hasContent(n)) slides.push(conceptSlide(model, n, path, color, tx)); (n.children || []).forEach(c => walk(c, path.concat(clip(n.label, 40)))); };
             walk(b, [clip(root.label, 40)]);
