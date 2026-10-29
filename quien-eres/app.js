@@ -2,7 +2,7 @@
 'use strict';
 var FN = '/.netlify/functions/';
 var $ = function (id) { return document.getElementById(id); };
-var TARGET = 12, MIC_FROM = 7, CARD_FROM = 7, MAX_RESERVE_RUN = 2, KEY_ID = 'ses_rid', KEY_ANON = 'ses_anon';
+var TARGET = 24, MIC_FROM = 7, CARD_FROM = 7, MAX_RESERVE_RUN = 2, KEY_ID = 'ses_rid', KEY_ANON = 'ses_anon';
 
 var FIXED = [
  { id: 'c1', t: 'choice', p: 'Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?', o: ['Sonrío y hablo más de lo normal', 'Me quedo callado/a y observo', 'Busco a alguien conocido y me quedo cerca', 'Actúo con seguridad aunque por dentro no la sienta'] },
@@ -17,7 +17,15 @@ var RESERVE = [
  { id: 'q1', t: 'short', p: 'Termina la frase: "La gente cree que soy..., pero en realidad soy..."', ph: 'Las dos partes, aunque no calcen' },
  { id: 'q3', t: 'short', p: '¿Cuál es la mentira que más te repites a ti?', ph: 'La que casi nunca dices en voz alta' },
  { id: 'q7', t: 'short', p: '¿Qué opinión tuya nunca dices en voz alta?', ph: 'Esa que te guardas' },
- { id: 'q11', t: 'short', p: 'Completa sin pensarlo mucho: "Lo que más me cuesta perdonar en alguien es..."', ph: 'Lo primero que se te venga' }
+ { id: 'q11', t: 'short', p: 'Completa sin pensarlo mucho: "Lo que más me cuesta perdonar en alguien es..."', ph: 'Lo primero que se te venga' },
+ { id: 'q12', t: 'short', p: 'Piensa en la última vez que alguien te falló de verdad. ¿Qué fue lo que más te dolió?', ph: 'Escribe solo lo que quieras compartir' },
+ { id: 'q15', t: 'short', p: '¿Qué te prometiste dejar de hacer y sigues haciendo?', ph: 'Sin justificarte' },
+ { id: 'q14', t: 'short', p: '¿A quién le debes una conversación que nunca has tenido? ¿Qué le dirías?', ph: 'Dile lo que no le dijiste' },
+ { id: 'q16', t: 'short', p: '¿Qué parte de tu historia cuentas siempre igual para no volver a sentir lo que sentiste?', ph: 'La versión que repites' },
+ { id: 'q18', t: 'short', p: 'Cuando algo te duele de verdad, ¿qué haces en los primeros cinco minutos, antes de que nadie lo note?', ph: 'Lo que haces en silencio' },
+ { id: 'q33', t: 'short', p: '¿Qué cargas por los demás que nadie te pidió cargar?', ph: 'Lo que sostienes en silencio' },
+ { id: 'q39', t: 'short', p: 'Si pudieras dejar de ser fuerte un día entero, ¿qué harías?', ph: 'Un día sin armadura' },
+ { id: 'q43', t: 'short', p: '¿Qué estás aguantando que ya no deberías aguantar?', ph: 'Eso que ya no te toca' }
 ];
 var CRISIS_RE = /(suicid|quitarme la vida|quitarme la vida|matarme|no quiero vivir|ya no quiero estar aqu[ií]|acabar con todo|hacerme da[ñn]o|cortarme|mejor muert[oa]|desaparecer para siempre)/i;
 
