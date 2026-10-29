@@ -1,4 +1,4 @@
-// Client ID público de PayPal y precio del retrato para /quien-eres/sesion/ (el precio vive solo en el servidor).
+// Client ID público de PayPal y precio del retrato para /quien-eres/ (el precio vive solo en el servidor).
 const { READING_PRICE } = require('./_lib/ses-core');
 exports.handler = async (event) => {
     if (event.httpMethod !== 'GET') return { statusCode: 405, body: 'Method Not Allowed' };

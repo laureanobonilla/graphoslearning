@@ -1,4 +1,4 @@
-// Núcleo de «¿Quién eres? — sesión» (/quien-eres/sesion/): preguntas que se adaptan a lo que la persona contesta y un retrato
+// Núcleo de «¿Quién eres? — sesión» (/quien-eres/): preguntas que se adaptan a lo que la persona contesta y un retrato
 // final con una parte visible y otra bloqueada. El texto bloqueado se queda en el SERVIDOR hasta que el pago se confirma.
 // Reutiliza las tablas qer_readings / qer_orders (sin SQL nuevo) con el prefijo de id «ses_».
 const READING_PRICE = (() => { const n = Number(String(process.env.SES_PRICE_USD || process.env.QER_PRICE_USD || '9.99').trim()); return Number.isFinite(n) && n >= 0.5 ? n.toFixed(2) : '9.99'; })();
