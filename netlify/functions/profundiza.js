@@ -25,10 +25,11 @@ const SCHEMA = { type: 'OBJECT', properties: {
     }, required: ['n', 'answers', 'meaning'] } }
 }, required: ['text', 'blanks'] };
 
-const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
-function prompt(term, topic, parent, lvl, variant, avoid) {
+const norm = (s) => String(s || '').toLowerCase().replace(/ß/g, 'ss').replace(/œ/g, 'oe').replace(/æ/g, 'ae').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
+const LANGS = { es: 'español', en: 'inglés', de: 'alemán', fr: 'francés' };
+function prompt(term, topic, parent, lvl, variant, avoid, lang) {
     const L = LEVELS[lvl];
-    return `Eres un profesor que crea ejercicios de completar para estudiar. Escribe en español.
+    return `Eres un profesor que crea ejercicios de completar para estudiar. Escribe TODO el texto de salida (la definición, las respuestas y los significados) en ${LANGS[lang]}, con ortografía y tildes/diéresis correctas${lang === 'es' ? '' : '; la persona está aprendiendo el tema en ese idioma, así que usa vocabulario natural y no traduzcas términos técnicos de forma rara'}.
 Concepto a definir: «${term}». ${topic && norm(topic) !== norm(term) ? `Se está estudiando el tema «${topic}»${parent ? ` y la persona llegó aquí porque no supo la palabra «${term}» dentro de una definición de «${parent}»` : ''}.` : ''}
 Redacta UNA definición clara y correcta de «${term}» de ${L.words} palabras (${L.style}). No empieces con «${term}» como título: es un texto corrido.
 Después reemplaza entre ${L.blanks[0]} y ${L.blanks[1]} palabras de ese texto por marcas [[1]], [[2]]… (una marca por palabra o término de máximo dos palabras).
@@ -63,14 +64,14 @@ exports.handler = async (event) => {
             if (limited(ip + 'c', 60)) return json(429, { error: 'demasiadas' });
             const term = clean(body.term, 80), topic = clean(body.topic, 80), parent = clean(body.parent, 80), lvl = LEVELS[body.level] ? body.level : 'beginner';
             if (term.length < 2) return json(400, { error: 'termino' });
-            const variant = Math.min(5, Math.max(0, parseInt(body.variant, 10) || 0)), avoid = (Array.isArray(body.avoid) ? body.avoid : []).slice(0, 2).map((x) => clean(x, 160)).filter(Boolean);
+            const lang = LANGS[body.lang] ? body.lang : 'es', variant = Math.min(5, Math.max(0, parseInt(body.variant, 10) || 0)), avoid = (Array.isArray(body.avoid) ? body.avoid : []).slice(0, 2).map((x) => clean(x, 160)).filter(Boolean);
             const t0 = Date.now();
-            const d = await generateWithRetries(prompt(term, topic, parent, lvl, variant, avoid), SCHEMA, (x) => validate(x, lvl), { tag: 'profundiza', maxOutputTokens: 1200, deadline: t0 + 22000, attemptMs: 9000 });
+            const d = await generateWithRetries(prompt(term, topic, parent, lvl, variant, avoid, lang), SCHEMA, (x) => validate(x, lvl), { tag: 'profundiza', maxOutputTokens: 1200, deadline: t0 + 22000, attemptMs: 9000 });
             const marks = [...d.text.matchAll(/\[\[(\d+)\]\]/g)].map((m) => Number(m[1]));
             const blanks = marks.map((n, i) => { const b = d.blanks.find((x) => Number(x.n) === n); return { n: i + 1, old: n, answers: b.answers.map((s) => clean(s, 60)).filter(Boolean).slice(0, 4), meaning: clean(b.meaning, 220) }; });
             // se renumera 1..k en orden de aparición (con marcas temporales para evitar choques)
             let text = d.text; blanks.forEach((b) => { text = text.split('[[' + b.old + ']]').join('{#' + b.n + '#}'); }); text = text.replace(/\{#(\d+)#\}/g, '[[$1]]');
-            return json(200, { term, level: lvl, text: clean(text, 900), blanks: blanks.map(({ n, answers, meaning }) => ({ n, answers, meaning })), ms: Date.now() - t0 });
+            return json(200, { term, level: lvl, lang, text: clean(text, 900), blanks: blanks.map(({ n, answers, meaning }) => ({ n, answers, meaning })), ms: Date.now() - t0 });
         }
         return json(400, { error: 'accion' });
     } catch (err) {
