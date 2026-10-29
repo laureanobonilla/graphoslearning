@@ -10,7 +10,7 @@ const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'app
 
 const WIN = 10 * 60 * 1000, hits = new Map();
 function limited(key, max) { const now = Date.now(), h = (hits.get(key) || []).filter((t) => now - t < WIN); h.push(now); hits.set(key, h); if (hits.size > 800) for (const [k, v] of hits) if (!v.length || now - v[v.length - 1] > WIN) hits.delete(k); return h.length > max; }
-const EVENTS = new Set(['ses_landing', 'ses_start', 'ses_answer', 'ses_card_shown', 'ses_wait', 'ses_mic_opened', 'ses_mic_used', 'ses_mic_unsupported', 'ses_crisis', 'ses_portrait_requested', 'ses_portrait_ready', 'ses_portrait_shown', 'ses_mic_error', 'ses_portrait_error', 'ses_paywall_seen', 'ses_continue_clicked', 'ses_paypal_ready', 'ses_paypal_error', 'ses_paid_client', 'ses_resumed', 'ses_copied', 'ses_shared']);
+const EVENTS = new Set(['ses_landing', 'ses_start', 'ses_answer', 'ses_card_shown', 'ses_wait', 'ses_mic_opened', 'ses_mic_used', 'ses_mic_unsupported', 'ses_crisis', 'ses_portrait_requested', 'ses_portrait_ready', 'ses_portrait_shown', 'ses_mic_error', 'ses_portrait_error', 'ses_paywall_seen', 'ses_continue_clicked', 'ses_paypal_ready', 'ses_paypal_error', 'ses_paid_client', 'ses_wa_clicked', 'ses_unlock_try', 'ses_resumed', 'ses_copied', 'ses_shared']);
 const cleanAnon = (a) => { const s = String(a || '').slice(0, 64); return /^[\w-]{8,64}$/.test(s) ? s : ''; };
 
 exports.handler = async (event) => {
@@ -53,6 +53,15 @@ exports.handler = async (event) => {
             if (r.failed) return json(200, { failed: true });
             await log('ses_resumed', { id, paid: !!r.paid });
             return json(200, S.view(r, !!r.paid));
+        }
+        if (a === 'unlock') {
+            if (limited(ip + 'u', 12)) return json(429, { error: 'demasiadas' });
+            const id = String(body.id || ''); if (!S.ID_RE.test(id)) return json(400, { error: 'id' });
+            if (!process.env.SES_UNLOCK_SECRET) return json(503, { error: 'sin_configurar' });
+            const r = await getReading(id); if (!r || !r.ses || r.failed) return json(404, { error: 'no_disponible' });
+            if (!S.codeMatches(id, body.code)) { await log('ses_unlock_bad', { id }); return json(403, { error: 'contrasena' }); }
+            await log('ses_unlocked', { id });
+            return json(200, S.view(r, true));
         }
         return json(400, { error: 'accion' });
     } catch (err) {

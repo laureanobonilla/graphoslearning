@@ -1,8 +1,22 @@
 // Núcleo de «¿Quién eres? — sesión» (/quien-eres/): preguntas que se adaptan a lo que la persona contesta y un retrato
 // final con una parte visible y otra bloqueada. El texto bloqueado se queda en el SERVIDOR hasta que el pago se confirma.
 // Reutiliza las tablas qer_readings / qer_orders (sin SQL nuevo) con el prefijo de id «ses_».
-const READING_PRICE = (() => { const n = Number(String(process.env.SES_PRICE_USD || process.env.QER_PRICE_USD || '9.99').trim()); return Number.isFinite(n) && n >= 0.5 ? n.toFixed(2) : '9.99'; })();
+const READING_PRICE = (() => { const n = Number(String(process.env.SES_PRICE_USD || process.env.QER_PRICE_USD || '4.99').trim()); return Number.isFinite(n) && n >= 0.5 ? n.toFixed(2) : '4.99'; })();
 const CRISIS_RE = /(suicid|quitarme la vida|quitarse la vida|acabar con mi vida|no quiero vivir|no quiero seguir viviendo|quiero morir|quiero morirme|matarme|hacerme da(ñ|n)o|cortarme|kill myself|want to die|end my life|self[- ]harm|suicide)/i;
+// Contraseña de desbloqueo: HMAC(secreto, id) -> 8 caracteres «XXXX-XXXX». No se guarda en ningún lado (se recalcula),
+// así que desbloquear no requiere cambiar datos. El secreto vive en la variable SES_UNLOCK_SECRET (la misma que usa scripts/ses-code.js).
+const crypto = require('crypto');
+function unlockCode(id) {
+    const secret = process.env.SES_UNLOCK_SECRET; if (!secret) return null;
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', h = crypto.createHmac('sha256', secret).update(String(id)).digest();
+    let out = ''; for (let i = 0; i < 8; i++) out += A[h[i] % A.length];
+    return out.slice(0, 4) + '-' + out.slice(4);
+}
+function codeMatches(id, given) {
+    const want = unlockCode(id); if (!want) return false;
+    const a = Buffer.from(want.replace(/-/g, '')), b = Buffer.from(String(given || '').toUpperCase().replace(/[^A-Z0-9]/g, ''));
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 const ID_RE = /^ses_[a-f0-9-]{36}$/;
 const MAX_ITEMS = 40, MAX_A = 1200, MAX_Q = 300;
 
@@ -88,4 +102,4 @@ function view(r, paid) {
     const sp = splitPreview(r.paragraphs);
     return { ...base, paid: false, preview: sp.visible, hiddenWords: sp.hiddenWords, price: READING_PRICE };
 }
-module.exports = { cleanAvoid, READING_PRICE, CRISIS_RE, ID_RE, sanitize, hasCrisis, langOf, NEXT_SCHEMA, PORTRAIT_SCHEMA, nextPrompt, portraitPrompt, splitPreview, view };
+module.exports = { cleanAvoid, READING_PRICE, CRISIS_RE, ID_RE, sanitize, hasCrisis, langOf, NEXT_SCHEMA, PORTRAIT_SCHEMA, nextPrompt, portraitPrompt, splitPreview, view, unlockCode, codeMatches };

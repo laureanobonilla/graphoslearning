@@ -227,7 +227,6 @@ var FILL = 'una forma de sostener lo que se calla cuando nadie pregunta y lo que
 function filler(n) { var out = []; for (var i = 0; i < Math.min(Math.max(n, 30), 90); i++) out.push(FILL[i % FILL.length]); return out.join(' ') + '.'; }
 function onCrisisResult() { crisisFlag = true; }
 
-var paypalLoaded = false;
 function renderResult(r, first) {
   var box = $('result'); box.textContent = ''; show('result');
   if (r.free || r.paid && crisisFlag) { var c = el('div', 'crisis'); c.appendChild(el('b', null, 'No estás sola ni solo. Si en algún momento lo necesitas, estas personas pueden escucharte:')); renderHelp(c, true); box.appendChild(c); }
@@ -244,11 +243,29 @@ function renderResult(r, first) {
   go.onclick = function () {
     track('ses_continue_clicked', { id: r.id });
     go.classList.add('hide');
-    pay.appendChild(el('p', null, 'Lo que sigue: el resto de tu retrato, tres pasos concretos y un cierre. Pago único de USD ' + Number(r.price || 9.99).toFixed(2) + ', sin suscripción.'));
-    var holder = el('div'); holder.id = 'pp'; pay.appendChild(holder);
-    pay.appendChild(el('p', 'small', 'El pago se hace en PayPal (también con tarjeta). Recibes el texto completo aquí mismo.'));
-    loadPayPal(r, holder);
+    pay.appendChild(el('p', null, 'Lo que sigue: el resto de tu retrato, tres pasos concretos y un cierre. Pago único de USD ' + Number(r.price || 4.99).toFixed(2) + ', sin suscripción.'));
+    pay.appendChild(el('p', 'small', 'Escríbeme por WhatsApp con tu código de sesión: te paso el enlace de pago y una contraseña para abrir tu retrato aquí mismo.'));
+    var wa = el('a', 'btn', 'Pedir el enlace de pago por WhatsApp'); wa.target = '_blank'; wa.rel = 'noopener'; wa.style.display = 'inline-block'; wa.style.textDecoration = 'none';
+    var msg = 'Hola, quiero leer mi retrato completo de ¿Quién eres? Mi código de sesión es: ' + r.id;
+    wa.href = 'https://wa.me/?text=' + encodeURIComponent(msg);
+    fetch(FN + 'ses-config').then(function (x) { return x.json(); }).then(function (cfg) { if (cfg && cfg.whatsapp) wa.href = 'https://wa.me/' + cfg.whatsapp + '?text=' + encodeURIComponent(msg); }).catch(function () {});
+    wa.onclick = function () { track('ses_wa_clicked', { id: r.id }); };
+    pay.appendChild(wa);
+    var code = el('p', 'small', 'Tu código de sesión: ' + r.id); pay.appendChild(code);
+    var inp = el('input'); inp.type = 'text'; inp.placeholder = 'Contraseña (XXXX-XXXX)'; inp.autocomplete = 'off'; inp.autocapitalize = 'characters'; inp.maxLength = 12; inp.style.cssText = 'display:block;margin:14px 0 8px;padding:10px 12px;font:inherit;width:100%;max-width:260px;border-radius:10px;border:1px solid currentColor;background:transparent;color:inherit;letter-spacing:.08em';
+    var ub = el('button', 'btn ghost', 'Abrir mi retrato'); ub.type = 'button'; var em = el('p', 'small', ''); 
+    ub.onclick = function () { tryUnlock(r.id, inp.value, em, ub); };
+    inp.onkeydown = function (e) { if (e.key === 'Enter') ub.onclick(); };
+    pay.appendChild(inp); pay.appendChild(ub); pay.appendChild(em);
   };
+}
+function tryUnlock(id, code, em, btn) {
+  code = String(code || '').trim(); if (!code) { em.textContent = 'Escribe la contraseña que te di.'; return; }
+  if (btn) btn.disabled = true; em.textContent = 'Comprobando…'; track('ses_unlock_try', { id: id });
+  ses('unlock', { id: id, code: code }).then(function (full) {
+    try { localStorage.setItem('ses_code_' + id, code); } catch (e) {}
+    track('ses_paid_client', { id: id }); renderResult(full, false); window.scrollTo(0, 0);
+  }).catch(function (e) { if (btn) btn.disabled = false; em.textContent = e && e.status === 403 ? 'Esa contraseña no es correcta. Revísala e inténtalo otra vez.' : e && e.status === 429 ? 'Demasiados intentos. Espera unos minutos.' : 'No se pudo comprobar. Inténtalo de nuevo en un momento.'; });
 }
 function renderFull(box, r) {
   (r.paragraphs || []).forEach(function (t) { box.appendChild(el('p', 'para', t)); });
@@ -266,36 +283,13 @@ function renderFull(box, r) {
   box.appendChild(el('p', 'small', 'Esto es una reflexión, no una terapia ni un diagnóstico.'));
 }
 
-function loadPayPal(r, holder) {
-  fetch(FN + 'ses-config').then(function (x) { return x.json(); })
-    .then(function (cfg) {
-      return new Promise(function (res, rej) {
-        if (window.paypal) return res(cfg);
-        var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(cfg.clientId) + '&currency=USD&intent=capture&components=buttons';
-        s.onload = function () { res(cfg); }; s.onerror = rej; document.head.appendChild(s);
-      });
-    })
-    .then(function () {
-      window.paypal.Buttons({
-        style: { layout: 'vertical', shape: 'pill', label: 'pay' },
-        createOrder: function () { return post('ses-pay-create', { id: r.id, anonId: ANON }, 20000).then(function (j) { return j.orderID; }); },
-        onApprove: function (d) {
-          return post('ses-pay-capture', { id: r.id, orderID: d.orderID, anonId: ANON }, 30000).then(function (full) { track('ses_paid_client', { id: r.id }); renderResult(full, false); window.scrollTo(0, 0); })
-            .catch(function () { holder.appendChild(el('p', null, 'El pago se hizo pero no pudimos mostrar el texto. Recarga esta página: ' + r.id)); });
-        },
-        onError: function () { track('ses_paypal_error', {}); holder.appendChild(el('p', null, 'PayPal tuvo un problema. Intenta de nuevo en un momento.')); }
-      }).render(holder);
-      track('ses_paypal_ready', {});
-    })
-    .catch(function () { track('ses_paypal_error', { stage: 'load' }); holder.appendChild(el('p', null, 'No se pudo cargar el pago. Recarga la página e inténtalo otra vez.')); });
-}
-
 // ---- arranque ----
+fetch(FN + 'ses-config').then(function (x) { return x.json(); }).then(function (cfg) { var n = $('priceNote'); if (n && cfg && cfg.priceUsd) n.textContent = 'Al final ves una parte de tu retrato gratis. Para leerlo completo hay un pago único de USD ' + String(cfg.priceUsd).replace('.', ',') + ', que se coordina por WhatsApp.'; }).catch(function () {});
 $('start').onclick = function () { track('ses_start', {}); show('quiz'); advance(); };
 track('ses_landing', { ref: (document.referrer || '').slice(0, 80), utm: (location.search.match(/utm_[a-z]+=[^&]+/g) || []).join('&').slice(0, 120) });
 var qs = new URLSearchParams(location.search), rid = qs.get('r');
 if (!rid) { try { rid = localStorage.getItem(KEY_ID); } catch (e) {} }
 if (rid && /^ses_[a-f0-9-]{36}$/.test(rid)) {
-  ses('get', { id: rid }).then(function (r) { if (r.failed) return; track('ses_resumed', {}); renderResult(r, false); }).catch(function () {});
+  ses('get', { id: rid }).then(function (r) { if (r.failed) return; track('ses_resumed', {}); var c = null; try { c = localStorage.getItem('ses_code_' + rid); } catch (e) {} if (!r.paid && !r.free && c) return ses('unlock', { id: rid, code: c }).then(function (f) { renderResult(f, false); }, function () { renderResult(r, false); }); renderResult(r, false); }).catch(function () {});
 }
 })();
