@@ -291,7 +291,7 @@
   function applyOptions(mode) {
     try {
       var X = IMPL[mode];
-      if (X && X.transparent) { network.setOptions({ edges: BASE_EDGES, nodes: { shadow: { enabled: false }, margin: X.margin || BASE_MARGIN, shapeProperties: { borderRadius: 12 } } }); patchNodes(true); return; }
+      if (X && X.transparent) { network.setOptions({ edges: X.edges === false ? HIDE_EDGES : BASE_EDGES, nodes: { shadow: { enabled: false }, margin: X.margin || BASE_MARGIN, shapeProperties: { borderRadius: 12 } } }); patchNodes(true); return; }
       patchNodes(false);
       if (mode === 'flat') network.setOptions({ edges: BASE_EDGES, nodes: Object.assign({ margin: BASE_MARGIN }, BASE_NODES) });
       else if (mode === 'blocks') network.setOptions({ edges: BASE_EDGES, nodes: { shadow: { enabled: false }, margin: BASE_MARGIN, shapeProperties: { borderRadius: 12 } } });
