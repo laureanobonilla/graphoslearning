@@ -243,8 +243,8 @@ function renderResult(r, first) {
   go.onclick = function () {
     track('ses_continue_clicked', { id: r.id });
     go.classList.add('hide');
-    pay.appendChild(el('p', null, 'Contacta a quien te dio el link de esta aplicación para ver tu respuesta completa.'));
-    var code = el('p', 'small', 'Dile este código de sesión: ' + r.id); pay.appendChild(code);
+    pay.appendChild(el('p', null, 'Contacta a quien te dio el link de esta aplicación para ver tu respuesta completa. Cuando te dé la contraseña, escríbela aquí.'));
+    var code = el('p', 'small', 'Tu código de sesión (se lo das a quien te pasó el link): ' + r.id); pay.appendChild(code);
     var inp = el('input'); inp.type = 'text'; inp.placeholder = 'Contraseña (XXXX-XXXX)'; inp.autocomplete = 'off'; inp.autocapitalize = 'characters'; inp.maxLength = 12; inp.style.cssText = 'display:block;margin:14px 0 8px;padding:10px 12px;font:inherit;width:100%;max-width:260px;border-radius:10px;border:1px solid currentColor;background:transparent;color:inherit;letter-spacing:.08em';
     var ub = el('button', 'btn ghost', 'Abrir mi retrato'); ub.type = 'button'; var em = el('p', 'small', ''); 
     ub.onclick = function () { tryUnlock(r.id, inp.value, em, ub); };

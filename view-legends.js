@@ -9,13 +9,13 @@
   function dot(c) { return function (ctx, x, y, w, h) { ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, h / 2 - 1, 0, 6.2832); ctx.fillStyle = css(c); ctx.fill(); ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(150,150,160,0.85)'; ctx.stroke(); }; }
   function star(cls) {
     return function (ctx, x, y, w, h) {
-      var cx = x + w / 2, cy = y + h / 2, r = 5.5; ctx.strokeStyle = ctx.fillStyle = 'rgb(226,222,205)'; ctx.lineWidth = 1.2; ctx.beginPath();
+      var cx = x + w / 2, cy = y + h / 2, r = 6.5; ctx.strokeStyle = ctx.fillStyle = 'rgb(226,222,205)'; ctx.lineWidth = 1.2; ctx.beginPath();
       if (cls === 'ring') { ctx.arc(cx, cy, r, 0, 6.2832); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy, 1.4, 0, 6.2832); ctx.fill(); }
       else if (cls === 'cross') { ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy); ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy, 2, 0, 6.2832); ctx.fill(); }
-      else if (cls === 'diamond') { ctx.moveTo(cx, cy - r); ctx.lineTo(cx + r * 0.7, cy); ctx.lineTo(cx, cy + r); ctx.lineTo(cx - r * 0.7, cy); ctx.closePath(); ctx.fill(); }
+      else if (cls === 'diamond') { ctx.moveTo(cx, cy - r * 1.1); ctx.lineTo(cx + r * 0.75, cy); ctx.lineTo(cx, cy + r * 1.1); ctx.lineTo(cx - r * 0.75, cy); ctx.closePath(); ctx.fill(); }
       else if (cls === 'tick') { ctx.arc(cx, cy, 2.6, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(cx, cy, r, 0.5, 3.5); ctx.stroke(); }
       else if (cls === 'double') { ctx.arc(cx - 3, cy, 3.4, 0, 6.2832); ctx.fill(); ctx.beginPath(); ctx.arc(cx + 4, cy + 1, 2, 0, 6.2832); ctx.stroke(); }
-      else { ctx.arc(cx, cy, 3.2, 0, 6.2832); ctx.fill(); }
+      else { ctx.arc(cx, cy, 4.2, 0, 6.2832); ctx.fill(); }
     };
   }
   // construye filas: tabla {rol: [nombreEs, nombreEn]} y función de swatch por rol
@@ -33,11 +33,21 @@
     var N = { root: ['Brújula / corona', 'Compass / crown'], category: ['Caja de herramientas / libros', 'Toolbox / books'], process: ['Engranaje / llave', 'Gear / wrench'], question: ['Lupa / cerradura', 'Magnifier / keyhole'], example: ['Bombilla / bandera', 'Bulb / flag'], benefit: ['Trofeo / medalla', 'Trophy / medal'], risk: ['Candado / advertencia', 'Lock / warning'], date: ['Reloj / calendario', 'Clock / calendar'], list: ['Balanza / regla', 'Scales / ruler'], formula: ['Regla / matraz', 'Ruler / flask'], definition: ['Libro / pergamino', 'Book / scroll'], concept: ['Objetos variados', 'Assorted objects'] };
     return { title: TITLE('Herramientas · objeto según función', 'Tools · object by function'), cw: 300, rows: rows(N, function () { return box('rgb(180,83,9)'); }), note: ['El material (color) del objeto es decorativo', 'The object material (colour) is decorative'] };
   });
-  // Naturaleza
+  // Naturaleza: la forma real de la primera familia de cada función (el color de cada pieza varía)
   wrap('nature', function () {
-    var C = { root: '#4fd1c5', category: '#8b7cf6', process: '#60a5fa', example: '#f2b366', question: '#c084fc', benefit: '#4ade80', risk: '#f87171', date: '#22d3ee', list: '#f472b6', formula: '#fbbf24', definition: '#94a3b8', concept: '#64748b' };
+    var SHp = window.__gkShapes, FIRST = { root: 'sun', category: 'leaf', process: 'dune', question: 'cloud', example: 'flower', benefit: 'fruit', risk: 'burst', date: 'pebble', list: 'hex', formula: 'crystal', definition: 'shell', concept: 'leaf' };
+    function sil(r) {
+      return function (ctx, x, y, w, h) {
+        var S; try { S = SHp.prep(FIRST[r], 0); } catch (e) { S = null; } if (!S || !S.pts) { dot('#4ade80')(ctx, x, y, w, h); return; }
+        var cx = x + w / 2, cy = y + h / 2, a = w / 2 - 2, b = h / 2, P = S.pts.map(function (q) { return [cx + q[0] * a, cy + q[1] * b]; }), n = P.length;
+        ctx.beginPath();
+        if (S.F && S.F.smooth) { ctx.moveTo((P[n - 1][0] + P[0][0]) / 2, (P[n - 1][1] + P[0][1]) / 2); for (var j = 0; j < n; j++) { var p0 = P[j], p1 = P[(j + 1) % n]; ctx.quadraticCurveTo(p0[0], p0[1], (p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2); } }
+        else { ctx.moveTo(P[0][0], P[0][1]); for (var i = 1; i < n; i++) ctx.lineTo(P[i][0], P[i][1]); }
+        ctx.closePath(); var col = S.F && S.F.cols && S.F.cols[0] ? S.F.cols[0] : '#4ade80'; ctx.fillStyle = col; ctx.globalAlpha = 0.85; ctx.fill(); ctx.globalAlpha = 1; ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(230,240,230,0.8)'; ctx.stroke();
+      };
+    }
     var N = { root: ['Sol / flor', 'Sun / flower'], category: ['Hoja / pluma', 'Leaf / feather'], process: ['Duna / gota / vaina', 'Dune / drop / pod'], question: ['Nube / hongo', 'Cloud / mushroom'], example: ['Flor / mariposa / fruto', 'Flower / butterfly / fruit'], benefit: ['Fruto / flor / huevo', 'Fruit / flower / egg'], risk: ['Estallido / escarcha / estrella', 'Burst / frost / star'], date: ['Guijarro / huevo', 'Pebble / egg'], list: ['Panal / concha / vaina', 'Hive / shell / pod'], formula: ['Cristal / escarcha', 'Crystal / frost'], definition: ['Concha / huevo / hongo', 'Shell / egg / mushroom'], concept: ['Formas naturales variadas', 'Assorted natural forms'] };
-    return { title: TITLE('Naturaleza · forma según función', 'Nature · form by function'), cw: 320, rows: rows(N, function (r) { return dot(C[r]); }) };
+    return { title: TITLE('Naturaleza · forma según función', 'Nature · form by function'), cw: 320, rows: rows(N, sil), note: ['La forma indica la función; el color de cada pieza varía', 'Form shows the function; each piece\'s colour varies'] };
   });
   // Organismo
   wrap('organism', function () {

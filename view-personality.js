@@ -110,12 +110,12 @@
 
   function legend(ctx, F, V, tone) {
     var cnt = {}; F.list.forEach(function (o) { cnt[o.role] = (cnt[o.role] || 0) + 1; });
-    var roles = Object.keys(cnt).filter(function (r) { return r !== 'bubble'; }).sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 7), g = MEANING[EN ? 'en' : 'es'], t = TONES[tone], pw = 330, rh = 21, ph = 34 + roles.length * rh, sc = V.sc || 1;
+    var roles = Object.keys(cnt).filter(function (r) { return r !== 'bubble'; }).sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 8), g = MEANING[EN ? 'en' : 'es'], t = TONES[tone], pw = 350, rh = 24, ph = 36 + roles.length * rh, sc = V.sc || 1;
     ctx.save(); ctx.translate(V.x0 + 14 / sc, V.y1 - (ph + 14) / sc); ctx.scale(1 / sc, 1 / sc);
     rrect(ctx, 0, 0, pw, ph, 10); ctx.fillStyle = t.dark ? 'rgba(10,16,30,0.82)' : 'rgba(255,252,244,0.9)'; ctx.fill(); ctx.strokeStyle = rgba(t.ink, 0.35); ctx.lineWidth = 1; ctx.stroke();
     ctx.fillStyle = rgba(t.ink, 1); ctx.font = '700 12px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText((EN ? 'Functional typology · background: ' : 'Tipología funcional · fondo: ') + t.name[EN ? 1 : 0], 12, 16);
     ctx.font = '500 11.5px system-ui, sans-serif';
-    roles.forEach(function (r, i) { var y = 34 + i * rh; rrect(ctx, 12, y, 22, 14, 3); ctx.fillStyle = rgba(BODY[r] || BODY.concept, 1); ctx.fill(); ctx.strokeStyle = rgba(ACC[r] || ACC.concept, 1); ctx.lineWidth = 1.6; ctx.stroke(); ctx.fillStyle = rgba(t.ink, 0.95); ctx.fillText(g[r] || '', 44, y + 8); });
+    roles.forEach(function (r, i) { var y = 36 + i * rh; ctx.save(); ctx.translate(12, y - 2); ctx.scale(0.42, 0.42); sticker(ctx, { role: r, id: 'leg' + r, x: 8, y: 6, w: 64, h: 24 }, 1, false, tone); ctx.restore(); ctx.fillStyle = rgba(t.ink, 0.95); ctx.fillText(g[r] || '', 54, y + 8); });
     ctx.restore();
   }
 

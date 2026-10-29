@@ -74,8 +74,8 @@
   }
 
   var MEANING = {
-    es: { root: 'Tema central', category: 'Categoría: agrupa subtemas', process: 'Proceso: paso o etapa', example: 'Ejemplo: caso concreto', question: 'Pregunta: interrogante a resolver', benefit: 'Beneficio: ventaja o resultado', risk: 'Riesgo: problema o advertencia', date: 'Dato: fecha o cifra', list: 'Lista: conjunto de elementos', formula: 'Fórmula: expresión o ley', definition: 'Definición: qué es algo', concept: 'Concepto: idea de apoyo' },
-    en: { root: 'Central topic', category: 'Category: groups subtopics', process: 'Process: step or stage', example: 'Example: concrete case', question: 'Question: open issue', benefit: 'Benefit: advantage or result', risk: 'Risk: problem or warning', date: 'Data: date or figure', list: 'List: set of items', formula: 'Formula: expression or law', definition: 'Definition: what it is', concept: 'Concept: supporting idea' }
+    es: { root: 'Tema central', category: 'Categoría: agrupa subtemas', process: 'Proceso: paso o etapa', example: 'Ejemplo: caso concreto', question: 'Pregunta: interrogante a resolver', benefit: 'Beneficio: ventaja o resultado', risk: 'Riesgo: problema o advertencia', date: 'Dato: fecha o cifra', list: 'Lista: conjunto de elementos', formula: 'Fórmula: expresión o ley', definition: 'Definición: qué es algo', concept: 'Concepto: idea de apoyo (color del nodo)' },
+    en: { root: 'Central topic', category: 'Category: groups subtopics', process: 'Process: step or stage', example: 'Example: concrete case', question: 'Question: open issue', benefit: 'Benefit: advantage or result', risk: 'Risk: problem or warning', date: 'Data: date or figure', list: 'List: set of items', formula: 'Formula: expression or law', definition: 'Definition: what it is', concept: 'Concept: supporting idea (node colour)' }
   };
   var LEG_ORDER = ['root', 'category', 'definition', 'process', 'example', 'question', 'benefit', 'risk', 'date', 'list', 'formula', 'concept'];
   // Leyenda al pie: qué significa cada forma (solo las que aparecen en este mapa). Tamaño constante en pantalla.
@@ -88,7 +88,14 @@
     ctx.font = '500 11.5px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     rows.forEach(function (r, i) {
       var c = Math.floor(i / per), k = i % per, x = 12 + c * cw, y = 10 + k * rh, col = r === 'concept' ? [148, 163, 184] : hex(ROLE_COL[r] || '#64748b');
-      ctx.save(); pathFor(ctx, r, x + 4, y + 3, 24, 11); ctx.fillStyle = rgba(darken(col, 0.6), 1); ctx.fill('evenodd'); ctx.strokeStyle = rgba(lighten(col, 0.05), 1); ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore();
+      var sx = x + 4, sy = y + 3, sw = 24, sh = 11;
+      ctx.save();
+      if (r === 'list') { [5, 2.5].forEach(function (d, j) { ctx.fillStyle = rgba(darken(col, 0.78), 1 - j * 0.25); ctx.strokeStyle = rgba(col, 0.55); ctx.lineWidth = 1; rr(ctx, sx + d, sy + d * 0.7, sw - 3, sh - 2, 3); ctx.fill(); ctx.stroke(); }); }
+      pathFor(ctx, r, sx, sy, sw, sh); ctx.fillStyle = rgba(darken(col, 0.6), 1); ctx.fill('evenodd'); ctx.strokeStyle = rgba(lighten(col, 0.05), 1); ctx.lineWidth = 1.4; ctx.stroke();
+      if (r === 'example') { var f = Math.min(16, sh * 0.5); ctx.fillStyle = rgba(lighten(col, 0.1), 0.9); ctx.beginPath(); ctx.moveTo(sx + sw - f, sy); ctx.lineTo(sx + sw - f, sy + f); ctx.lineTo(sx + sw, sy + f); ctx.closePath(); ctx.fill(); }
+      if (r === 'definition') { ctx.strokeStyle = rgba(col, 0.8); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(sx + 5, sy + 2); ctx.lineTo(sx + 5, sy + sh - 2); ctx.stroke(); }
+      if (ROLE_GLYPH[r]) { ctx.fillStyle = rgba(col, 1); ctx.beginPath(); ctx.arc(sx + sw, sy - 1, 5, 0, TAU); ctx.fill(); }
+      ctx.restore();
       ctx.fillStyle = 'rgba(226,232,250,0.95)'; ctx.fillText(L[r], x + 40, y + 9);
     });
     ctx.restore();

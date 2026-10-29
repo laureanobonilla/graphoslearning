@@ -10,12 +10,12 @@
   function star(ctx, x, y, r, cls, id) {
     ctx.save(); ctx.translate(x, y); ctx.strokeStyle = rgba(INK, 0.95); ctx.fillStyle = rgba(INK, 0.95); ctx.lineWidth = 1.1;
     if (cls === 'ring') { ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, 1.4, 0, TAU); ctx.fill(); }
-    else if (cls === 'cross') { ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, r * 0.35, 0, TAU); ctx.fill(); }
-    else if (cls === 'double') { ctx.beginPath(); ctx.arc(-r * 0.45, 0, r * 0.55, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(r * 0.6, r * 0.2, r * 0.3, 0, TAU); ctx.stroke(); }
-    else if (cls === 'diamond') { ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(r * 0.7, 0); ctx.lineTo(0, r); ctx.lineTo(-r * 0.7, 0); ctx.closePath(); ctx.fill(); }
-    else if (cls === 'tick') { ctx.beginPath(); ctx.arc(0, 0, r * 0.5, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(0, 0, r, Math.PI * 0.15, Math.PI * 1.1); ctx.stroke(); }
-    else { ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TAU); ctx.fill(); }
-    if (r > 7) { ctx.lineWidth = 0.8; var s = r * 2.4; ctx.beginPath(); ctx.moveTo(-s, 0); ctx.lineTo(-r * 1.1, 0); ctx.moveTo(r * 1.1, 0); ctx.lineTo(s, 0); ctx.moveTo(0, -s); ctx.lineTo(0, -r * 1.1); ctx.moveTo(0, r * 1.1); ctx.lineTo(0, s); ctx.stroke(); }
+    else if (cls === 'cross') { ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, r * 0.45, 0, TAU); ctx.fill(); }
+    else if (cls === 'double') { ctx.beginPath(); ctx.arc(-r * 0.45, 0, r * 0.7, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(r * 0.75, r * 0.25, r * 0.4, 0, TAU); ctx.stroke(); }
+    else if (cls === 'diamond') { ctx.beginPath(); ctx.moveTo(0, -r * 1.25); ctx.lineTo(r * 0.85, 0); ctx.lineTo(0, r * 1.25); ctx.lineTo(-r * 0.85, 0); ctx.closePath(); ctx.fill(); }
+    else if (cls === 'tick') { ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(0, 0, r * 1.05, Math.PI * 0.15, Math.PI * 1.1); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(0, 0, r * 0.8, 0, TAU); ctx.fill(); }
+    if (r > 9) { ctx.lineWidth = 0.8; var s = r * 2.4; ctx.beginPath(); ctx.moveTo(-s, 0); ctx.lineTo(-r * 1.1, 0); ctx.moveTo(r * 1.1, 0); ctx.lineTo(s, 0); ctx.moveTo(0, -s); ctx.lineTo(0, -r * 1.1); ctx.moveTo(0, r * 1.1); ctx.lineTo(0, s); ctx.stroke(); }
     ctx.restore();
   }
   var CLASS = { root: 'ring', category: 'cross', process: 'diamond', example: 'dot', question: 'tick', benefit: 'dot', risk: 'double', date: 'tick', list: 'cross', formula: 'diamond', definition: 'ring', concept: 'dot', bubble: 'dot' };
@@ -40,7 +40,7 @@
         var mx = (p0[0] + p1[0]) / 2, my = (p0[1] + p1[1]) / 2; ctx.beginPath(); ctx.moveTo(mx - uy * 3, my + ux * 3); ctx.lineTo(mx + uy * 3, my - ux * 3); ctx.stroke(); });
       ctx.restore();
       F.list.forEach(function (o) {
-        var r = 3.5 + Math.min(o.k, 6) * 1.5 + (o.lv === 0 ? 4 : 0), sx = o.x - 14, sy = o.cy;
+        var r = 6.5 + Math.min(o.k, 6) * 1.5 + (o.lv === 0 ? 4 : 0), sx = o.x - 14, sy = o.cy;
         // la estrella se ancla a la izquierda del texto, y la caja se anota con dos corchetes
         star(ctx, sx, sy, r, CLASS[o.role] || 'dot', o.id);
         ctx.save(); ctx.strokeStyle = rgba(sel.has(o.id) ? ACC : INK, sel.has(o.id) ? 1 : 0.55); ctx.lineWidth = sel.has(o.id) ? 1.6 : 1; var x0 = o.x - 4, x1 = o.x + o.w + 4, y0 = o.y + 1, y1 = o.y + o.h - 1, c = 6;
