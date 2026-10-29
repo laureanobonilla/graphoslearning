@@ -185,6 +185,8 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
   };
 
   /* ---------- pestañas ---------- */
+  /* Camino, Genio, Claridad y Cosmos están ocultos por ahora (el código sigue en lentes.js y cosmos.js). Para recuperarlos: true. */
+  const SHOW_LENS_TABS = false;
   function buildTabs() {
     const anchor = document.getElementById('btnToggleReader'); if (!anchor || !anchor.parentNode) return false;
     tabs = document.createElement('nav'); tabs.id = 'gkTabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', L('Cómo explorar el tema', 'How to explore the topic'));
@@ -192,7 +194,7 @@ body.gk-chat #gkResume{bottom:calc(var(--gk-comp-h,0px) + 16px)}
     tabs.innerHTML =
       '<button type="button" class="all" role="tab" data-tab="todas" aria-selected="false" title="' + esc(L('Ver todas las tarjetas', 'See all cards')) + '">⊞</button>' +
       '<span class="sep"></span>' + t('mapa', (window.GK_IC ? window.GK_IC('mapa') : ''), L('Mapa mental', 'Mind map')) + t('rizoma', (window.GK_IC ? window.GK_IC('rizoma') : ''), L('Rizoma', 'Rhizome')) + '<span class="sep"></span>' +
-      '<span class="len">' + t('camino', (window.GK_IC ? window.GK_IC('camino') : ''), L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', (window.GK_IC ? window.GK_IC('genio') : ''), L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', (window.GK_IC ? window.GK_IC('claridad') : ''), L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + t('cosmos', (window.GK_IC ? window.GK_IC('cosmos') : ''), L('Cosmos', 'Cosmos'), L('Tu mapa mental en 3D, como un recorrido', 'Your mind map in 3D, as a flythrough')) + '</span><span class="sep"></span>' + t('biblioteca', (window.GK_IC ? window.GK_IC('biblio') : ''), L('Biblioteca', 'Library'), L('Todos tus mapas juntos y cómo se conectan', 'All your maps together and how they connect')) ;
+      (SHOW_LENS_TABS ? ('<span class="len">' + t('camino', (window.GK_IC ? window.GK_IC('camino') : ''), L('Camino', 'Path'), L('Cómo llegar ahí', 'How to get there')) + t('genio', (window.GK_IC ? window.GK_IC('genio') : ''), L('Genio', 'Genius'), L('Entender como un genio', 'Understand it like a genius')) + t('claridad', (window.GK_IC ? window.GK_IC('claridad') : ''), L('Claridad', 'Clarity'), L('De la confusión a la claridad', 'From confusion to clarity')) + t('cosmos', (window.GK_IC ? window.GK_IC('cosmos') : ''), L('Cosmos', 'Cosmos'), L('Tu mapa mental en 3D, como un recorrido', 'Your mind map in 3D, as a flythrough')) + '</span><span class="sep"></span>') : '') + t('biblioteca', (window.GK_IC ? window.GK_IC('biblio') : ''), L('Biblioteca', 'Library'), L('Todos tus mapas juntos y cómo se conectan', 'All your maps together and how they connect')) ;
     const slot = document.querySelector('#mainHeader .flex.gap-2.flex-1.min-w-0');   // hueco que antes ocupaba el buscador
     if (slot) { slot.classList.add('gk-tabslot'); slot.appendChild(tabs); } else anchor.parentNode.insertBefore(tabs, anchor);
     buildCtl();
