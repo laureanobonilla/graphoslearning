@@ -8,7 +8,7 @@
   var LV = { beginner: ['Principiante', '1–2 espacios'], intermediate: ['Intermedio', '3 espacios'], advanced: ['Avanzado', '4–5 espacios'] };
   var KEY = 'prf_state_v1', ANON = (function () { try { var a = localStorage.getItem('prf_anon'); if (!a) { a = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('prf_anon', a); } return a; } catch (e) { return 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); } })();
   var $ = function (id) { return document.getElementById(id); };
-  var main = $('main'), pile = $('pile');
+  var main = $('main'), pile = $('pile'), learnEl = $('learn');
   var S = null, cache = {}, busy = false;
 
   function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
@@ -37,7 +37,7 @@
   // Mapa del recorrido: árbol de todo lo que apareció (✓ resuelto, ● en curso, ○ pendiente) y un medidor de profundidad
   function renderPile() {
     pile.textContent = '';
-    if (!S || !S.nodes.length) { pile.classList.remove('on'); return; }
+    document.body.classList.toggle('start', !S || !S.nodes.length); if (!S || !S.nodes.length) { pile.classList.remove('on'); learnEl.classList.remove('on'); return; }
     pile.classList.add('on'); pile.appendChild(el('h3', null, 'Mapa de tu recorrido'));
     var depth = S.stack.length, g = el('div', 'gauge'); g.setAttribute('role', 'img'); g.setAttribute('aria-label', 'Profundidad ' + depth + ' de ' + MAX_DEPTH);
     for (var i = 1; i <= MAX_DEPTH; i++) g.appendChild(el('i', i <= depth ? 'on' : ''));
@@ -45,7 +45,14 @@
     var tree = el('div', 'tree'); (function walk(pid, lvl) { S.nodes.forEach(function (n) { if (n.parentId !== pid) return; var st = n.status === 'active' && S.stack.length && S.stack[S.stack.length - 1].nodeId !== n.id ? 'wait' : n.status, r = el('div', 'tn ' + st); r.style.paddingLeft = (lvl * 14) + 'px'; r.appendChild(el('span', 'mk', st === 'done' ? '✓' : st === 'active' ? '●' : st === 'wait' ? '◐' : '○')); r.appendChild(document.createTextNode(n.term)); tree.appendChild(r); walk(n.id, lvl + 1); }); })(null, 0);
     pile.appendChild(tree);
     var done = S.nodes.filter(function (n) { return n.status === 'done'; }).length, pend = S.nodes.filter(function (n) { return n.status !== 'done'; }).length - 1;
+    renderLearn();
     pile.appendChild(el('div', 'stat', done + ' resueltos · ' + Math.max(0, pend) + ' por resolver (sin contar el tema)'));
+  }
+  function renderLearn() {
+    learnEl.textContent = ''; var L = (S && S.learned || []).filter(function (x) { return x.meaning; });
+    if (!L.length) { learnEl.classList.remove('on'); return; }
+    learnEl.classList.add('on'); learnEl.appendChild(el('h3', null, 'Lo que ya aprendiste (' + L.length + ')'));
+    L.slice().reverse().forEach(function (x) { var d = el('div', 'lrn'); d.appendChild(el('b', null, x.term)); d.appendChild(el('span', null, x.meaning)); learnEl.appendChild(d); });
   }
   function crumb(parent) {
     var c = el('p', 'crumb'); S.stack.forEach(function (f, i) { if (i) c.appendChild(document.createTextNode(' › ')); var b = i === S.stack.length - 1 ? el('b', null, f.term) : document.createTextNode(f.term); c.appendChild(b); }); parent.appendChild(c);
@@ -57,16 +64,16 @@
   }
 
   function start() {
-    S = null; renderPile(); main.textContent = '';
-    main.appendChild(el('h1', null, 'Profundiza'));
-    main.appendChild(el('p', null, 'Escribe un tema. Te doy una definición con espacios en blanco. Cada palabra que no sepas se vuelve la siguiente pregunta, y solo cuando la aciertas regresas a la anterior.'));
-    var inp = el('input', 'field'); inp.type = 'text'; inp.placeholder = 'Por ejemplo: fotosíntesis'; inp.maxLength = 80; inp.setAttribute('aria-label', 'Tema que quieres estudiar'); main.appendChild(inp);
+    S = null; document.body.classList.remove('fin'); renderPile(); main.textContent = '';
+    var hero = el('div', 'hero'), form = el('div', 'formcard'); hero.appendChild(el('h1', null, 'Profundiza'));
+    hero.appendChild(el('p', null, 'Escribe un tema. Te doy una definición con espacios en blanco. Cada palabra que no sepas se vuelve la siguiente pregunta, y solo cuando la aciertas regresas a la anterior.'));
+    var inp = el('input', 'field'); inp.type = 'text'; inp.placeholder = 'Por ejemplo: fotosíntesis'; inp.maxLength = 80; inp.setAttribute('aria-label', 'Tema que quieres estudiar'); form.appendChild(inp);
     var lvl = 'beginner', box = el('div', 'lvs'); box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Nivel');
     Object.keys(LV).forEach(function (k) { var b = el('button', 'lv'); b.type = 'button'; b.setAttribute('aria-pressed', k === lvl ? 'true' : 'false'); b.appendChild(el('b', null, LV[k][0])); b.appendChild(el('span', null, LV[k][1])); b.onclick = function () { lvl = k; [].forEach.call(box.children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); }; box.appendChild(b); });
-    main.appendChild(box);
-    var go = el('button', 'btn', 'Empezar'); go.type = 'button'; main.appendChild(go);
+    form.appendChild(box);
+    var go = el('button', 'btn', 'Empezar'); go.type = 'button'; form.appendChild(go); main.appendChild(hero); main.appendChild(form);
     var saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
-    if (saved && saved.stack && saved.stack.length) { var r = el('button', 'btn ghost', 'Seguir con «' + saved.topic + '»'); r.style.marginLeft = '10px'; r.onclick = function () { S = saved; track('prf_resumed', {}); next(); }; main.appendChild(r); }
+    if (saved && saved.stack && saved.stack.length) { var r = el('button', 'btn ghost', 'Seguir con «' + saved.topic + '»'); r.style.marginLeft = '10px'; r.onclick = function () { S = saved; track('prf_resumed', {}); next(); }; form.appendChild(r); }
     var run = function () { var t = inp.value.trim(); if (t.length < 2) { inp.focus(); return; } S = { topic: t, level: lvl, stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1 }; track('prf_start', { level: lvl }); pushFrame(t, '', null); };
     go.onclick = run; inp.onkeydown = function (e) { if (e.key === 'Enter') run(); }; inp.focus();
   }
@@ -160,13 +167,13 @@
     var b = el('button', 'btn', 'Seguir'); b.onclick = next; main.appendChild(b); b.focus();
   }
   function done() {
-    track('prf_done', { rounds: S.rounds, depth: S.maxDepth, learned: S.learned.length }); clear(); renderPile(); pile.classList.remove('on'); main.textContent = '';
+    track('prf_done', { rounds: S.rounds, depth: S.maxDepth, learned: S.learned.length }); clear(); renderPile(); learnEl.classList.remove('on'); pile.classList.remove('on'); document.body.classList.add('fin'); main.textContent = '';
     main.appendChild(el('h2', null, 'Completaste «' + S.topic + '»'));
     main.appendChild(el('p', 'muted', S.rounds + ' intentos · hasta ' + S.maxDepth + ' niveles de profundidad · ' + S.learned.length + ' conceptos'));
     var withM = S.learned.filter(function (x) { return x.meaning; });
     if (withM.length) { main.appendChild(el('p', null, 'Lo que repasaste en el camino:')); var ul = el('ul', 'recap'); withM.forEach(function (x) { var li = el('li'); li.appendChild(el('b', null, x.term)); li.appendChild(document.createTextNode(': ' + x.meaning)); ul.appendChild(li); }); main.appendChild(ul); }
     var row = el('div', 'row'), again = el('button', 'btn', 'Estudiar otro tema'); again.onclick = start; row.appendChild(again);
-    var up = el('button', 'btn ghost', 'Mismo tema, más difícil'); up.onclick = function () { var t = S.topic, nl = S.level === 'beginner' ? 'intermediate' : 'advanced'; S = { topic: t, level: nl, stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1 }; pushFrame(t, '', null); }; if (S.level !== 'advanced') row.appendChild(up);
+    var up = el('button', 'btn ghost', 'Mismo tema, más difícil'); up.onclick = function () { var t = S.topic, nl = S.level === 'beginner' ? 'intermediate' : 'advanced'; S = { topic: t, level: nl, stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1 }; document.body.classList.remove('fin'); pushFrame(t, '', null); }; if (S.level !== 'advanced') row.appendChild(up);
     main.appendChild(row);
   }
 

@@ -14,8 +14,16 @@
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh}
-.wrap{max-width:880px;margin:0 auto;padding:20px 16px 70px;display:grid;grid-template-columns:1fr;gap:18px}
-@media(min-width:820px){.wrap{grid-template-columns:230px 1fr;align-items:start;padding-top:36px}}
+.wrap{max-width:1680px;margin:0 auto;padding:18px 16px 70px;display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+#main{order:1}#pile{order:2}#learn{order:3}
+.side{display:none}
+.side.on{display:block}
+.side h3{font:600 .8rem 'Instrument Sans';letter-spacing:.02em;color:var(--muted);margin:0 0 10px}
+.lrn{margin:0 0 10px;padding:9px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px;font-size:.9rem}
+.lrn b{display:block;font-family:'Newsreader',serif;font-size:1.02rem;color:var(--ok)}
+.lrn span{color:var(--muted)}
+.hero h1{margin-bottom:12px}
+
 h1,h2{font-family:'Newsreader',Georgia,serif;font-weight:500;line-height:1.15;margin:0}
 h1{font-size:2.3rem;margin-bottom:10px}
 h2{font-size:1.5rem;margin-bottom:6px}
@@ -23,8 +31,6 @@ p{margin:0 0 12px}
 .muted{color:var(--muted);font-size:.92rem}
 .small{font-size:.85rem}
 /* la pila */
-.pile{display:none}
-.pile.on{display:block}
 .pile h3{font:600 .8rem 'Instrument Sans';letter-spacing:.02em;color:var(--muted);margin:0 0 10px}
 .pcard{position:relative;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:0 0 8px;font-size:.92rem}
 .pcard b{display:block;font-family:'Newsreader',serif;font-weight:600;font-size:1.02rem}
@@ -72,13 +78,33 @@ p{margin:0 0 12px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}}
 .recap li{margin:0 0 8px}
+@media(min-width:1000px){
+  .wrap{grid-template-columns:270px minmax(0,1fr) 290px;gap:28px;align-items:start;padding:36px clamp(24px,3vw,56px) 60px;min-height:100vh}
+  #pile{order:1;position:sticky;top:28px;max-height:calc(100vh - 56px);overflow:auto}#main{order:2;min-height:calc(100vh - 72px);padding:44px clamp(32px,4vw,72px);display:flex;flex-direction:column;justify-content:center;align-items:flex-start}
+  #main>*{max-width:52em}
+  body.start #main>*{max-width:none}#learn{order:3;position:sticky;top:28px;max-height:calc(100vh - 56px);overflow:auto}
+  .cloze{font-size:clamp(1.7rem,1.1rem + 1.1vw,2.3rem);line-height:2.15;max-width:34em}
+  .crumb{font-size:.95rem}
+  h2{font-size:2rem}
+  .btn{padding:14px 28px;font-size:1.05rem}
+  .why{font-size:1rem;max-width:40em}
+  .mean{max-width:44em;font-size:1.02rem}
+  body.fin .wrap{grid-template-columns:minmax(0,1fr)}
+  body.fin #main{max-width:980px;margin:0 auto;width:100%;min-height:0}
+  body.start .wrap{grid-template-columns:minmax(0,1fr)}
+  body.start #main{background:transparent;border:0;min-height:calc(100vh - 80px);display:grid;grid-template-columns:1.1fr 1fr;gap:clamp(40px,6vw,110px);align-items:center;padding:0}
+  body.start .hero h1{font-size:clamp(3.4rem,6vw,5.6rem);letter-spacing:-.02em}
+  body.start .hero p{font-size:1.25rem;max-width:30em;color:var(--muted)}
+  body.start .formcard{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:32px}
+}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <aside class="pile" id="pile" aria-label="Pila de preguntas"></aside>
+  <aside class="side" id="pile" aria-label="Mapa del recorrido"></aside>
   <main class="main" id="main"></main>
+  <aside class="side" id="learn" aria-label="Lo que ya aprendiste"></aside>
 </div>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
