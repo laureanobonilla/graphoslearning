@@ -108,6 +108,17 @@
       { name: ['Triángulo = concepto (vértice geodésico)', 'Triangle = concept (survey marker)'], swatch: tri },
       { name: ['Sendero = relación entre conceptos', 'Trail = relation between concepts'], swatch: path }] };
   });
+  // Dibujado a mano
+  wrap('handdrawn', function () {
+    var MK = window.__gkHandMark || {}, D = window.__gkHandDoodle;
+    var N = { root: ['Corona', 'Crown'], category: ['Subrayado', 'Underline'], process: ['Flecha', 'Arrow'], question: ['Interrogante', 'Question mark'], example: ['Estrella', 'Star'], benefit: ['Visto bueno', 'Check mark'], risk: ['Triángulo de aviso', 'Warning triangle'], date: ['Calendario', 'Calendar'], list: ['Viñetas', 'Bullets'], formula: ['Cuadrícula', 'Grid'], definition: ['Libro abierto', 'Open book'], concept: ['Rotulador gris, sin garabato', 'Grey marker, no doodle'] };
+    return { title: TITLE('Dibujado a mano · garabato y rotulador según función', 'Hand-drawn · doodle and marker by function'), light: true, cw: 300, rows: rows(N, function (r) {
+      return function (ctx, x, y, w, h) {
+        ctx.fillStyle = css(MK[r] || [62, 66, 78]); ctx.fillRect(x + 1, y, w - 2, h); ctx.strokeStyle = 'rgb(28,26,42)'; ctx.lineWidth = 1; ctx.strokeRect(x + 1, y, w - 2, h);
+        if (D && r !== 'concept') D(ctx, r, x + w - 6, y + 2, 4.2, 'lg' + r);
+      };
+    }), note: ['Línea punteada = relación con una pregunta o un dato', 'Dashed line = relation to a question or data'] };
+  });
   // Radiografía
   wrap('xray', function () {
     var N = { root: ['Pelvis', 'Pelvis'], category: ['Vértebra', 'Vertebra'], process: ['Articulación', 'Joint'], question: ['Anillo con retícula', 'Ring with grid'], example: ['Tornillo de implante', 'Implant screw'], benefit: ['Malla (stent)', 'Mesh (stent)'], risk: ['Fractura', 'Fracture'], date: ['Regla graduada', 'Graduated ruler'], list: ['Costillas', 'Ribs'], formula: ['Grapa', 'Staple'], definition: ['Nódulo denso', 'Dense nodule'], concept: ['Hueso largo', 'Long bone'] };
