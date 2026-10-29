@@ -195,17 +195,31 @@ $('micTa').addEventListener('input', function () { if (recOn) armSilence(); });
 var MSGS = ['Releyendo tus palabras…', 'Buscando lo que se repite…', 'Escribiendo tu retrato…'];
 var lastMsg = null, msgT = null;
 function finish() {
-  show('making'); lastMsg = null; var i = 0;
-  clearInterval(msgT); msgT = setInterval(function () { i = Math.min(i + 1, MSGS.length - 1); $('mmsg').textContent = MSGS[i]; }, 6000);
+  show('making'); var i = 0, id = 'ses_' + (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }));
+  clearInterval(msgT); msgT = setInterval(function () { i = Math.min(i + 1, MSGS.length - 1); $('mmsg').textContent = MSGS[i]; }, 8000);
   track('ses_portrait_requested', { n: answers.length });
-  ses('portrait', { answers: answers.map(function (a) { return { q: a.q, a: a.a }; }) })
-    .then(function (r) {
-      clearInterval(msgT);
-      try { localStorage.setItem(KEY_ID, r.id); } catch (e) {}
-      if (r.crisis) onCrisisResult();
-      renderResult(r, true);
+  var t0 = Date.now();
+  var fail = function (why) { clearInterval(msgT); track('ses_portrait_error', { why: why, ms: Date.now() - t0 }); show('err'); };
+  // se lanza en segundo plano (responde 202 enseguida) y se pregunta por el resultado cada pocos segundos
+  post('ses-portrait-background', { id: id, anonId: ANON, lang: 'es', answers: answers.map(function (a) { return { q: a.q, a: a.a }; }) }, 20000).catch(function (e) { return e && e.status && e.status < 400 ? null : (e && e.name === 'SyntaxError' ? null : Promise.reject(e)); })
+    .then(function () {
+      var tries = 0;
+      (function poll() {
+        tries++;
+        ses('get', { id: id }).then(function (r) {
+          if (r.failed) return fail('failed');
+          clearInterval(msgT); try { localStorage.setItem(KEY_ID, r.id); } catch (e) {}
+          if (r.free) onCrisisResult();
+          track('ses_portrait_shown', { ms: Date.now() - t0 });
+          renderResult(r, true);
+        }).catch(function (e) {
+          if (e && e.status === 404 && tries < 60) return setTimeout(poll, 3000);
+          if (e && e.status !== 404 && tries < 60) return setTimeout(poll, 4000);
+          fail('timeout');
+        });
+      })();
     })
-    .catch(function (e) { clearInterval(msgT); track('ses_portrait_error', { status: e.status || 0 }); show('err'); });
+    .catch(function (e) { fail('start:' + (e && (e.status || e.name) || '')); });
 }
 $('retry').onclick = function () { finish(); };
 
@@ -282,6 +296,6 @@ track('ses_landing', { ref: (document.referrer || '').slice(0, 80), utm: (locati
 var qs = new URLSearchParams(location.search), rid = qs.get('r');
 if (!rid) { try { rid = localStorage.getItem(KEY_ID); } catch (e) {} }
 if (rid && /^ses_[a-f0-9-]{36}$/.test(rid)) {
-  ses('get', { id: rid }).then(function (r) { track('ses_resumed', {}); renderResult(r, false); }).catch(function () {});
+  ses('get', { id: rid }).then(function (r) { if (r.failed) return; track('ses_resumed', {}); renderResult(r, false); }).catch(function () {});
 }
 })();
