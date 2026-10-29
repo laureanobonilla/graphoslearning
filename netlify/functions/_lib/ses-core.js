@@ -4,7 +4,7 @@
 const READING_PRICE = (() => { const n = Number(String(process.env.SES_PRICE_USD || process.env.QER_PRICE_USD || '9.99').trim()); return Number.isFinite(n) && n >= 0.5 ? n.toFixed(2) : '9.99'; })();
 const CRISIS_RE = /(suicid|quitarme la vida|quitarse la vida|acabar con mi vida|no quiero vivir|no quiero seguir viviendo|quiero morir|quiero morirme|matarme|hacerme da(ñ|n)o|cortarme|kill myself|want to die|end my life|self[- ]harm|suicide)/i;
 const ID_RE = /^ses_[a-f0-9-]{36}$/;
-const MAX_ITEMS = 30, MAX_A = 1200, MAX_Q = 300;
+const MAX_ITEMS = 40, MAX_A = 1200, MAX_Q = 300;
 
 function sanitize(list) {
     if (!Array.isArray(list)) return [];

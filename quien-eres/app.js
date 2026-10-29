@@ -2,7 +2,7 @@
 'use strict';
 var FN = '/.netlify/functions/';
 var $ = function (id) { return document.getElementById(id); };
-var TARGET = 24, MIC_FROM = 7, CARD_FROM = 7, MAX_RESERVE_RUN = 2, KEY_ID = 'ses_rid', KEY_ANON = 'ses_anon';
+var TARGET = 30, MIC_FROM = 7, CARD_FROM = 7, MAX_RESERVE_RUN = 2, KEY_ID = 'ses_rid', KEY_ANON = 'ses_anon';
 
 var FIXED = [
  { id: 'c1', t: 'choice', p: 'Cuando entras a un lugar lleno de gente, ¿qué haces con tu cara, tus manos y tu voz?', o: ['Sonrío y hablo más de lo normal', 'Me quedo callado/a y observo', 'Busco a alguien conocido y me quedo cerca', 'Actúo con seguridad aunque por dentro no la sienta'] },
