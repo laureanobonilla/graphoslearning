@@ -53,7 +53,7 @@
         const geom = o.ellipse ? '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>' : o.round ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${o.round}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
         const ins = o.ins == null ? 0.1 : o.ins;
         const body = `<p:txBody><a:bodyPr wrap="square" lIns="${e(ins)}" tIns="${e(o.tIns == null ? 0.05 : o.tIns)}" rIns="${e(ins)}" bIns="${e(0.05)}" anchor="${o.anchor || 't'}" rtlCol="0"><a:noAutofit/></a:bodyPr><a:lstStyle/>${o.paras || '<a:p><a:endParaRPr lang="es-ES"/></a:p>'}</p:txBody>`;
-        return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(o.name || 'Forma ' + id)}"/><p:cNvSpPr${o.paras ? ' txBox="1"' : ''}/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${e(x)}" y="${e(y)}"/><a:ext cx="${e(w)}" cy="${e(h)}"/></a:xfrm>${geom}${fill}${ln}</p:spPr>${body}</p:sp>`;
+        return `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(o.name || 'Forma ' + id)}">${o.link ? `<a:hlinkClick r:id="@@${o.link}@@" action="ppaction://hlinksldjump"/>` : ''}</p:cNvPr><p:cNvSpPr${o.paras ? ' txBox="1"' : ''}/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${e(x)}" y="${e(y)}"/><a:ext cx="${e(w)}" cy="${e(h)}"/></a:xfrm>${geom}${fill}${ln}</p:spPr>${body}</p:sp>`;
     }
     // Título real (marcador de posición «title») para que el esquema de la presentación y los lectores de pantalla lo reconozcan.
     function titleShape(text, x, y, w, h, o) {
@@ -99,7 +99,7 @@
         L.items.forEach(it => {
             const col = it.n._branch >= 0 ? colorOfBranch(it.n._branch) : C.night, isTop = it === L.items[L.items.length - 1], rootTop = isTop && top === model.root, suffix = it.hidden ? ` (+${it.hidden})` : '';
             const txt = clip(it.n.label, it.d >= 3 ? 22 : 30) + suffix, sz = Math.max(8, Math.min(13, Math.round(nodeH * 72 * 0.42)));
-            sh.push(shape(px(it) - nodeW / 2, py(it) - nodeH / 2, nodeW, nodeH, { name: 'Nodo ' + it.n._uid, fill: rootTop ? C.night : (isTop || it.d === 1 ? col : tint(col, 0.82)), line: col, lineW: 9525, round: 30000, ins: 0.05, tIns: 0.01, anchor: 'ctr', paras: para(txt, { sz, b: it.d <= 1, color: isTop || it.d === 1 ? 'FFFFFF' : C.ink, algn: 'ctr' }) }));
+            sh.push(shape(px(it) - nodeW / 2, py(it) - nodeH / 2, nodeW, nodeH, { name: 'Nodo ' + it.n._uid, link: 'L' + it.n._uid, fill: rootTop ? C.night : (isTop || it.d === 1 ? col : tint(col, 0.82)), line: col, lineW: 9525, round: 30000, ins: 0.05, tIns: 0.01, anchor: 'ctr', paras: para(txt, { sz, b: it.d <= 1, color: isTop || it.d === 1 ? 'FFFFFF' : C.ink, algn: 'ctr' }) }));
         });
         return sh;
     }
@@ -113,7 +113,7 @@
         L.items.forEach(it => {
             const on = keep.has(it.n._uid), isCur = it.n._uid === cur._uid, col = it.n._branch >= 0 ? colorOfBranch(it.n._branch) : C.night, r = isCur ? 0.085 : on ? 0.05 : 0.032;
             if (isCur) sh.push(shape(px(it) - r * 1.9, py(it) - r * 1.9, r * 3.8, r * 3.8, { name: 'Estás aquí (halo)', ellipse: true, line: col, lineW: 15875 }));
-            sh.push(shape(px(it) - r, py(it) - r, r * 2, r * 2, { name: 'Punto ' + it.n._uid, ellipse: true, fill: on ? col : 'B9B5A6' }));
+            sh.push(shape(px(it) - r * 1.4, py(it) - r * 1.4, r * 2.8, r * 2.8, { name: 'Punto ' + it.n._uid, link: 'L' + it.n._uid, ellipse: true, fill: on ? col : 'B9B5A6' }));
         });
         sh.push(shape(x0, y0 + h + 0.02, w, 0.22, { name: 'Dónde estás', ins: 0, paras: para(tx.where, { sz: 9, color: C.mute, algn: 'ctr' }) }));
         return sh;
@@ -134,8 +134,9 @@
     function footer(model, tx) {
         return [
             shape(0.6, 7.02, 9, 0.3, { name: 'Pie', ins: 0, paras: para(`${tx.brand} · ${clip(model.title, 70)}`, { sz: 10, color: C.mute }) }),
+            !(model.root.children || []).length ? null : shape(10.0, 7.02, 1.6, 0.3, { name: 'Volver al mapa', link: 'N2', ins: 0, paras: para('‹ ' + tx.map, { sz: 10, color: C.teal, algn: 'r' }) }),
             shape(11.7, 7.02, 1.0, 0.3, { name: 'Número', ins: 0, paras: para('', { sz: 10, algn: 'r', slideNum: true }) })
-        ];
+        ].filter(Boolean);
     }
 
     function coverSlide(model, tx) {
@@ -223,17 +224,23 @@
     function planSlides(model) {
         const tx = T(model.lang); const slides = [coverSlide(model, tx)];
         annotate(model);
-        const root = model.root, branches = root.children || [];
+        const root = model.root, branches = root.children || [], conceptAt = new Map(), branchMapAt = [];
         if (branches.length) slides.push(mapSlide(model, root, tx.map, tx, 30));
-        if (hasContent(root)) slides.push(conceptSlide(model, root, [], BRANCH[0], tx));
+        const rootMapAt = branches.length ? slides.length : 1;
+        if (hasContent(root)) { slides.push(conceptSlide(model, root, [], BRANCH[0], tx)); conceptAt.set(root._uid, slides.length); }
         if (branches.length) overviewSlides(model, branches, tx).forEach(s => slides.push(s));
         branches.forEach((b, bi) => {
             const color = BRANCH[bi % BRANCH.length];
-            if ((b.children || []).length) slides.push(mapSlide(model, b, `${b.label} · ${tx.map.toLowerCase()}`, tx, 22));
+            if ((b.children || []).length) { slides.push(mapSlide(model, b, `${b.label} · ${tx.map.toLowerCase()}`, tx, 22)); branchMapAt[bi] = slides.length; }
             branchSlides(model, b, color, tx).forEach(s => slides.push(s));
-            const walk = (n, path) => { if (hasContent(n)) slides.push(conceptSlide(model, n, path, color, tx)); (n.children || []).forEach(c => walk(c, path.concat(clip(n.label, 40)))); };
+            const walk = (n, path) => { if (hasContent(n)) { slides.push(conceptSlide(model, n, path, color, tx)); conceptAt.set(n._uid, slides.length); } (n.children || []).forEach(c => walk(c, path.concat(clip(n.label, 40)))); };
             walk(b, [clip(root.label, 40)]);
         });
+        // destino de cada nodo: su diapositiva de concepto, o la del ascendente más cercano que la tenga, o el mapa de su rama
+        slides.target = (uid) => { let n = null; (function f(x) { if (x._uid === uid) n = x; else (x.children || []).forEach(f); })(root); if (!n) return rootMapAt;
+            if (n._depth === 1 && branchMapAt[n._branch]) return branchMapAt[n._branch];
+            for (let x = n; x; x = x._parent) if (conceptAt.has(x._uid)) return conceptAt.get(x._uid);
+            return (n._branch >= 0 && branchMapAt[n._branch]) || rootMapAt; };
         return slides;
     }
 
@@ -255,6 +262,9 @@
         slides.forEach((s, i) => {
             const n = i + 1; files[`ppt/slides/slide${n}.xml`] = s.xml;
             const r = [['rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml']];
+            const toks = new Set(); s.xml = s.xml.replace(/@@([LN])(\d+)@@/g, (m, k, v) => { toks.add(k + v); return 'rId' + k + v; });
+            toks.forEach(t => { const dest = t[0] === 'N' ? Math.min(+t.slice(1), slides.length) : slides.target(+t.slice(1)); r.push(['rId' + t, 'slide', `slide${dest}.xml`]); });
+            files[`ppt/slides/slide${n}.xml`] = s.xml;
             if (s.notes) { r.push(['rId2', 'notesSlide', `../notesSlides/notesSlide${n}.xml`]); files[`ppt/notesSlides/notesSlide${n}.xml`] = notesSlide(s.notes); files[`ppt/notesSlides/_rels/notesSlide${n}.xml.rels`] = rels([['rId1', 'notesMaster', '../notesMasters/notesMaster1.xml'], ['rId2', 'slide', `../slides/slide${n}.xml`]]); ov.push([`/ppt/notesSlides/notesSlide${n}.xml`, 'presentationml.notesSlide']); }
             files[`ppt/slides/_rels/slide${n}.xml.rels`] = rels(r);
             presRels.push([`rId${n + 3}`, 'slide', `slides/slide${n}.xml`]); ov.push([`/ppt/slides/slide${n}.xml`, 'presentationml.slide']);
