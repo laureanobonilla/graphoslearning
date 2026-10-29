@@ -1,19 +1,19 @@
-/* view-personality.js — vista «Personalidad»: material de estudio con carácter.
+/* view-personality.js — vista «Tipología funcional»: cada función del nodo tiene su pieza y su trazo.
  * Cada nodo se vuelve la pieza de papelería que mejor hace su trabajo de estudio (definición → ficha, ejemplo → nota adhesiva,
  * pregunta → globo de flashcard, proceso → banda de pasos numerados, riesgo → cinta de precaución, beneficio → sello, fecha → hoja de
  * calendario, lista → portapapeles, fórmula → bloque cuadriculado, categoría → pestaña de archivador, raíz → portada).
  * Cada relación tiene su trazo según lo que lleva (hilo con chincheta, flecha de secuencia, zigzag de alerta, subrayador, regla de
  * tiempo…). El fondo toma la personalidad del mapa según sus funciones dominantes (cuaderno, plano, pizarra o papel kraft) y una
- * leyenda dice qué hacer con cada pieza al estudiar. Solo dibuja detrás del texto. Necesita /view3d.js, /view-shapes.js y /view-artkit.js. */
+ * leyenda explica qué significa cada pieza (qué función representa). Solo dibuja detrás del texto. Necesita /view3d.js, /view-shapes.js y /view-artkit.js. */
 (function () {
   'use strict';
   var T = window.__gkV3, K = window.__gkKit; if (!T || !T.register || !K) return;
   var EN = (typeof I18N !== 'undefined' && I18N.lang === 'en'), rgba = T.rgba, hash = T.hash, mix = T.mix, lighten = T.lighten, darken = T.darken, TAU = Math.PI * 2;
   var BODY = { root: [26, 32, 62], category: [38, 62, 112], definition: [44, 48, 66], example: [120, 94, 26], question: [66, 42, 104], process: [28, 68, 124], benefit: [26, 92, 64], risk: [58, 26, 26], date: [44, 54, 74], list: [40, 66, 66], formula: [22, 40, 84], concept: [54, 58, 68], bubble: [54, 58, 68] };
   var ACC = { root: [212, 176, 90], category: [140, 176, 240], definition: [224, 84, 84], example: [255, 214, 90], question: [190, 150, 255], process: [110, 190, 255], benefit: [100, 220, 150], risk: [255, 200, 40], date: [230, 90, 90], list: [150, 220, 210], formula: [150, 190, 255], concept: [190, 196, 210], bubble: [190, 196, 210] };
-  var GESTURE = {
-    es: { root: 'Tema: léelo primero', category: 'Agrupa: guarda por carpetas', definition: 'Defínela con tus palabras', example: 'Ilústrala con un caso', question: 'Respóndela sin mirar', process: 'Repite los pasos en orden', benefit: 'Úsalo para motivarte', risk: 'Anticípalo: cómo evitarlo', date: 'Ubícala en una línea de tiempo', list: 'Recítala de memoria', formula: 'Practícala con ejercicios', concept: 'Conéctala con algo que ya sabes' },
-    en: { root: 'Topic: read it first', category: 'Group it: file by folders', definition: 'Define it in your own words', example: 'Illustrate it with a case', question: 'Answer it without looking', process: 'Repeat the steps in order', benefit: 'Use it to stay motivated', risk: 'Anticipate it: how to avoid it', date: 'Place it on a timeline', list: 'Recite it from memory', formula: 'Practise it with exercises', concept: 'Connect it to what you know' }
+  var MEANING = {
+    es: { root: 'Tema central', category: 'Categoría: agrupa subtemas', definition: 'Definición: qué es algo', example: 'Ejemplo: caso concreto', question: 'Pregunta: interrogante a resolver', process: 'Proceso: paso o etapa (numerado)', benefit: 'Beneficio: ventaja o resultado', risk: 'Riesgo: problema o advertencia', date: 'Dato: fecha o cifra', list: 'Lista: conjunto de elementos', formula: 'Fórmula: expresión o ley', concept: 'Concepto: idea de apoyo' },
+    en: { root: 'Central topic', category: 'Category: groups subtopics', definition: 'Definition: what it is', example: 'Example: concrete case', question: 'Question: open issue', process: 'Process: step or stage (numbered)', benefit: 'Benefit: advantage or result', risk: 'Risk: problem or warning', date: 'Data: date or figure', list: 'List: set of items', formula: 'Formula: expression or law', concept: 'Concept: supporting idea' }
   };
   var TONES = { notebook: { bg: [246, 242, 230], ink: [38, 42, 60], line: [150, 180, 215], dark: false, name: ['Cuaderno', 'Notebook'] }, blueprint: { bg: [22, 54, 104], ink: [226, 238, 255], line: [96, 140, 205], dark: true, name: ['Plano', 'Blueprint'] }, chalk: { bg: [30, 54, 48], ink: [238, 240, 228], line: [80, 112, 100], dark: true, name: ['Pizarra', 'Chalkboard'] }, kraft: { bg: [200, 164, 124], ink: [48, 36, 28], line: [160, 126, 90], dark: false, name: ['Papel kraft', 'Kraft paper'] } };
   function toneOf(F) {
@@ -110,10 +110,10 @@
 
   function legend(ctx, F, V, tone) {
     var cnt = {}; F.list.forEach(function (o) { cnt[o.role] = (cnt[o.role] || 0) + 1; });
-    var roles = Object.keys(cnt).filter(function (r) { return r !== 'bubble'; }).sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 7), g = GESTURE[EN ? 'en' : 'es'], t = TONES[tone], pw = 292, rh = 21, ph = 34 + roles.length * rh, sc = V.sc || 1;
+    var roles = Object.keys(cnt).filter(function (r) { return r !== 'bubble'; }).sort(function (a, b) { return cnt[b] - cnt[a]; }).slice(0, 7), g = MEANING[EN ? 'en' : 'es'], t = TONES[tone], pw = 330, rh = 21, ph = 34 + roles.length * rh, sc = V.sc || 1;
     ctx.save(); ctx.translate(V.x0 + 14 / sc, V.y1 - (ph + 14) / sc); ctx.scale(1 / sc, 1 / sc);
     rrect(ctx, 0, 0, pw, ph, 10); ctx.fillStyle = t.dark ? 'rgba(10,16,30,0.82)' : 'rgba(255,252,244,0.9)'; ctx.fill(); ctx.strokeStyle = rgba(t.ink, 0.35); ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = rgba(t.ink, 1); ctx.font = '700 12px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText((EN ? 'Map personality: ' : 'Personalidad del mapa: ') + t.name[EN ? 1 : 0], 12, 16);
+    ctx.fillStyle = rgba(t.ink, 1); ctx.font = '700 12px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText((EN ? 'Functional typology · background: ' : 'Tipología funcional · fondo: ') + t.name[EN ? 1 : 0], 12, 16);
     ctx.font = '500 11.5px system-ui, sans-serif';
     roles.forEach(function (r, i) { var y = 34 + i * rh; rrect(ctx, 12, y, 22, 14, 3); ctx.fillStyle = rgba(BODY[r] || BODY.concept, 1); ctx.fill(); ctx.strokeStyle = rgba(ACC[r] || ACC.concept, 1); ctx.lineWidth = 1.6; ctx.stroke(); ctx.fillStyle = rgba(t.ink, 0.95); ctx.fillText(g[r] || '', 44, y + 8); });
     ctx.restore();
@@ -130,5 +130,5 @@
     },
     after: function (ctx, F, V) { legend(ctx, F, V, F.tone || toneOf(F)); }
   };
-  T.register('personality', EN ? '🎭 Personality' : '🎭 Personalidad', pers);
+  T.register('personality', EN ? '🏷️ Functional typology' : '🏷️ Tipología funcional', pers);
 })();

@@ -72,6 +72,27 @@
       default: { rr(ctx, x - 2, y - 1, w + 4, h + 2, (h + 2) / 2); }   // concepto: píldora
     }
   }
+
+  var MEANING = {
+    es: { root: 'Tema central', category: 'Categoría: agrupa subtemas', process: 'Proceso: paso o etapa', example: 'Ejemplo: caso concreto', question: 'Pregunta: interrogante a resolver', benefit: 'Beneficio: ventaja o resultado', risk: 'Riesgo: problema o advertencia', date: 'Dato: fecha o cifra', list: 'Lista: conjunto de elementos', formula: 'Fórmula: expresión o ley', definition: 'Definición: qué es algo', concept: 'Concepto: idea de apoyo' },
+    en: { root: 'Central topic', category: 'Category: groups subtopics', process: 'Process: step or stage', example: 'Example: concrete case', question: 'Question: open issue', benefit: 'Benefit: advantage or result', risk: 'Risk: problem or warning', date: 'Data: date or figure', list: 'List: set of items', formula: 'Formula: expression or law', definition: 'Definition: what it is', concept: 'Concept: supporting idea' }
+  };
+  var LEG_ORDER = ['root', 'category', 'definition', 'process', 'example', 'question', 'benefit', 'risk', 'date', 'list', 'formula', 'concept'];
+  // Leyenda al pie: qué significa cada forma (solo las que aparecen en este mapa). Tamaño constante en pantalla.
+  function legend(ctx, F, V) {
+    var present = {}; F.list.forEach(function (o) { present[o.role === 'bubble' ? 'concept' : o.role] = 1; });
+    var rows = LEG_ORDER.filter(function (r) { return present[r]; }); if (!rows.length) return;
+    var L = MEANING[EN ? 'en' : 'es'], cols = rows.length > 6 ? 2 : 1, per = Math.ceil(rows.length / cols), cw = 232, rh = 22, pw = 14 + cols * cw, ph = 12 + per * rh + 6, sc = V.sc || 1;
+    ctx.save(); ctx.translate(V.x0 + 14 / sc, V.y1 - (ph + 14) / sc); ctx.scale(1 / sc, 1 / sc);
+    rr(ctx, 0, 0, pw, ph, 10); ctx.fillStyle = 'rgba(8,12,26,0.84)'; ctx.fill(); ctx.strokeStyle = 'rgba(140,156,210,0.35)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.font = '500 11.5px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    rows.forEach(function (r, i) {
+      var c = Math.floor(i / per), k = i % per, x = 12 + c * cw, y = 10 + k * rh, col = r === 'concept' ? [148, 163, 184] : hex(ROLE_COL[r] || '#64748b');
+      ctx.save(); pathFor(ctx, r, x + 4, y + 3, 24, 11); ctx.fillStyle = rgba(darken(col, 0.6), 1); ctx.fill('evenodd'); ctx.strokeStyle = rgba(lighten(col, 0.05), 1); ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore();
+      ctx.fillStyle = 'rgba(226,232,250,0.95)'; ctx.fillText(L[r], x + 40, y + 9);
+    });
+    ctx.restore();
+  }
   var shapes = {
     transparent: true, edges: true, static: true, margin: { top: 14, bottom: 14, left: 26, right: 26 },
     before: function (ctx, F, V, pr) {
@@ -91,7 +112,7 @@
         if (gl && o.w > 40) { var gx = o.role === 'process' ? x + w - 2 : x + w - 1, gy = y - 1; ctx.save(); ctx.fillStyle = rgba(col, 1); ctx.beginPath(); ctx.arc(gx, gy, 8.5, 0, TAU); ctx.fill(); ctx.fillStyle = '#0a0f1f'; ctx.font = '700 11px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(gl, gx, gy + 0.5); ctx.restore(); }
       });
     },
-    after: function () { }
+    after: function (ctx, F, V) { legend(ctx, F, V); }
   };
 
   /* =====================================================================

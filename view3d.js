@@ -6,7 +6,7 @@
   'use strict';
   if (window.__gkV3) return;
   var sel, S = { mode: 'flat', t: 0, last: 0, raf: 0, sig: '', level: new Map(), kids: new Map(), frame: null, orig: null };
-  var MODES = ['blocks', 'city', 'organic'];
+  var MODES = ['blocks', 'organic'];   // «Ciudad» (city) se retiró del selector; su código queda sin uso
   var EN = (typeof I18N !== 'undefined' && I18N.lang === 'en');
   var LABELS = { blocks: EN ? '🧱 3D blocks' : '🧱 Bloques 3D', city: EN ? '🏙️ City' : '🏙️ Ciudad', organic: EN ? '🌿 Organic' : '🌿 Orgánico' };
   var reduce = function () { try { return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
@@ -415,18 +415,33 @@
   }
 
   /* ---------- selector «Vista» ---------- */
+  // Orden del selector: vistas principales primero (Formas por función, Plana, Bloques 3D, Organismo, Arquitectura) y el resto en «Más vistas».
+  var MAIN = ['shapes', 'flat', 'blocks', 'organism', 'impossible'];
+  function arrange() {
+    if (!sel) return;
+    var cur = sel.value, opts = [].slice.call(sel.querySelectorAll('option')), g1 = document.createElement('optgroup'), g2 = document.createElement('optgroup');
+    g1.label = EN ? 'Main views' : 'Vistas principales'; g2.label = EN ? 'More views' : 'Más vistas';
+    opts.forEach(function (o) { if (o.value === 'city') o.parentNode.removeChild(o); });
+    opts = [].slice.call(sel.querySelectorAll('option'));
+    MAIN.forEach(function (m) { opts.forEach(function (o) { if (o.value === m) g1.appendChild(o); }); });
+    opts.forEach(function (o) { if (MAIN.indexOf(o.value) < 0) g2.appendChild(o); });
+    [].slice.call(sel.querySelectorAll('optgroup')).forEach(function (g) { if (g.parentNode) g.parentNode.removeChild(g); });
+    sel.appendChild(g1); if (g2.children.length) sel.appendChild(g2); sel.value = cur;
+  }
   function wire() {
     sel = document.getElementById('viewMode'); if (!sel) return;
     MODES.forEach(function (m) { if (!sel.querySelector('option[value="' + m + '"]')) { var o = document.createElement('option'); o.value = m; o.textContent = LABELS[m]; sel.appendChild(o); } });
     // en fase de captura para correr antes que el manejador de «Profundidad»
     sel.addEventListener('change', function (e) { var v = e.target.value; if (MODES.indexOf(v) >= 0) set(v, true); else if (S.mode !== 'flat') set('flat', false); }, true);
-    wirePhoto();
-    var saved = 'flat'; try { saved = localStorage.getItem('gk_view_mode3') || 'flat'; } catch (e) { /* ok */ }
-    if (MODES.indexOf(saved) >= 0) setTimeout(function () { set(saved, false); }, 300);
+    wirePhoto(); arrange();
+    // por defecto: «Formas por función» (si la persona ya eligió otra vista, se respeta; «Ciudad» ya no existe)
+    var saved = 'shapes'; try { saved = localStorage.getItem('gk_view_mode3') || 'shapes'; } catch (e) { /* ok */ }
+    if (saved === 'city') saved = 'shapes';
+    setTimeout(function () { if (MODES.indexOf(saved) >= 0) set(saved, false); else if (sel) sel.value = 'flat'; arrange(); }, 300);
   }
   function register(name, label, impl) {
     if (!impl || MODES.indexOf(name) >= 0) return; IMPL[name] = impl; MODES.push(name); LABELS[name] = label;
-    if (sel && !sel.querySelector('option[value="' + name + '"]')) { var o = document.createElement('option'); o.value = name; o.textContent = label; sel.appendChild(o); }
+    if (sel && !sel.querySelector('option[value="' + name + '"]')) { var o = document.createElement('option'); o.value = name; o.textContent = label; sel.appendChild(o); arrange(); }
   }
   window.__gkV3 = { register: register, rr: rr, rgba: rgba, hex: hex, mix: mix, lighten: lighten, darken: darken, hash: hash, reduce: reduce, snapshot: snapshot, shareBlob: shareBlob, photo: photo, set: function (m) { set(m, true); }, owns: function (v) { return MODES.indexOf(v) >= 0; }, mode: function () { return S.mode; }, modes: MODES, labels: LABELS, _impl: IMPL };
   if (HAS) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire); else wire(); }
