@@ -243,15 +243,8 @@ function renderResult(r, first) {
   go.onclick = function () {
     track('ses_continue_clicked', { id: r.id });
     go.classList.add('hide');
-    pay.appendChild(el('p', null, 'Lo que sigue: el resto de tu retrato, tres pasos concretos y un cierre. Pago único de USD ' + Number(r.price || 4.99).toFixed(2) + ', sin suscripción.'));
-    pay.appendChild(el('p', 'small', 'Escríbeme por WhatsApp con tu código de sesión: te paso el enlace de pago y una contraseña para abrir tu retrato aquí mismo.'));
-    var wa = el('a', 'btn', 'Pedir el enlace de pago por WhatsApp'); wa.target = '_blank'; wa.rel = 'noopener'; wa.style.display = 'inline-block'; wa.style.textDecoration = 'none';
-    var msg = 'Hola, quiero leer mi retrato completo de ¿Quién eres? Mi código de sesión es: ' + r.id;
-    wa.href = 'https://wa.me/?text=' + encodeURIComponent(msg);
-    fetch(FN + 'ses-config').then(function (x) { return x.json(); }).then(function (cfg) { if (cfg && cfg.whatsapp) wa.href = 'https://wa.me/' + cfg.whatsapp + '?text=' + encodeURIComponent(msg); }).catch(function () {});
-    wa.onclick = function () { track('ses_wa_clicked', { id: r.id }); };
-    pay.appendChild(wa);
-    var code = el('p', 'small', 'Tu código de sesión: ' + r.id); pay.appendChild(code);
+    pay.appendChild(el('p', null, 'Contacta a quien te dio el link de esta aplicación para ver tu respuesta completa.'));
+    var code = el('p', 'small', 'Dile este código de sesión: ' + r.id); pay.appendChild(code);
     var inp = el('input'); inp.type = 'text'; inp.placeholder = 'Contraseña (XXXX-XXXX)'; inp.autocomplete = 'off'; inp.autocapitalize = 'characters'; inp.maxLength = 12; inp.style.cssText = 'display:block;margin:14px 0 8px;padding:10px 12px;font:inherit;width:100%;max-width:260px;border-radius:10px;border:1px solid currentColor;background:transparent;color:inherit;letter-spacing:.08em';
     var ub = el('button', 'btn ghost', 'Abrir mi retrato'); ub.type = 'button'; var em = el('p', 'small', ''); 
     ub.onclick = function () { tryUnlock(r.id, inp.value, em, ub); };
@@ -284,7 +277,6 @@ function renderFull(box, r) {
 }
 
 // ---- arranque ----
-fetch(FN + 'ses-config').then(function (x) { return x.json(); }).then(function (cfg) { var n = $('priceNote'); if (n && cfg && cfg.priceUsd) n.textContent = 'Al final ves una parte de tu retrato gratis. Para leerlo completo hay un pago único de USD ' + String(cfg.priceUsd).replace('.', ',') + ', que se coordina por WhatsApp.'; }).catch(function () {});
 $('start').onclick = function () { track('ses_start', {}); show('quiz'); advance(); };
 track('ses_landing', { ref: (document.referrer || '').slice(0, 80), utm: (location.search.match(/utm_[a-z]+=[^&]+/g) || []).join('&').slice(0, 120) });
 var qs = new URLSearchParams(location.search), rid = qs.get('r');
