@@ -166,6 +166,7 @@
   .modal-card{ background:var(--paper); border-radius:22px; padding:28px 24px 20px; width:100%; max-width:440px; box-shadow:6px 6px 0 var(--ink); text-align:center; max-height:92vh; overflow:auto; }
   .pm-big{ font-size:2.35rem; line-height:1.05; margin:0 0 10px; color:var(--ink); }
   .pm-lead{ font-size:1.12rem; font-weight:600; margin:0 0 16px; }
+  .pm-inc{ font-weight:700; margin:0 0 8px; text-align:left; }
   .pm-list{ list-style:none; margin:0 0 18px; padding:14px 16px; text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:16px; display:flex; flex-direction:column; gap:10px; font-size:1.02rem; }
   .pm-list span{ display:inline-block; width:1.7em; }
   .pm-price{ font-size:.82rem; color:var(--muted); margin:0 0 16px; line-height:1.4; }
@@ -295,7 +296,8 @@
   <div class="modal-card">
     <h2 id="pmTitle" class="pm-big display">No pagas nada ahora</h2>
     <p class="pm-lead">Primero te enviaré una muestra. Solo si te gusta, pagas.</p>
-    <ul class="pm-list"><li><span>🎬</span> Un video como el de la demo</li><li><span>🎤</span> Tu canción cantada</li><li><span>🎼</span> La versión instrumental, si la necesitas</li></ul>
+    <p class="pm-inc">El paquete incluye:</p>
+    <ul class="pm-list"><li><span>🎬</span> Un video como el de la demo</li><li><span>🎤</span> Versión de la canción cantada</li><li><span>🎼</span> La versión instrumental, si la necesitas</li></ul>
     <p class="pm-price" id="pmPrice"></p>
     <button type="button" id="pmOk" class="btn btn-primary">Entendido, enviar mi letra</button>
     <button type="button" id="pmBack" class="btn-quiet">Volver</button>
@@ -304,6 +306,6 @@
 
 <div id="ctaBar" class="cta-bar"><button type="button" class="btn btn-primary" id="btnCta">Quiero mi canción</button></div>
 
-<script src="app.js?v=20261030b"></script>
+<script src="app.js?v=20261030c"></script>
 </body>
 </html>
