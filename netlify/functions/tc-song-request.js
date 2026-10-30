@@ -2,6 +2,8 @@
 //  via 'draft'    → solo guarda el borrador (letra propia lista para revisar): sin correo.
 //  via 'whatsapp' → abrió WhatsApp (sin número): es una INTENCIÓN; se guarda y te llega correo marcado así.
 //  via 'phone'    → dejó su número: se guarda y te llega el correo con el número y el enlace a WhatsApp.
+//  via 'email'    → dejó su correo (y opcionalmente el nombre con el que te escribió): te llega el correo con la letra y todo lo que contó;
+//                   el correo de la persona NO se guarda en la base de datos, solo viaja en este correo (reply-to). Tú la contactas por el medio de siempre.
 // TODO queda en la tabla tc_songs (supabase/tu-cancion.sql) y en events (app = 'tu-cancion'). Si la tabla aún no existe,
 // el correo sale igual y el registro completo se guarda como evento `tc_record_fallback`.
 const store = require('./_lib/store');
@@ -16,7 +18,7 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
     let body; try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
     const id = String(body.id || '');
-    const via = ['draft', 'whatsapp', 'phone'].includes(body.via) ? body.via : '';
+    const via = ['draft', 'whatsapp', 'phone', 'email'].includes(body.via) ? body.via : '';
     if (!UUID_RE.test(id) || !via) return json(400, { error: 'Solicitud inválida' });
     const anonId = typeof body.anonId === 'string' ? body.anonId.slice(0, 64) : '';
     const brief = cleanBrief(body.brief);
@@ -25,11 +27,16 @@ exports.handler = async (event) => {
     const lyrics = scrub(body.lyrics, 2600), lyricsFinal = scrub(body.lyricsFinal, 3200), title = scrubOne(body.title, 90) || 'Sin título';
     const phone = via === 'phone' ? normalizePhone(body.phone) : null;
     if (via === 'phone' && !phone) return json(400, { error: 'Revisa tu número: incluye el código de tu país, por ejemplo +506 8888 1234.' });
+    const EMAIL_RE = /^[^\s@<>]{1,64}@[^\s@<>]{1,200}\.[^\s@<>]{2,}$/;
+    const email = via === 'email' ? String(body.email || '').trim().slice(0, 120) : '';
+    if (via === 'email' && !EMAIL_RE.test(email)) return json(400, { error: 'Revisa tu correo: debe verse como nombre@ejemplo.com' });
+    const contactName = via === 'email' ? scrubOne(body.contactName, 40) : '';
     if (via !== 'draft' && body.consent !== true) return json(400, { error: 'Falta tu permiso para que te escriba.' });
     if (!lyricsFinal && !lyrics) return json(400, { error: 'Falta la letra.' });
     const country = countryOf(event), price = priceFor(country);
     const utm = { campaign: scrubOne(body.utm && body.utm.campaign, 40), ad: scrubOne(body.utm && body.utm.ad, 40) };
     const status = via === 'draft' ? 'own_lyrics_ready' : via === 'whatsapp' ? 'whatsapp_intent' : 'requested';
+    const label = via === 'email' ? 'CON CORREO' : via === 'phone' ? 'CON TELÉFONO' : 'SOLO ABRIÓ WHATSAPP';
 
     // 1) Registro completo (tabla) — nunca debe impedir el correo.
     const row = { id, status, anon_id: anonId || null, country: country || null, price_text: price.text, price_amount: price.amount, price_currency: price.currency,
@@ -53,9 +60,11 @@ exports.handler = async (event) => {
     const digits = phone ? phone.slice(1) : '';
     const firstMsg = `Hola, soy quien hace "tu canción". Ya recibí tu pedido de «${title}»${brief.rhythm || brief.rhythmOther ? ` (${pick(brief.rhythm, brief.rhythmOther)})` : ''}. Voy a preparar una primera muestra. ¿Te la envío por aquí?`;
     const text = [
-        `Nueva solicitud · tu canción · ${via === 'phone' ? 'CON TELÉFONO' : 'SOLO ABRIÓ WHATSAPP'}`,
+        `Nueva solicitud · tu canción · ${label}`,
         ``,
-        ...(via === 'whatsapp'
+        ...(via === 'email'
+            ? [`Correo: ${email}`, ...(contactName ? [`Nombre con el que te escribió: ${contactName}`] : []), `Contáctala por el MISMO medio por el que te escribió primero (Messenger/WhatsApp), con su muestra. El correo es para identificarla.`]
+            : via === 'whatsapp'
             ? [`SOLO ABRIÓ WHATSAPP (no dejó teléfono): es una INTENCIÓN, no un pedido confirmado.`, `Solo cuenta si te llega su mensaje con el código ${id.slice(0, 8)}. Todo lo que armó queda guardado igual (tabla tc_songs, id ${id}).`]
             : [`Teléfono: ${phone}`, `WhatsApp (toca para escribirle con el mensaje listo): https://wa.me/${digits}?text=${encodeURIComponent(firstMsg)}`]),
         ``,
@@ -78,14 +87,15 @@ exports.handler = async (event) => {
         ...(lyricsFinal && lyrics && lyricsFinal !== lyrics ? [``, `=== LETRA ORIGINAL (antes de editar) ===\n${lyrics}`] : []),
         ``,
         `Registro en la base de datos: ${saved ? 'guardado en tc_songs' : 'LA TABLA tc_songs NO EXISTE O FALLÓ: guardado como evento tc_record_fallback (corre supabase/tu-cancion.sql)'}.`,
-        `Recordatorio: haz la muestra parcial, envíala y solo entonces habla de precio (la persona ya sabe que cuesta ${price.text} y que no paga hasta escucharla).`
+        `Recordatorio: haz la muestra parcial, envíala y solo entonces habla de precio (la persona vio que no paga hasta escucharla y que el precio es ${price.text}).`
     ].join('\n');
     try {
         const res = await fetch('https://api.resend.com/emails', {
             method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 from: 'Graphikosmos <onboarding@resend.dev>', to: [process.env.FEEDBACK_TO_EMAIL || FALLBACK_TO_EMAIL],
-                subject: `Tu canción${via === 'whatsapp' ? ' (clic WhatsApp, sin número)' : ''}: ${title} · ${pick(brief.rhythm, brief.rhythmOther) || 'sin ritmo'}${phone ? ' · ' + phone : ''} · ${price.text}`,
+                subject: `Tu canción${via === 'whatsapp' ? ' (clic WhatsApp, sin número)' : ''}: ${title} · ${pick(brief.rhythm, brief.rhythmOther) || 'sin ritmo'}${phone ? ' · ' + phone : ''}${email ? ' · ' + email : ''}${contactName ? ' · ' + contactName : ''} · ${price.text}`,
+                ...(email ? { reply_to: email } : {}),
                 text
             })
         });

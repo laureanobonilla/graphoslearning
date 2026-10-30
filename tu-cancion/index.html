@@ -159,6 +159,17 @@
   .phone-row{ display:flex; gap:8px; }
   .phone-row select, .phone-row input{ appearance:none; border:1.5px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:12px; font-size:1rem; min-width:0; }
   .phone-row select{ flex:0 0 38%; font-size:.88rem; } .phone-row input{ flex:1 1 auto; }
+  .field-in{ width:100%; background:#fff; border:1.5px solid var(--line); border-radius:12px; padding:13px 14px; font-size:1rem; color:var(--ink); margin:2px 0 8px; }
+  .field-in:focus{ outline:none; border-color:var(--ink); }
+  .modal{ position:fixed; inset:0; z-index:50; background:rgba(27,23,64,.62); display:flex; align-items:center; justify-content:center; padding:20px; }
+  .modal.is-hidden{ display:none; }
+  .modal-card{ background:var(--paper); border-radius:22px; padding:28px 24px 20px; width:100%; max-width:440px; box-shadow:6px 6px 0 var(--ink); text-align:center; max-height:92vh; overflow:auto; }
+  .pm-big{ font-size:2.35rem; line-height:1.05; margin:0 0 10px; color:var(--ink); }
+  .pm-lead{ font-size:1.12rem; font-weight:600; margin:0 0 16px; }
+  .pm-list{ list-style:none; margin:0 0 18px; padding:14px 16px; text-align:left; background:#fff; border:1.5px solid var(--line); border-radius:16px; display:flex; flex-direction:column; gap:10px; font-size:1.02rem; }
+  .pm-list span{ display:inline-block; width:1.7em; }
+  .pm-price{ font-size:.82rem; color:var(--muted); margin:0 0 16px; line-height:1.4; }
+  .modal-card .btn-primary{ width:100%; }
   .back-q{ margin:14px 0; padding:12px; border-radius:12px; background:rgba(0,0,0,.05); }
   .back-q .row{ display:flex; gap:8px; } .back-q .btn{ padding:11px 8px; font-size:.9rem; }
   .done-title{ font-size:1.6rem; margin:2px 0 8px; }
@@ -196,8 +207,8 @@
       <h2 class="display">Así funciona</h2>
       <ol class="steps">
         <li><span class="n">1</span><div><b>Cuéntanos tu idea</b><span>Unas pocas preguntas, sin complicarte. Si ya tienes la letra, pégala.</span></div></li>
-        <li><span class="n">2</span><div><b>Revisa la letra</b><span>La ves completa, puedes cambiarla, ves el precio y recién entonces nos la envías.</span></div></li>
-        <li><span class="n">3</span><div><b>Escucha tu canción primero</b><span>Te mandamos una muestra por WhatsApp. Si te gusta, la terminamos. Si no, no pagas nada.</span></div></li>
+        <li><span class="n">2</span><div><b>Revisa la letra</b><span>La ves completa, puedes cambiarla y recién entonces la envías.</span></div></li>
+        <li><span class="n">3</span><div><b>Escucha tu canción primero</b><span>Te envío una muestra. Si te gusta, la terminamos. Si no, no pagas nada.</span></div></li>
       </ol>
     </div>
 
@@ -206,7 +217,7 @@
       <ul class="trust">
         <li>Escuchas tu canción antes de pagar.</li>
         <li>La letra es tuya: la ves y la editas antes de enviarla.</li>
-        <li>Tu número solo se usa para enviarte la muestra.</li>
+        <li>Tu correo solo se usa para recibir tu letra y escribirte la muestra.</li>
       </ul>
     </div>
 
@@ -261,32 +272,13 @@
     <div id="sendBox" class="send-box is-hidden" aria-label="Enviar">
       <div id="sendForm">
         <h3 class="display">Último paso</h3>
-        <label class="ack" id="ackRow"><input type="checkbox" id="priceAck"><span id="ackText"></span></label>
-        <p class="err is-hidden" id="ackHint" role="alert">Marca la casilla para continuar.</p>
-        <p>Te escribimos por WhatsApp con una muestra de tu canción.</p>
-        <a id="btnWa" class="btn btn-wa" href="#" target="_blank" rel="noopener">Enviar por WhatsApp</a>
-        <p class="fine">Se abre WhatsApp con el mensaje ya escrito. Solo tienes que enviarlo.</p>
-        <div id="waBack" class="back-q is-hidden" role="status">
-          <p class="label">¿Alcanzaste a enviar el mensaje por WhatsApp?</p>
-          <div class="row"><button type="button" id="waYes" class="btn btn-ghost">Sí, ya lo envié</button><button type="button" id="waNo" class="btn btn-ghost">No, escríbeme tú</button></div>
-        </div>
-        <p class="fine"><button type="button" id="btnShowPhone" class="linkbtn">¿Prefieres que te escribamos nosotros? Deja tu número</button></p>
-        <form id="phoneBox" class="is-hidden" novalidate>
-          <p class="label"><label for="songPhone">Tu número de WhatsApp</label></p>
-          <div class="phone-row">
-            <select id="songDial" aria-label="Código de país">
-              <option value="+506">CR +506</option><option value="+598">UY +598</option><option value="+52">MX +52</option>
-              <option value="+54">AR +54</option><option value="+57">CO +57</option><option value="+56">CL +56</option>
-              <option value="+51">PE +51</option><option value="+593">EC +593</option><option value="+507">PA +507</option>
-              <option value="+502">GT +502</option><option value="+503">SV +503</option><option value="+504">HN +504</option>
-              <option value="+505">NI +505</option><option value="+58">VE +58</option><option value="+591">BO +591</option>
-              <option value="+595">PY +595</option><option value="+34">ES +34</option><option value="+1">US/CA/RD +1</option>
-              <option value="">Otro (escribe +código)</option>
-            </select>
-            <input id="songPhone" type="tel" inputmode="tel" enterkeyhint="send" autocomplete="tel-national" placeholder="Ej. 8888 1234" maxlength="24">
-          </div>
-          <p class="fine">Solo lo usamos para enviarte la muestra. No lo compartimos.</p>
-          <button type="submit" id="btnPhoneSend" class="btn btn-primary">Ponerle música</button>
+        <form id="emailBox" novalidate>
+          <p class="label"><label for="songEmail">Tu correo</label></p>
+          <input id="songEmail" class="field-in" type="email" inputmode="email" autocomplete="email" enterkeyhint="send" placeholder="tucorreo@ejemplo.com" maxlength="120">
+          <p class="label" style="margin-top:12px"><label for="songWho">Tu nombre <span class="fine">· opcional, el de tu mensaje</span></label></p>
+          <input id="songWho" class="field-in" type="text" autocomplete="name" maxlength="40" placeholder="Para saber quién eres">
+          <p class="fine">Solo lo uso para recibir tu letra y escribirte la muestra. No lo comparto.</p>
+          <button type="submit" id="btnEmailSend" class="btn btn-primary">Enviar mi letra</button>
         </form>
         <p id="sendErr" class="err is-hidden" role="alert"></p>
       </div>
@@ -299,8 +291,19 @@
   </section>
 </div>
 
+<div id="priceModal" class="modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+  <div class="modal-card">
+    <h2 id="pmTitle" class="pm-big display">No pagas nada ahora</h2>
+    <p class="pm-lead">Primero te envío una muestra. Solo si te gusta, pagas.</p>
+    <ul class="pm-list"><li><span>🎬</span> Un video como el de la demo</li><li><span>🎤</span> Tu canción cantada</li><li><span>🎼</span> La versión instrumental, si la necesitas</li></ul>
+    <p class="pm-price" id="pmPrice"></p>
+    <button type="button" id="pmOk" class="btn btn-primary">Entendido, enviar mi letra</button>
+    <button type="button" id="pmBack" class="btn-quiet">Volver</button>
+  </div>
+</div>
+
 <div id="ctaBar" class="cta-bar"><button type="button" class="btn btn-primary" id="btnCta">Quiero mi canción</button></div>
 
-<script src="app.js?v=20261008d"></script>
+<script src="app.js?v=20261030a"></script>
 </body>
 </html>

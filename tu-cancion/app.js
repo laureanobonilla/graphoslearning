@@ -192,12 +192,10 @@ function choiceList({ options, multi, selected, onChange, otherLabel = 'Otro', o
 // ---------- Definición de pasos ----------
 const STEPS = {
   price: {
-    title: 'Tu canción, antes de empezar', hint: '',
+    title: 'Así va a funcionar', hint: '',
     render(body) {
-      const p = geo.price || {};
-      body.innerHTML = `<div class="price-box"><p class="amt"></p><p class="lbl">Es lo que cuesta tu canción terminada.</p><ul>
-        <li>No pagas nada ahora.</li><li>Primero te enviamos una muestra para que la escuches.</li><li>Solo si te gusta, pagas y recibes tu canción completa.</li></ul><p class="inc"><b>Incluye:</b> la versión cantada y la pista instrumental.</p></div>`;
-      body.querySelector('.amt').textContent = p.text || '';
+      body.innerHTML = `<div class="price-box"><p class="amt">Primero escuchas.</p><p class="lbl">Después decides.</p><ul>
+        <li>No pagas nada ahora.</li><li>Te envío una muestra para que la escuches.</li><li>Solo si te gusta, pagas y recibes tu canción completa.</li></ul><p class="inc"><b>Recibes:</b> un video como el de la demo, la canción cantada y la versión instrumental si la necesitas.</p></div>`;
     },
     ok: () => true, nextLabel: 'Entendido, empezar'
   },
@@ -464,67 +462,39 @@ $('btnRegen').addEventListener('click', () => { track('regen_clicked', {}); gene
 $('btnAdjust').addEventListener('click', () => { track('adjust_clicked', {}); lsDel('tc_song_v1'); stack = []; const path = pathOf(); stepId = ''; goTo(S.hasOwn === true ? 'paste' : 'reason', false); stack = []; });
 $('btnCopy').addEventListener('click', async () => { let ok = false; try { await navigator.clipboard.writeText(`${S.title}\n\n${S.lyricsFinal}`); ok = true; } catch { /* ok */ } $('btnCopy').textContent = ok ? 'Copiada' : 'No se pudo copiar'; setTimeout(() => { $('btnCopy').textContent = 'Copiar letra'; }, 1800); });
 
-// Teléfono
-const SONG_TZ_DIAL = { 'America/Costa_Rica': '+506', 'America/Montevideo': '+598', 'America/Mexico_City': '+52', 'America/Cancun': '+52', 'America/Monterrey': '+52', 'America/Tijuana': '+52', 'America/Argentina/Buenos_Aires': '+54', 'America/Bogota': '+57', 'America/Santiago': '+56', 'America/Lima': '+51', 'America/Guayaquil': '+593', 'America/Panama': '+507', 'America/Guatemala': '+502', 'America/El_Salvador': '+503', 'America/Tegucigalpa': '+504', 'America/Managua': '+505', 'America/Caracas': '+58', 'America/La_Paz': '+591', 'America/Asuncion': '+595', 'Europe/Madrid': '+34' };
-function guessDial() { try { return SONG_TZ_DIAL[Intl.DateTimeFormat().resolvedOptions().timeZone] || ''; } catch { return ''; } }
-function buildPhone(dial, raw) {
-  let n = String(raw || '').replace(/[\s().\-]/g, '');
-  if (!n) return { phone: '', reason: 'empty' };
-  if (n.startsWith('00')) n = '+' + n.slice(2);
-  const ok = (v) => /^\+[1-9]\d{7,14}$/.test(v);
-  if (n.startsWith('+')) return ok(n) ? { phone: n, reason: '' } : { phone: '', reason: n.length < 9 ? 'short' : 'long' };
-  if (/\D/.test(n)) return { phone: '', reason: 'short' };
-  if (!dial) return { phone: '', reason: 'nodial' };
-  const dd = dial.slice(1); n = n.replace(/^0+/, '');
-  if (n.startsWith(dd) && n.length >= dd.length + 8 && n.length <= 15 && ok('+' + n)) return { phone: '+' + n, reason: '' };
-  const full = dial + n; return ok(full) ? { phone: full, reason: '' } : { phone: '', reason: n.length + dial.length < 9 ? 'short' : 'long' };
-}
-const PHONE_MSG = { empty: 'Falta tu número de WhatsApp, por ejemplo 8888 1234.', short: 'Al número le faltan dígitos. Escríbelo completo, por ejemplo 8888 1234.', long: 'El número tiene demasiados dígitos. Revisa el código de país.', nodial: 'Elige tu país en la lista o escribe el número con + y el código.' };
-
-let waPending = false, waPosted = false, waReturn = null;
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && waReturn) waReturn(); });
+// Correo: se abre una ventana que deja clarísimo que no se paga nada ahora (el precio va pequeño) y luego se envía.
+const EMAIL_RE2 = /^[^\s@<>]{1,64}@[^\s@<>]{1,200}\.[^\s@<>]{2,}$/;
 function payload(via, extra) { return Object.assign({ id, anonId, via, brief: briefOf(), title: S.title, lyrics: S.lyrics, lyricsFinal: S.lyricsFinal, utm: UTM, consent: true, priceAck: true }, extra || {}); }
 function setupSend() {
-  waPending = false; waPosted = false;
-  const dial = $('songDial'), phone = $('songPhone'); phone.value = ''; const g = guessDial(); if (g) dial.value = g;
-  $('waBack').classList.add('is-hidden'); $('phoneBox').classList.add('is-hidden'); $('btnShowPhone').classList.remove('is-hidden'); $('sendErr').classList.add('is-hidden');
-  const ack = $('priceAck'), priceTxt = geo.price && geo.price.text ? geo.price.text : '';
-  $('ackText').textContent = priceTxt ? `Quiero recibir una muestra gratis y sin compromiso. Si me gusta, podré pagar ${priceTxt} por la canción completa, que incluye la versión cantada y la pista instrumental.` : 'Quiero recibir una muestra gratis y sin compromiso. Si me gusta, podré pagar por la canción completa, que incluye la versión cantada y la pista instrumental.';
-  ack.checked = false;
-  const gate = () => { const on = ack.checked; $('btnWa').classList.toggle('is-disabled', !on); $('btnWa').setAttribute('aria-disabled', String(!on)); $('btnPhoneSend').disabled = !on; $('ackHint').classList.toggle('is-hidden', on); };
-  ack.onchange = () => { gate(); if (ack.checked) track('price_ack', { price: priceTxt, country: geo.country || '' }); };
-  gate(); track('price_shown', { price: priceTxt, country: geo.country || '', where: 'review' });
-  const waText = () => `Hola, quiero que suene mi canción 🎵\n«${S.title}»\nRitmo: ${rhythmLabel() || '—'}\nQuiero la muestra gratis y sin compromiso; si me gusta, la canción completa vale ${priceTxt || 'el precio indicado'}.\nMi código es: ${id.slice(0, 8)}`;
-  const wa = $('btnWa'); wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(waText())}`;
-  wa.onclick = (ev) => {
-    if (!ack.checked) { ev.preventDefault(); $('ackHint').classList.remove('is-hidden'); try { $('ackRow').scrollIntoView({ block: 'center' }); } catch { /* ok */ } return; }
-    wa.href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(waText())}`;
-    track('whatsapp_clicked', { primary: true }); waPending = true;
-    if (!waPosted) { waPosted = true; postFn('tc-song-request', payload('whatsapp')).catch(() => {}); }
+  const email = $('songEmail'), who = $('songWho'), err = $('sendErr'), modal = $('priceModal'), box = $('emailBox'), send = $('btnEmailSend');
+  email.value = ''; who.value = ''; err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Enviar mi letra'; modal.classList.add('is-hidden');
+  const priceTxt = geo.price && geo.price.text ? geo.price.text : '';
+  $('pmPrice').textContent = priceTxt ? `Si te gusta la muestra y decides continuar, la canción completa cuesta ${priceTxt}.` : 'Si te gusta la muestra y decides continuar, te digo el precio entonces.';
+  const closeModal = () => { modal.classList.add('is-hidden'); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') { track('price_modal_back', {}); closeModal(); } };
+  box.onsubmit = (ev) => {
+    ev.preventDefault(); err.classList.add('is-hidden');
+    const v = email.value.trim();
+    if (!EMAIL_RE2.test(v) || v.length > 120) { track('email_invalid', {}); err.textContent = 'Revisa tu correo: debe verse como nombre@ejemplo.com'; err.classList.remove('is-hidden'); email.focus(); return; }
+    modal.classList.remove('is-hidden'); document.addEventListener('keydown', onKey); $('pmOk').focus();
+    track('price_modal_shown', { price: priceTxt, country: geo.country || '' });
   };
-  waReturn = () => { if (!waPending) return; waPending = false; $('waBack').classList.remove('is-hidden'); track('wa_return', {}); try { $('waBack').scrollIntoView({ block: 'center' }); } catch { /* ok */ } };
-  const openPhone = () => { $('phoneBox').classList.remove('is-hidden'); $('btnShowPhone').classList.add('is-hidden'); $('waBack').classList.add('is-hidden'); };
-  $('btnShowPhone').onclick = () => { track('phone_form_opened', {}); openPhone(); };
-  $('waNo').onclick = () => { track('wa_not_sent', {}); openPhone(); };
-  $('waYes').onclick = () => { track('wa_confirmed', {}); $('sendDoneText').textContent = 'Perfecto. Te respondemos por WhatsApp con la muestra de tu canción apenas veamos tu mensaje.'; $('sendForm').classList.add('is-hidden'); $('sendDone').classList.remove('is-hidden'); };
-  $('phoneBox').onsubmit = async (ev) => {
-    ev.preventDefault(); const err = $('sendErr'); err.classList.add('is-hidden');
-    if (!ack.checked) { $('ackHint').classList.remove('is-hidden'); return; }
-    const pr = buildPhone(dial.value, phone.value);
-    if (!pr.phone) { track('phone_invalid', { reason: pr.reason, len: String(phone.value || '').replace(/\D/g, '').length, dial: dial.value }); err.textContent = PHONE_MSG[pr.reason] || PHONE_MSG.short; err.classList.remove('is-hidden'); phone.focus(); return; }
-    const btn = $('btnPhoneSend'); btn.disabled = true; btn.textContent = 'Enviando…'; track('request_submitted', {});
+  $('pmBack').onclick = () => { track('price_modal_back', {}); closeModal(); };
+  modal.onclick = (e) => { if (e.target === modal) { track('price_modal_back', {}); closeModal(); } };
+  $('pmOk').onclick = async () => {
+    const pm = $('pmOk'); pm.disabled = true; pm.textContent = 'Enviando…'; track('request_submitted', {});
     try {
-      const d = await postFn('tc-song-request', payload('phone', { phone: pr.phone }));
+      const d = await postFn('tc-song-request', payload('email', { email: email.value.trim(), contactName: who.value.trim() }));
       if (!d.ok) throw new Error('fallo');
-      track('request_confirmed', {});
-      $('sendDoneText').textContent = `Te escribiremos por WhatsApp al ${pr.phone} con una muestra de tu canción. Revisa tus mensajes pronto.`;
+      track('request_confirmed', {}); closeModal();
+      $('sendDoneText').textContent = 'Recibí tu letra. Te escribo por el mismo medio por el que hablamos para darte tu muestra. No pagas nada hasta que la escuches.';
       $('sendForm').classList.add('is-hidden'); $('sendDone').classList.remove('is-hidden');
     } catch (e) {
-      track('request_failed', { status: e.status || 0 });
+      track('request_failed', { status: e.status || 0 }); closeModal();
       err.textContent = e.status ? (e.message || 'No pudimos registrar tu solicitud. Inténtalo de nuevo.') : 'Sin conexión. Inténtalo de nuevo.'; err.classList.remove('is-hidden');
-      btn.disabled = false; btn.textContent = 'Ponerle música';
-    }
+    } finally { pm.disabled = false; pm.textContent = 'Entendido, enviar mi letra'; }
   };
+  track('price_shown', { price: priceTxt, country: geo.country || '', where: 'review' });
 }
 $('btnSendTop').addEventListener('click', () => {
   if (editing) $('btnEdit').click();
