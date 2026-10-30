@@ -469,7 +469,7 @@ function setupSend() {
   const email = $('songEmail'), who = $('songWho'), err = $('sendErr'), modal = $('priceModal'), box = $('emailBox'), send = $('btnEmailSend');
   email.value = ''; who.value = ''; err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Enviar mi letra'; modal.classList.add('is-hidden');
   const priceTxt = geo.price && geo.price.text ? geo.price.text : '';
-  $('pmPrice').textContent = priceTxt ? `Si te gusta la muestra y decides continuar, la canción completa cuesta ${priceTxt}.` : 'Si te gusta la muestra y decides continuar, te digo el precio entonces.';
+  $('pmPrice').textContent = (priceTxt ? `Si te llegara a gustar la muestra que te enviaré más tarde y vas a adquirir la canción completa, el costo es de ${priceTxt}. ` : 'Si te llegara a gustar la muestra que te enviaré más tarde y vas a adquirir la canción completa, te diré el costo entonces. ') + 'No vas a pagar nada aún: primero escucharás y decidirás según la calidad.';
   const closeModal = () => { modal.classList.add('is-hidden'); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') { track('price_modal_back', {}); closeModal(); } };
   box.onsubmit = (ev) => {

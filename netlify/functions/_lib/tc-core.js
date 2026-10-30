@@ -3,8 +3,9 @@ const crypto = require('crypto');
 
 // >>> EDITA AQUÍ los precios. Costa Rica paga CR_CRC colones; los demás países, el equivalente de BASE_CRC colones en su
 // moneda (tipos de cambio aproximados en _lib/currency.js). <<<
-const { currencyOf, convertCrc, fmtMoney } = require('./currency');
-const CR_CRC = 3900, BASE_CRC = 9900;
+const { currencyOf, convertCrc, fmtMoney, CRC_PER_USD } = require('./currency');
+const PRICE_USD = 50;   // precio base: US$50, mostrado en la moneda de cada país
+const BASE_CRC = Math.ceil(PRICE_USD * CRC_PER_USD), CR_CRC = convertCrc(BASE_CRC, 'CRC');
 const PRICES = { CR: { amount: CR_CRC, currency: 'CRC' }, BASE_CRC };
 const priceFor = (country) => {
     const c = String(country || '').toUpperCase();
