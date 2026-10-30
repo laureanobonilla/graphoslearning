@@ -21,11 +21,12 @@ const SCHEMA = { type: 'OBJECT', properties: {
     text: { type: 'STRING', description: 'La definición con los espacios marcados como [[1]], [[2]]… (cada marca reemplaza UNA palabra o un término de máximo dos palabras).' },
     blanks: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
         n: { type: 'INTEGER' },
-        answers: { type: 'ARRAY', items: { type: 'STRING' }, description: 'La palabra correcta primero y hasta 3 variantes igual de correctas (sinónimo exacto, singular/plural).' },
+        answers: { type: 'ARRAY', items: { type: 'STRING' }, description: 'La palabra correcta primero y SOLO variantes de forma (singular/plural, con o sin artículo, abreviatura o grafía alternativa de la misma palabra). NUNCA sinónimos ni palabras relacionadas: si la persona escribe un sinónimo debe contar como incorrecto.' },
         meaning: { type: 'STRING', description: 'Qué significa esa palabra, en una frase simple de máximo 25 palabras, SIN usar la palabra.' }
     }, required: ['n', 'answers', 'meaning'] } }
 }, required: ['term', 'text', 'blanks'] };
 
+function lev(a, b) { const m = a.length, n = b.length, d = []; for (let i = 0; i <= m; i++) d[i] = [i]; for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
 const norm = (s) => String(s || '').toLowerCase().replace(/ß/g, 'ss').replace(/œ/g, 'oe').replace(/æ/g, 'ae').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
 const LANGS = { es: 'español', en: 'inglés', de: 'alemán', fr: 'francés' };
 function prompt(term, topic, parent, lvl, variant, avoid, lang) {
@@ -35,8 +36,19 @@ Concepto a definir: «${term}» (la persona pudo escribirlo en otro idioma: en �
 Redacta UNA definición clara y correcta de «${term}» de ${L.words} palabras (${L.style}). No empieces con «${term}» como título: es un texto corrido.
 Después reemplaza entre ${L.blanks[0]} y ${L.blanks[1]} palabras de ese texto por marcas [[1]], [[2]]… (una marca por palabra o término de máximo dos palabras).
 Qué ocultar: prioriza los términos más propios del tema (sustantivos técnicos, nombres propios, magnitudes, procesos con nombre) porque son lo que de verdad hay que saber. Evita verbos comunes, artículos, preposiciones y conectores. Si la definición no tiene palabras especiales, oculta las que más carga de significado tengan.
-Reglas: no ocultes «${term}» ni una palabra que sea casi igual. La palabra oculta no debe aparecer en ninguna otra parte del texto. Que el texto con los espacios todavía permita deducir la respuesta. Cada espacio: la respuesta correcta primero en «answers» y hasta 3 variantes igual de correctas; «meaning» explica en una frase qué significa esa palabra sin usarla.
+Reglas: no ocultes «${term}» ni una palabra que sea casi igual. La palabra oculta no debe aparecer en ninguna otra parte del texto. Que el texto con los espacios todavía permita deducir la respuesta. Cada espacio: la respuesta correcta primero en «answers» y, si acaso, variantes de FORMA de esa misma palabra (plural, grafía), nunca sinónimos; «meaning» explica en una frase qué significa esa palabra sin usarla.
 ${variant ? `Esta es la versión ${variant}: redáctala distinta a las anteriores y oculta otras palabras si es posible.` : ''}${avoid && avoid.length ? ` Evita parecerte a estos textos: ${avoid.map((a) => '«' + a + '»').join(' ')}.` : ''}`;
+}
+// Solo se aceptan variantes de FORMA de la respuesta principal (plural, grafía, artículo); los sinónimos se descartan aunque el modelo los proponga.
+function cpl(a, b) { let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++; return i; }
+function strict(list) {
+    const first = list[0], f = norm(first), out = [first];
+    for (const v of list.slice(1)) {
+        const x = norm(v), core = x.replace(/^(the|a|an|le|la|les|l|un|une|der|die|das|ein|eine|el|los|las|una|unos|unas) /, ''), fc = f.replace(/^(the|a|an|le|la|les|l|un|une|der|die|das|ein|eine|el|los|las|una|unos|unas) /, '');
+        if (!x || x === f || out.some((o) => norm(o) === x)) continue;
+        if (core === fc || lev(core, fc) <= Math.max(1, Math.floor(fc.length / 6)) || (Math.abs(core.length - fc.length) <= 3 && cpl(core, fc) >= Math.max(4, Math.min(core.length, fc.length) - 2))) out.push(v);
+    }
+    return out.slice(0, 3);
 }
 function validate(d, lvl) {
     if (!d || typeof d.text !== 'string' || !Array.isArray(d.blanks) || typeof d.term !== 'string' || d.term.trim().length < 2) return false;
@@ -69,7 +81,7 @@ exports.handler = async (event) => {
             const t0 = Date.now();
             const d = await generateWithRetries(prompt(term, topic, parent, lvl, variant, avoid, lang), SCHEMA, (x) => validate(x, lvl), { tag: 'profundiza', maxOutputTokens: 1200, deadline: t0 + 22000, attemptMs: 9000 });
             const marks = [...d.text.matchAll(/\[\[(\d+)\]\]/g)].map((m) => Number(m[1]));
-            const blanks = marks.map((n, i) => { const b = d.blanks.find((x) => Number(x.n) === n); return { n: i + 1, old: n, answers: b.answers.map((s) => clean(s, 60)).filter(Boolean).slice(0, 4), meaning: clean(b.meaning, 220) }; });
+            const blanks = marks.map((n, i) => { const b = d.blanks.find((x) => Number(x.n) === n); return { n: i + 1, old: n, answers: strict(b.answers.map((s) => clean(s, 60)).filter(Boolean)), meaning: clean(b.meaning, 220) }; });
             // se renumera 1..k en orden de aparición (con marcas temporales para evitar choques)
             let text = d.text; blanks.forEach((b) => { text = text.split('[[' + b.old + ']]').join('{#' + b.n + '#}'); }); text = text.replace(/\{#(\d+)#\}/g, '[[$1]]');
             return json(200, { term: clean(d.term, 80).replace(/[«»"“”„]/g, '').trim() || term, asked: term, level: lvl, lang, text: clean(text, 900), blanks: blanks.map(({ n, answers, meaning }) => ({ n, answers, meaning })), ms: Date.now() - t0 });
