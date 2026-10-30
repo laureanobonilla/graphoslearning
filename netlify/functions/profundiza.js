@@ -17,20 +17,21 @@ const LEVELS = {
     advanced: { blanks: [4, 5], words: '55 a 80', style: 'vocabulario técnico preciso, como para alguien que ya conoce el tema' }
 };
 const SCHEMA = { type: 'OBJECT', properties: {
+    term: { type: 'STRING', description: 'El nombre del concepto en el idioma pedido (si la persona lo escribió en otro idioma, tradúcelo). Nombre natural, máximo 6 palabras, sin comillas.' },
     text: { type: 'STRING', description: 'La definición con los espacios marcados como [[1]], [[2]]… (cada marca reemplaza UNA palabra o un término de máximo dos palabras).' },
     blanks: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
         n: { type: 'INTEGER' },
         answers: { type: 'ARRAY', items: { type: 'STRING' }, description: 'La palabra correcta primero y hasta 3 variantes igual de correctas (sinónimo exacto, singular/plural).' },
         meaning: { type: 'STRING', description: 'Qué significa esa palabra, en una frase simple de máximo 25 palabras, SIN usar la palabra.' }
     }, required: ['n', 'answers', 'meaning'] } }
-}, required: ['text', 'blanks'] };
+}, required: ['term', 'text', 'blanks'] };
 
 const norm = (s) => String(s || '').toLowerCase().replace(/ß/g, 'ss').replace(/œ/g, 'oe').replace(/æ/g, 'ae').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]/g, ' ').replace(/\s+/g, ' ').trim();
 const LANGS = { es: 'español', en: 'inglés', de: 'alemán', fr: 'francés' };
 function prompt(term, topic, parent, lvl, variant, avoid, lang) {
     const L = LEVELS[lvl];
     return `Eres un profesor que crea ejercicios de completar para estudiar. Escribe TODO el texto de salida (la definición, las respuestas y los significados) en ${LANGS[lang]}, con ortografía y tildes/diéresis correctas${lang === 'es' ? '' : '; la persona está aprendiendo el tema en ese idioma, así que usa vocabulario natural y no traduzcas términos técnicos de forma rara'}.
-Concepto a definir: «${term}». ${topic && norm(topic) !== norm(term) ? `Se está estudiando el tema «${topic}»${parent ? ` y la persona llegó aquí porque no supo la palabra «${term}» dentro de una definición de «${parent}»` : ''}.` : ''}
+Concepto a definir: «${term}» (la persona pudo escribirlo en otro idioma: en «term» devuélvelo en ${LANGS[lang]}, y trabaja con ese nombre). ${topic && norm(topic) !== norm(term) ? `Se está estudiando el tema «${topic}»${parent ? ` y la persona llegó aquí porque no supo la palabra «${term}» dentro de una definición de «${parent}»` : ''}.` : ''}
 Redacta UNA definición clara y correcta de «${term}» de ${L.words} palabras (${L.style}). No empieces con «${term}» como título: es un texto corrido.
 Después reemplaza entre ${L.blanks[0]} y ${L.blanks[1]} palabras de ese texto por marcas [[1]], [[2]]… (una marca por palabra o término de máximo dos palabras).
 Qué ocultar: prioriza los términos más propios del tema (sustantivos técnicos, nombres propios, magnitudes, procesos con nombre) porque son lo que de verdad hay que saber. Evita verbos comunes, artículos, preposiciones y conectores. Si la definición no tiene palabras especiales, oculta las que más carga de significado tengan.
@@ -38,12 +39,12 @@ Reglas: no ocultes «${term}» ni una palabra que sea casi igual. La palabra ocu
 ${variant ? `Esta es la versión ${variant}: redáctala distinta a las anteriores y oculta otras palabras si es posible.` : ''}${avoid && avoid.length ? ` Evita parecerte a estos textos: ${avoid.map((a) => '«' + a + '»').join(' ')}.` : ''}`;
 }
 function validate(d, lvl) {
-    if (!d || typeof d.text !== 'string' || !Array.isArray(d.blanks)) return false;
+    if (!d || typeof d.text !== 'string' || !Array.isArray(d.blanks) || typeof d.term !== 'string' || d.term.trim().length < 2) return false;
     const L = LEVELS[lvl], marks = [...d.text.matchAll(/\[\[(\d+)\]\]/g)].map((m) => Number(m[1]));
     if (marks.length < L.blanks[0] || marks.length > L.blanks[1] + 1 || new Set(marks).size !== marks.length) return false;
     for (const n of marks) { const b = d.blanks.find((x) => Number(x.n) === n); if (!b || !Array.isArray(b.answers) || !b.answers.length || !b.answers[0] || !String(b.meaning || '').trim()) return false; }
-    const rest = norm(d.text.replace(/\[\[\d+\]\]/g, ' '));
-    for (const n of marks) { const a = norm(d.blanks.find((x) => Number(x.n) === n).answers[0]); if (!a || (' ' + rest + ' ').includes(' ' + a + ' ')) return false; }
+    const rest = norm(d.text.replace(/\[\[\d+\]\]/g, ' ')), tn = norm(d.term);
+    for (const n of marks) { const a = norm(d.blanks.find((x) => Number(x.n) === n).answers[0]); if (!a || a === tn || (' ' + rest + ' ').includes(' ' + a + ' ')) return false; }
     return d.text.length > 60;
 }
 
@@ -71,7 +72,7 @@ exports.handler = async (event) => {
             const blanks = marks.map((n, i) => { const b = d.blanks.find((x) => Number(x.n) === n); return { n: i + 1, old: n, answers: b.answers.map((s) => clean(s, 60)).filter(Boolean).slice(0, 4), meaning: clean(b.meaning, 220) }; });
             // se renumera 1..k en orden de aparición (con marcas temporales para evitar choques)
             let text = d.text; blanks.forEach((b) => { text = text.split('[[' + b.old + ']]').join('{#' + b.n + '#}'); }); text = text.replace(/\{#(\d+)#\}/g, '[[$1]]');
-            return json(200, { term, level: lvl, lang, text: clean(text, 900), blanks: blanks.map(({ n, answers, meaning }) => ({ n, answers, meaning })), ms: Date.now() - t0 });
+            return json(200, { term: clean(d.term, 80).replace(/[«»"“”„]/g, '').trim() || term, asked: term, level: lvl, lang, text: clean(text, 900), blanks: blanks.map(({ n, answers, meaning }) => ({ n, answers, meaning })), ms: Date.now() - t0 });
         }
         return json(400, { error: 'accion' });
     } catch (err) {

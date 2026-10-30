@@ -154,7 +154,8 @@
   function pushFrame(term, parent, why, nodeId) {
     loading(T.loadQ(term));
     getCloze(term, parent, 0, []).then(function (c) {
-      if (nodeId == null) nodeId = node(term, null).id; setStatus(nodeId, 'active'); S.stack.push({ term: term, parent: parent || '', nodeId: nodeId, cloze: c, pending: [], tries: 0, why: why || '', seen: [c.text] });
+      var shown = (c.term && String(c.term).trim()) || term; if (nodeId == null) { nodeId = node(shown, null).id; if (!S.stack.length) S.topic = shown; } else if (S.nodes[nodeId]) S.nodes[nodeId].term = shown;
+      setStatus(nodeId, 'active'); S.stack.push({ term: shown, parent: parent || '', nodeId: nodeId, cloze: c, pending: [], tries: 0, why: why || '', seen: [c.text] });
       S.maxDepth = Math.max(S.maxDepth, S.stack.length); save(); ask();
     }).catch(function () { fail(function () { pushFrame(term, parent, why, nodeId); }); });
   }
