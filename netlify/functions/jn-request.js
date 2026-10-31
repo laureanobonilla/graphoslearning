@@ -28,11 +28,11 @@ exports.handler = async (event) => {
     if (via === 'whatsapp' && !phone) return json(400, { error: 'Revise su número: incluya el código de país, por ejemplo +506 8888 1234.' });
     const contactName = scrubOne(body.contactName, 40);
     if (via !== 'draft' && body.priceAck !== true) return json(400, { error: 'Falta confirmar el precio.' });
-    const country = core.countryOf(event), price = core.priceOf(b.option, b.exclusive);
+    const country = core.countryOf(event), price = core.priceOf(b.option);
     const utm = { campaign: scrubOne(body.utm && body.utm.campaign, 40), ad: scrubOne(body.utm && body.utm.ad, 40) };
     const status = via === 'draft' ? 'draft' : 'requested';
 
-    const row = { id, status, anon_id: anonId || null, country: country || null, rubro: b.rubroLabel, option: b.option, exclusive: b.exclusive,
+    const row = { id, status, anon_id: anonId || null, country: country || null, rubro: b.rubroLabel, option: b.option,
         price_text: price.text, price_amount: price.amount, business: b.business, rhythm: core.rhythmText(b) || null, details: b.details || null,
         brief: b, utm, ...(title ? { title } : {}), ...(lyricsFinal || lyrics ? { lyrics_final: lyricsFinal || lyrics } : {}),
         ...(logoId ? { logo_id: logoId } : {}), ...(phone ? { phone } : {}), ...(contactName ? { contact_name: contactName } : {}) };
@@ -62,7 +62,7 @@ exports.handler = async (event) => {
         `Contacto: ${contactName || '(sin nombre)'} · ${phone}`,
         `WhatsApp con mensaje listo: https://wa.me/${phone.slice(1)}?text=${encodeURIComponent(firstMsg)}`,
         ``,
-        `Precio aceptado: ${price.text} (opción ${core.money(price.base)}${b.exclusive ? ` + exclusividad en su cantón ${core.money(core.EXCLUSIVE_PRICE)}` : ''})`,
+        `Precio aceptado: ${price.text}`,
         `Logo: ${logoLink ? `subido · descarga (30 días): ${logoLink}` : 'no subió logo'}`,
         ...(b.slogan ? [`Eslogan: ${b.slogan}`] : []),
         ...(b.phoneInSong ? [`Teléfono para la canción: ${b.phoneInSong}`] : []),
@@ -80,14 +80,14 @@ exports.handler = async (event) => {
         const res = await fetch('https://api.resend.com/emails', {
             method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ from: 'Graphikosmos <onboarding@resend.dev>', to: [process.env.FEEDBACK_TO_EMAIL || FALLBACK_TO_EMAIL],
-                subject: `Jingle: ${b.business} · ${b.rubroLabel} · ${b.option}${b.exclusive ? ' + exclusiva' : ''} · ${price.text} · ${phone}`, text })
+                subject: `Jingle: ${b.business} · ${b.rubroLabel} · ${b.option} · ${price.text} · ${phone}`, text })
         });
         if (!res.ok) {
             console.error('[jn-request] Resend', res.status, await res.text().catch(() => ''));
             return json(502, { error: 'No pudimos registrar su pedido. Inténtelo de nuevo o escríbanos por WhatsApp.' });
         }
         try { await core.saveOrder({ id, email_sent: true }); } catch (_e) { /* no crítico */ }
-        try { await store.logEvent(id, 'anon', anonId || null, 'jn_request_sent', { option: b.option, rubro: b.rubro, exclusive: b.exclusive, logo: !!logoId, price: price.text, country, saved, source: 'server' }, null, 'jingle-negocio'); }
+        try { await store.logEvent(id, 'anon', anonId || null, 'jn_request_sent', { option: b.option, rubro: b.rubro, logo: !!logoId, price: price.text, country, saved, source: 'server' }, null, 'jingle-negocio'); }
         catch (e) { console.error('[jn-request] evento', e.message); }
         return json(200, { ok: true, price: price.text });
     } catch (err) {

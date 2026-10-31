@@ -23,7 +23,7 @@ const RUBROS = [
   { key: 'ferreteria', label: 'Ferretería', icon: '🔨', hint: 'Por ejemplo: materiales de construcción, entrega a domicilio, buenos precios…' }
 ];
 const RHYTHMS = ['Cumbia', 'Reguetón', 'Merengue', 'Salsa', 'Pop', 'Rock', 'Bachata', 'Tropical / Calypso', 'Balada'];
-const FALLBACK_PRICES = { logo: '₡12.900', nombre: '₡24.900', propia: '₡34.900', exclusive: '₡9.900' };
+const FALLBACK_PRICES = { logo: '₡12.900', nombre: '₡24.900', propia: '₡34.900' };
 const OPTIONS = [
   { key: 'logo', title: 'La del anuncio, con su logo', desc: 'La misma canción que escuchó, con un video con su logo y sus datos.', fast: 'La más rápida' },
   { key: 'nombre', title: 'La del anuncio, con el nombre de su negocio', desc: 'La misma canción, pero cantando el nombre de su negocio. Incluye su logo.', fast: 'La más pedida' },
@@ -56,19 +56,18 @@ const lsDel = (k) => { try { localStorage.removeItem(k); } catch { /* ok */ } };
 const newId = () => (crypto.randomUUID ? crypto.randomUUID() : `00000000-0000-4000-8000-${String(Date.now()).padStart(12, '0')}`);
 
 // ---------- Precios ----------
-let prices = Object.assign({}, FALLBACK_PRICES), priceNum = { logo: 12900, nombre: 24900, propia: 34900, exclusive: 9900 };
+let prices = Object.assign({}, FALLBACK_PRICES), priceNum = { logo: 12900, nombre: 24900, propia: 34900 };
 fetch('/.netlify/functions/jn-config', { cache: 'no-store' }).then(r => r.json()).then(d => {
   if (!d || !d.options) return;
   Object.keys(d.options).forEach(k => { prices[k] = d.options[k].text; priceNum[k] = d.options[k].price; });
-  if (d.exclusive) { prices.exclusive = d.exclusive.text; priceNum.exclusive = d.exclusive.price; }
   if (currentScreen === 'flow') renderStep();
 }).catch(() => {});
 const money = (n) => '₡' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-const totalText = () => S.option ? money(priceNum[S.option] + (S.exclusive ? priceNum.exclusive : 0)) : '';
+const totalText = () => S.option ? money(priceNum[S.option]) : '';
 
 // ---------- Estado ----------
 const preRubro = RUBROS.some(r => r.key === QS.get('rubro')) ? QS.get('rubro') : '';
-const blank = () => ({ rubro: preRubro, rubroOther: '', option: '', exclusive: false, business: '', pronounce: '', canton: '', slogan: '', phoneInSong: '', details: '', rhythm: '', rhythmOther: '', notes: '', title: '', lyrics: '', lyricsFinal: '', regen: 0, logoId: '', logoName: '', contactName: '', phone: '' });
+const blank = () => ({ rubro: preRubro, rubroOther: '', option: '', business: '', pronounce: '', canton: '', slogan: '', phoneInSong: '', details: '', rhythm: '', rhythmOther: '', notes: '', title: '', lyrics: '', lyricsFinal: '', regen: 0, logoId: '', logoName: '', contactName: '', phone: '' });
 let S = blank(), id = newId(), stack = [], stepId = '';
 const rubroObj = () => RUBROS.find(r => r.key === S.rubro);
 const rubroLabel = () => (S.rubro === 'otro' ? (S.rubroOther.trim() || 'su negocio') : (rubroObj() ? rubroObj().label : ''));
@@ -83,7 +82,7 @@ function pathOf() {
 function saveState() { lsSet('jn_state_v1', { id, S, stack, stepId, savedAt: Date.now() }); }
 function loadState() { const s = lsGet('jn_state_v1'); return s && s.S && s.id && s.stepId && Date.now() - (s.savedAt || 0) < 24 * 3600 * 1000 ? s : null; }
 function briefOf() {
-  return { rubro: S.rubro, rubroOther: S.rubroOther.trim(), option: S.option, exclusive: S.exclusive, business: S.business.trim(), pronounce: S.pronounce.trim(), canton: S.canton.trim(),
+  return { rubro: S.rubro, rubroOther: S.rubroOther.trim(), option: S.option, business: S.business.trim(), pronounce: S.pronounce.trim(), canton: S.canton.trim(),
     slogan: S.slogan.trim(), phoneInSong: S.phoneInSong.trim(), details: S.details.trim(), rhythm: S.rhythm, rhythmOther: S.rhythmOther.trim(), notes: S.notes.trim() };
 }
 
@@ -164,11 +163,6 @@ const STEPS = {
       });
       if (S.rubro === 'otro' && S.option !== 'propia') S.option = 'propia';
       body.appendChild(wrap);
-      const ex = document.createElement('label'); ex.className = 'ack';
-      ex.innerHTML = '<input type="checkbox"><span><b>Exclusiva en su cantón</b> (+<span class="exp"></span>): no se la vendemos a otro negocio de su mismo tipo en su cantón.</span>';
-      ex.querySelector('.exp').textContent = prices.exclusive; const cb = ex.querySelector('input'); cb.checked = S.exclusive;
-      cb.addEventListener('change', () => { S.exclusive = cb.checked; track('exclusive_toggled', { on: cb.checked }); paintTotal(); update(); });
-      body.appendChild(ex);
       const tot = document.createElement('p'); tot.className = 'total'; tot.id = 'totalLine'; body.appendChild(tot); paintTotal();
     },
     ok: () => !!S.option
@@ -178,13 +172,13 @@ const STEPS = {
     render(body) {
       body.appendChild(input({ label: 'Nombre del negocio', value: S.business, placeholder: 'Por ejemplo: Taller Hermanos Mora', max: 60, onInput: (v) => { S.business = v; }, attrs: { autocapitalize: 'words' } }));
       if (S.option !== 'logo') body.appendChild(input({ label: '¿Cómo se pronuncia?', value: S.pronounce, placeholder: 'Solo si se puede leer mal. Ej.: "Yei Ci Motors"', max: 60, optional: true, onInput: (v) => { S.pronounce = v; } }));
-      body.appendChild(input({ label: 'Cantón o zona', value: S.canton, placeholder: 'Por ejemplo: Desamparados', max: 60, optional: true, onInput: (v) => { S.canton = v; }, hint: S.exclusive ? 'Lo necesitamos para la exclusividad.' : '' }));
+      body.appendChild(input({ label: 'Cantón o zona', value: S.canton, placeholder: 'Por ejemplo: Desamparados', max: 60, optional: true, onInput: (v) => { S.canton = v; } }));
       if (S.option === 'propia') {
         body.appendChild(input({ label: 'Eslogan o frase', value: S.slogan, placeholder: 'Por ejemplo: "Su carro como nuevo"', max: 120, optional: true, onInput: (v) => { S.slogan = v; } }));
         body.appendChild(input({ label: 'Teléfono que quiere que se cante', value: S.phoneInSong, placeholder: 'Por ejemplo: 8888 1234', max: 30, optional: true, type: 'tel', onInput: (v) => { S.phoneInSong = v; } }));
       }
     },
-    ok: () => S.business.trim().length >= 2 && (!S.exclusive || S.canton.trim().length >= 3)
+    ok: () => S.business.trim().length >= 2
   },
   details: {
     title: 'Cuéntenos de su negocio', hint: 'Escriba todo lo que quiera que diga la canción: qué ofrece, qué lo hace distinto, por qué la gente debería ir. Con sus palabras.',
@@ -222,7 +216,7 @@ const STEPS = {
       const opt = OPTIONS.find(o => o.key === S.option);
       sum.innerHTML = '<p class="s-t"></p><p class="s-d"></p><p class="s-p"></p>';
       sum.querySelector('.s-t').textContent = S.business.trim();
-      sum.querySelector('.s-d').textContent = `${opt ? opt.title : ''}${S.exclusive ? ' · exclusiva en su cantón' : ''}${S.option === 'propia' && S.title ? ` · «${S.title}»` : ''}`;
+      sum.querySelector('.s-d').textContent = `${opt ? opt.title : ''}${S.option === 'propia' && S.title ? ` · «${S.title}»` : ''}`;
       sum.querySelector('.s-p').textContent = `Total: ${totalText()}`;
       body.appendChild(sum);
       body.appendChild(input({ label: 'Su nombre', value: S.contactName, placeholder: 'Para saber con quién hablamos', max: 40, optional: true, onInput: (v) => { S.contactName = v; }, attrs: { autocomplete: 'name' } }));

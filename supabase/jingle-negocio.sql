@@ -12,7 +12,6 @@ create table if not exists public.jn_orders (
   country       text,
   rubro         text,
   option        text,                              -- logo | nombre | propia
-  exclusive     boolean default false,
   price_text    text,
   price_amount  numeric,
   business      text,
@@ -34,6 +33,6 @@ create index if not exists jn_orders_status on public.jn_orders (status, created
 
 drop view if exists public.jn_orders_friendly;
 create view public.jn_orders_friendly as
-  select id, (created_at at time zone 'America/Costa_Rica') as creado_cr, status, business, rubro, option, exclusive, price_text,
+  select id, (created_at at time zone 'America/Costa_Rica') as creado_cr, status, business, rubro, option, price_text,
          contact_name, phone, rhythm, title, details, logo_id, email_sent, brief, lyrics_final
   from public.jn_orders order by created_at desc;

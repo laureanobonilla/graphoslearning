@@ -61,9 +61,9 @@ exports.handler = async (event) => {
             await store.logEvent(ipKey, 'anon', anonId || null, 'jn_lyrics_generated', meta, null, 'jingle-negocio');
             if (anonId) await store.logEvent(anonId, 'anon', anonId, 'jn_lyrics_generated', meta, null, 'jingle-negocio');
         } catch (e) { console.error('[jn-generate-lyrics] evento', e.message); }
-        const price = core.priceOf('propia', b.exclusive);
+        const price = core.priceOf('propia');
         try {
-            await core.saveOrder({ id, status: 'generated', anon_id: anonId || null, country: country || null, rubro: b.rubroLabel, option: 'propia', exclusive: b.exclusive,
+            await core.saveOrder({ id, status: 'generated', anon_id: anonId || null, country: country || null, rubro: b.rubroLabel, option: 'propia',
                 price_text: price.text, price_amount: price.amount, business: b.business, rhythm: core.rhythmText(b) || null, details: b.details || null, brief: b, title, lyrics });
         } catch (e) {
             console.error('[jn-generate-lyrics] tabla', e.message);

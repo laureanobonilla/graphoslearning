@@ -8,7 +8,6 @@ const OPTIONS = {
     nombre: { label: 'La canción del anuncio con el nombre de su negocio', price: 24900 },
     propia: { label: 'Una canción totalmente personalizada', price: 34900 }
 };
-const EXCLUSIVE_PRICE = 9900;   // nadie más de su rubro en su cantón tendrá esa canción
 
 // >>> EDITA AQUÍ los rubros (deben coincidir con RUBROS de jingle-negocio/app.js). <<<
 const RUBROS = {
@@ -20,14 +19,12 @@ const RUBROS = {
 const RHYTHMS = ['Cumbia', 'Reguetón', 'Merengue', 'Salsa', 'Pop', 'Rock', 'Bachata', 'Tropical / Calypso', 'Balada'];
 
 const money = (n) => '₡' + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-function priceOf(option, exclusive) {
+function priceOf(option) {
     const o = OPTIONS[option]; if (!o) return null;
-    const amount = o.price + (exclusive ? EXCLUSIVE_PRICE : 0);
-    return { amount, text: money(amount), base: o.price, exclusive: !!exclusive };
+    return { amount: o.price, text: money(o.price) };
 }
 const publicConfig = () => ({
-    options: Object.fromEntries(Object.entries(OPTIONS).map(([k, v]) => [k, { label: v.label, price: v.price, text: money(v.price) }])),
-    exclusive: { price: EXCLUSIVE_PRICE, text: money(EXCLUSIVE_PRICE) }
+    options: Object.fromEntries(Object.entries(OPTIONS).map(([k, v]) => [k, { label: v.label, price: v.price, text: money(v.price) }]))
 });
 
 // Lo que manda el navegador es DATO, nunca instrucción: todo se limpia y se acota.
@@ -37,7 +34,7 @@ function cleanBrief(b) {
     const rubro = RUBROS[b.rubro] ? b.rubro : '';
     return {
         rubro, rubroLabel: rubro === 'otro' ? scrubOne(b.rubroOther, 80) || 'Otro' : (RUBROS[rubro] || ''), rubroOther: scrubOne(b.rubroOther, 80),
-        option, exclusive: b.exclusive === true,
+        option,
         business: scrubOne(b.business, 60), pronounce: scrubOne(b.pronounce, 60), canton: scrubOne(b.canton, 60),
         slogan: scrubOne(b.slogan, 120), phoneInSong: scrubOne(b.phoneInSong, 30),
         details: scrub(b.details, 1500),
@@ -63,4 +60,4 @@ async function saveOrder(row) {
     if (!res.ok) throw new Error(`jn_orders HTTP ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
 }
 
-module.exports = { OPTIONS, EXCLUSIVE_PRICE, RUBROS, RHYTHMS, money, priceOf, publicConfig, cleanBrief, rhythmText, saveOrder, json, UUID_RE, scrub, scrubOne, ipOf, hashIp, countryOf };
+module.exports = { OPTIONS, RUBROS, RHYTHMS, money, priceOf, publicConfig, cleanBrief, rhythmText, saveOrder, json, UUID_RE, scrub, scrubOne, ipOf, hashIp, countryOf };
