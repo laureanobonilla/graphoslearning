@@ -200,6 +200,8 @@
   .err{ color:#b3261e; font-weight:500; font-size:.92rem; margin:10px 0 0; }
   #screen-done{ justify-content:center; text-align:center; padding:40px 4px; }
   .hero h1{ max-width:15ch; }
+  .contact-line{ text-align:center; color:var(--muted); font-size:.95rem; margin:28px 0 0; }
+  .wa-link{ color:var(--wa); font-weight:700; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -222,6 +224,7 @@
         <li><span class="n">3</span><div><b>Le escribimos por WhatsApp</b><span>Paga por SINPE Móvil y recibe su jingle con video listo para redes.</span></div></li>
       </ol>
     </div>
+    <p class="contact-line">¿Prefiere escribirnos directamente? <a class="wa-link" href="https://wa.me/50687772993?text=Hola%2C%20me%20interesa%20un%20jingle%20para%20mi%20negocio" target="_blank" rel="noopener">WhatsApp +506 8777 2993</a></p>
     <div class="welcome-end" aria-hidden="true"></div>
   </section>
 
@@ -268,10 +271,11 @@
   <section id="screen-done" class="screen">
     <p class="done-title display" style="font-size:2.2rem">¡Pedido recibido!</p>
     <p id="doneText" style="color:var(--muted)"></p>
+    <p class="contact-line">¿Alguna duda? Escríbanos al <a class="wa-link" id="doneWa" href="https://wa.me/50687772993" target="_blank" rel="noopener">WhatsApp +506 8777 2993</a></p>
   </section>
 </div>
 
 <div id="ctaBar" class="cta-bar"><button type="button" class="btn btn-primary" id="btnCta">Quiero mi jingle</button></div>
-<script src="app.js?v=20261031a"></script>
+<script src="app.js?v=20261031b"></script>
 </body>
 </html>

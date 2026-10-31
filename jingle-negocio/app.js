@@ -8,6 +8,7 @@
 'use strict';
 const APP = 'jingle-negocio', TRACK_URL = '/.netlify/functions/sfc-track-event', SVGNS = 'http://www.w3.org/2000/svg';
 const $ = (id) => document.getElementById(id);
+const CONTACT_WHATSAPP = '50687772993';   // su WhatsApp: aparece en la bienvenida y al final del pedido
 
 // >>> EDITA AQUÍ los rubros (las claves deben coincidir con RUBROS de netlify/functions/_lib/jn-core.js) <<<
 const RUBROS = [
@@ -353,6 +354,7 @@ async function submit() {
     if (!d.ok) throw new Error('fallo');
     track('request_confirmed', { option: S.option });
     $('doneText').textContent = `Recibimos su pedido para ${S.business.trim()} (${totalText()}). En breve le escribimos al WhatsApp ${phoneE164()} con las instrucciones de pago por SINPE Móvil.${S.logoId ? '' : ' Si tiene logo, puede enviárnoslo por ahí mismo.'}`;
+    $('doneWa').href = `https://wa.me/${CONTACT_WHATSAPP}?text=${encodeURIComponent(`Hola, acabo de pedir el jingle para ${S.business.trim()}.`)}`;
     stepId = 'done'; lsDel('jn_state_v1'); showScreen('done');
   } catch (e) {
     track('request_failed', { status: e.status || 0 });
