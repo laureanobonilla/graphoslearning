@@ -1,17 +1,19 @@
 /* Profundiza — pila de preguntas de completar guiada por lo que la persona no sabe (es, en, de, fr).
  * Cada palabra fallada se vuelve una pregunta nueva que la define; las demás quedan pendientes en la pila.
  * Solo cuando una pregunta sale bien se vuelve a la anterior. Nada queda suelto.
+ * Cada tema se estudia por partes (10 / 25 / 65 según el nivel). Solo se profundiza en palabras CRUCIALES para el tema central;
+ * las demás se explican y se sigue. Todos los temas quedan guardados en este dispositivo y se pueden retomar.
  * En inglés, alemán y francés hay pronunciación (voz del dispositivo) del texto completo y del concepto. */
 (function () {
   'use strict';
   var FN = '/.netlify/functions/profundiza';
   var LANG = (document.documentElement.lang || 'es').slice(0, 2); if (['es', 'en', 'de', 'fr'].indexOf(LANG) < 0) LANG = 'es';
-  var MAX_DEPTH = 6, MAX_TAUGHT = 2;   // profundidad máxima y veces que se baja a una misma palabra antes de solo explicarla
+  var MAX_DEPTH = 6, MAX_TAUGHT = 2, PARTS = { beginner: 10, intermediate: 25, advanced: 65 };   // profundidad máxima y veces que se baja a una misma palabra antes de solo explicarla
   var TTS = LANG !== 'es' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   var LOC = { es: 'es-ES', en: 'en-US', de: 'de-DE', fr: 'fr-FR' };
 
   var I = {
-    es: { name: 'Profundiza', lv: { beginner: ['Principiante', '1–2 espacios'], intermediate: ['Intermedio', '3 espacios'], advanced: ['Avanzado', '4–5 espacios'] },
+    es: { name: 'Profundiza', lv: { beginner: ['Principiante', '10 partes · 1–2 espacios'], intermediate: ['Intermedio', '25 partes · 3 espacios'], advanced: ['Avanzado', '65 partes · 4–5 espacios'] },
       intro: 'Escribe un tema. Te doy una definición con espacios en blanco. Cada palabra que no sepas se vuelve la siguiente pregunta, y solo cuando la aciertas regresas a la anterior.', ph: 'Por ejemplo: fotosíntesis', topicAria: 'Tema que quieres estudiar', levelAria: 'Nivel', go: 'Empezar', resume: function (t) { return 'Seguir con «' + t + '»'; },
       map: 'Mapa de tu recorrido', depth: function (d, m) { return 'Profundidad ' + d + ' de ' + m; }, up: function (d) { return ' · hay que subir ' + (d - 1) + (d === 2 ? ' nivel' : ' niveles') + ' para volver al tema'; }, atTopic: ' · estás en el tema', stat: function (a, b) { return a + ' resueltos · ' + b + ' por resolver (sin contar el tema)'; },
       learned: function (n) { return 'Lo que ya aprendiste (' + n + ')'; }, loadQ: function (t) { return 'Preparando la pregunta sobre «' + t + '»…'; }, loadV: function (t) { return 'Preparando otra versión de «' + t + '»…'; },
@@ -21,8 +23,10 @@
       nowAbout: function (w, more) { return 'Ahora una pregunta sobre «' + w + '»' + (more > 0 ? '. Después seguirás con ' + more + ' más y volverás a esta.' : ', y luego volverás a esta.'); }, seen: 'Seguimos: ya viste esas palabras.', understand: function (w) { return 'Entender «' + w + '»'; }, tryAgain: 'Volver a intentarlo',
       win: '¡Lo lograste!', okBack: 'Bien. Ya puedes volver', seeLearned: 'Ver lo que aprendiste', backTo: function (t) { return 'Volver a «' + t + '»'; },
       explainNote: 'Ya pasaste por esta palabra antes (o el recorrido ya es muy profundo), así que aquí la explico y seguimos.', cont: 'Seguir',
-      doneT: function (t) { return 'Completaste «' + t + '»'; }, doneS: function (r, d, c) { return r + ' intentos · hasta ' + d + ' niveles de profundidad · ' + c + ' conceptos'; }, recap: 'Lo que repasaste en el camino:', again: 'Estudiar otro tema', harder: 'Mismo tema, más difícil', blankWord: 'espacio' },
-    en: { name: 'Dive Deeper', lv: { beginner: ['Beginner', '1–2 blanks'], intermediate: ['Intermediate', '3 blanks'], advanced: ['Advanced', '4–5 blanks'] },
+      doneT: function (t) { return 'Completaste «' + t + '»'; }, doneS: function (r, d, c) { return r + ' intentos · hasta ' + d + ' niveles de profundidad · ' + c + ' conceptos'; }, recap: 'Lo que repasaste en el camino:', again: 'Estudiar otro tema', harder: 'Mismo tema, más difícil', partOf: function (k, n) { return 'Parte ' + k + ' de ' + n; }, partWin: function (k, n) { return '¡Parte ' + k + ' de ' + n + ' lista!'; }, nextPart: function (k, n) { return 'Seguir con la parte ' + k + ' de ' + n; }, lastPart: function (n) { return 'Parte final (' + n + ' de ' + n + ')'; }, loadO: function (t) { return 'Armando el temario de «' + t + '»…'; },
+      myTopics: 'Tus temas', contT: 'Continuar', viewT: 'Ver lo aprendido', delT: 'Quitar', sureT: '¿Quitar?', doneTag: 'Completado', progT: function (k, n) { return 'Parte ' + k + ' de ' + n; },
+      minorNote: function (t) { return 'Esta palabra no es clave para «' + t + '», así que solo te la explico y seguimos.'; }, minorSeen: 'Seguimos: esas palabras no son clave para el tema, ya viste qué significan.', blankWord: 'espacio' },
+    en: { name: 'Dive Deeper', lv: { beginner: ['Beginner', '10 parts · 1–2 blanks'], intermediate: ['Intermediate', '25 parts · 3 blanks'], advanced: ['Advanced', '65 parts · 4–5 blanks'] },
       intro: 'Type a topic. You get a definition with blanks. Every word you miss becomes the next question, and only when you get it right do you go back to the previous one.', ph: 'For example: photosynthesis', topicAria: 'Topic you want to study', levelAria: 'Level', go: 'Start', resume: function (t) { return 'Continue with “' + t + '”'; },
       map: 'Your path', depth: function (d, m) { return 'Depth ' + d + ' of ' + m; }, up: function (d) { return ' · climb ' + (d - 1) + (d === 2 ? ' level' : ' levels') + ' to get back to the topic'; }, atTopic: ' · you are at the topic', stat: function (a, b) { return a + ' solved · ' + b + ' to go (not counting the topic)'; },
       learned: function (n) { return 'What you have learned (' + n + ')'; }, loadQ: function (t) { return 'Preparing the question about “' + t + '”…'; }, loadV: function (t) { return 'Preparing another version of “' + t + '”…'; },
@@ -32,8 +36,10 @@
       nowAbout: function (w, more) { return 'Now a question about “' + w + '”' + (more > 0 ? '. Then ' + more + ' more, and you will come back to this one.' : ', and then you will come back to this one.'); }, seen: 'Moving on: you have already seen those words.', understand: function (w) { return 'Understand “' + w + '”'; }, tryAgain: 'Try again',
       win: 'You did it!', okBack: 'Good. You can go back now', seeLearned: 'See what you learned', backTo: function (t) { return 'Back to “' + t + '”'; },
       explainNote: 'You have been through this word before (or the path is already very deep), so here is the explanation and we move on.', cont: 'Continue',
-      doneT: function (t) { return 'You completed “' + t + '”'; }, doneS: function (r, d, c) { return r + ' attempts · up to ' + d + ' levels deep · ' + c + ' concepts'; }, recap: 'What you reviewed along the way:', again: 'Study another topic', harder: 'Same topic, harder', blankWord: 'blank', listen: 'Listen', listenText: 'Listen to the text', listenWord: 'Listen to the word', slow: 'Slow', noVoice: 'No voice available in this browser.' },
-    de: { name: 'Tiefer lernen', lv: { beginner: ['Anfänger', '1–2 Lücken'], intermediate: ['Mittel', '3 Lücken'], advanced: ['Fortgeschritten', '4–5 Lücken'] },
+      doneT: function (t) { return 'You completed “' + t + '”'; }, doneS: function (r, d, c) { return r + ' attempts · up to ' + d + ' levels deep · ' + c + ' concepts'; }, recap: 'What you reviewed along the way:', again: 'Study another topic', harder: 'Same topic, harder', partOf: function (k, n) { return 'Part ' + k + ' of ' + n; }, partWin: function (k, n) { return 'Part ' + k + ' of ' + n + ' done!'; }, nextPart: function (k, n) { return 'Go on to part ' + k + ' of ' + n; }, lastPart: function (n) { return 'Final part (' + n + ' of ' + n + ')'; }, loadO: function (t) { return 'Building the outline for “' + t + '”…'; },
+      myTopics: 'Your topics', contT: 'Continue', viewT: 'See what you learned', delT: 'Remove', sureT: 'Remove?', doneTag: 'Completed', progT: function (k, n) { return 'Part ' + k + ' of ' + n; },
+      minorNote: function (t) { return 'This word is not key to “' + t + '”, so I just explain it and we move on.'; }, minorSeen: 'Moving on: those words are not key to the topic, and you have seen what they mean.', blankWord: 'blank', listen: 'Listen', listenText: 'Listen to the text', listenWord: 'Listen to the word', slow: 'Slow', noVoice: 'No voice available in this browser.' },
+    de: { name: 'Tiefer lernen', lv: { beginner: ['Anfänger', '10 Teile · 1–2 Lücken'], intermediate: ['Mittel', '25 Teile · 3 Lücken'], advanced: ['Fortgeschritten', '65 Teile · 4–5 Lücken'] },
       intro: 'Gib ein Thema ein. Du bekommst eine Definition mit Lücken. Jedes Wort, das du nicht weißt, wird zur nächsten Frage – erst wenn du es richtig hast, geht es zur vorherigen zurück.', ph: 'Zum Beispiel: Photosynthese', topicAria: 'Thema, das du lernen möchtest', levelAria: 'Niveau', go: 'Los', resume: function (t) { return 'Weiter mit „' + t + '“'; },
       map: 'Dein Weg', depth: function (d, m) { return 'Tiefe ' + d + ' von ' + m; }, up: function (d) { return ' · ' + (d - 1) + (d === 2 ? ' Ebene' : ' Ebenen') + ' nach oben, um zum Thema zurückzukehren'; }, atTopic: ' · du bist beim Thema', stat: function (a, b) { return a + ' gelöst · ' + b + ' offen (ohne das Thema)'; },
       learned: function (n) { return 'Das hast du gelernt (' + n + ')'; }, loadQ: function (t) { return 'Frage zu „' + t + '“ wird vorbereitet …'; }, loadV: function (t) { return 'Andere Version von „' + t + '“ wird vorbereitet …'; },
@@ -43,8 +49,10 @@
       nowAbout: function (w, more) { return 'Jetzt eine Frage zu „' + w + '“' + (more > 0 ? '. Danach noch ' + more + ' weitere, dann kommst du hierher zurück.' : ', danach kommst du hierher zurück.'); }, seen: 'Weiter: diese Wörter hast du schon gesehen.', understand: function (w) { return '„' + w + '“ verstehen'; }, tryAgain: 'Noch einmal versuchen',
       win: 'Geschafft!', okBack: 'Gut. Du kannst zurück', seeLearned: 'Gelerntes ansehen', backTo: function (t) { return 'Zurück zu „' + t + '“'; },
       explainNote: 'Dieses Wort hattest du schon (oder der Weg ist schon sehr tief), deshalb erkläre ich es hier und wir machen weiter.', cont: 'Weiter',
-      doneT: function (t) { return '„' + t + '“ abgeschlossen'; }, doneS: function (r, d, c) { return r + ' Versuche · bis zu ' + d + ' Ebenen tief · ' + c + ' Begriffe'; }, recap: 'Das hast du unterwegs wiederholt:', again: 'Anderes Thema lernen', harder: 'Gleiches Thema, schwerer', blankWord: 'Lücke', listen: 'Anhören', listenText: 'Text anhören', listenWord: 'Wort anhören', slow: 'Langsam', noVoice: 'In diesem Browser ist keine Stimme verfügbar.' },
-    fr: { name: 'Approfondis', lv: { beginner: ['Débutant', '1–2 blancs'], intermediate: ['Intermédiaire', '3 blancs'], advanced: ['Avancé', '4–5 blancs'] },
+      doneT: function (t) { return '„' + t + '“ abgeschlossen'; }, doneS: function (r, d, c) { return r + ' Versuche · bis zu ' + d + ' Ebenen tief · ' + c + ' Begriffe'; }, recap: 'Das hast du unterwegs wiederholt:', again: 'Anderes Thema lernen', harder: 'Gleiches Thema, schwerer', partOf: function (k, n) { return 'Teil ' + k + ' von ' + n; }, partWin: function (k, n) { return 'Teil ' + k + ' von ' + n + ' geschafft!'; }, nextPart: function (k, n) { return 'Weiter mit Teil ' + k + ' von ' + n; }, lastPart: function (n) { return 'Letzter Teil (' + n + ' von ' + n + ')'; }, loadO: function (t) { return 'Gliederung für „' + t + '“ wird erstellt …'; },
+      myTopics: 'Deine Themen', contT: 'Weiter', viewT: 'Gelerntes ansehen', delT: 'Entfernen', sureT: 'Entfernen?', doneTag: 'Abgeschlossen', progT: function (k, n) { return 'Teil ' + k + ' von ' + n; },
+      minorNote: function (t) { return 'Dieses Wort ist für „' + t + '“ nicht wichtig, deshalb erkläre ich es nur und wir machen weiter.'; }, minorSeen: 'Weiter: diese Wörter sind für das Thema nicht wichtig, ihre Bedeutung hast du gesehen.', blankWord: 'Lücke', listen: 'Anhören', listenText: 'Text anhören', listenWord: 'Wort anhören', slow: 'Langsam', noVoice: 'In diesem Browser ist keine Stimme verfügbar.' },
+    fr: { name: 'Approfondis', lv: { beginner: ['Débutant', '10 parties · 1–2 blancs'], intermediate: ['Intermédiaire', '25 parties · 3 blancs'], advanced: ['Avancé', '65 parties · 4–5 blancs'] },
       intro: 'Écris un sujet. Tu reçois une définition à trous. Chaque mot que tu rates devient la question suivante, et ce n’est qu’en le réussissant que tu reviens à la précédente.', ph: 'Par exemple : photosynthèse', topicAria: 'Sujet que tu veux étudier', levelAria: 'Niveau', go: 'Commencer', resume: function (t) { return 'Continuer avec « ' + t + ' »'; },
       map: 'Ton parcours', depth: function (d, m) { return 'Profondeur ' + d + ' sur ' + m; }, up: function (d) { return ' · il faut remonter de ' + (d - 1) + (d === 2 ? ' niveau' : ' niveaux') + ' pour revenir au sujet'; }, atTopic: ' · tu es au sujet', stat: function (a, b) { return a + ' résolus · ' + b + ' à résoudre (sans compter le sujet)'; },
       learned: function (n) { return 'Ce que tu as appris (' + n + ')'; }, loadQ: function (t) { return 'Préparation de la question sur « ' + t + ' »…'; }, loadV: function (t) { return 'Préparation d’une autre version de « ' + t + ' »…'; },
@@ -54,7 +62,9 @@
       nowAbout: function (w, more) { return 'Maintenant une question sur « ' + w + ' »' + (more > 0 ? '. Ensuite ' + more + ' de plus, puis tu reviendras à celle-ci.' : ', puis tu reviendras à celle-ci.'); }, seen: 'On continue : tu as déjà vu ces mots.', understand: function (w) { return 'Comprendre « ' + w + ' »'; }, tryAgain: 'Réessayer',
       win: 'Bravo !', okBack: 'Bien. Tu peux revenir', seeLearned: 'Voir ce que tu as appris', backTo: function (t) { return 'Retour à « ' + t + ' »'; },
       explainNote: 'Tu es déjà passé par ce mot (ou le parcours est déjà très profond), je l’explique donc ici et on continue.', cont: 'Continuer',
-      doneT: function (t) { return '« ' + t + ' » terminé'; }, doneS: function (r, d, c) { return r + ' essais · jusqu’à ' + d + ' niveaux de profondeur · ' + c + ' notions'; }, recap: 'Ce que tu as revu en chemin :', again: 'Étudier un autre sujet', harder: 'Même sujet, plus difficile', blankWord: 'blanc', listen: 'Écouter', listenText: 'Écouter le texte', listenWord: 'Écouter le mot', slow: 'Lent', noVoice: 'Aucune voix disponible dans ce navigateur.' }
+      doneT: function (t) { return '« ' + t + ' » terminé'; }, doneS: function (r, d, c) { return r + ' essais · jusqu’à ' + d + ' niveaux de profondeur · ' + c + ' notions'; }, recap: 'Ce que tu as revu en chemin :', again: 'Étudier un autre sujet', harder: 'Même sujet, plus difficile', partOf: function (k, n) { return 'Partie ' + k + ' sur ' + n; }, partWin: function (k, n) { return 'Partie ' + k + ' sur ' + n + ' terminée !'; }, nextPart: function (k, n) { return 'Passer à la partie ' + k + ' sur ' + n; }, lastPart: function (n) { return 'Partie finale (' + n + ' sur ' + n + ')'; }, loadO: function (t) { return 'Préparation du plan de « ' + t + ' »…'; },
+      myTopics: 'Tes sujets', contT: 'Continuer', viewT: 'Voir ce que tu as appris', delT: 'Retirer', sureT: 'Retirer ?', doneTag: 'Terminé', progT: function (k, n) { return 'Partie ' + k + ' sur ' + n; },
+      minorNote: function (t) { return 'Ce mot n’est pas essentiel pour « ' + t + ' », je l’explique donc et on continue.'; }, minorSeen: 'On continue : ces mots ne sont pas essentiels pour le sujet, tu as vu ce qu’ils veulent dire.', blankWord: 'blanc', listen: 'Écouter', listenText: 'Écouter le texte', listenWord: 'Écouter le mot', slow: 'Lent', noVoice: 'Aucune voix disponible dans ce navigateur.' }
   };
   var T = I[LANG];
   var KEY = 'prf_state_v2_' + LANG, ANON = (function () { try { var a = localStorage.getItem('prf_anon'); if (!a) { a = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('prf_anon', a); } return a; } catch (e) { return 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); } })();
@@ -71,8 +81,19 @@
     return answers.some(function (a) { var x = norm(a); if (g === x) return true; var tol = x.length >= 9 ? 2 : x.length >= 5 ? 1 : 0; return tol > 0 && lev(g, x) <= tol; });
   }
   function track(ev, md) { try { md = md || {}; md.lang = LANG; fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'track', anonId: ANON, event: ev, metadata: md }) }).catch(function () {}); } catch (e) {} }
-  function save() { try { if (S) localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
-  function clear() { try { localStorage.removeItem(KEY); } catch (e) {} }
+  /* ---------- biblioteca: TODOS los temas de la persona quedan guardados en este dispositivo ---------- */
+  var LIB = 'prf_lib_v3_' + LANG;
+  function libAll() { var a = []; try { a = JSON.parse(localStorage.getItem(LIB) || '[]'); } catch (e) {} return Array.isArray(a) ? a.filter(function (x) { return x && x.id && x.topic; }) : []; }
+  function libPut(list) { try { localStorage.setItem(LIB, JSON.stringify(list)); return true; } catch (e) { return false; } }
+  function save() {
+    if (!S) return; S.updated = Date.now(); var list = libAll().filter(function (x) { return x.id !== S.id; }); list.unshift(S);
+    if (!libPut(list)) { list.forEach(function (x) { if (x.status === 'done') { x.stack = []; x.nodes = []; } }); libPut(list); }   // sin espacio: se aligeran los temas terminados (se conserva lo aprendido)
+  }
+  function libDel(id) { libPut(libAll().filter(function (x) { return x.id !== id; })); }
+  function newId() { return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  (function migrate() {   // el tema que estaba a medias en la versión anterior pasa a la biblioteca
+    try { var old = JSON.parse(localStorage.getItem(KEY) || 'null'); if (old && old.stack && old.stack.length) { old.id = newId(); old.parts = old.parts || [old.topic]; old.part = old.part || 0; old.status = 'active'; var list = libAll(); list.unshift(old); libPut(list); } localStorage.removeItem(KEY); } catch (e) {}
+  })();
 
   /* ---------- pronunciación (voz del dispositivo) ---------- */
   var curBtn = null;
@@ -93,27 +114,28 @@
   }
 
   function getCloze(term, parent, variant, avoid) {
-    var key = norm(term) + '|' + S.level + '|' + (variant || 0);
+    var key = norm(term) + '|' + S.level + '|' + (variant || 0) + '|' + (parent ? '' : 'p' + S.part);
     if (cache[key]) return cache[key];
-    var p = fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cloze', anonId: ANON, lang: LANG, term: term, topic: S.topic, parent: parent || '', level: S.level, variant: variant || 0, avoid: avoid || [] }) })
+    var p = fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cloze', anonId: ANON, lang: LANG, term: term, topic: S.topic, parent: parent || '', level: S.level, variant: variant || 0, avoid: avoid || [], partK: parent ? 0 : S.part + 1, partN: parent ? 0 : S.parts.length }) })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'http'); return j; }); })
       .catch(function (e) { delete cache[key]; throw e; });
     cache[key] = p; return p;
   }
 
   /* ---------- pantallas ---------- */
-  function node(term, parentId) { var n = { id: S.nodes.length, term: term, parentId: parentId, status: 'pending' }; S.nodes.push(n); return n; }
+  function node(term, parentId) { var n = { id: S.nodes.length, term: term, parentId: parentId, status: 'pending', part: S.part }; S.nodes.push(n); return n; }
   function setStatus(id, st) { if (S.nodes[id]) S.nodes[id].status = st; }
   function renderPile() {
     pile.textContent = '';
     document.body.classList.toggle('start', !S || !S.nodes.length); if (!S || !S.nodes.length) { pile.classList.remove('on'); learnEl.classList.remove('on'); return; }
     pile.classList.add('on'); pile.appendChild(el('h3', null, T.map));
+    if (S.parts && S.parts.length > 1) { var pg = el('div', 'parts'), pb = el('div', 'pbar'), pi = el('i'); pi.style.width = Math.round(S.part / S.parts.length * 100) + '%'; pb.appendChild(pi); pg.appendChild(el('b', null, S.part === S.parts.length - 1 ? T.lastPart(S.parts.length) : T.partOf(S.part + 1, S.parts.length))); pg.appendChild(pb); pile.appendChild(pg); }
     var depth = S.stack.length, g = el('div', 'gauge'); g.setAttribute('role', 'img'); g.setAttribute('aria-label', T.depth(depth, MAX_DEPTH));
     for (var i = 1; i <= MAX_DEPTH; i++) g.appendChild(el('i', i <= depth ? 'on' : ''));
     pile.appendChild(g); pile.appendChild(el('div', 'gl', T.depth(depth, MAX_DEPTH) + (depth > 1 ? T.up(depth) : T.atTopic)));
-    var tree = el('div', 'tree'); (function walk(pid, lvl) { S.nodes.forEach(function (n) { if (n.parentId !== pid) return; var st = n.status === 'active' && S.stack.length && S.stack[S.stack.length - 1].nodeId !== n.id ? 'wait' : n.status, r = el('div', 'tn ' + st); r.style.paddingLeft = (lvl * 14) + 'px'; r.appendChild(el('span', 'mk', st === 'done' ? '✓' : st === 'active' ? '●' : st === 'wait' ? '◐' : '○')); r.appendChild(document.createTextNode(n.term)); tree.appendChild(r); walk(n.id, lvl + 1); }); })(null, 0);
+    var tree = el('div', 'tree'); (function walk(pid, lvl) { S.nodes.forEach(function (n) { if (n.parentId !== pid || (n.part || 0) !== S.part) return; var st = n.status === 'active' && S.stack.length && S.stack[S.stack.length - 1].nodeId !== n.id ? 'wait' : n.status, r = el('div', 'tn ' + st); r.style.paddingLeft = (lvl * 14) + 'px'; r.appendChild(el('span', 'mk', st === 'done' ? '✓' : st === 'active' ? '●' : st === 'wait' ? '◐' : '○')); r.appendChild(document.createTextNode(n.term)); tree.appendChild(r); walk(n.id, lvl + 1); }); })(null, 0);
     pile.appendChild(tree);
-    var done = S.nodes.filter(function (n) { return n.status === 'done'; }).length, pend = S.nodes.filter(function (n) { return n.status !== 'done'; }).length - 1;
+    var cur = S.nodes.filter(function (n) { return (n.part || 0) === S.part; }), done = cur.filter(function (n) { return n.status === 'done'; }).length, pend = cur.filter(function (n) { return n.status !== 'done'; }).length - 1;
     renderLearn();
     pile.appendChild(el('div', 'stat', T.stat(done, Math.max(0, pend))));
   }
@@ -124,6 +146,7 @@
     L.slice().reverse().forEach(function (x) { var d = el('div', 'lrn'); var b = el('b', null, x.term); if (TTS) b.appendChild(spk(x.term, T.listenWord)); d.appendChild(b); d.appendChild(el('span', null, x.meaning)); learnEl.appendChild(d); });
   }
   function crumb(parent) {
+    if (S.parts && S.parts.length > 1) parent.appendChild(el('p', 'ptag', (S.part === S.parts.length - 1 ? T.lastPart(S.parts.length) : T.partOf(S.part + 1, S.parts.length)) + ' · ' + S.topic));
     var c = el('p', 'crumb'); S.stack.forEach(function (f, i) { if (i) c.appendChild(document.createTextNode(' › ')); var last = i === S.stack.length - 1, b = last ? el('b', null, f.term) : document.createTextNode(f.term); c.appendChild(b); if (last && TTS) c.appendChild(spk(f.term, T.listenWord)); }); parent.appendChild(c);
   }
   function loading(msg) { stopSpeech(); main.textContent = ''; var p = el('p', 'muted'); p.appendChild(el('span', 'spin')); p.appendChild(document.createTextNode(msg)); main.appendChild(p); }
@@ -145,16 +168,42 @@
     Object.keys(T.lv).forEach(function (k) { var b = el('button', 'lv'); b.type = 'button'; b.setAttribute('aria-pressed', k === lvl ? 'true' : 'false'); b.appendChild(el('b', null, T.lv[k][0])); b.appendChild(el('span', null, T.lv[k][1])); b.onclick = function () { lvl = k; [].forEach.call(box.children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); }; box.appendChild(b); });
     form.appendChild(box);
     var go = el('button', 'btn', T.go); go.type = 'button'; form.appendChild(go); main.appendChild(hero); main.appendChild(form);
-    var saved = null; try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
-    if (saved && saved.stack && saved.stack.length) { var r = el('button', 'btn ghost', T.resume(saved.topic)); r.style.marginLeft = '10px'; r.onclick = function () { S = saved; track('prf_resumed', {}); next(); }; form.appendChild(r); }
-    var run = function () { var t = inp.value.trim(); if (t.length < 2) { inp.focus(); return; } S = { topic: t, level: lvl, stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1 }; track('prf_start', { level: lvl }); pushFrame(t, '', null); };
+    library();
+    var run = function () { var t = inp.value.trim(); if (t.length < 2) { inp.focus(); return; } track('prf_start', { level: lvl }); begin(t, lvl); };
     go.onclick = run; inp.onkeydown = function (e) { if (e.key === 'Enter') run(); }; inp.focus();
+  }
+
+  function library() {
+    var list = libAll(); if (!list.length) return;
+    var box = el('div', 'lib'); box.appendChild(el('h3', null, T.myTopics));
+    list.forEach(function (x) {
+      var row = el('div', 'libitem'), info = el('div', 'li-info'), n = (x.parts || [x.topic]).length;
+      info.appendChild(el('b', null, x.topic));
+      info.appendChild(el('span', null, (T.lv[x.level] ? T.lv[x.level][0] : '') + ' · ' + (x.status === 'done' ? T.doneTag : T.progT((x.part || 0) + 1, n))));
+      if (x.status !== 'done' && n > 1) { var pb = el('div', 'pbar'), pi = el('i'); pi.style.width = Math.round((x.part || 0) / n * 100) + '%'; pb.appendChild(pi); info.appendChild(pb); }
+      row.appendChild(info);
+      var act = el('div', 'li-act'), go = el('button', 'btn small', x.status === 'done' ? T.viewT : T.contT); go.type = 'button';
+      go.onclick = function () { S = x; S.parts = S.parts || [S.topic]; S.part = S.part || 0; track('prf_resumed', { done: x.status === 'done' }); if (x.status === 'done') done(true); else if (S.stack.length) next(); else pushFrame(S.parts[S.part], '', null); };
+      var del = el('button', 'btn ghost small', T.delT); del.type = 'button';
+      del.onclick = function () { if (del.dataset.sure) { libDel(x.id); start(); return; } del.dataset.sure = '1'; del.textContent = T.sureT; setTimeout(function () { delete del.dataset.sure; del.textContent = T.delT; }, 3000); };
+      act.appendChild(go); act.appendChild(del); row.appendChild(act); box.appendChild(row);
+    });
+    main.appendChild(box);
+  }
+  function begin(t, lvl) {
+    loading(T.loadO(t));
+    fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'outline', anonId: ANON, lang: LANG, topic: t, level: lvl }) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.parts || !j.parts.length) throw new Error(j.error || 'http'); return j; }); })
+      .then(function (o) {
+        S = { id: newId(), topic: o.topic || t, level: lvl, parts: o.parts, part: 0, status: 'active', created: Date.now(), stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1 };
+        track('prf_outline', { level: lvl, parts: o.parts.length }); save(); pushFrame(S.parts[0], '', null);
+      }).catch(function () { fail(function () { begin(t, lvl); }); });
   }
 
   function pushFrame(term, parent, why, nodeId) {
     loading(T.loadQ(term));
     getCloze(term, parent, 0, []).then(function (c) {
-      var shown = (c.term && String(c.term).trim()) || term; if (nodeId == null) { nodeId = node(shown, null).id; if (!S.stack.length) S.topic = shown; } else if (S.nodes[nodeId]) S.nodes[nodeId].term = shown;
+      var shown = (c.term && String(c.term).trim()) || term; if (nodeId == null) { nodeId = node(shown, null).id; } else if (S.nodes[nodeId]) S.nodes[nodeId].term = shown;
       setStatus(nodeId, 'active'); S.stack.push({ term: shown, parent: parent || '', nodeId: nodeId, cloze: c, pending: [], tries: 0, why: why || '', seen: [c.text] });
       S.maxDepth = Math.max(S.maxDepth, S.stack.length); save(); ask();
     }).catch(function () { fail(function () { pushFrame(term, parent, why, nodeId); }); });
@@ -182,13 +231,14 @@
     var res = f.cloze.blanks.map(function (b) { var inp = inputs.filter(function (i) { return Number(i.dataset.n) === b.n; })[0], given = inp ? inp.value : ''; return { b: b, given: given, right: isRight(given, b.answers) }; });
     S.rounds++; var wrong = res.filter(function (r) { return !r.right; });
     if (!wrong.length) { track('prf_cloze_ok', { depth: S.stack.length, tries: f.tries }); res.forEach(function (r) { learn(r.b.answers[0], r.b.meaning); }); learn(f.term, ''); success(f, res); return; }
-    f.tries++; f.pending = wrong.map(function (r) { var k = norm(r.b.answers[0]), n = S.nodes.filter(function (x) { return x.parentId === f.nodeId && norm(x.term) === k; })[0] || node(r.b.answers[0], f.nodeId); n.status = 'pending'; return { answer: r.b.answers[0], meaning: r.b.meaning, nodeId: n.id }; }); save(); track('prf_cloze_fail', { depth: S.stack.length, wrong: wrong.length, of: res.length });
+    f.tries++; f.pending = wrong.map(function (r) { var k = norm(r.b.answers[0]), n = S.nodes.filter(function (x) { return x.parentId === f.nodeId && norm(x.term) === k; })[0] || node(r.b.answers[0], f.nodeId); n.status = 'pending'; return { answer: r.b.answers[0], meaning: r.b.meaning, nodeId: n.id, crucial: r.b.crucial !== false }; }); save(); track('prf_cloze_fail', { depth: S.stack.length, wrong: wrong.length, of: res.length });
     res.filter(function (r) { return r.right; }).forEach(function (r) { learn(r.b.answers[0], r.b.meaning); });
     feedback(f, res); prefetch(f);
   }
   function learn(term, meaning) { var k = norm(term); if (!k) return; if (!S.learned.some(function (x) { return norm(x.term) === k; })) S.learned.push({ term: term, meaning: meaning || '' }); else if (meaning) S.learned.forEach(function (x) { if (norm(x.term) === k && !x.meaning) x.meaning = meaning; }); }
   function canDescend(f, w) {
-    var k = norm(w.answer); if (S.stack.length >= MAX_DEPTH) return false; if ((S.taught[k] || 0) >= MAX_TAUGHT) return false;
+    var k = norm(w.answer); if (w.crucial === false) return false;   // palabra no clave para el tema central: se explica, no se profundiza
+    if (S.stack.length >= MAX_DEPTH) return false; if ((S.taught[k] || 0) >= MAX_TAUGHT) return false;
     return !S.stack.some(function (x) { return norm(x.term) === k; });
   }
   function prefetch(f) { if (f.pending[0] && canDescend(f, f.pending[0])) getCloze(f.pending[0].answer, f.term, 0, []).catch(function () {}); }
@@ -208,18 +258,26 @@
     var bar = ttsBar(function () { return plain(f, res); }); if (bar) main.appendChild(bar);
     main.appendChild(filled(f, res));
     wrong.forEach(function (r) { var d = el('p', 'mean'); d.appendChild(el('b', null, r.b.answers[0])); if (TTS) d.appendChild(spk(r.b.answers[0], T.listenWord)); d.appendChild(document.createTextNode(': ' + r.b.meaning)); main.appendChild(d); });
-    var first = f.pending[0], desc = canDescend(f, first);
-    main.appendChild(el('p', 'muted small', desc ? T.nowAbout(first.answer, f.pending.length - 1) : T.seen));
+    f.pending.sort(function (a, b) { return (b.crucial !== false) - (a.crucial !== false); });   // primero las palabras clave
+    var allMinor = f.pending.every(function (w) { return w.crucial === false; });
+    if (allMinor) { f.pending.forEach(function (w) { setStatus(w.nodeId, 'done'); }); f.pending = []; track('prf_minor', {}); }   // su significado ya se ve arriba: se reintenta sin bajar
+    save(); var first = f.pending[0], desc = !!first && canDescend(f, first);
+    main.appendChild(el('p', 'muted small', desc ? T.nowAbout(first.answer, f.pending.length - 1) : allMinor ? T.minorSeen : T.seen));
     var b = el('button', 'btn', desc ? T.understand(first.answer) : T.tryAgain); b.onclick = next; main.appendChild(b); b.focus();
   }
   function success(f, res) {
-    stopSpeech(); main.textContent = ''; crumb(main);
-    var isRoot = S.stack.length === 1;
-    main.appendChild(el('h2', null, isRoot ? T.win : T.okBack));
+    stopSpeech(); renderPile(); main.textContent = ''; crumb(main);
+    var isRoot = S.stack.length === 1, more = isRoot && S.part < S.parts.length - 1;
+    main.appendChild(el('h2', null, more ? T.partWin(S.part + 1, S.parts.length) : isRoot ? T.win : T.okBack));
     var bar = ttsBar(function () { return plain(f, res); }); if (bar) main.appendChild(bar);
     main.appendChild(filled(f, res));
-    var b = el('button', 'btn', isRoot ? T.seeLearned : T.backTo(S.stack[S.stack.length - 2].term));
-    b.onclick = function () { setStatus(f.nodeId, 'done'); S.stack.pop(); track('prf_return', { depth: S.stack.length }); save(); if (isRoot) done(); else next(); }; main.appendChild(b); b.focus();
+    var b = el('button', 'btn', more ? T.nextPart(S.part + 2, S.parts.length) : isRoot ? T.seeLearned : T.backTo(S.stack[S.stack.length - 2].term));
+    if (more) { S.part++; getCloze(S.parts[S.part], '', 0, []).catch(function () {}); S.part--; }   // la siguiente parte se prepara mientras lee
+    b.onclick = function () {
+      setStatus(f.nodeId, 'done'); S.stack.pop(); track('prf_return', { depth: S.stack.length }); save();
+      if (more) { S.part++; S.taught = {}; track('prf_part_done', { part: S.part, of: S.parts.length }); save(); pushFrame(S.parts[S.part], '', null); }
+      else if (isRoot) done(); else next();
+    }; main.appendChild(b); b.focus();
   }
 
   /* ---------- motor de la pila ---------- */
@@ -240,17 +298,17 @@
   function explain(f, w) {
     stopSpeech(); renderPile(); main.textContent = ''; crumb(main);
     var h = el('h2', null, w.answer); if (TTS) h.appendChild(spk(w.answer, T.listenWord)); main.appendChild(h); main.appendChild(el('p', null, w.meaning));
-    main.appendChild(el('p', 'muted small', T.explainNote));
+    main.appendChild(el('p', 'muted small', w.crucial === false ? T.minorNote(S.topic) : T.explainNote));
     var b = el('button', 'btn', T.cont); b.onclick = next; main.appendChild(b); b.focus();
   }
-  function done() {
-    stopSpeech(); track('prf_done', { rounds: S.rounds, depth: S.maxDepth, learned: S.learned.length }); clear(); renderPile(); learnEl.classList.remove('on'); pile.classList.remove('on'); document.body.classList.add('fin'); main.textContent = '';
+  function done(review) {
+    stopSpeech(); if (!review) { track('prf_done', { rounds: S.rounds, depth: S.maxDepth, learned: S.learned.length, parts: S.parts.length }); S.status = 'done'; S.stack = []; S.nodes = []; save(); } renderPile(); learnEl.classList.remove('on'); pile.classList.remove('on'); document.body.classList.add('fin'); main.textContent = '';
     main.appendChild(el('h2', null, T.doneT(S.topic)));
     main.appendChild(el('p', 'muted', T.doneS(S.rounds, S.maxDepth, S.learned.length)));
     var withM = S.learned.filter(function (x) { return x.meaning; });
     if (withM.length) { main.appendChild(el('p', null, T.recap)); var ul = el('ul', 'recap'); withM.forEach(function (x) { var li = el('li'); li.appendChild(el('b', null, x.term)); if (TTS) li.appendChild(spk(x.term, T.listenWord)); li.appendChild(document.createTextNode(': ' + x.meaning)); ul.appendChild(li); }); main.appendChild(ul); }
-    var row = el('div', 'row'), again = el('button', 'btn', T.again); again.onclick = start; row.appendChild(again);
-    var up = el('button', 'btn ghost', T.harder); up.onclick = function () { var t = S.topic, nl = S.level === 'beginner' ? 'intermediate' : 'advanced'; S = { topic: t, level: nl, stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1 }; document.body.classList.remove('fin'); pushFrame(t, '', null); }; if (S.level !== 'advanced') row.appendChild(up);
+    var row = el('div', 'row'), again = el('button', 'btn', T.again); again.onclick = function () { document.body.classList.remove('fin'); start(); }; row.appendChild(again);
+    var up = el('button', 'btn ghost', T.harder); up.onclick = function () { var t = S.topic, nl = S.level === 'beginner' ? 'intermediate' : 'advanced'; document.body.classList.remove('fin'); track('prf_start', { level: nl, harder: true }); begin(t, nl); }; if (S.level !== 'advanced') row.appendChild(up);
     main.appendChild(row);
   }
 

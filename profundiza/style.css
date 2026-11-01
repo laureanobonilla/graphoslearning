@@ -55,8 +55,8 @@ p{margin:0 0 12px}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
 .btn:focus-visible,.lv:focus-visible,input:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 45%,transparent);outline-offset:2px}
 .field{width:100%;font:500 1.15rem 'Newsreader',serif;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:0 0 14px}
-.lvs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 16px}
-.lv{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
+.lvs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0 0 16px}
+.lv{min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:left;color:var(--ink);font:inherit;cursor:pointer}
 .lv b{display:block}
 .lv span{font-size:.8rem;color:var(--muted)}
 .lv[aria-pressed=true]{border-color:var(--primary);box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 25%,transparent)}
@@ -98,3 +98,19 @@ p{margin:0 0 12px}
 .langs{margin:22px 0 0;font-size:.9rem;color:var(--muted)}
 .langs a{color:var(--muted);margin-right:12px;text-decoration:none;border-bottom:1px solid var(--line)}
 .langs a[aria-current]{color:var(--ink);border-bottom-color:var(--primary);font-weight:600}
+/* partes del tema */
+.parts{margin:0 0 14px}
+.parts b{display:block;font-size:.88rem;margin:0 0 5px}
+.pbar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px}
+.pbar i{display:block;height:100%;background:var(--primary);border-radius:3px}
+.ptag{font-size:.8rem;font-weight:600;color:var(--primary);margin:0 0 4px}
+/* tus temas */
+.lib{margin-top:26px}
+.lib h3{font:600 .8rem 'Instrument Sans';letter-spacing:.02em;color:var(--muted);margin:0 0 10px}
+.libitem{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 8px}
+.li-info{flex:1 1 200px;min-width:0}
+.li-info b{display:block;font-family:'Newsreader',serif;font-size:1.1rem;font-weight:600}
+.li-info span{color:var(--muted);font-size:.85rem}
+.li-act{display:flex;gap:8px}
+.btn.small{padding:8px 14px;font-size:.88rem}
+@media (max-width:520px){.lvs{grid-template-columns:1fr}.lv{display:flex;justify-content:space-between;align-items:baseline;gap:10px}}
