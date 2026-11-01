@@ -81,6 +81,68 @@ Tu trabajo es escribir el INFORME FORENSE que lo justifica. Es lo que la persona
 - Español neutro latinoamericano, tuteando al lector («tu ceja», «tu mirada»). Si hay varias personas, analiza la cara más grande.
 - Si no hay rostro humano, si parece menor de 18 años o si hay desnudez o violencia, marca safety y llena el resto con textos mínimos.`;
 
+// Respaldo 1: sin foto (la IA escribe un informe divertido pero sin detalles de la foto).
+const PROMPT_SIN_FOTO = (si) => PROMPT(si) + `
+
+IMPORTANTE: esta vez NO tienes la foto. No describas rasgos concretos. Usa zonas genéricas de cualquier selfie
+(«La mirada», «Las cejas», «La comisura de la boca», «El ángulo de la selfie») y escribe como si las hubieras medido.
+En safety pon todo en false.`;
+
+// Respaldo 2: informes ya escritos, por si la IA no responde de ninguna forma.
+const PLANTILLAS = {
+    si: [{
+        titulo: 'Expediente de fastidio facial en reposo',
+        hallazgos: [
+            { zona: 'El entrecejo', observacion: 'Pliegue central de 3,2 mm que se mantiene incluso en momentos felices. El comité lo considera preocupante.' },
+            { zona: 'La mirada', observacion: 'Fija y evaluadora. El sujeto ya calificó con una estrella a quien le tomó la foto.' },
+            { zona: 'La comisura de la boca', observacion: 'Inclinada 7 grados hacia abajo, posición típica de un «ajá» sarcástico contenido.' },
+            { zona: 'El ángulo de la selfie', observacion: 'Tomada desde abajo: el sujeto mira al mundo como si el mundo le debiera plata.' }
+        ],
+        diagnostico: 'Cara de culo confirmada. El caso no es grave: la cara está así, pero por dentro hay una persona que sí se ríe de vez en cuando.',
+        pronostico: 'Esta semana alguien te preguntará «¿estás bravo?» cuando no lo estés. Al menos dos veces.',
+        recomendacion: 'Sonreír 10 segundos frente al espejo cada mañana, sobre todo si se siente ridículo.',
+        otrasCaras: ['que te despertaron temprano un domingo', 'que leíste el chat de la familia', 'que no te gusta el café de la oficina']
+    }, {
+        titulo: 'Informe de indignación facial acumulada',
+        hallazgos: [
+            { zona: 'Las cejas', observacion: 'Elevadas un 14% por encima de lo socialmente aceptable. Patrón de quien revisa la factura dos veces.' },
+            { zona: 'La nariz', observacion: 'Ligeramente arrugada, como quien detecta que alguien se comió su almuerzo de la refri.' },
+            { zona: 'La mandíbula', observacion: 'Tensión compatible con 4 días esperando que alguien le conteste un mensaje.' },
+            { zona: 'La pose', observacion: 'El sujeto posa como quien está a punto de pedir hablar con el gerente.' }
+        ],
+        diagnostico: 'Índice de culez: 91%. No es mala persona, simplemente sabe cómo deberían hacerse las cosas y nadie le hace caso.',
+        pronostico: 'En los próximos días dirá «no es por molestar» y va a ser por molestar.',
+        recomendacion: 'Aceptar un pedido en un restaurante tal cual llegue. Repetir 3 veces por semana.',
+        otrasCaras: ['que revisas la cuenta con calculadora', 'que dejas reseñas largas', 'que pides hablar con el gerente']
+    }],
+    no: [{
+        titulo: 'Informe de ausencia de culez facial',
+        hallazgos: [
+            { zona: 'La mirada', observacion: 'Brillo de quien acaba de recordar una anécdota que no viene al caso. Incompatible con cara de culo.' },
+            { zona: 'La comisura de la boca', observacion: 'Curvatura positiva de 9 grados. El sujeto se ríe de sus propios chistes antes de terminarlos.' },
+            { zona: 'Las cejas', observacion: 'Relajadas y disponibles. Nivel de indignación por debajo del 12%.' },
+            { zona: 'El ángulo de la selfie', observacion: 'Tomada de frente y sin miedo: el sujeto no tiene nada que esconder, salvo quizás unos audios de 7 minutos.' }
+        ],
+        diagnostico: 'El sujeto NO tiene cara de culo. Tiene cara de alguien que saluda a todo el mundo en el súper.',
+        pronostico: 'Esta semana alguien le va a contar sus problemas sin que se lo pida.',
+        recomendacion: 'Seguir así, pero practicar una cara seria para cuando haya que cobrar plata.',
+        otrasCaras: ['que pones audios de 7 minutos', 'que saludas a todo el mundo en el súper', 'que dices «ya me voy» y te quedas una hora']
+    }, {
+        titulo: 'Expediente de simpatía facial crónica',
+        hallazgos: [
+            { zona: 'Los ojos', observacion: 'Abiertos al 94%: el sujeto está siempre listo para un chisme.' },
+            { zona: 'La sonrisa', observacion: 'Presente incluso cuando no sonríe. El comité tuvo que revisarlo dos veces.' },
+            { zona: 'La frente', observacion: 'Sin pliegues de fastidio. El sujeto perdona rápido, aunque nunca olvida.' },
+            { zona: 'La pose', observacion: 'Postura de quien aplaude cuando aterriza el avión.' }
+        ],
+        diagnostico: 'Cara de culo descartada con alta certeza. Lo que tiene es cara de buena gente, que a veces es peor porque todo el mundo le pide favores.',
+        pronostico: 'Le van a pedir prestado algo que no le van a devolver.',
+        recomendacion: 'Aprender a decir «no» frente al espejo. Empezar con cosas pequeñas.',
+        otrasCaras: ['que prestas plata y no la cobras', 'que aplaudes cuando aterriza el avión', 'que te ríes antes de terminar el chiste']
+    }]
+};
+const plantilla = (si) => { const l = PLANTILLAS[si ? 'si' : 'no']; return { certeza: 82 + require('crypto').randomInt(15), informe: JSON.parse(JSON.stringify(l[require('crypto').randomInt(l.length)])) }; };
+
 const clean = (s, max) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 function normalizar(d) {
     const inf = d.informe || {};
@@ -107,4 +169,4 @@ function aviso(asunto, texto) {
         body: JSON.stringify({ from: 'Graphikosmos <onboarding@resend.dev>', to: [process.env.FEEDBACK_TO_EMAIL || 'bonillapretiz@gmail.com'], subject: asunto, text: texto }) }).catch(() => {});
 }
 
-module.exports = { sortear, PRICE_USD, MAX_PER_DAY, MAX_IMG_CHARS, SCHEMA, PROMPT, normalizar, valido, vistaGratis, saveJob, getJob, countToday, aviso, json, UUID_RE, countryOf, ipOf, hashIp };
+module.exports = { PROMPT_SIN_FOTO, plantilla, sortear, PRICE_USD, MAX_PER_DAY, MAX_IMG_CHARS, SCHEMA, PROMPT, normalizar, valido, vistaGratis, saveJob, getJob, countToday, aviso, json, UUID_RE, countryOf, ipOf, hashIp };

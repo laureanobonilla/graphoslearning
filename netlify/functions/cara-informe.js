@@ -7,6 +7,6 @@ exports.handler = async (event) => {
     try {
         const job = await core.getJob(jobId);
         if (!job) return core.json(404, { error: 'No existe.' });
-        return core.json(200, job.paid ? { ...core.vistaGratis(job), informe: job.informe } : core.vistaGratis(job));
+        return core.json(200, job.paid ? { ...core.vistaGratis(job), informe: (({ fuente, fallaIA, ...x }) => x)(job.informe || {}) } : core.vistaGratis(job));
     } catch (e) { console.error('[cara-informe]', e.message); return core.json(502, { error: 'No se pudo leer el informe.' }); }
 };

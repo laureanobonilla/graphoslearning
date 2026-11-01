@@ -5,7 +5,8 @@
 const core = require('./_lib/cara-core');
 const { captureOrder, getOrder } = require('./_lib/paypal');
 
-const entrega = (job) => core.json(200, { ok: true, si: job.veredicto === 'si', certeza: job.certeza, informe: job.informe });
+const limpio = (inf) => { const x = Object.assign({}, inf); delete x.fuente; delete x.fallaIA; return x; };
+const entrega = (job) => core.json(200, { ok: true, si: job.veredicto === 'si', certeza: job.certeza, informe: limpio(job.informe) });
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };

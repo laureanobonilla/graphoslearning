@@ -222,7 +222,7 @@ var state = { cfg: null, demo: false, jobId: null, res: null, foto: null, count:
 var anonId = (function () { try { var id = localStorage.getItem('tc_anon_id'); if (!id) { id = crypto.randomUUID(); localStorage.setItem('tc_anon_id', id); } return id; } catch (e) { return 'v-' + Date.now() + Math.random().toString(36).slice(2); } })();
 var REF = (function () { var c = function (v) { return String(v || '').replace(/[^\w.\-]/g, '').slice(0, 40); }; try { var q = new URLSearchParams(location.search); var r = c(q.get('ref') || q.get('utm_campaign') || q.get('c')); if (r) sessionStorage.setItem('cara_ref', r); return r || c(sessionStorage.getItem('cara_ref')); } catch (e) { return ''; } })();
 function track(ev, meta) { if (state.demo) return; try { fetch(FN + 'sfc-track-event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event: ev, anonId: anonId, app: APP, metadata: Object.assign({}, meta || {}, REF ? { campaign: REF } : {}) }) }).catch(function () {}); } catch (e) {} }
-function post(name, body) { return fetch(FN + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw Object.assign(new Error(d.error || 'El laboratorio no responde en este momento. Inténtalo otra vez en un minuto.'), { status: r.status }); return d; }); }); }
+function post(name, body) { return fetch(FN + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw Object.assign(new Error(d.error || 'El laboratorio no responde en este momento. Inténtalo otra vez en un minuto.'), { status: r.status, codigo: d.codigo || (d.error ? null : 'sin_respuesta_' + r.status) }); return d; }); }); }
 var newId = function () { return crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-8000-' + String(Date.now()).padStart(12, '0'); };
 
 // ---------- Píxeles de anuncios ----------
@@ -288,10 +288,10 @@ async function analizar(file) {
     }
     parar(); state.res = r;
     try { localStorage.setItem('cara_ultimo', state.jobId); } catch (e) {}
-    track('verdict_ok', { n: state.count, ms: Date.now() - t0 });
+    track('verdict_ok', { n: state.count, ms: Date.now() - t0, fuente: r.fuente || null });
     px('ViewContent', { content_name: 'veredicto' });
     await mostrarResultado();
-  } catch (e) { parar(); track('verdict_fail', { status: e.status || 0 }); fallo(e.status ? e.message : 'Se cortó la conexión. Inténtalo otra vez.'); }
+  } catch (e) { parar(); track('verdict_fail', { status: e.status || 0, codigo: e.codigo || null, msg: String(e.message || '').slice(0, 80) }); fallo(e.status ? e.message : 'Se cortó la conexión. Inténtalo otra vez.'); }
 }
 function espera(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 function fallo(t) { $('errTxt').textContent = t; ver('vError'); }
@@ -345,6 +345,7 @@ async function mostrarResultado() {
   $('informe').classList.add('is-hidden'); $('muro').classList.remove('is-hidden', 'recuperando'); $('tarjeta').classList.remove('is-hidden'); document.querySelector('#vResultado .fila').classList.remove('is-hidden'); $('paypalBox').classList.remove('is-hidden'); $('payRetry').classList.add('is-hidden');
   ver('vResultado');
   if (r.paid && r.informe) mostrarInforme(r);
+  else if (r.pagable === false) { $('muro').classList.add('is-hidden'); }
   else { track('paywall_viewed', {}); pintarPago(); }
 }
 
