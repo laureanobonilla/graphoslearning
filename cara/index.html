@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>¿De qué tienes cara?</title>
+<meta name="description" content="Sube tu selfie y la ciencia te dice de qué tienes cara. Sin piedad.">
+<meta property="og:title" content="¿De qué tienes cara?">
+<meta property="og:description" content="Sube tu selfie y la ciencia te dice de qué tienes cara. Sin piedad.">
+<meta property="og:image" content="/cara/og.png">
+<meta name="theme-color" content="#16130F">
+<link rel="manifest" href="/cara/manifest.webmanifest">
+<link rel="icon" href="/cara/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/cara/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Laboratorio de broma: papel de expediente, tinta negra y sello rojo de goma. */
+:root{
+  --papel:#F4EFE3; --papel2:#EAE2D0; --tinta:#16130F; --suave:#6B6253; --linea:#D6CBB4;
+  --rojo:#E5352B; --amarillo:#FFD23F; --verde:#1FA855; --blanco:#FFFDF8;
+  --display:'Bricolage Grotesque',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'Space Mono',ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --papel:#16130F; --papel2:#221E18; --tinta:#F4EFE3; --suave:#B3A893; --linea:#3A3329; --blanco:#1D1914; color-scheme:dark}}
+:root[data-theme="dark"]{--papel:#16130F; --papel2:#221E18; --tinta:#F4EFE3; --suave:#B3A893; --linea:#3A3329; --blanco:#1D1914; color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--papel);color:var(--tinta);font:16px/1.5 var(--display);min-height:100dvh;
+  padding:max(14px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
+  -webkit-tap-highlight-color:transparent}
+.wrap{max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.is-hidden{display:none!important}
+.lab{font:700 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--suave);display:flex;align-items:center;gap:8px;justify-content:center}
+.lab i{width:8px;height:8px;border-radius:50%;background:var(--rojo);box-shadow:0 0 0 3px color-mix(in srgb,var(--rojo) 25%,transparent);animation:late 1.4s ease-in-out infinite}
+@keyframes late{50%{opacity:.35}}
+h1{font-weight:800;font-size:clamp(2.6rem,13vw,3.9rem);line-height:.92;letter-spacing:-.035em;margin:4px 0 0;text-align:center;text-wrap:balance}
+h1 em{font-style:normal;color:var(--rojo)}
+.ticker{height:1.6em;overflow:hidden;text-align:center;font:400 15px/1.6 var(--mono);color:var(--suave)}
+.ticker span{display:block;animation:sube .45s ease-out}
+.ticker b{color:var(--tinta)}
+@keyframes sube{from{transform:translateY(100%);opacity:0}}
+
+/* El botón gigante: toda la zona es el selector de foto */
+.subir{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;aspect-ratio:1;width:min(100%,340px);margin:6px auto 0;
+  border-radius:50%;background:var(--tinta);color:var(--papel);cursor:pointer;
+  box-shadow:0 0 0 10px var(--papel),0 0 0 12px var(--tinta),0 22px 50px -18px rgba(0,0,0,.55);transition:transform .15s}
+.subir:active{transform:scale(.97)}
+.subir:focus-within{outline:4px solid var(--amarillo);outline-offset:14px}
+.subir input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.subir svg{width:44%;height:auto}
+.subir .cta{font-weight:800;font-size:1.45rem;letter-spacing:-.01em}
+.subir .cta2{font:400 13px var(--mono);opacity:.75;margin-top:-6px}
+.subir::after{content:"";position:absolute;inset:-12px;border-radius:50%;border:2px dashed var(--rojo);animation:gira 18s linear infinite;pointer-events:none}
+@keyframes gira{to{transform:rotate(360deg)}}
+.letra{font:400 12.5px/1.5 var(--mono);color:var(--suave);text-align:center;margin:4px 0 0;text-wrap:balance}
+.ultimo{background:none;border:0;color:var(--tinta);text-decoration:underline;font:700 14px var(--display);cursor:pointer;padding:6px}
+
+/* Analizando */
+.escaner{position:relative;width:min(100%,340px);aspect-ratio:1;margin:8px auto 0;border-radius:24px;overflow:hidden;background:var(--papel2);border:3px solid var(--tinta)}
+.escaner img{width:100%;height:100%;object-fit:cover;filter:grayscale(.35) contrast(1.05)}
+.escaner .linea{position:absolute;left:0;right:0;height:3px;background:var(--rojo);box-shadow:0 0 18px 4px color-mix(in srgb,var(--rojo) 55%,transparent);animation:barre 1.6s ease-in-out infinite alternate}
+@keyframes barre{from{top:4%}to{top:94%}}
+.escaner .puntos{position:absolute;inset:0}
+.escaner .puntos i{position:absolute;width:9px;height:9px;margin:-4px;border:2px solid var(--amarillo);border-radius:50%;opacity:0;animation:punto 2.4s ease-in-out infinite}
+@keyframes punto{20%,60%{opacity:1}80%{opacity:0}}
+.msg{font:700 14px/1.4 var(--mono);text-align:center;min-height:2.8em;margin:0}
+.barra{height:6px;background:var(--papel2);border-radius:9px;overflow:hidden}
+.barra i{display:block;height:100%;width:0;background:var(--tinta);transition:width .6s ease}
+
+/* Resultado */
+.tarjeta{width:100%;border-radius:18px;display:block;box-shadow:0 18px 40px -20px rgba(0,0,0,.6);background:var(--papel2);aspect-ratio:4/5}
+.fila{display:flex;gap:10px}
+.btn{flex:1;min-height:54px;border-radius:16px;border:0;font:800 1.05rem var(--display);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;padding:0 14px}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible{outline:3px solid var(--amarillo);outline-offset:3px}
+.btn.compartir{background:var(--verde);color:#fff}
+.btn.amigo{background:var(--tinta);color:var(--papel)}
+.btn.sec{background:transparent;color:var(--tinta);border:2px solid var(--linea)}
+.btn svg{width:20px;height:20px}
+
+.muro{background:var(--blanco);border:2px solid var(--tinta);border-radius:20px;padding:18px 16px 16px;display:flex;flex-direction:column;gap:12px;position:relative}
+.muro h2{margin:0;font-weight:800;font-size:1.5rem;line-height:1.05;letter-spacing:-.02em;text-wrap:balance}
+.muro h2 span{color:var(--rojo)}
+.muro .sub{margin:-4px 0 0;color:var(--suave);font-size:.95rem}
+.zonas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.zonas li{border-top:1px dashed var(--linea);padding-top:8px}
+.zonas b{font:700 12px var(--mono);text-transform:uppercase;letter-spacing:.08em;display:block}
+.zonas span{display:block;filter:blur(5px);user-select:none;color:var(--suave);font-size:.95rem;line-height:1.35}
+.precio{display:flex;align-items:baseline;justify-content:space-between;gap:10px;border-top:2px solid var(--tinta);padding-top:12px}
+.precio b{font-weight:800;font-size:1.9rem;letter-spacing:-.02em}
+.precio small{font:400 12px var(--mono);color:var(--suave);text-align:right}
+#paypalBox{background:#fff;border-radius:14px;padding:10px;min-height:56px}
+.err{color:var(--rojo);font-weight:700;margin:0}
+.sello{position:absolute;top:-14px;right:12px;transform:rotate(7deg);font:700 11px var(--mono);letter-spacing:.12em;color:var(--rojo);border:2px solid var(--rojo);border-radius:6px;padding:3px 8px;background:var(--blanco)}
+
+/* Informe pagado */
+.expediente{background:var(--blanco);border:2px solid var(--tinta);border-radius:6px;padding:20px 18px;font-family:var(--mono);font-size:14px;line-height:1.55;position:relative;
+  background-image:repeating-linear-gradient(transparent 0 27px,color-mix(in srgb,var(--linea) 55%,transparent) 27px 28px)}
+.expediente .num{font-size:11px;letter-spacing:.14em;color:var(--suave);text-transform:uppercase;margin:0}
+.expediente h3{font:800 1.45rem/1.1 var(--display);margin:6px 0 12px;letter-spacing:-.01em;padding-right:84px}
+.expediente h4{font:700 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;margin:16px 0 4px;color:var(--rojo)}
+.expediente p{margin:0}
+.expediente ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.expediente .ver{font:800 1.25rem/1.15 var(--display);margin:0}
+.expediente .estampa{position:absolute;right:14px;top:16px;transform:rotate(-9deg);color:var(--rojo);border:3px double var(--rojo);border-radius:8px;padding:4px 8px;font:700 12px var(--mono);letter-spacing:.1em;opacity:.85}
+
+.error{background:var(--blanco);border:2px solid var(--rojo);border-radius:18px;padding:18px;text-align:center;display:flex;flex-direction:column;gap:12px}
+.error p{margin:0;font-weight:700}
+.demo{font:400 12px var(--mono);background:var(--amarillo);color:#16130F;border-radius:10px;padding:8px 10px;text-align:center}
+.pie{font:400 11px var(--mono);color:var(--suave);text-align:center;margin-top:6px}
+.pie a{color:inherit}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="demo is-hidden" id="demo">Modo demostración: los veredictos son de ejemplo y el pago es simulado.</div>
+
+  <!-- 1. Portada: un solo toque para empezar -->
+  <section id="vInicio">
+    <div class="lab"><i></i>Laboratorio Nacional de Caras</div>
+    <h1>¿De qué tienes <em>cara</em>?</h1>
+    <div class="ticker" id="ticker" aria-hidden="true"></div>
+    <label class="subir" id="subir">
+      <input type="file" accept="image/*" id="foto" aria-label="Sube tu selfie">
+      <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true">
+        <ellipse cx="60" cy="62" rx="36" ry="44" stroke-dasharray="7 9"/>
+        <path d="M44 52h7M69 52h7"/><path d="M47 79c8 6 18 6 26 0"/>
+        <path d="M14 30V18a4 4 0 0 1 4-4h12M106 30V18a4 4 0 0 0-4-4H90M14 90v12a4 4 0 0 0 4 4h12M106 90v12a4 4 0 0 1-4 4H90"/>
+      </svg>
+      <span class="cta">Sube tu selfie</span>
+      <span class="cta2">la ciencia no miente</span>
+    </label>
+    <p class="letra">Solo mayores de 18 · Tu foto no se guarda en ningún lado · Es humor, no te lo tomes a pecho</p>
+    <p style="text-align:center;margin:6px 0 0"><button class="ultimo is-hidden" id="btnUltimo" type="button">Ver mi último informe</button></p>
+  </section>
+
+  <!-- 2. Analizando -->
+  <section id="vAnalisis" class="is-hidden" aria-live="polite">
+    <div class="lab"><i></i>Analizando muestra</div>
+    <div class="escaner"><img id="prev" alt=""><div class="puntos" id="puntos"></div><div class="linea"></div></div>
+    <p class="msg" id="msg">Midiendo la inclinación de tus cejas…</p>
+    <div class="barra"><i id="barra"></i></div>
+  </section>
+
+  <!-- 3. Error -->
+  <section id="vError" class="error is-hidden" role="alert">
+    <p id="errTxt"></p>
+    <button class="btn amigo" type="button" id="btnReintentar">Probar con otra foto</button>
+  </section>
+
+  <!-- 4. Resultado -->
+  <section id="vResultado" class="is-hidden" style="display:flex;flex-direction:column;gap:14px">
+    <img class="tarjeta" id="tarjeta" alt="">
+    <div class="fila">
+      <button class="btn compartir" type="button" id="btnCompartir">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg>
+        Compartir
+      </button>
+      <button class="btn amigo" type="button" id="btnAmigo">Ahora un amigo</button>
+    </div>
+
+    <div class="muro" id="muro">
+      <span class="sello">CONFIDENCIAL</span>
+      <h2>¿Y por qué tienes cara de <span id="muroVer"></span>?</h2>
+      <p class="sub">El laboratorio encontró evidencia en estas zonas de tu foto:</p>
+      <ul class="zonas" id="zonas"></ul>
+      <div class="precio"><b id="precio">US$2.99</b><small>Informe forense completo<br>pago único · PayPal o tarjeta</small></div>
+      <div id="paypalBox"></div>
+      <p class="err is-hidden" id="payErr"></p>
+    </div>
+
+    <div id="informe" class="is-hidden" style="display:flex;flex-direction:column;gap:12px"></div>
+  </section>
+
+  <p class="pie">Entretenimiento. Ningún veredicto es real. <a href="/privacidad/">Privacidad</a></p>
+</div>
+
+<script src="/install.js" defer></script>
+<script>
+(function () {
+'use strict';
+// ====== Anuncios: pega tus IDs aquí. Vacíos = no se carga nada. ======
+var META_PIXEL_ID = '';            // ej. '1234567890' (Píxel de Meta, para anuncios de Facebook/Instagram)
+var GOOGLE_TAG_ID = '';            // ej. 'AW-1234567890'
+var GOOGLE_PURCHASE_SEND_TO = '';  // ej. 'AW-1234567890/AbCdEf' (conversión de compra)
+// ======================================================================
+var APP = 'cara', FN = '/.netlify/functions/', SITE = 'graphoslearning.netlify.app/cara';
+var $ = function (id) { return document.getElementById(id); };
+var state = { cfg: null, demo: false, jobId: null, res: null, foto: null, count: 0, paypalOk: false };
+
+// ---------- Identidad y origen (anuncio / compartido) ----------
+var anonId = (function () { try { var id = localStorage.getItem('tc_anon_id'); if (!id) { id = crypto.randomUUID(); localStorage.setItem('tc_anon_id', id); } return id; } catch (e) { return 'v-' + Date.now() + Math.random().toString(36).slice(2); } })();
+var REF = (function () { var c = function (v) { return String(v || '').replace(/[^\w.\-]/g, '').slice(0, 40); }; try { var q = new URLSearchParams(location.search); var r = c(q.get('ref') || q.get('utm_campaign') || q.get('c')); if (r) sessionStorage.setItem('cara_ref', r); return r || c(sessionStorage.getItem('cara_ref')); } catch (e) { return ''; } })();
+function track(ev, meta) { if (state.demo) return; try { fetch(FN + 'sfc-track-event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event: ev, anonId: anonId, app: APP, metadata: Object.assign({}, meta || {}, REF ? { campaign: REF } : {}) }) }).catch(function () {}); } catch (e) {} }
+function post(name, body) { return fetch(FN + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw Object.assign(new Error(d.error || 'Error ' + r.status), { status: r.status }); return d; }); }); }
+var newId = function () { return crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-8000-' + String(Date.now()).padStart(12, '0'); };
+
+// ---------- Píxeles de anuncios ----------
+function px(ev, data) { try { if (window.fbq) window.fbq('track', ev, data || {}); } catch (e) {} }
+if (META_PIXEL_ID) { !function (f, b, e, v, n, t, s) { if (f.fbq) return; n = f.fbq = function () { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); }; if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0'; n.queue = []; t = b.createElement(e); t.async = !0; t.src = v; s = b.getElementsByTagName(e)[0]; s.parentNode.insertBefore(t, s); }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js'); window.fbq('init', META_PIXEL_ID); window.fbq('track', 'PageView'); }
+if (GOOGLE_TAG_ID) { window.dataLayer = window.dataLayer || []; window.gtag = function () { window.dataLayer.push(arguments); }; var gs = document.createElement('script'); gs.async = true; gs.src = 'https://www.googletagmanager.com/gtag/js?id=' + GOOGLE_TAG_ID; document.head.appendChild(gs); window.gtag('js', new Date()); window.gtag('config', GOOGLE_TAG_ID); }
+
+// ---------- Vistas ----------
+var VISTAS = ['vInicio', 'vAnalisis', 'vError', 'vResultado'];
+function ver(id) { VISTAS.forEach(function (v) { $(v).classList.toggle('is-hidden', v !== id); }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+
+// ---------- Ticker de ejemplos (el gancho de la portada) ----------
+var EJ = ['que debes plata', 'culo', 'que pones audios de 7 minutos', 'que pides hablar con el gerente', 'que dices «ya voy» y no te has bañado', 'que dejas en visto a tu mamá', 'que te comiste el almuerzo ajeno', 'que aplaudes cuando aterriza el avión'];
+var ti = 0; function tick() { var s = document.createElement('span'); s.innerHTML = 'Tienes cara de <b></b>'; s.querySelector('b').textContent = EJ[ti++ % EJ.length]; $('ticker').replaceChildren(s); }
+tick(); setInterval(tick, 2200);
+
+// ---------- Configuración (si no responde el servidor, se usa el modo demostración) ----------
+var cfgP = fetch(FN + 'cara-config', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (d) { state.cfg = d; $('precio').textContent = 'US$' + d.priceUsd; return d; })
+  .catch(function () { state.demo = true; state.cfg = { priceUsd: '2.99', clientId: null }; $('demo').classList.remove('is-hidden'); return state.cfg; });
+cfgP.then(function () { track('landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 160) : null }); });
+
+// ---------- Foto: se reduce en el teléfono antes de mandarla ----------
+function cargarImagen(file) {
+  if (window.createImageBitmap) return createImageBitmap(file, { imageOrientation: 'from-image' }).catch(function () { return viaImg(file); });
+  return viaImg(file);
+}
+function viaImg(file) { return new Promise(function (res, rej) { var i = new Image(), u = URL.createObjectURL(file); i.onload = function () { res(i); }; i.onerror = function () { rej(new Error('decode')); }; i.src = u; }); }
+function aCanvas(img, max) {
+  var w = img.width || img.naturalWidth, h = img.height || img.naturalHeight, k = Math.min(1, max / Math.max(w, h));
+  var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
+}
+
+$('foto').addEventListener('change', function (e) {
+  var f = e.target.files && e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  track('photo_chosen', { kb: Math.round(f.size / 1024), n: state.count });
+  analizar(f);
+});
+
+var MSGS = ['Midiendo la inclinación de tus cejas…', 'Comparando con 4.812 caras de archivo…', 'Detectando indignación acumulada…', 'Calibrando el caramómetro…', 'Consultando al comité de expertos…', 'Redactando el veredicto (sin piedad)…'];
+function animarAnalisis() {
+  var p = $('puntos'); p.innerHTML = '';
+  [[38, 40], [62, 40], [50, 55], [42, 70], [58, 70], [50, 28], [30, 55], [70, 55]].forEach(function (xy, i) { var d = document.createElement('i'); d.style.left = xy[0] + '%'; d.style.top = xy[1] + '%'; d.style.animationDelay = (i * .28) + 's'; p.appendChild(d); });
+  var i = 0, b = 6; $('msg').textContent = MSGS[0]; $('barra').style.width = b + '%';
+  var iv = setInterval(function () { i++; $('msg').textContent = MSGS[i % MSGS.length]; b = Math.min(92, b + (92 - b) * .28); $('barra').style.width = b + '%'; }, 1500);
+  return function () { clearInterval(iv); $('barra').style.width = '100%'; };
+}
+
+async function analizar(file) {
+  var img;
+  try { img = await cargarImagen(file); } catch (e) { return fallo('No pudimos abrir esa foto. Prueba con otra.'); }
+  state.foto = aCanvas(img, 1080);
+  var envio = aCanvas(img, 900);
+  $('prev').src = state.foto.toDataURL('image/jpeg', .8);
+  ver('vAnalisis');
+  var parar = animarAnalisis(), t0 = Date.now();
+  state.jobId = newId(); state.res = null; state.count++;
+  try {
+    await cfgP;
+    var r;
+    if (state.demo) { await espera(3800); r = demoRes(); }
+    else {
+      var b64 = envio.toDataURL('image/jpeg', .85).split(',')[1];
+      r = await post('cara-analizar', { jobId: state.jobId, image: b64, anonId: anonId, ref: REF });
+      var falta = 3200 - (Date.now() - t0); if (falta > 0) await espera(falta);   // que el suspenso dure un poquito
+    }
+    parar(); state.res = r;
+    try { localStorage.setItem('cara_ultimo', state.jobId); } catch (e) {}
+    track('verdict_ok', { n: state.count, ms: Date.now() - t0 });
+    px('ViewContent', { content_name: 'veredicto' });
+    await mostrarResultado();
+    if (state.count >= 2) setTimeout(instalar, 2500);
+  } catch (e) { parar(); track('verdict_fail', { status: e.status || 0 }); fallo(e.status ? e.message : 'Se cortó la conexión. Inténtalo otra vez.'); }
+}
+function espera(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function fallo(t) { $('errTxt').textContent = t; ver('vError'); }
+$('btnReintentar').addEventListener('click', function () { ver('vInicio'); $('foto').click(); });
+
+// ---------- Tarjeta para compartir (con marca de agua) ----------
+function envolver(ctx, txt, maxW) { var pal = txt.split(/\s+/), l = [], cur = ''; pal.forEach(function (w) { var t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { l.push(cur); cur = w; } else cur = t; }); if (cur) l.push(cur); return l; }
+function ajustarTexto(ctx, txt, maxW, maxLines, size, peso) { for (var s = size; s >= 44; s -= 4) { ctx.font = peso + ' ' + s + 'px "Bricolage Grotesque", sans-serif'; var l = envolver(ctx, txt, maxW); if (l.length <= maxLines) return { lines: l, size: s }; } ctx.font = peso + ' 44px "Bricolage Grotesque", sans-serif'; return { lines: envolver(ctx, txt, maxW).slice(0, maxLines), size: 44 }; }
+function fotoCuadrada(ctx, x, y, s, r) {
+  var f = state.foto, k = Math.max(s / f.width, s / f.height), w = f.width * k, h = f.height * k;
+  ctx.save(); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, s, s, r) : ctx.rect(x, y, s, s); ctx.clip();
+  ctx.drawImage(f, x + (s - w) / 2, y + (s - h) / 2.6, w, h); ctx.restore();
+}
+function sello(ctx, x, y, txt, ang, size) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.font = '700 ' + size + 'px "Space Mono", monospace';
+  var w = ctx.measureText(txt).width + size * 1.2, h = size * 1.9;
+  ctx.globalAlpha = .9; ctx.strokeStyle = '#E5352B'; ctx.lineWidth = size * .2; ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.fillStyle = '#E5352B'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 2); ctx.restore();
+}
+async function lienzo() { try { await Promise.all([document.fonts.load('800 80px "Bricolage Grotesque"'), document.fonts.load('700 30px "Space Mono"')]); } catch (e) {} var c = document.createElement('canvas'); c.width = 1080; c.height = 1350; return c; }
+
+async function hacerTarjeta() {
+  var c = await lienzo(), ctx = c.getContext('2d'), r = state.res;
+  ctx.fillStyle = '#F4EFE3'; ctx.fillRect(0, 0, 1080, 1350);
+  fotoCuadrada(ctx, 60, 60, 960, 36);
+  // marca de agua sobre la foto
+  ctx.save(); ctx.font = '700 30px "Space Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 8; ctx.fillText('LAB. NACIONAL DE CARAS', 96, 118); ctx.restore();
+  // veredicto sobre la parte de abajo de la foto, calculado de abajo hacia arriba para que nunca se salga
+  var t = ajustarTexto(ctx, r.veredicto, 880, 3, 104, '800'), lh = t.size * .98, base = 980, y0 = base - (t.lines.length - 1) * lh, ylab = y0 - t.size * .95 - 6;
+  var g = ctx.createLinearGradient(0, ylab - 160, 0, 1020); g.addColorStop(0, 'rgba(22,19,15,0)'); g.addColorStop(.45, 'rgba(22,19,15,.78)'); g.addColorStop(1, 'rgba(22,19,15,.94)');
+  ctx.save(); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(60, 60, 960, 960, 36) : ctx.rect(60, 60, 960, 960); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(60, ylab - 160, 960, 1020 - ylab + 160); ctx.restore();
+  ctx.fillStyle = '#FFD23F'; ctx.font = '700 34px "Space Mono", monospace'; ctx.fillText('TIENES CARA DE', 100, ylab);
+  ctx.font = '800 ' + t.size + 'px "Bricolage Grotesque", sans-serif'; ctx.fillStyle = '#fff';
+  t.lines.forEach(function (l, i) { ctx.fillText(l, 100, y0 + i * lh); });
+  sello(ctx, 830, 1150, 'CERTEZA ' + r.certeza + '%', -.13, 40);
+  ctx.fillStyle = '#16130F'; ctx.font = '800 54px "Bricolage Grotesque", sans-serif'; ctx.fillText('¿De qué tienes cara?', 60, 1140);
+  ctx.font = '400 30px "Space Mono", monospace'; ctx.fillStyle = '#6B6253'; ctx.fillText('La ciencia no miente.', 60, 1192);
+  ctx.fillStyle = '#16130F'; ctx.fillRect(0, 1262, 1080, 88);
+  ctx.fillStyle = '#F4EFE3'; ctx.font = '700 30px "Space Mono", monospace'; ctx.textAlign = 'center'; ctx.fillText(SITE + '  ·  sube tu selfie', 540, 1316); ctx.textAlign = 'left';
+  return c;
+}
+
+async function mostrarResultado() {
+  var r = state.res;
+  var c = await hacerTarjeta(); state.tarjeta = c;
+  $('tarjeta').src = c.toDataURL('image/jpeg', .9); $('tarjeta').alt = 'Tienes cara de ' + r.veredicto;
+  $('muroVer').textContent = r.veredicto;
+  var ul = $('zonas'); ul.innerHTML = '';
+  var relleno = ['La evidencia es contundente y el comité no tuvo dudas al respecto.', 'Se observaron patrones compatibles con el veredicto en tres mediciones.', 'El análisis confirma una tendencia preocupante y sostenida.', 'Los expertos pidieron una segunda opinión y llegaron a lo mismo.'];
+  (r.zonas || []).slice(0, 4).forEach(function (z, i) { var li = document.createElement('li'); li.innerHTML = '<b></b><span></span>'; li.querySelector('b').textContent = z; li.querySelector('span').textContent = relleno[i % 4]; ul.appendChild(li); });
+  $('informe').classList.add('is-hidden'); $('muro').classList.remove('is-hidden');
+  ver('vResultado');
+  if (r.paid && r.informe) mostrarInforme(r);
+  else { track('paywall_viewed', {}); pintarPago(); }
+}
+
+// ---------- Compartir ----------
+function textoCompartir() { return 'Según la ciencia tengo cara de ' + state.res.veredicto + ' 😂 ¿Y tú de qué tienes cara? https://' + SITE + '/?ref=compartido'; }
+async function compartir(canvas, nombre, texto) {
+  track('share_clicked', {});
+  var blob = await new Promise(function (r) { canvas.toBlob(r, 'image/jpeg', .9); });
+  var file = new File([blob], nombre, { type: 'image/jpeg' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: texto }); track('share_done', { modo: 'nativo' }); instalarLuego(); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  // Respaldo: se descarga la imagen y se abre WhatsApp con el texto
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function () { window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener'); }, 600);
+  track('share_done', { modo: 'descarga' }); instalarLuego();
+}
+$('btnCompartir').addEventListener('click', function () { compartir(state.tarjeta, 'mi-cara.jpg', textoCompartir()); });
+$('btnAmigo').addEventListener('click', function () { track('friend_clicked', {}); ver('vInicio'); $('foto').click(); });
+
+// ---------- Cobro (PayPal) ----------
+async function pintarPago() {
+  var box = $('paypalBox'); box.textContent = ''; $('payErr').classList.add('is-hidden');
+  if (state.demo) {
+    var b = document.createElement('button'); b.className = 'btn amigo'; b.style.width = '100%'; b.type = 'button'; b.textContent = 'Simular pago (demo)';
+    b.onclick = async function () { b.disabled = true; b.textContent = 'Procesando…'; await espera(900); mostrarInforme(Object.assign({}, state.res, { informe: state.res._informe })); };
+    box.appendChild(b); return;
+  }
+  var cfg = await cfgP;
+  if (!cfg.clientId) { box.textContent = 'El pago aún no está configurado.'; return; }
+  try {
+    if (!window.paypal) await new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(cfg.clientId) + '&currency=USD'; s.onload = res; s.onerror = function () { rej(new Error('No se pudo cargar PayPal.')); }; document.head.appendChild(s); });
+    var jobId = state.jobId;
+    window.paypal.Buttons({
+      style: { layout: 'vertical', shape: 'pill', label: 'pay', height: 48 },
+      createOrder: async function () { setPayErr(''); track('pay_clicked', {}); px('InitiateCheckout', { value: Number(cfg.priceUsd), currency: 'USD' }); var d = await post('cara-pay-create', { jobId: jobId }); return d.orderID; },
+      onApprove: async function (data) {
+        try {
+          var d = await post('cara-pay-capture', { jobId: jobId, orderID: data.orderID });
+          track('pay_ok', {}); px('Purchase', { value: Number(cfg.priceUsd), currency: 'USD' });
+          if (GOOGLE_PURCHASE_SEND_TO && window.gtag) window.gtag('event', 'conversion', { send_to: GOOGLE_PURCHASE_SEND_TO, value: Number(cfg.priceUsd), currency: 'USD', transaction_id: data.orderID });
+          mostrarInforme(d);
+          setTimeout(instalar, 4000);
+        } catch (e) { setPayErr(e.message); }
+      },
+      onCancel: function () { track('pay_cancel', {}); },
+      onError: function () { setPayErr('PayPal tuvo un problema. Inténtalo de nuevo.'); }
+    }).render('#paypalBox');
+  } catch (e) { setPayErr(e.message); }
+}
+function setPayErr(t) { $('payErr').textContent = t; $('payErr').classList.toggle('is-hidden', !t); }
+
+// ---------- Informe pagado ----------
+function el(tag, txt, cls) { var e = document.createElement(tag); if (txt != null) e.textContent = txt; if (cls) e.className = cls; return e; }
+function mostrarInforme(d) {
+  var inf = d.informe; if (!inf) return;
+  state.res.informe = inf;
+  $('muro').classList.add('is-hidden');
+  var box = $('informe'); box.innerHTML = ''; box.classList.remove('is-hidden');
+  var ex = el('article', null, 'expediente');
+  ex.appendChild(el('span', 'CONFIRMADO', 'estampa'));
+  ex.appendChild(el('p', 'Expediente Nº ' + String(state.jobId || '').slice(0, 6).toUpperCase(), 'num'));
+  ex.appendChild(el('h3', inf.titulo || 'Informe forense facial'));
+  ex.appendChild(el('h4', 'Veredicto'));
+  ex.appendChild(el('p', 'Cara de ' + d.veredicto + ' (certeza ' + d.certeza + '%)', 'ver'));
+  ex.appendChild(el('h4', 'Hallazgos'));
+  var ol = el('ol'); (inf.hallazgos || []).forEach(function (h) { var li = el('li'); li.appendChild(el('b', h.zona + ': ')); li.appendChild(document.createTextNode(h.observacion)); ol.appendChild(li); }); ex.appendChild(ol);
+  ex.appendChild(el('h4', 'Diagnóstico')); ex.appendChild(el('p', inf.diagnostico));
+  ex.appendChild(el('h4', 'Pronóstico')); ex.appendChild(el('p', inf.pronostico));
+  ex.appendChild(el('h4', 'Tratamiento recomendado')); ex.appendChild(el('p', inf.recomendacion));
+  if ((inf.otrasCaras || []).length) { ex.appendChild(el('h4', 'También se detectó cara de')); ex.appendChild(el('p', inf.otrasCaras.join(' · '))); }
+  box.appendChild(ex);
+  var f = el('div', null, 'fila');
+  var b1 = el('button', 'Compartir certificado', 'btn compartir'); b1.type = 'button';
+  b1.onclick = async function () { var c = await hacerCertificado(d); compartir(c, 'certificado-cara.jpg', 'Me hicieron el informe forense de mi cara 🧪 ' + d.veredicto + ' con ' + d.certeza + '% de certeza. ¿Y tú? https://' + SITE + '/?ref=compartido'); };
+  var b2 = el('button', 'Otra cara', 'btn amigo'); b2.type = 'button'; b2.onclick = function () { ver('vInicio'); $('foto').click(); };
+  f.appendChild(b1); f.appendChild(b2); box.appendChild(f);
+  ex.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function hacerCertificado(d) {
+  var c = await lienzo(), ctx = c.getContext('2d'), inf = d.informe;
+  ctx.fillStyle = '#FFFDF8'; ctx.fillRect(0, 0, 1080, 1350);
+  ctx.strokeStyle = '#16130F'; ctx.lineWidth = 6; ctx.strokeRect(36, 36, 1008, 1278); ctx.lineWidth = 2; ctx.strokeRect(52, 52, 976, 1246);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#6B6253'; ctx.font = '700 28px "Space Mono", monospace'; ctx.fillText('LABORATORIO NACIONAL DE CARAS', 540, 130);
+  ctx.fillStyle = '#16130F'; ctx.font = '800 76px "Bricolage Grotesque", sans-serif'; ctx.fillText('Certificado oficial', 540, 215);
+  if (state.foto) { ctx.save(); ctx.beginPath(); ctx.arc(540, 405, 150, 0, Math.PI * 2); ctx.clip(); var f = state.foto, k = Math.max(300 / f.width, 300 / f.height); ctx.drawImage(f, 540 - f.width * k / 2, 405 - f.height * k / 2.4, f.width * k, f.height * k); ctx.restore(); ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(540, 405, 150, 0, Math.PI * 2); ctx.stroke(); }
+  ctx.font = '400 32px "Space Mono", monospace'; ctx.fillStyle = '#6B6253'; ctx.fillText('Se certifica que el portador de esta cara', 540, 610); ctx.fillText('tiene, sin lugar a dudas, cara de', 540, 655);
+  var t = ajustarTexto(ctx, d.veredicto, 900, 3, 96, '800'); ctx.fillStyle = '#E5352B';
+  t.lines.forEach(function (l, i) { ctx.fillText(l, 540, 760 + i * t.size * 1.02); });
+  var y = 760 + t.lines.length * t.size * 1.02 + 30;
+  if ((inf.otrasCaras || []).length) { ctx.fillStyle = '#16130F'; ctx.font = '700 28px "Space Mono", monospace'; ctx.fillText('Con rasgos secundarios de:', 540, y); ctx.font = '400 28px "Space Mono", monospace'; inf.otrasCaras.slice(0, 3).forEach(function (o, i) { ctx.fillText('· ' + o, 540, y + 46 + i * 42); }); }
+  sello(ctx, 820, 1150, 'CERTEZA ' + d.certeza + '%', -.15, 40);
+  ctx.fillStyle = '#16130F'; ctx.font = '700 26px "Space Mono", monospace'; ctx.fillText(SITE, 540, 1262); ctx.textAlign = 'left';
+  return c;
+}
+
+// ---------- Instalar como app (la guía compartida de Graphikosmos: install.js) ----------
+function instalar() { try { if (window.GK_INSTALL) window.GK_INSTALL.maybe(false, { name: '¿De qué tienes cara?' }); } catch (e) {} }
+var instalarPend = false; function instalarLuego() { if (instalarPend) return; instalarPend = true; setTimeout(instalar, 3000); }
+if ('serviceWorker' in navigator && !state.demo) { try { navigator.serviceWorker.register('/cara/sw.js', { scope: '/cara/' }).catch(function () {}); } catch (e) {} }
+
+// ---------- Último informe pagado (al volver a abrir la app) ----------
+cfgP.then(function () {
+  if (state.demo) return;
+  var id = null; try { id = localStorage.getItem('cara_ultimo'); } catch (e) {}
+  if (!id) return;
+  fetch(FN + 'cara-informe?id=' + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+    if (!d || !d.paid || !d.informe) return;
+    var b = $('btnUltimo'); b.classList.remove('is-hidden');
+    b.onclick = function () { state.jobId = id; state.res = d; state.foto = null; $('vResultado').classList.remove('is-hidden'); $('tarjeta').classList.add('is-hidden'); document.querySelector('#vResultado .fila').classList.add('is-hidden'); ver('vResultado'); mostrarInforme(d); };
+  }).catch(function () {});
+});
+
+// ---------- Demostración (cuando no hay servidor) ----------
+var DEMOS = [
+  { c: 91, veredicto: 'que pides hablar con el gerente', titulo: 'Expediente de exigencia facial crónica', z: ['Ceja derecha', 'Comisura de la boca', 'Mirada', 'Fondo de la foto'], o: ['Elevada 14 grados por encima de lo socialmente aceptable. Patrón típico de quien revisa la factura dos veces.', 'Tensión lateral compatible con la frase «yo no pedí esto así».', 'Fija, evaluadora. El sujeto ya calificó con una estrella a quien tomó la foto.', 'Se detecta una pared sin decoración: el sujeto la considera «un servicio deficiente».'], d: 'El sujeto presenta una abrumadora mayoría de rasgos de cliente insatisfecho. No es mala persona: simplemente sabe cómo deberían hacerse las cosas.', p: 'En los próximos 7 días pedirá un cambio de mesa al menos una vez.', r: 'Pedir algo en un restaurante y aceptarlo tal cual llegue. Repetir 3 veces por semana.', x: ['que revisas la cuenta con calculadora', 'que dejas reseñas largas', 'que dices «no es por molestar» y es por molestar'] },
+  { c: 94, veredicto: 'culo', titulo: 'Informe de fastidio facial en reposo', z: ['Entrecejo', 'Labio inferior', 'Ángulo de la selfie', 'Hombros'], o: ['Pliegue central de 3,2 mm. Se forma incluso cuando el sujeto está contento, lo cual es preocupante.', 'Ligeramente proyectado hacia adelante: señal de un «ajá» sarcástico contenido.', 'Tomada desde abajo, a 22 grados. El sujeto mira al mundo como si el mundo le debiera algo.', 'Tensos. El sujeto lleva aproximadamente 4 días esperando a que alguien le conteste un mensaje.'], d: 'Cara de culo confirmada con altísima certeza. El caso no es grave: la cara está así, pero por dentro hay una persona que sí se ríe.', p: 'Alguien le preguntará «¿estás bravo?» cuando no lo esté. Dos veces.', r: 'Sonreír 10 segundos frente al espejo cada mañana, aunque se sienta ridículo. Sobre todo si se siente ridículo.', x: ['que te despertaron temprano un domingo', 'que no te gusta el café de la oficina', 'que leíste el chat de la familia'] },
+  { c: 88, veredicto: 'que pones audios de 7 minutos', titulo: 'Análisis de expresividad verbal acumulada', z: ['Boca', 'Ojos', 'Mano visible', 'Iluminación'], o: ['Entreabierta, en posición de «y otra cosa…». El sujeto tenía algo más que decir cuando se tomó la foto.', 'Brillo de quien acaba de recordar una anécdota que no viene al caso.', 'En posición de sostener el teléfono cerca de la boca, como quien graba en WhatsApp.', 'Luz cálida de sala: entorno ideal para un audio de 7 minutos que empieza con «bueno, te cuento».'], d: 'El sujeto comunica con generosidad. Sus audios son largos, pero se escuchan a 1,5x con cariño.', p: 'Esta semana enviará un audio que empieza con «no te voy a quitar mucho tiempo».', r: 'Escribir lo mismo en tres líneas. Fallar. Mandar el audio igual.', x: ['que cuentas el final de las películas', 'que saludas a todo el mundo en el súper', 'que dices «ya me voy» y te quedas una hora'] }
+];
+function demoRes() { var e = DEMOS[Math.floor(Math.random() * DEMOS.length)]; return { jobId: state.jobId, veredicto: e.veredicto, certeza: e.c, zonas: e.z, paid: false, _informe: { titulo: e.titulo, hallazgos: e.z.map(function (z, i) { return { zona: z, observacion: e.o[i] }; }), diagnostico: e.d, pronostico: e.p, recomendacion: e.r, otrasCaras: e.x } }; }
+})();
+</script>
+</body>
+</html>

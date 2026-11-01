@@ -1,0 +1,15 @@
+{
+  "name": "¿De qué tienes cara?",
+  "short_name": "Tu cara",
+  "description": "Sube tu selfie y la ciencia te dice de qué tienes cara.",
+  "start_url": "/cara/?ref=app",
+  "scope": "/cara/",
+  "display": "standalone",
+  "background_color": "#F4EFE3",
+  "theme_color": "#16130F",
+  "icons": [
+    { "src": "/cara/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/cara/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/cara/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
