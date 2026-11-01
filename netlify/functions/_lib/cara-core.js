@@ -98,8 +98,8 @@ function normalizar(d) {
 }
 const valido = (d) => d && d.safety && d.informe && Array.isArray(d.informe.hallazgos) && d.informe.hallazgos.length >= 3 && d.informe.diagnostico;
 
-// Lo que la persona ve SIN pagar: veredicto, certeza y solo los nombres de las zonas (el gancho), nunca el texto del informe.
-const vistaGratis = (job) => ({ jobId: job.id, si: job.veredicto === 'si', certeza: job.certeza, zonas: ((job.informe && job.informe.hallazgos) || []).map(h => h.zona), paid: !!job.paid });
+// Lo que la persona ve SIN pagar: la respuesta, la certeza y CUÁNTOS hallazgos hay. Ni una palabra del porqué.
+const vistaGratis = (job) => ({ jobId: job.id, si: job.veredicto === 'si', certeza: job.certeza, zonas: ((job.informe && job.informe.hallazgos) || []).length, paid: !!job.paid });
 
 function aviso(asunto, texto) {
     if (!process.env.RESEND_API_KEY) return;
