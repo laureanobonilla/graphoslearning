@@ -117,6 +117,11 @@ h1 em{font-style:normal;color:var(--rojo)}
 .expediente .ver{font:800 1.25rem/1.15 var(--display);margin:0}
 .expediente .estampa{position:absolute;right:14px;top:16px;transform:rotate(-9deg);color:var(--rojo);border:3px double var(--rojo);border-radius:8px;padding:4px 8px;font:700 12px var(--mono);letter-spacing:.1em;opacity:.85}
 
+.amigos{background:var(--tinta);color:var(--papel);border-radius:20px;padding:20px 16px 16px;display:flex;flex-direction:column;gap:10px;text-align:center}
+.amigos h3{margin:0;font-weight:800;font-size:1.6rem;letter-spacing:-.02em}
+.amigos p{margin:0 0 4px;opacity:.85;text-wrap:balance}
+.amigos .btn.sec{color:var(--papel);border-color:color-mix(in srgb,var(--papel) 30%,transparent);flex:none}
+.amigos .btn.compartir{flex:none;min-height:58px;font-size:1.1rem}
 .error{background:var(--blanco);border:2px solid var(--rojo);border-radius:18px;padding:18px;text-align:center;display:flex;flex-direction:column;gap:12px}
 .error p{margin:0;font-weight:700}
 .demo{font:400 12px var(--mono);background:var(--amarillo);color:#16130F;border-radius:10px;padding:8px 10px;text-align:center}
@@ -408,11 +413,15 @@ function mostrarInforme(d) {
   ex.appendChild(el('h4', 'Tratamiento recomendado')); ex.appendChild(el('p', inf.recomendacion));
   if ((inf.otrasCaras || []).length) { ex.appendChild(el('h4', d.si ? 'Además se detectó cara de' : 'En cambio, tienes cara de')); ex.appendChild(el('p', inf.otrasCaras.join(' · '))); }
   box.appendChild(ex);
-  var f = el('div', null, 'fila');
-  var b1 = el('button', 'Compartir certificado', 'btn compartir'); b1.type = 'button';
-  b1.onclick = async function () { var c = await hacerCertificado(d); compartir(c, 'certificado-cara.jpg', 'Tengo certificado oficial: ' + (d.si ? 'SÍ' : 'NO') + ' tengo cara de culo 🧪 ¿Y tú? https://' + SITE + '/?ref=compartido'); };
-  var b2 = el('button', 'Otra cara', 'btn amigo'); b2.type = 'button'; b2.onclick = function () { ver('vInicio'); $('foto').click(); };
-  f.appendChild(b1); f.appendChild(b2); box.appendChild(f);
+  // Cierre: que no termine en el informe, sino mandándoselo a los amigos (un solo botón, imagen + enlace).
+  var am = el('div', null, 'amigos');
+  am.appendChild(el('h3', '¿Y tus amigos?'));
+  am.appendChild(el('p', 'Muéstrales tu resultado y pregúntales si ellos tienen cara de culo.'));
+  var b1 = el('button', null, 'btn compartir'); b1.type = 'button';
+  b1.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.6 0-3.1-.4-4.4-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.4-.3z"/></svg><span>Compartir con mis amigos</span>';
+  b1.onclick = async function () { track('friends_share_clicked', {}); var c = await hacerCertificado(d); compartir(c, 'tengo-cara-de-culo.jpg', 'Me hicieron el análisis oficial: ' + (d.si ? 'SÍ' : 'NO') + ' tengo cara de culo 😂 ¿Y tú? Averígualo aquí 👉 https://' + SITE + '/?ref=compartido'); };
+  var b2 = el('button', 'Analizar otra cara', 'btn sec'); b2.type = 'button'; b2.onclick = function () { ver('vInicio'); $('foto').click(); };
+  am.appendChild(b1); am.appendChild(b2); box.appendChild(am);
   ex.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 async function hacerCertificado(d) {
