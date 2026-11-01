@@ -210,6 +210,7 @@ var META_PIXEL_ID = '';            // ej. '1234567890' (Píxel de Meta, para anu
 var GOOGLE_TAG_ID = '';            // ej. 'AW-1234567890'
 var GOOGLE_PURCHASE_SEND_TO = '';  // ej. 'AW-1234567890/AbCdEf' (conversión de compra)
 // ======================================================================
+var PERMITIR_DEMO = false;   // solo la copia de demostración lo pone en true; en tu sitio NUNCA hay pago simulado
 var APP = 'cara', FN = '/.netlify/functions/', SITE = 'graphoslearning.netlify.app/cara';
 var $ = function (id) { return document.getElementById(id); };
 var state = { cfg: null, demo: false, jobId: null, res: null, foto: null, count: 0, paypalOk: false };
@@ -218,7 +219,7 @@ var state = { cfg: null, demo: false, jobId: null, res: null, foto: null, count:
 var anonId = (function () { try { var id = localStorage.getItem('tc_anon_id'); if (!id) { id = crypto.randomUUID(); localStorage.setItem('tc_anon_id', id); } return id; } catch (e) { return 'v-' + Date.now() + Math.random().toString(36).slice(2); } })();
 var REF = (function () { var c = function (v) { return String(v || '').replace(/[^\w.\-]/g, '').slice(0, 40); }; try { var q = new URLSearchParams(location.search); var r = c(q.get('ref') || q.get('utm_campaign') || q.get('c')); if (r) sessionStorage.setItem('cara_ref', r); return r || c(sessionStorage.getItem('cara_ref')); } catch (e) { return ''; } })();
 function track(ev, meta) { if (state.demo) return; try { fetch(FN + 'sfc-track-event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true, body: JSON.stringify({ event: ev, anonId: anonId, app: APP, metadata: Object.assign({}, meta || {}, REF ? { campaign: REF } : {}) }) }).catch(function () {}); } catch (e) {} }
-function post(name, body) { return fetch(FN + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw Object.assign(new Error(d.error || 'Error ' + r.status), { status: r.status }); return d; }); }); }
+function post(name, body) { return fetch(FN + name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok) throw Object.assign(new Error(d.error || 'El laboratorio no responde en este momento. Inténtalo otra vez en un minuto.'), { status: r.status }); return d; }); }); }
 var newId = function () { return crypto.randomUUID ? crypto.randomUUID() : '00000000-0000-4000-8000-' + String(Date.now()).padStart(12, '0'); };
 
 // ---------- Píxeles de anuncios ----------
@@ -232,7 +233,7 @@ function ver(id) { VISTAS.forEach(function (v) { $(v).classList.toggle('is-hidde
 
 // ---------- Configuración (si no responde el servidor, se usa el modo demostración) ----------
 var cfgP = fetch(FN + 'cara-config', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (d) { state.cfg = d; $('precio').textContent = 'US$' + d.priceUsd; return d; })
-  .catch(function () { state.demo = true; state.cfg = { priceUsd: '2.99', clientId: null }; $('demo').classList.remove('is-hidden'); return state.cfg; });
+  .catch(function () { state.cfg = { priceUsd: '2.99', clientId: null }; if (PERMITIR_DEMO) { state.demo = true; $('demo').classList.remove('is-hidden'); } return state.cfg; });
 cfgP.then(function () { track('landing_viewed', { referrer: document.referrer ? document.referrer.slice(0, 160) : null }); });
 
 // ---------- Foto: se reduce en el teléfono antes de mandarla ----------
@@ -370,7 +371,10 @@ async function pintarPago() {
     box.appendChild(b); return;
   }
   var cfg = await cfgP;
-  if (!cfg.clientId) { box.textContent = 'El pago aún no está configurado.'; return; }
+  if (!cfg.clientId) {   // si la configuración falló al entrar, se intenta otra vez antes de rendirse
+    try { var r2 = await fetch(FN + 'cara-config', { cache: 'no-store' }); if (r2.ok) { cfg = await r2.json(); state.cfg = cfg; cfgP = Promise.resolve(cfg); $('precio').textContent = 'US$' + cfg.priceUsd; } } catch (e) {}
+  }
+  if (!cfg.clientId) { setPayErr('No pudimos conectar con PayPal. Recarga la página e inténtalo de nuevo.'); return; }
   try {
     if (!window.paypal) await new Promise(function (res, rej) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(cfg.clientId) + '&currency=USD'; s.onload = res; s.onerror = function () { rej(new Error('No se pudo cargar PayPal.')); }; document.head.appendChild(s); });
     var jobId = state.jobId;
