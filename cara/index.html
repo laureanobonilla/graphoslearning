@@ -104,6 +104,8 @@ h1 em{font-style:normal;color:var(--rojo)}
 .precio small{font:400 12px var(--mono);color:var(--suave);text-align:right}
 #paypalBox{background:#fff;border-radius:14px;padding:10px;min-height:56px}
 .err{color:var(--rojo);font-weight:700;margin:0}
+.muro.recuperando h2,.muro.recuperando .sub,.muro.recuperando .zonas,.muro.recuperando .precio,.muro.recuperando #paypalBox,.muro.recuperando .sello{display:none}
+.muro.recuperando .err{color:var(--tinta)}
 .sello{position:absolute;top:-14px;right:12px;transform:rotate(7deg);font:700 11px var(--mono);letter-spacing:.12em;color:var(--rojo);border:2px solid var(--rojo);border-radius:6px;padding:3px 8px;background:var(--blanco)}
 
 /* Informe pagado */
@@ -193,6 +195,7 @@ h1 em{font-style:normal;color:var(--rojo)}
       <div class="precio"><b id="precio">US$2.99</b><small>Informe forense completo<br>pago único · PayPal o tarjeta</small></div>
       <div id="paypalBox"></div>
       <p class="err is-hidden" id="payErr"></p>
+      <button class="btn amigo is-hidden" type="button" id="payRetry">Recibir mi informe</button>
     </div>
 
     <div id="informe" class="is-hidden" style="display:flex;flex-direction:column;gap:12px"></div>
@@ -339,7 +342,7 @@ async function mostrarResultado() {
   var n = typeof r.zonas === 'number' ? r.zonas : (r.zonas || []).length || 4;
   var ul = $('zonas'); ul.innerHTML = '';
   falsos.slice(0, Math.max(3, Math.min(4, n))).forEach(function (f) { var li = document.createElement('li'); li.setAttribute('aria-hidden', 'true'); li.innerHTML = '<b></b><span></span>'; li.querySelector('b').textContent = f[0]; li.querySelector('span').textContent = f[1]; ul.appendChild(li); });
-  $('informe').classList.add('is-hidden'); $('muro').classList.remove('is-hidden');
+  $('informe').classList.add('is-hidden'); $('muro').classList.remove('is-hidden', 'recuperando'); $('tarjeta').classList.remove('is-hidden'); document.querySelector('#vResultado .fila').classList.remove('is-hidden'); $('paypalBox').classList.remove('is-hidden'); $('payRetry').classList.add('is-hidden');
   ver('vResultado');
   if (r.paid && r.informe) mostrarInforme(r);
   else { track('paywall_viewed', {}); pintarPago(); }
@@ -381,19 +384,49 @@ async function pintarPago() {
     window.paypal.Buttons({
       style: { layout: 'vertical', shape: 'pill', label: 'pay', height: 48 },
       createOrder: async function () { setPayErr(''); track('pay_clicked', {}); px('InitiateCheckout', { value: Number(cfg.priceUsd), currency: 'USD' }); var d = await post('cara-pay-create', { jobId: jobId }); return d.orderID; },
-      onApprove: async function (data) {
-        try {
-          var d = await post('cara-pay-capture', { jobId: jobId, orderID: data.orderID });
-          track('pay_ok', {}); px('Purchase', { value: Number(cfg.priceUsd), currency: 'USD' });
-          if (GOOGLE_PURCHASE_SEND_TO && window.gtag) window.gtag('event', 'conversion', { send_to: GOOGLE_PURCHASE_SEND_TO, value: Number(cfg.priceUsd), currency: 'USD', transaction_id: data.orderID });
-          mostrarInforme(d);
-          setTimeout(instalar, 4000);
-        } catch (e) { setPayErr(e.message); }
-      },
+      onApprove: function (data) { return confirmarPago(jobId, data.orderID, true); },
       onCancel: function () { track('pay_cancel', {}); },
       onError: function () { setPayErr('PayPal tuvo un problema. Inténtalo de nuevo.'); }
     }).render('#paypalBox');
   } catch (e) { setPayErr(e.message); }
+}
+// ---------- Confirmar el pago: quien pagó SIEMPRE recibe su informe ----------
+// Se guarda la orden en el teléfono ANTES de confirmar: si se corta el internet o cierra la página,
+// al volver a abrirla se confirma sola. Confirmar varias veces la misma orden nunca cobra dos veces.
+function guardarPend(jobId, orderID) { try { localStorage.setItem('cara_pend', JSON.stringify({ jobId: jobId, orderID: orderID, t: Date.now() })); } catch (e) {} }
+function leerPend() { try { var p = JSON.parse(localStorage.getItem('cara_pend') || 'null'); return p && p.jobId && p.orderID ? p : null; } catch (e) { return null; } }
+function borrarPend() { try { localStorage.removeItem('cara_pend'); } catch (e) {} }
+async function confirmarPago(jobId, orderID, nuevo) {
+  guardarPend(jobId, orderID); setPayErr(''); $('payRetry').classList.add('is-hidden');
+  var esperas = [0, 1500, 3000, 6000, 10000], ultimo = null;
+  for (var i = 0; i < esperas.length; i++) {
+    if (esperas[i]) { setPayErr('Confirmando tu pago con PayPal…'); await espera(esperas[i]); }
+    try {
+      var d = await post('cara-pay-capture', { jobId: jobId, orderID: orderID });
+      borrarPend(); setPayErr('');
+      if (nuevo) {
+        track('pay_ok', {}); var precio = Number((state.cfg && state.cfg.priceUsd) || 2.99);
+        px('Purchase', { value: precio, currency: 'USD' });
+        if (GOOGLE_PURCHASE_SEND_TO && window.gtag) window.gtag('event', 'conversion', { send_to: GOOGLE_PURCHASE_SEND_TO, value: precio, currency: 'USD', transaction_id: orderID });
+      } else track('pay_recovered', {});
+      if (state.jobId !== jobId || !state.res) abrirInforme(jobId, d); else mostrarInforme(d);
+      setTimeout(instalar, 4000);
+      return;
+    } catch (e) {
+      ultimo = e;
+      if (e.status && e.status < 500) break;   // respuesta clara del servidor (p. ej. «no se te cobró»): no tiene caso reintentar
+    }
+  }
+  track('pay_confirm_failed', { status: (ultimo && ultimo.status) || 0 });
+  if (ultimo && ultimo.status && ultimo.status < 500) { borrarPend(); setPayErr(ultimo.message); return; }
+  setPayErr('Tu pago quedó registrado, pero no logramos traer tu informe todavía. Toca el botón para intentarlo otra vez. Código de tu orden: ' + orderID);
+  var b = $('payRetry'); b.classList.remove('is-hidden'); b.onclick = function () { confirmarPago(jobId, orderID, false); };
+}
+// Abre un informe que no es el de la pantalla actual (al volver a la app o tras recuperar un pago).
+function abrirInforme(jobId, d) {
+  state.jobId = jobId; state.res = d; state.foto = null;
+  $('tarjeta').classList.add('is-hidden'); document.querySelector('#vResultado .fila').classList.add('is-hidden');
+  ver('vResultado'); mostrarInforme(d);
 }
 function setPayErr(t) { $('payErr').textContent = t; $('payErr').classList.toggle('is-hidden', !t); }
 
@@ -467,15 +500,17 @@ function instalar() { mostrarBarra(); }
 var instalarPend = false; function instalarLuego() { if (instalarPend) return; instalarPend = true; setTimeout(instalar, 3000); }
 if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('/cara/sw.js', { scope: '/cara/' }).catch(function () {}); } catch (e) {} }
 
-// ---------- Último informe pagado (al volver a abrir la app) ----------
+// ---------- Al abrir: primero, cualquier pago que quedó a medias; luego, el último informe pagado ----------
 cfgP.then(function () {
   if (state.demo) return;
+  var pend = leerPend();
+  if (pend) { $('muro').classList.remove('is-hidden'); $('muro').classList.add('recuperando'); setPayErr('Recuperando tu informe…'); ver('vResultado'); $('tarjeta').classList.add('is-hidden'); document.querySelector('#vResultado .fila').classList.add('is-hidden'); $('paypalBox').classList.add('is-hidden'); confirmarPago(pend.jobId, pend.orderID, false); return; }
   var id = null; try { id = localStorage.getItem('cara_ultimo'); } catch (e) {}
   if (!id) return;
   fetch(FN + 'cara-informe?id=' + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
     if (!d || !d.paid || !d.informe) return;
     var b = $('btnUltimo'); b.classList.remove('is-hidden');
-    b.onclick = function () { state.jobId = id; state.res = d; state.foto = null; $('vResultado').classList.remove('is-hidden'); $('tarjeta').classList.add('is-hidden'); document.querySelector('#vResultado .fila').classList.add('is-hidden'); ver('vResultado'); mostrarInforme(d); };
+    b.onclick = function () { abrirInforme(id, d); };
   }).catch(function () {});
 });
 
