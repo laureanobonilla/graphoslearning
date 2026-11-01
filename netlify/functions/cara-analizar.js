@@ -17,14 +17,15 @@ exports.handler = async (event) => {
     } catch (e) { console.error('[cara-analizar] conteo', e.message); }   // si falla el conteo, se sigue
 
     try {
-        const parts = [{ inlineData: { mimeType: 'image/jpeg', data: img } }, { text: core.PROMPT }];
+        const si = core.sortear();
+        const parts = [{ inlineData: { mimeType: 'image/jpeg', data: img } }, { text: core.PROMPT(si) }];
         const d = await generateWithRetries([{ role: 'user', parts }], core.SCHEMA, core.valido, { tag: 'cara', maxOutputTokens: 1600, deadline: t0 + 24000, attemptMs: 15000 });
         const sf = d.safety || {};
         if (sf.appearsUnder18) return core.json(422, { error: 'Esta app es solo para mayores de 18. Prueba con la foto de un adulto.', motivo: 'menor' });
         if (sf.explicit) return core.json(422, { error: 'Esa foto no la podemos analizar. Prueba con una selfie normal.', motivo: 'explicita' });
         if (sf.notAPerson) return core.json(422, { error: 'No encontramos ninguna cara en esa foto. Prueba con una selfie de frente.', motivo: 'sin_cara' });
         const r = core.normalizar(d);
-        const job = { id: jobId, anon_id: String(b.anonId || '').slice(0, 64) || null, country, ip_hash: ipHash, ref: String(b.ref || '').replace(/[^\w.-]/g, '').slice(0, 40) || null, veredicto: r.veredicto, certeza: r.certeza, informe: r.informe };
+        const job = { id: jobId, anon_id: String(b.anonId || '').slice(0, 64) || null, country, ip_hash: ipHash, ref: String(b.ref || '').replace(/[^\w.-]/g, '').slice(0, 40) || null, veredicto: si ? 'si' : 'no', certeza: r.certeza, informe: r.informe };
         await core.saveJob(job);
         return core.json(200, core.vistaGratis(job));
     } catch (e) {

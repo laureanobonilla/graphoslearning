@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>¿De qué tienes cara?</title>
-<meta name="description" content="Sube tu selfie y la ciencia te dice de qué tienes cara. Sin piedad.">
-<meta property="og:title" content="¿De qué tienes cara?">
-<meta property="og:description" content="Sube tu selfie y la ciencia te dice de qué tienes cara. Sin piedad.">
+<title>¿Tienes cara de culo?</title>
+<meta name="description" content="Tómate una selfie y la ciencia responde: sí o no. Sin piedad.">
+<meta property="og:title" content="¿Tienes cara de culo?">
+<meta property="og:description" content="Tómate una selfie y la ciencia responde: sí o no. Sin piedad.">
 <meta property="og:image" content="/cara/og.png">
 <meta name="theme-color" content="#16130F">
 <link rel="manifest" href="/cara/manifest.webmanifest">
@@ -57,6 +57,15 @@ h1 em{font-style:normal;color:var(--rojo)}
 .subir::after{content:"";position:absolute;inset:-12px;border-radius:50%;border:2px dashed var(--rojo);animation:gira 18s linear infinite;pointer-events:none}
 @keyframes gira{to{transform:rotate(360deg)}}
 .letra{font:400 12.5px/1.5 var(--mono);color:var(--suave);text-align:center;margin:4px 0 0;text-wrap:balance}
+.instalar{display:flex;align-items:center;gap:10px;background:var(--tinta);color:var(--papel);border-radius:16px;padding:10px 10px 10px 12px;animation:sube .35s ease-out}
+.instalar img{width:40px;height:40px;border-radius:10px;flex:none}
+.instalar div{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.2}
+.instalar b{font-weight:800;font-size:1rem}
+.instalar span{font:400 12px var(--mono);opacity:.75}
+.instalar .ok{flex:none;height:40px;border-radius:12px;border:0;background:var(--amarillo);color:#16130F;font:800 .95rem var(--display);padding:0 16px;cursor:pointer}
+.instalar .x{flex:none;width:32px;height:32px;border:0;background:none;color:var(--papel);opacity:.6;font-size:22px;line-height:1;cursor:pointer}
+.galeria{display:block;position:relative;margin:2px auto 0;width:max-content;max-width:100%;font:700 14px var(--display);color:var(--tinta);text-decoration:underline;cursor:pointer;padding:6px 8px}
+.galeria input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
 .ultimo{background:none;border:0;color:var(--tinta);text-decoration:underline;font:700 14px var(--display);cursor:pointer;padding:6px}
 
 /* Analizando */
@@ -118,23 +127,30 @@ h1 em{font-style:normal;color:var(--rojo)}
 </head>
 <body>
 <div class="wrap">
-  <div class="demo is-hidden" id="demo">Modo demostración: los veredictos son de ejemplo y el pago es simulado.</div>
+  <div class="demo is-hidden" id="demo">Modo demostración: la respuesta y el informe son de ejemplo y el pago es simulado.</div>
+  <div class="instalar is-hidden" id="instalar" role="region" aria-label="Instalar la app">
+    <img src="/cara/icon-192.png" alt="">
+    <div><b>Instala la app</b><span>Un toque y queda en tu celular</span></div>
+    <button class="ok" type="button" id="btnInstalar">Instalar</button>
+    <button class="x" type="button" id="btnNoInstalar" aria-label="Cerrar">×</button>
+  </div>
 
   <!-- 1. Portada: un solo toque para empezar -->
   <section id="vInicio">
     <div class="lab"><i></i>Laboratorio Nacional de Caras</div>
-    <h1>¿De qué tienes <em>cara</em>?</h1>
-    <div class="ticker" id="ticker" aria-hidden="true"></div>
+    <h1>¿Tienes cara de <em>culo</em>?</h1>
+    <div class="ticker">La ciencia solo responde <b>SÍ</b> o <b>NO</b></div>
     <label class="subir" id="subir">
-      <input type="file" accept="image/*" id="foto" aria-label="Sube tu selfie">
+      <input type="file" accept="image/*" capture="user" id="foto" aria-label="Tómate una selfie">
       <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" aria-hidden="true">
         <ellipse cx="60" cy="62" rx="36" ry="44" stroke-dasharray="7 9"/>
         <path d="M44 52h7M69 52h7"/><path d="M47 79c8 6 18 6 26 0"/>
         <path d="M14 30V18a4 4 0 0 1 4-4h12M106 30V18a4 4 0 0 0-4-4H90M14 90v12a4 4 0 0 0 4 4h12M106 90v12a4 4 0 0 1-4 4H90"/>
       </svg>
-      <span class="cta">Sube tu selfie</span>
-      <span class="cta2">la ciencia no miente</span>
+      <span class="cta">Tómate la selfie</span>
+      <span class="cta2">y descúbrelo</span>
     </label>
+    <label class="galeria">o elige una foto de tu galería<input type="file" accept="image/*" id="fotoGaleria"></label>
     <p class="letra">Solo mayores de 18 · Tu foto no se guarda en ningún lado · Es humor, no te lo tomes a pecho</p>
     <p style="text-align:center;margin:6px 0 0"><button class="ultimo is-hidden" id="btnUltimo" type="button">Ver mi último informe</button></p>
   </section>
@@ -166,8 +182,8 @@ h1 em{font-style:normal;color:var(--rojo)}
 
     <div class="muro" id="muro">
       <span class="sello">CONFIDENCIAL</span>
-      <h2>¿Y por qué tienes cara de <span id="muroVer"></span>?</h2>
-      <p class="sub">El laboratorio encontró evidencia en estas zonas de tu foto:</p>
+      <h2>¿Por qué <span id="muroVer"></span> tienes cara de culo?</h2>
+      <p class="sub">Te vamos a decir por qué. El laboratorio encontró la evidencia en estas zonas de tu foto:</p>
       <ul class="zonas" id="zonas"></ul>
       <div class="precio"><b id="precio">US$2.99</b><small>Informe forense completo<br>pago único · PayPal o tarjeta</small></div>
       <div id="paypalBox"></div>
@@ -177,7 +193,7 @@ h1 em{font-style:normal;color:var(--rojo)}
     <div id="informe" class="is-hidden" style="display:flex;flex-direction:column;gap:12px"></div>
   </section>
 
-  <p class="pie">Entretenimiento. Ningún veredicto es real. <a href="/privacidad/">Privacidad</a></p>
+  <p class="pie">Entretenimiento. La respuesta es al azar y nada de esto es real. <a href="/privacidad/">Privacidad</a></p>
 </div>
 
 <script src="/install.js" defer></script>
@@ -209,11 +225,6 @@ if (GOOGLE_TAG_ID) { window.dataLayer = window.dataLayer || []; window.gtag = fu
 var VISTAS = ['vInicio', 'vAnalisis', 'vError', 'vResultado'];
 function ver(id) { VISTAS.forEach(function (v) { $(v).classList.toggle('is-hidden', v !== id); }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
-// ---------- Ticker de ejemplos (el gancho de la portada) ----------
-var EJ = ['que debes plata', 'culo', 'que pones audios de 7 minutos', 'que pides hablar con el gerente', 'que dices «ya voy» y no te has bañado', 'que dejas en visto a tu mamá', 'que te comiste el almuerzo ajeno', 'que aplaudes cuando aterriza el avión'];
-var ti = 0; function tick() { var s = document.createElement('span'); s.innerHTML = 'Tienes cara de <b></b>'; s.querySelector('b').textContent = EJ[ti++ % EJ.length]; $('ticker').replaceChildren(s); }
-tick(); setInterval(tick, 2200);
-
 // ---------- Configuración (si no responde el servidor, se usa el modo demostración) ----------
 var cfgP = fetch(FN + 'cara-config', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (d) { state.cfg = d; $('precio').textContent = 'US$' + d.priceUsd; return d; })
   .catch(function () { state.demo = true; state.cfg = { priceUsd: '2.99', clientId: null }; $('demo').classList.remove('is-hidden'); return state.cfg; });
@@ -230,12 +241,14 @@ function aCanvas(img, max) {
   var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c;
 }
 
-$('foto').addEventListener('change', function (e) {
+function elegida(e) {
   var f = e.target.files && e.target.files[0]; e.target.value = '';
   if (!f) return;
   track('photo_chosen', { kb: Math.round(f.size / 1024), n: state.count });
   analizar(f);
-});
+}
+$('foto').addEventListener('change', elegida);
+$('fotoGaleria').addEventListener('change', elegida);
 
 var MSGS = ['Midiendo la inclinación de tus cejas…', 'Comparando con 4.812 caras de archivo…', 'Detectando indignación acumulada…', 'Calibrando el caramómetro…', 'Consultando al comité de expertos…', 'Redactando el veredicto (sin piedad)…'];
 function animarAnalisis() {
@@ -269,7 +282,6 @@ async function analizar(file) {
     track('verdict_ok', { n: state.count, ms: Date.now() - t0 });
     px('ViewContent', { content_name: 'veredicto' });
     await mostrarResultado();
-    if (state.count >= 2) setTimeout(instalar, 2500);
   } catch (e) { parar(); track('verdict_fail', { status: e.status || 0 }); fallo(e.status ? e.message : 'Se cortó la conexión. Inténtalo otra vez.'); }
 }
 function espera(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -298,16 +310,14 @@ async function hacerTarjeta() {
   fotoCuadrada(ctx, 60, 60, 960, 36);
   // marca de agua sobre la foto
   ctx.save(); ctx.font = '700 30px "Space Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 8; ctx.fillText('LAB. NACIONAL DE CARAS', 96, 118); ctx.restore();
-  // veredicto sobre la parte de abajo de la foto, calculado de abajo hacia arriba para que nunca se salga
-  var t = ajustarTexto(ctx, r.veredicto, 880, 3, 104, '800'), lh = t.size * .98, base = 980, y0 = base - (t.lines.length - 1) * lh, ylab = y0 - t.size * .95 - 6;
-  var g = ctx.createLinearGradient(0, ylab - 160, 0, 1020); g.addColorStop(0, 'rgba(22,19,15,0)'); g.addColorStop(.45, 'rgba(22,19,15,.78)'); g.addColorStop(1, 'rgba(22,19,15,.94)');
-  ctx.save(); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(60, 60, 960, 960, 36) : ctx.rect(60, 60, 960, 960); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(60, ylab - 160, 960, 1020 - ylab + 160); ctx.restore();
-  ctx.fillStyle = '#FFD23F'; ctx.font = '700 34px "Space Mono", monospace'; ctx.fillText('TIENES CARA DE', 100, ylab);
-  ctx.font = '800 ' + t.size + 'px "Bricolage Grotesque", sans-serif'; ctx.fillStyle = '#fff';
-  t.lines.forEach(function (l, i) { ctx.fillText(l, 100, y0 + i * lh); });
+  // la respuesta, gigante, sobre la parte de abajo de la foto
+  var g = ctx.createLinearGradient(0, 470, 0, 1020); g.addColorStop(0, 'rgba(22,19,15,0)'); g.addColorStop(.5, 'rgba(22,19,15,.75)'); g.addColorStop(1, 'rgba(22,19,15,.94)');
+  ctx.save(); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(60, 60, 960, 960, 36) : ctx.rect(60, 60, 960, 960); ctx.clip(); ctx.fillStyle = g; ctx.fillRect(60, 470, 960, 550); ctx.restore();
+  ctx.fillStyle = '#FFD23F'; ctx.font = '700 38px "Space Mono", monospace'; ctx.fillText('¿TIENES CARA DE CULO?', 100, 655);
+  ctx.save(); ctx.font = '800 300px "Bricolage Grotesque", sans-serif'; ctx.fillStyle = r.si ? '#FF4A3D' : '#3DDC84'; ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 24; ctx.fillText(r.si ? 'SÍ' : 'NO', 88, 985); ctx.restore();
   sello(ctx, 830, 1150, 'CERTEZA ' + r.certeza + '%', -.13, 40);
-  ctx.fillStyle = '#16130F'; ctx.font = '800 54px "Bricolage Grotesque", sans-serif'; ctx.fillText('¿De qué tienes cara?', 60, 1140);
-  ctx.font = '400 30px "Space Mono", monospace'; ctx.fillStyle = '#6B6253'; ctx.fillText('La ciencia no miente.', 60, 1192);
+  ctx.fillStyle = '#16130F'; ctx.font = '800 54px "Bricolage Grotesque", sans-serif'; ctx.fillText('¿Tienes cara de culo?', 60, 1140);
+  ctx.font = '400 30px "Space Mono", monospace'; ctx.fillStyle = '#6B6253'; ctx.fillText('Pregúntale a la ciencia.', 60, 1192);
   ctx.fillStyle = '#16130F'; ctx.fillRect(0, 1262, 1080, 88);
   ctx.fillStyle = '#F4EFE3'; ctx.font = '700 30px "Space Mono", monospace'; ctx.textAlign = 'center'; ctx.fillText(SITE + '  ·  sube tu selfie', 540, 1316); ctx.textAlign = 'left';
   return c;
@@ -316,8 +326,8 @@ async function hacerTarjeta() {
 async function mostrarResultado() {
   var r = state.res;
   var c = await hacerTarjeta(); state.tarjeta = c;
-  $('tarjeta').src = c.toDataURL('image/jpeg', .9); $('tarjeta').alt = 'Tienes cara de ' + r.veredicto;
-  $('muroVer').textContent = r.veredicto;
+  $('tarjeta').src = c.toDataURL('image/jpeg', .9); $('tarjeta').alt = (r.si ? 'Sí' : 'No') + ' tienes cara de culo';
+  $('muroVer').textContent = r.si ? 'SÍ' : 'NO';
   var ul = $('zonas'); ul.innerHTML = '';
   var relleno = ['La evidencia es contundente y el comité no tuvo dudas al respecto.', 'Se observaron patrones compatibles con el veredicto en tres mediciones.', 'El análisis confirma una tendencia preocupante y sostenida.', 'Los expertos pidieron una segunda opinión y llegaron a lo mismo.'];
   (r.zonas || []).slice(0, 4).forEach(function (z, i) { var li = document.createElement('li'); li.innerHTML = '<b></b><span></span>'; li.querySelector('b').textContent = z; li.querySelector('span').textContent = relleno[i % 4]; ul.appendChild(li); });
@@ -328,7 +338,7 @@ async function mostrarResultado() {
 }
 
 // ---------- Compartir ----------
-function textoCompartir() { return 'Según la ciencia tengo cara de ' + state.res.veredicto + ' 😂 ¿Y tú de qué tienes cara? https://' + SITE + '/?ref=compartido'; }
+function textoCompartir() { return 'Le pregunté a la ciencia si tengo cara de culo y dijo que ' + (state.res.si ? 'SÍ 😩' : 'NO 😎') + ' ¿Y tú? https://' + SITE + '/?ref=compartido'; }
 async function compartir(canvas, nombre, texto) {
   track('share_clicked', {});
   var blob = await new Promise(function (r) { canvas.toBlob(r, 'image/jpeg', .9); });
@@ -388,17 +398,17 @@ function mostrarInforme(d) {
   ex.appendChild(el('p', 'Expediente Nº ' + String(state.jobId || '').slice(0, 6).toUpperCase(), 'num'));
   ex.appendChild(el('h3', inf.titulo || 'Informe forense facial'));
   ex.appendChild(el('h4', 'Veredicto'));
-  ex.appendChild(el('p', 'Cara de ' + d.veredicto + ' (certeza ' + d.certeza + '%)', 'ver'));
+  ex.appendChild(el('p', (d.si ? 'SÍ' : 'NO') + ' tienes cara de culo (certeza ' + d.certeza + '%)', 'ver'));
   ex.appendChild(el('h4', 'Hallazgos'));
   var ol = el('ol'); (inf.hallazgos || []).forEach(function (h) { var li = el('li'); li.appendChild(el('b', h.zona + ': ')); li.appendChild(document.createTextNode(h.observacion)); ol.appendChild(li); }); ex.appendChild(ol);
   ex.appendChild(el('h4', 'Diagnóstico')); ex.appendChild(el('p', inf.diagnostico));
   ex.appendChild(el('h4', 'Pronóstico')); ex.appendChild(el('p', inf.pronostico));
   ex.appendChild(el('h4', 'Tratamiento recomendado')); ex.appendChild(el('p', inf.recomendacion));
-  if ((inf.otrasCaras || []).length) { ex.appendChild(el('h4', 'También se detectó cara de')); ex.appendChild(el('p', inf.otrasCaras.join(' · '))); }
+  if ((inf.otrasCaras || []).length) { ex.appendChild(el('h4', d.si ? 'Además se detectó cara de' : 'En cambio, tienes cara de')); ex.appendChild(el('p', inf.otrasCaras.join(' · '))); }
   box.appendChild(ex);
   var f = el('div', null, 'fila');
   var b1 = el('button', 'Compartir certificado', 'btn compartir'); b1.type = 'button';
-  b1.onclick = async function () { var c = await hacerCertificado(d); compartir(c, 'certificado-cara.jpg', 'Me hicieron el informe forense de mi cara 🧪 ' + d.veredicto + ' con ' + d.certeza + '% de certeza. ¿Y tú? https://' + SITE + '/?ref=compartido'); };
+  b1.onclick = async function () { var c = await hacerCertificado(d); compartir(c, 'certificado-cara.jpg', 'Tengo certificado oficial: ' + (d.si ? 'SÍ' : 'NO') + ' tengo cara de culo 🧪 ¿Y tú? https://' + SITE + '/?ref=compartido'); };
   var b2 = el('button', 'Otra cara', 'btn amigo'); b2.type = 'button'; b2.onclick = function () { ver('vInicio'); $('foto').click(); };
   f.appendChild(b1); f.appendChild(b2); box.appendChild(f);
   ex.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -410,20 +420,37 @@ async function hacerCertificado(d) {
   ctx.textAlign = 'center'; ctx.fillStyle = '#6B6253'; ctx.font = '700 28px "Space Mono", monospace'; ctx.fillText('LABORATORIO NACIONAL DE CARAS', 540, 130);
   ctx.fillStyle = '#16130F'; ctx.font = '800 76px "Bricolage Grotesque", sans-serif'; ctx.fillText('Certificado oficial', 540, 215);
   if (state.foto) { ctx.save(); ctx.beginPath(); ctx.arc(540, 405, 150, 0, Math.PI * 2); ctx.clip(); var f = state.foto, k = Math.max(300 / f.width, 300 / f.height); ctx.drawImage(f, 540 - f.width * k / 2, 405 - f.height * k / 2.4, f.width * k, f.height * k); ctx.restore(); ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(540, 405, 150, 0, Math.PI * 2); ctx.stroke(); }
-  ctx.font = '400 32px "Space Mono", monospace'; ctx.fillStyle = '#6B6253'; ctx.fillText('Se certifica que el portador de esta cara', 540, 610); ctx.fillText('tiene, sin lugar a dudas, cara de', 540, 655);
-  var t = ajustarTexto(ctx, d.veredicto, 900, 3, 96, '800'); ctx.fillStyle = '#E5352B';
-  t.lines.forEach(function (l, i) { ctx.fillText(l, 540, 760 + i * t.size * 1.02); });
-  var y = 760 + t.lines.length * t.size * 1.02 + 30;
-  if ((inf.otrasCaras || []).length) { ctx.fillStyle = '#16130F'; ctx.font = '700 28px "Space Mono", monospace'; ctx.fillText('Con rasgos secundarios de:', 540, y); ctx.font = '400 28px "Space Mono", monospace'; inf.otrasCaras.slice(0, 3).forEach(function (o, i) { ctx.fillText('· ' + o, 540, y + 46 + i * 42); }); }
+  ctx.font = '400 32px "Space Mono", monospace'; ctx.fillStyle = '#6B6253'; ctx.fillText('Se certifica que el portador de esta cara', 540, 610);
+  ctx.font = '800 190px "Bricolage Grotesque", sans-serif'; ctx.fillStyle = d.si ? '#E5352B' : '#1FA855'; ctx.fillText(d.si ? 'SÍ' : 'NO', 540, 800);
+  ctx.font = '800 64px "Bricolage Grotesque", sans-serif'; ctx.fillStyle = '#16130F'; ctx.fillText('tiene cara de culo', 540, 880);
+  var y = 960;
+  if ((inf.otrasCaras || []).length) { ctx.font = '700 28px "Space Mono", monospace'; ctx.fillText(d.si ? 'Además, cara de:' : 'En cambio, cara de:', 540, y); ctx.font = '400 28px "Space Mono", monospace'; inf.otrasCaras.slice(0, 3).forEach(function (o, i) { ctx.fillText('· ' + o, 540, y + 46 + i * 42); }); }
   sello(ctx, 820, 1150, 'CERTEZA ' + d.certeza + '%', -.15, 40);
   ctx.fillStyle = '#16130F'; ctx.font = '700 26px "Space Mono", monospace'; ctx.fillText(SITE, 540, 1262); ctx.textAlign = 'left';
   return c;
 }
 
-// ---------- Instalar como app (la guía compartida de Graphikosmos: install.js) ----------
-function instalar() { try { if (window.GK_INSTALL) window.GK_INSTALL.maybe(false, { name: '¿De qué tienes cara?' }); } catch (e) {} }
+// ---------- Instalar como app: barra arriba desde que entra ----------
+// Android/Chrome: el botón instala con un toque (beforeinstallprompt). iPhone o navegador de Facebook/Instagram:
+// el botón muestra la guía compartida de Graphikosmos (install.js) con los pasos para su caso.
+var instPrompt = null, UA = navigator.userAgent || '';
+var esMovil = /android|iphone|ipad|ipod|mobile/i.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function instalada() { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; } catch (e) { return false; } }
+function cerrada() { try { return sessionStorage.getItem('cara_inst_no') === '1'; } catch (e) { return false; } }
+function mostrarBarra() { if (instalada() || cerrada()) return; $('instalar').classList.remove('is-hidden'); }
+function ocultarBarra() { $('instalar').classList.add('is-hidden'); }
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); instPrompt = e; mostrarBarra(); });
+window.addEventListener('appinstalled', function () { ocultarBarra(); track('app_installed', {}); });
+if (esMovil) mostrarBarra();
+$('btnInstalar').addEventListener('click', async function () {
+  track('install_clicked', { nativo: !!instPrompt });
+  if (instPrompt) { var p = instPrompt; instPrompt = null; try { p.prompt(); var c = await p.userChoice; track('install_choice', { outcome: c && c.outcome }); if (c && c.outcome === 'accepted') ocultarBarra(); } catch (e) {} return; }
+  try { if (window.GK_INSTALL) window.GK_INSTALL.maybe(true, { name: '¿Tienes cara de culo?' }); } catch (e) {}
+});
+$('btnNoInstalar').addEventListener('click', function () { ocultarBarra(); try { sessionStorage.setItem('cara_inst_no', '1'); } catch (e) {} });
+function instalar() { mostrarBarra(); }
 var instalarPend = false; function instalarLuego() { if (instalarPend) return; instalarPend = true; setTimeout(instalar, 3000); }
-if ('serviceWorker' in navigator && !state.demo) { try { navigator.serviceWorker.register('/cara/sw.js', { scope: '/cara/' }).catch(function () {}); } catch (e) {} }
+if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('/cara/sw.js', { scope: '/cara/' }).catch(function () {}); } catch (e) {} }
 
 // ---------- Último informe pagado (al volver a abrir la app) ----------
 cfgP.then(function () {
@@ -439,11 +466,11 @@ cfgP.then(function () {
 
 // ---------- Demostración (cuando no hay servidor) ----------
 var DEMOS = [
-  { c: 91, veredicto: 'que pides hablar con el gerente', titulo: 'Expediente de exigencia facial crónica', z: ['Ceja derecha', 'Comisura de la boca', 'Mirada', 'Fondo de la foto'], o: ['Elevada 14 grados por encima de lo socialmente aceptable. Patrón típico de quien revisa la factura dos veces.', 'Tensión lateral compatible con la frase «yo no pedí esto así».', 'Fija, evaluadora. El sujeto ya calificó con una estrella a quien tomó la foto.', 'Se detecta una pared sin decoración: el sujeto la considera «un servicio deficiente».'], d: 'El sujeto presenta una abrumadora mayoría de rasgos de cliente insatisfecho. No es mala persona: simplemente sabe cómo deberían hacerse las cosas.', p: 'En los próximos 7 días pedirá un cambio de mesa al menos una vez.', r: 'Pedir algo en un restaurante y aceptarlo tal cual llegue. Repetir 3 veces por semana.', x: ['que revisas la cuenta con calculadora', 'que dejas reseñas largas', 'que dices «no es por molestar» y es por molestar'] },
-  { c: 94, veredicto: 'culo', titulo: 'Informe de fastidio facial en reposo', z: ['Entrecejo', 'Labio inferior', 'Ángulo de la selfie', 'Hombros'], o: ['Pliegue central de 3,2 mm. Se forma incluso cuando el sujeto está contento, lo cual es preocupante.', 'Ligeramente proyectado hacia adelante: señal de un «ajá» sarcástico contenido.', 'Tomada desde abajo, a 22 grados. El sujeto mira al mundo como si el mundo le debiera algo.', 'Tensos. El sujeto lleva aproximadamente 4 días esperando a que alguien le conteste un mensaje.'], d: 'Cara de culo confirmada con altísima certeza. El caso no es grave: la cara está así, pero por dentro hay una persona que sí se ríe.', p: 'Alguien le preguntará «¿estás bravo?» cuando no lo esté. Dos veces.', r: 'Sonreír 10 segundos frente al espejo cada mañana, aunque se sienta ridículo. Sobre todo si se siente ridículo.', x: ['que te despertaron temprano un domingo', 'que no te gusta el café de la oficina', 'que leíste el chat de la familia'] },
-  { c: 88, veredicto: 'que pones audios de 7 minutos', titulo: 'Análisis de expresividad verbal acumulada', z: ['Boca', 'Ojos', 'Mano visible', 'Iluminación'], o: ['Entreabierta, en posición de «y otra cosa…». El sujeto tenía algo más que decir cuando se tomó la foto.', 'Brillo de quien acaba de recordar una anécdota que no viene al caso.', 'En posición de sostener el teléfono cerca de la boca, como quien graba en WhatsApp.', 'Luz cálida de sala: entorno ideal para un audio de 7 minutos que empieza con «bueno, te cuento».'], d: 'El sujeto comunica con generosidad. Sus audios son largos, pero se escuchan a 1,5x con cariño.', p: 'Esta semana enviará un audio que empieza con «no te voy a quitar mucho tiempo».', r: 'Escribir lo mismo en tres líneas. Fallar. Mandar el audio igual.', x: ['que cuentas el final de las películas', 'que saludas a todo el mundo en el súper', 'que dices «ya me voy» y te quedas una hora'] }
+  { c: 91, si: false, titulo: 'Expediente de exigencia facial crónica', z: ['Ceja derecha', 'Comisura de la boca', 'Mirada', 'Fondo de la foto'], o: ['Elevada 14 grados por encima de lo socialmente aceptable. Patrón típico de quien revisa la factura dos veces.', 'Tensión lateral compatible con la frase «yo no pedí esto así».', 'Fija, evaluadora. El sujeto ya calificó con una estrella a quien tomó la foto.', 'Se detecta una pared sin decoración: el sujeto la considera «un servicio deficiente».'], d: 'El sujeto NO tiene cara de culo: tiene cara de cliente exigente, que es distinto. No es mala persona, simplemente sabe cómo deberían hacerse las cosas.', p: 'En los próximos 7 días pedirá un cambio de mesa al menos una vez.', r: 'Pedir algo en un restaurante y aceptarlo tal cual llegue. Repetir 3 veces por semana.', x: ['que revisas la cuenta con calculadora', 'que dejas reseñas largas', 'que dices «no es por molestar» y es por molestar'] },
+  { c: 94, si: true, titulo: 'Informe de fastidio facial en reposo', z: ['Entrecejo', 'Labio inferior', 'Ángulo de la selfie', 'Hombros'], o: ['Pliegue central de 3,2 mm. Se forma incluso cuando el sujeto está contento, lo cual es preocupante.', 'Ligeramente proyectado hacia adelante: señal de un «ajá» sarcástico contenido.', 'Tomada desde abajo, a 22 grados. El sujeto mira al mundo como si el mundo le debiera algo.', 'Tensos. El sujeto lleva aproximadamente 4 días esperando a que alguien le conteste un mensaje.'], d: 'Cara de culo confirmada con altísima certeza. El caso no es grave: la cara está así, pero por dentro hay una persona que sí se ríe.', p: 'Alguien le preguntará «¿estás bravo?» cuando no lo esté. Dos veces.', r: 'Sonreír 10 segundos frente al espejo cada mañana, aunque se sienta ridículo. Sobre todo si se siente ridículo.', x: ['que te despertaron temprano un domingo', 'que no te gusta el café de la oficina', 'que leíste el chat de la familia'] },
+  { c: 88, si: false, titulo: 'Análisis de expresividad verbal acumulada', z: ['Boca', 'Ojos', 'Mano visible', 'Iluminación'], o: ['Entreabierta, en posición de «y otra cosa…». El sujeto tenía algo más que decir cuando se tomó la foto.', 'Brillo de quien acaba de recordar una anécdota que no viene al caso.', 'En posición de sostener el teléfono cerca de la boca, como quien graba en WhatsApp.', 'Luz cálida de sala: entorno ideal para un audio de 7 minutos que empieza con «bueno, te cuento».'], d: 'El sujeto NO tiene cara de culo: es demasiado conversador para eso. Sus audios son largos, pero se escuchan a 1,5x con cariño.', p: 'Esta semana enviará un audio que empieza con «no te voy a quitar mucho tiempo».', r: 'Escribir lo mismo en tres líneas. Fallar. Mandar el audio igual.', x: ['que cuentas el final de las películas', 'que saludas a todo el mundo en el súper', 'que dices «ya me voy» y te quedas una hora'] }
 ];
-function demoRes() { var e = DEMOS[Math.floor(Math.random() * DEMOS.length)]; return { jobId: state.jobId, veredicto: e.veredicto, certeza: e.c, zonas: e.z, paid: false, _informe: { titulo: e.titulo, hallazgos: e.z.map(function (z, i) { return { zona: z, observacion: e.o[i] }; }), diagnostico: e.d, pronostico: e.p, recomendacion: e.r, otrasCaras: e.x } }; }
+function demoRes() { var e = DEMOS[Math.floor(Math.random() * DEMOS.length)]; return { jobId: state.jobId, si: e.si, certeza: e.c, zonas: e.z, paid: false, _informe: { titulo: e.titulo, hallazgos: e.z.map(function (z, i) { return { zona: z, observacion: e.o[i] }; }), diagnostico: e.d, pronostico: e.p, recomendacion: e.r, otrasCaras: e.x } }; }
 })();
 </script>
 </body>

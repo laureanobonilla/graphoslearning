@@ -1,7 +1,7 @@
 {
-  "name": "¿De qué tienes cara?",
-  "short_name": "Tu cara",
-  "description": "Sube tu selfie y la ciencia te dice de qué tienes cara.",
+  "name": "¿Tienes cara de culo?",
+  "short_name": "Cara de culo",
+  "description": "Tómate una selfie y la ciencia responde: sí o no.",
   "start_url": "/cara/?ref=app",
   "scope": "/cara/",
   "display": "standalone",

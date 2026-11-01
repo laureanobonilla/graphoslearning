@@ -9,14 +9,14 @@ exports.handler = async (event) => {
     try {
         const job = await core.getJob(jobId);
         if (!job || job.paypal_order !== orderID) return core.json(400, { error: 'Esa orden no corresponde a este informe.' });
-        if (job.paid) return core.json(200, { ok: true, veredicto: job.veredicto, certeza: job.certeza, informe: job.informe });
+        if (job.paid) return core.json(200, { ok: true, si: job.veredicto === 'si', certeza: job.certeza, informe: job.informe });
         const order = await captureOrder(orderID);
         if (order.status !== 'COMPLETED') return core.json(402, { error: `El pago no se completó (estado: ${order.status}).` });
         const cap = order.purchase_units && order.purchase_units[0] && order.purchase_units[0].payments && order.purchase_units[0].payments.captures && order.purchase_units[0].payments.captures[0];
         if (!cap || cap.amount.currency_code !== 'USD' || Number(cap.amount.value) < Number(core.PRICE_USD) - 0.01) { console.error('[cara-pay-capture] monto no coincide', orderID, cap && cap.amount); return core.json(402, { error: 'El monto pagado no corresponde al precio.' }); }
         const payer = (order.payer && order.payer.email_address) || '';
         await core.saveJob({ id: jobId, paid: true, paid_at: new Date().toISOString(), paid_amount_usd: Number(cap.amount.value), payer_email: payer || null });
-        core.aviso(`Cara: pago de US$${cap.amount.value}${payer ? ' · ' + payer : ''}`, `Pago recibido en «¿De qué tienes cara?».\nMonto: US$${cap.amount.value}\nVeredicto: cara de ${job.veredicto}\nPaís (aprox.): ${job.country || 'desconocido'}\nOrigen: ${job.ref || 'directo'}`);
-        return core.json(200, { ok: true, veredicto: job.veredicto, certeza: job.certeza, informe: job.informe });
+        core.aviso(`Cara: pago de US$${cap.amount.value}${payer ? ' · ' + payer : ''}`, `Pago recibido en «¿Tienes cara de culo?».\nMonto: US$${cap.amount.value}\nRespuesta: ${job.veredicto === 'si' ? 'SÍ' : 'NO'} tiene cara de culo\nPaís (aprox.): ${job.country || 'desconocido'}\nOrigen: ${job.ref || 'directo'}`);
+        return core.json(200, { ok: true, si: job.veredicto === 'si', certeza: job.certeza, informe: job.informe });
     } catch (e) { console.error('[cara-pay-capture]', e.message); return core.json(502, { error: 'No se pudo confirmar el pago con PayPal. Si el cargo sí se hizo, escríbenos y te lo resolvemos a mano.' }); }
 };

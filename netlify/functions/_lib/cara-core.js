@@ -1,6 +1,6 @@
 // «¿De qué tienes cara?»: piezas compartidas de las funciones cara-*.
 // Flujo: la foto llega reducida (base64) a cara-analizar → la IA devuelve veredicto + informe → la FOTO NO SE GUARDA en ningún lado;
-// solo se guarda el texto en la tabla cara_jobs (supabase/cara.sql). Gratis: el veredicto. Pagado (PayPal): el informe forense completo.
+// solo se guarda el texto en la tabla cara_jobs (supabase/cara.sql). Gratis: la respuesta (sí o no, al azar). Pagado (PayPal): el porqué, en un informe forense.
 const { json, UUID_RE, countryOf, ipOf, hashIp } = require('./tc-core');
 
 // >>> EDITA AQUÍ el precio (o pon CARA_PRICE_USD en Netlify). <<<
@@ -34,6 +34,10 @@ async function countToday(ipHash) {
 }
 
 // ---------- IA ----------
+// La respuesta (sí / no) la decide el SERVIDOR al azar ANTES de llamar a la IA; la IA solo escribe el porqué.
+const PROB_SI = Math.max(0, Math.min(1, Number(process.env.CARA_PROB_SI || 0.5)));
+const sortear = () => require('crypto').randomInt(1000) < PROB_SI * 1000;
+
 const SCHEMA = {
     type: 'OBJECT',
     properties: {
@@ -46,48 +50,41 @@ const SCHEMA = {
             },
             required: ['appearsUnder18', 'notAPerson', 'explicit']
         },
-        veredicto: { type: 'STRING', description: 'Lo que va después de «Tienes cara de». 2 a 8 palabras, sin punto final, sin repetir «cara de».' },
         certeza: { type: 'INTEGER', description: 'Porcentaje de certeza científica del veredicto, entre 71 y 99.' },
         informe: {
             type: 'OBJECT',
             properties: {
                 titulo: { type: 'STRING', description: 'Título del informe, estilo expediente forense absurdo.' },
                 hallazgos: {
-                    type: 'ARRAY', description: 'Exactamente 4 hallazgos sobre zonas o detalles VISIBLES en la foto.',
+                    type: 'ARRAY', description: 'Exactamente 4 hallazgos sobre zonas o detalles VISIBLES en la foto que prueban el veredicto.',
                     items: { type: 'OBJECT', properties: { zona: { type: 'STRING', description: '2 a 4 palabras: la zona o detalle (ej. «Ceja izquierda», «La pared de atrás»).' }, observacion: { type: 'STRING', description: '1 o 2 frases, tono clínico y serio, contenido absurdo.' } }, required: ['zona', 'observacion'] }
                 },
                 diagnostico: { type: 'STRING', description: '2 o 3 frases que remachan el veredicto.' },
                 pronostico: { type: 'STRING', description: 'Qué le espera a esta cara en los próximos días. 1 o 2 frases.' },
                 recomendacion: { type: 'STRING', description: 'Tratamiento recomendado, absurdo. 1 o 2 frases.' },
-                otrasCaras: { type: 'ARRAY', description: '3 «caras» secundarias detectadas, cada una de 2 a 7 palabras, sin «cara de».', items: { type: 'STRING' } }
+                otrasCaras: { type: 'ARRAY', description: '3 «caras» que esta persona SÍ tiene además (o en lugar) de la del veredicto, cada una de 2 a 7 palabras, sin «cara de».', items: { type: 'STRING' } }
             },
             required: ['titulo', 'hallazgos', 'diagnostico', 'pronostico', 'recomendacion', 'otrasCaras']
         }
     },
-    required: ['safety', 'veredicto', 'certeza', 'informe']
+    required: ['safety', 'certeza', 'informe']
 };
 
-const PROMPT = `Eres el «Laboratorio Nacional de Caras», un instituto de pura broma. Miras la foto y dices de qué tiene cara la persona.
-Es humor para compartir entre amigos: la gente lo usa para reírse de sí misma y de sus amigos.
+const PROMPT = (si) => `Eres el «Laboratorio Nacional de Caras», un instituto de pura broma. La app hace UNA sola pregunta: «¿Tienes cara de culo?» (en el sentido coloquial: cara de fastidio, de mal humor, de pocos amigos).
+El comité ya decidió el veredicto y NO se discute: ${si ? 'SÍ, esta persona TIENE cara de culo.' : 'NO, esta persona NO tiene cara de culo.'}
+Tu trabajo es escribir el INFORME FORENSE que lo justifica. Es lo que la persona paga por leer, así que tiene que dar mucha risa y sentirse hecho para ELLA.
 
-VEREDICTO (lo único que la persona ve gratis, tiene que dar risa sola, sin explicación):
-- Frase corta (2 a 8 palabras) que completa «Tienes cara de…». Ejemplos del tono: «culo», «que te tiraste un pedo en el ascensor», «que debes plata», «que dices "ya voy saliendo" y no te has bañado», «que te comiste el almuerzo ajeno de la refri», «que dejas en visto a tu mamá», «que pides hablar con el gerente», «que pones audios de 7 minutos», «que te ríes de tus propios chistes antes de terminarlos».
-- Puede ser un poco vulgar y coloquial latinoamericano («culo», «pedo», «chancletudo»), nada más fuerte que eso.
-- Usa «culo» tal cual solo cuando la expresión sea seria, malhumorada o de fastidio; si no, inventa otra. Varía siempre.
-- Bása el veredicto en la EXPRESIÓN, el gesto, la pose, la mirada, la ropa, los accesorios y lo que se ve en el fondo.
-
-PROHIBIDO (en el veredicto y en el informe): hablar del peso o la forma del cuerpo, el color de piel, la etnia, el pelo como rasgo étnico, discapacidades, enfermedades, la edad, el género o la orientación, si la persona es fea o bonita, y cualquier cosa sexual. Nada que humille de verdad: es una burla cariñosa, como entre amigos.
-
-INFORME FORENSE (lo que se paga): tono de expediente científico MUY serio con contenido absurdo. Cada hallazgo debe mencionar algo que de verdad se ve en esta foto (una ceja, la mirada, la boca, la camisa, la lámpara del fondo, el ángulo de la selfie), para que la persona sienta que es SOBRE ELLA. Inventa medidas ridículas con números («inclinación de 14 grados», «índice de indignación: 87%»). Que el diagnóstico remache el veredicto.
-
-Escribe en español neutro latinoamericano, tuteando. Si la foto tiene varias personas, analiza la cara más grande. Si no hay rostro humano, si parece menor de 18 años o si hay desnudez o violencia, marca safety y llena el resto con textos mínimos.`;
+- Tono de expediente científico MUY serio, contenido absurdo. Inventa medidas ridículas con números («inclinación de 14 grados», «índice de fastidio: 87%»).
+- Cada hallazgo menciona algo que de verdad se ve en ESTA foto: la mirada, una ceja, la boca, la ropa, la lámpara del fondo, el ángulo de la selfie. ${si ? 'Aunque la persona esté sonriendo, encuentra la prueba escondida (una sonrisa «sospechosamente forzada», etc.).' : 'Aunque la persona se vea seria, encuentra por qué en el fondo no lo es.'}
+- ${si ? 'Puedes ser un poco vulgar y coloquial latinoamericano («culo», «pedo»), nada más fuerte que eso.' : 'En «otrasCaras» di de qué SÍ tiene cara en cambio (ej. «que debes plata», «que pones audios de 7 minutos»).'}
+- PROHIBIDO: hablar del peso o la forma del cuerpo, el color de piel, la etnia, el pelo como rasgo étnico, discapacidades, enfermedades, la edad, el género o la orientación, si es fea o bonita, y cualquier cosa sexual. Es una burla cariñosa, como entre amigos.
+- Español neutro latinoamericano, tuteando al lector («tu ceja», «tu mirada»). Si hay varias personas, analiza la cara más grande.
+- Si no hay rostro humano, si parece menor de 18 años o si hay desnudez o violencia, marca safety y llena el resto con textos mínimos.`;
 
 const clean = (s, max) => String(s == null ? '' : s).replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
 function normalizar(d) {
     const inf = d.informe || {};
-    let ver = clean(d.veredicto, 90).replace(/^(tienes\s+)?cara\s+de\s+/i, '').replace(/[.。]+$/, '');
     return {
-        veredicto: ver,
         certeza: Math.max(71, Math.min(99, Math.round(Number(d.certeza) || 87))),
         informe: {
             titulo: clean(inf.titulo, 120),
@@ -99,10 +96,10 @@ function normalizar(d) {
         }
     };
 }
-const valido = (d) => d && d.safety && typeof d.veredicto === 'string' && d.veredicto.trim().length > 1 && d.informe && Array.isArray(d.informe.hallazgos) && d.informe.hallazgos.length >= 3 && d.informe.diagnostico;
+const valido = (d) => d && d.safety && d.informe && Array.isArray(d.informe.hallazgos) && d.informe.hallazgos.length >= 3 && d.informe.diagnostico;
 
 // Lo que la persona ve SIN pagar: veredicto, certeza y solo los nombres de las zonas (el gancho), nunca el texto del informe.
-const vistaGratis = (job) => ({ jobId: job.id, veredicto: job.veredicto, certeza: job.certeza, zonas: ((job.informe && job.informe.hallazgos) || []).map(h => h.zona), paid: !!job.paid });
+const vistaGratis = (job) => ({ jobId: job.id, si: job.veredicto === 'si', certeza: job.certeza, zonas: ((job.informe && job.informe.hallazgos) || []).map(h => h.zona), paid: !!job.paid });
 
 function aviso(asunto, texto) {
     if (!process.env.RESEND_API_KEY) return;
@@ -110,4 +107,4 @@ function aviso(asunto, texto) {
         body: JSON.stringify({ from: 'Graphikosmos <onboarding@resend.dev>', to: [process.env.FEEDBACK_TO_EMAIL || 'bonillapretiz@gmail.com'], subject: asunto, text: texto }) }).catch(() => {});
 }
 
-module.exports = { PRICE_USD, MAX_PER_DAY, MAX_IMG_CHARS, SCHEMA, PROMPT, normalizar, valido, vistaGratis, saveJob, getJob, countToday, aviso, json, UUID_RE, countryOf, ipOf, hashIp };
+module.exports = { sortear, PRICE_USD, MAX_PER_DAY, MAX_IMG_CHARS, SCHEMA, PROMPT, normalizar, valido, vistaGratis, saveJob, getJob, countToday, aviso, json, UUID_RE, countryOf, ipOf, hashIp };
