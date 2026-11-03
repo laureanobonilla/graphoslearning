@@ -114,3 +114,9 @@ p{margin:0 0 12px}
 .li-act{display:flex;gap:8px}
 .btn.small{padding:8px 14px;font-size:.88rem}
 @media (max-width:520px){.lvs{grid-template-columns:1fr}.lv{display:flex;justify-content:space-between;align-items:baseline;gap:10px}}
+/* curiosidades e historias poco contadas */
+.cur{margin:18px 0;padding:14px 16px;border-radius:12px;border:1px solid var(--line);border-left:4px solid var(--primary);background:var(--card)}
+.cur.untold{border-left-color:#b8862b}
+.cur b{display:block;font-size:.82rem;color:var(--muted);margin:0 0 6px;font-weight:600}
+.cur p{margin:0;font-family:'Newsreader',Georgia,serif;font-size:1.08rem;line-height:1.5}
+.cur .spk{margin:8px 0 0}
