@@ -41,7 +41,7 @@ ${kind ? `IMPORTANTE: «${term}» NO es un concepto sino ${kind === 'untold' ? '
 Después reemplaza entre ${L.blanks[0]} y ${L.blanks[1]} palabras de ese texto por marcas [[1]], [[2]]… (una marca por palabra o término de máximo dos palabras).
 Qué ocultar: SOLO términos CRUCIALES para entender el tema central «${central}»: conceptos, nombres propios, hechos, procesos o magnitudes que alguien que estudia «${central}» de verdad necesita saber (para «revolución rusa», por ejemplo, «régimen», «zar», «bolcheviques»). NO ocultes palabras generales que no hace falta estudiar para ese tema (como «hombre», «persona», «grupo», «época», «cambio», «forma»), ni verbos comunes, artículos, preposiciones o conectores.
 Marca «crucial» con honestidad: true solo si esa palabra es necesaria para entender «${central}». Si la definición ya no tiene palabras cruciales (porque es un concepto muy básico), igual oculta las palabras con más significado, pero márcalas con crucial=false.
-Reglas: no ocultes «${term}» ni una palabra que sea casi igual. La palabra oculta no debe aparecer en ninguna otra parte del texto. Que el texto con los espacios todavía permita deducir la respuesta. Cada espacio: la respuesta correcta primero en «answers» y, si acaso, variantes de FORMA de esa misma palabra (plural, grafía), nunca sinónimos; «meaning» explica en una frase qué significa esa palabra sin usarla.
+Reglas: no ocultes «${term}» ni una palabra que sea casi igual. La palabra oculta no debe aparecer en ninguna otra parte del texto. Que el texto con los espacios todavía permita deducir la respuesta, y que haya UNA sola respuesta evidente: lee la frase con el espacio vacío y pregúntate si otra palabra encajaría igual de bien (un sinónimo, un adjetivo, otro término); si es así, reescribe la frase para que solo encaje la palabra oculta, o elige otra palabra para ocultar. La palabra oculta NO puede compartir raíz con ninguna otra palabra del texto (por ejemplo, no ocultes «industrialización» si el texto dice «industrial», ni «revolución» si dice «revolucionarios»); la frase no puede quedar redundante ni forzada (como «La [[industrialización]] industrial transformaba…»). Cada espacio: la respuesta correcta primero en «answers» y, si acaso, variantes de FORMA de esa misma palabra (plural, grafía), nunca sinónimos; «meaning» explica en una frase qué significa esa palabra sin usarla.
 ${variant ? `Esta es la versión ${variant}: redáctala distinta a las anteriores y oculta otras palabras si es posible.` : ''}${avoid && avoid.length ? ` Evita parecerte a estos textos: ${avoid.map((a) => '«' + a + '»').join(' ')}.` : ''}`;
 }
 // Solo se aceptan variantes de FORMA de la respuesta principal (plural, grafía, artículo); los sinónimos se descartan aunque el modelo los proponga.
@@ -77,7 +77,13 @@ function validate(d, lvl) {
     if (marks.length < L.blanks[0] || marks.length > L.blanks[1] + 1 || new Set(marks).size !== marks.length) return false;
     for (const n of marks) { const b = d.blanks.find((x) => Number(x.n) === n); if (!b || !Array.isArray(b.answers) || !b.answers.length || !b.answers[0] || !String(b.meaning || '').trim()) return false; }
     const rest = norm(d.text.replace(/\[\[\d+\]\]/g, ' ')), tn = norm(d.term);
-    for (const n of marks) { const a = norm(d.blanks.find((x) => Number(x.n) === n).answers[0]); if (!a || a === tn || (' ' + rest + ' ').includes(' ' + a + ' ')) return false; }
+    const words = rest.split(' ').filter((w) => w.length >= 4);
+    for (const n of marks) {
+        const a = norm(d.blanks.find((x) => Number(x.n) === n).answers[0]); if (!a || a === tn || (' ' + rest + ' ').includes(' ' + a + ' ')) return false;
+        // la respuesta no puede compartir raíz con otra palabra del texto («industrialización» junto a «industrial»): delata la respuesta o la vuelve absurda
+        const roots = a.split(' ').filter((w) => w.length >= 5);
+        if (roots.some((r) => words.some((w) => cpl(r, w) >= Math.min(6, r.length - 1) && cpl(r, w) >= 5))) return false;
+    }
     return d.text.length > 60;
 }
 
