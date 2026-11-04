@@ -14,7 +14,7 @@
 
   var I = {
     es: { name: 'Profundiza', lv: { beginner: ['Principiante', '10 partes · 1–2 espacios'], intermediate: ['Intermedio', '25 partes · 3 espacios'], advanced: ['Avanzado', '65 partes · 4–5 espacios'] },
-      intro: 'Escribe un tema. Te doy una definición con espacios en blanco. Cada palabra que no sepas se vuelve la siguiente pregunta, y solo cuando la aciertas regresas a la anterior. Entre las preguntas se cuelan curiosidades e historias poco contadas del tema, cuando las hay.', ph: 'Por ejemplo: fotosíntesis', topicAria: 'Tema que quieres estudiar', levelAria: 'Nivel', go: 'Empezar', resume: function (t) { return 'Seguir con «' + t + '»'; },
+      intro: 'Escribe un tema o trae tu propio texto (link, PDF o texto pegado). Te doy fragmentos con espacios en blanco, sacados de tu texto cuando lo hay. Cada palabra que no sepas se vuelve la siguiente pregunta, y solo cuando la aciertas regresas a la anterior. Entre las preguntas se cuelan curiosidades e historias poco contadas del tema, cuando las hay.', ph: 'Por ejemplo: fotosíntesis', topicAria: 'Tema que quieres estudiar', levelAria: 'Nivel', go: 'Empezar', resume: function (t) { return 'Seguir con «' + t + '»'; },
       map: 'Mapa de tu recorrido', depth: function (d, m) { return 'Profundidad ' + d + ' de ' + m; }, up: function (d) { return ' · hay que subir ' + (d - 1) + (d === 2 ? ' nivel' : ' niveles') + ' para volver al tema'; }, atTopic: ' · estás en el tema', stat: function (a, b) { return a + ' resueltos · ' + b + ' por resolver (sin contar el tema)'; },
       learned: function (n) { return 'Lo que ya aprendiste (' + n + ')'; }, loadQ: function (t) { return 'Preparando la pregunta sobre «' + t + '»…'; }, loadV: function (t) { return 'Preparando otra versión de «' + t + '»…'; },
       failT: 'No pude preparar la pregunta', failB: 'Pasa a veces. Intenta de nuevo; tu avance está guardado.', retry: 'Reintentar',
@@ -27,7 +27,7 @@
       myTopics: 'Tus temas', contT: 'Continuar', viewT: 'Ver lo aprendido', delT: 'Quitar', sureT: '¿Quitar?', doneTag: 'Completado', progT: function (k, n) { return 'Parte ' + k + ' de ' + n; },
       minorNote: function (t) { return 'Esta palabra no es clave para «' + t + '», así que solo te la explico y seguimos.'; }, minorSeen: 'Seguimos: esas palabras no son clave para el tema, ya viste qué significan.', blankWord: 'espacio', curK: 'Curiosidad', untK: 'Historia poco contada' },
     en: { name: 'Dive Deeper', lv: { beginner: ['Beginner', '10 parts · 1–2 blanks'], intermediate: ['Intermediate', '25 parts · 3 blanks'], advanced: ['Advanced', '65 parts · 4–5 blanks'] },
-      intro: 'Type a topic. You get a definition with blanks. Every word you miss becomes the next question, and only when you get it right do you go back to the previous one. Curious facts and little-told stories about the topic are mixed in among the questions, when there are any.', ph: 'For example: photosynthesis', topicAria: 'Topic you want to study', levelAria: 'Level', go: 'Start', resume: function (t) { return 'Continue with “' + t + '”'; },
+      intro: 'Type a topic or bring your own text (link, PDF or pasted text). You get fragments with blanks, taken from your text when you have one. Every word you miss becomes the next question, and only when you get it right do you go back to the previous one. Curious facts and little-told stories about the topic are mixed in among the questions, when there are any.', ph: 'For example: photosynthesis', topicAria: 'Topic you want to study', levelAria: 'Level', go: 'Start', resume: function (t) { return 'Continue with “' + t + '”'; },
       map: 'Your path', depth: function (d, m) { return 'Depth ' + d + ' of ' + m; }, up: function (d) { return ' · climb ' + (d - 1) + (d === 2 ? ' level' : ' levels') + ' to get back to the topic'; }, atTopic: ' · you are at the topic', stat: function (a, b) { return a + ' solved · ' + b + ' to go (not counting the topic)'; },
       learned: function (n) { return 'What you have learned (' + n + ')'; }, loadQ: function (t) { return 'Preparing the question about “' + t + '”…'; }, loadV: function (t) { return 'Preparing another version of “' + t + '”…'; },
       failT: 'Could not prepare the question', failB: 'It happens. Try again; your progress is saved.', retry: 'Try again',
@@ -40,7 +40,7 @@
       myTopics: 'Your topics', contT: 'Continue', viewT: 'See what you learned', delT: 'Remove', sureT: 'Remove?', doneTag: 'Completed', progT: function (k, n) { return 'Part ' + k + ' of ' + n; },
       minorNote: function (t) { return 'This word is not key to “' + t + '”, so I just explain it and we move on.'; }, minorSeen: 'Moving on: those words are not key to the topic, and you have seen what they mean.', blankWord: 'blank', listen: 'Listen', listenText: 'Listen to the text', listenWord: 'Listen to the word', slow: 'Slow', noVoice: 'No voice available in this browser.', curK: 'Curious fact', untK: 'Little-told story' },
     de: { name: 'Tiefer lernen', lv: { beginner: ['Anfänger', '10 Teile · 1–2 Lücken'], intermediate: ['Mittel', '25 Teile · 3 Lücken'], advanced: ['Fortgeschritten', '65 Teile · 4–5 Lücken'] },
-      intro: 'Gib ein Thema ein. Du bekommst eine Definition mit Lücken. Jedes Wort, das du nicht weißt, wird zur nächsten Frage – erst wenn du es richtig hast, geht es zur vorherigen zurück. Zwischen den Fragen tauchen Kuriositäten und wenig erzählte Geschichten zum Thema auf, wenn es welche gibt.', ph: 'Zum Beispiel: Photosynthese', topicAria: 'Thema, das du lernen möchtest', levelAria: 'Niveau', go: 'Los', resume: function (t) { return 'Weiter mit „' + t + '“'; },
+      intro: 'Gib ein Thema ein oder bring deinen eigenen Text mit (Link, PDF oder eingefügter Text). Du bekommst Ausschnitte mit Lücken, aus deinem Text, wenn du einen hast. Jedes Wort, das du nicht weißt, wird zur nächsten Frage – erst wenn du es richtig hast, geht es zur vorherigen zurück. Zwischen den Fragen tauchen Kuriositäten und wenig erzählte Geschichten zum Thema auf, wenn es welche gibt.', ph: 'Zum Beispiel: Photosynthese', topicAria: 'Thema, das du lernen möchtest', levelAria: 'Niveau', go: 'Los', resume: function (t) { return 'Weiter mit „' + t + '“'; },
       map: 'Dein Weg', depth: function (d, m) { return 'Tiefe ' + d + ' von ' + m; }, up: function (d) { return ' · ' + (d - 1) + (d === 2 ? ' Ebene' : ' Ebenen') + ' nach oben, um zum Thema zurückzukehren'; }, atTopic: ' · du bist beim Thema', stat: function (a, b) { return a + ' gelöst · ' + b + ' offen (ohne das Thema)'; },
       learned: function (n) { return 'Das hast du gelernt (' + n + ')'; }, loadQ: function (t) { return 'Frage zu „' + t + '“ wird vorbereitet …'; }, loadV: function (t) { return 'Andere Version von „' + t + '“ wird vorbereitet …'; },
       failT: 'Die Frage konnte nicht erstellt werden', failB: 'Das passiert. Versuch es noch einmal; dein Fortschritt ist gespeichert.', retry: 'Noch einmal',
@@ -53,7 +53,7 @@
       myTopics: 'Deine Themen', contT: 'Weiter', viewT: 'Gelerntes ansehen', delT: 'Entfernen', sureT: 'Entfernen?', doneTag: 'Abgeschlossen', progT: function (k, n) { return 'Teil ' + k + ' von ' + n; },
       minorNote: function (t) { return 'Dieses Wort ist für „' + t + '“ nicht wichtig, deshalb erkläre ich es nur und wir machen weiter.'; }, minorSeen: 'Weiter: diese Wörter sind für das Thema nicht wichtig, ihre Bedeutung hast du gesehen.', blankWord: 'Lücke', listen: 'Anhören', listenText: 'Text anhören', listenWord: 'Wort anhören', slow: 'Langsam', noVoice: 'In diesem Browser ist keine Stimme verfügbar.', curK: 'Kuriosität', untK: 'Wenig erzählte Geschichte' },
     fr: { name: 'Approfondis', lv: { beginner: ['Débutant', '10 parties · 1–2 blancs'], intermediate: ['Intermédiaire', '25 parties · 3 blancs'], advanced: ['Avancé', '65 parties · 4–5 blancs'] },
-      intro: 'Écris un sujet. Tu reçois une définition à trous. Chaque mot que tu rates devient la question suivante, et ce n’est qu’en le réussissant que tu reviens à la précédente. Entre les questions se glissent des curiosités et des histoires peu racontées sur le sujet, quand il y en a.', ph: 'Par exemple : photosynthèse', topicAria: 'Sujet que tu veux étudier', levelAria: 'Niveau', go: 'Commencer', resume: function (t) { return 'Continuer avec « ' + t + ' »'; },
+      intro: 'Écris un sujet ou apporte ton propre texte (lien, PDF ou texte collé). Tu reçois des extraits à trous, tirés de ton texte quand tu en as un. Chaque mot que tu rates devient la question suivante, et ce n’est qu’en le réussissant que tu reviens à la précédente. Entre les questions se glissent des curiosités et des histoires peu racontées sur le sujet, quand il y en a.', ph: 'Par exemple : photosynthèse', topicAria: 'Sujet que tu veux étudier', levelAria: 'Niveau', go: 'Commencer', resume: function (t) { return 'Continuer avec « ' + t + ' »'; },
       map: 'Ton parcours', depth: function (d, m) { return 'Profondeur ' + d + ' sur ' + m; }, up: function (d) { return ' · il faut remonter de ' + (d - 1) + (d === 2 ? ' niveau' : ' niveaux') + ' pour revenir au sujet'; }, atTopic: ' · tu es au sujet', stat: function (a, b) { return a + ' résolus · ' + b + ' à résoudre (sans compter le sujet)'; },
       learned: function (n) { return 'Ce que tu as appris (' + n + ')'; }, loadQ: function (t) { return 'Préparation de la question sur « ' + t + ' »…'; }, loadV: function (t) { return 'Préparation d’une autre version de « ' + t + ' »…'; },
       failT: 'Impossible de préparer la question', failB: 'Ça arrive. Réessaie ; ta progression est enregistrée.', retry: 'Réessayer',
@@ -66,7 +66,14 @@
       myTopics: 'Tes sujets', contT: 'Continuer', viewT: 'Voir ce que tu as appris', delT: 'Retirer', sureT: 'Retirer ?', doneTag: 'Terminé', progT: function (k, n) { return 'Partie ' + k + ' sur ' + n; },
       minorNote: function (t) { return 'Ce mot n’est pas essentiel pour « ' + t + ' », je l’explique donc et on continue.'; }, minorSeen: 'On continue : ces mots ne sont pas essentiels pour le sujet, tu as vu ce qu’ils veulent dire.', blankWord: 'blanc', listen: 'Écouter', listenText: 'Écouter le texte', listenWord: 'Écouter le mot', slow: 'Lent', noVoice: 'Aucune voix disponible dans ce navigateur.', curK: 'Curiosité', untK: 'Histoire peu racontée' }
   };
-  var T = I[LANG];
+
+  var IX = {
+    es: { tabTopic: 'Tema', tabLink: 'Link', tabFile: 'PDF o archivo', tabText: 'Texto', phLink: 'Pega el link de un artículo o de un PDF', phText: 'Pega aquí tu texto: un capítulo, tus apuntes, un artículo…', pickFile: 'Elegir PDF o archivo de texto', fileHint: 'PDF, TXT o MD. Se lee en tu dispositivo: a la IA solo viajan los fragmentos de cada pregunta.', textHint: 'Las preguntas salen de tu texto, con sus mismas palabras. La IA solo completa cuando algo no está en él.', readingP: function (p, n) { return 'Leyendo la página ' + p + ' de ' + n + '…'; }, fetching: 'Leyendo el link…', preparing: 'Preparando tu texto…', errNoText: 'No encontré texto suficiente. Si el PDF es escaneado (solo imágenes) no se puede leer: prueba con otro archivo o pega el texto.', errUrl: 'Ese link no es válido o no se pudo abrir.', errPoco: 'Esa página casi no tiene texto (puede cargarlo con JavaScript o pedir inicio de sesión). Pega el texto o sube el archivo.', errPdfBig: 'Ese PDF es demasiado grande para abrirlo desde el link. Descárgalo y súbelo como archivo.', errPdfLib: 'No pude cargar el lector de PDF. Revisa tu conexión e intenta de nuevo.', errLen: 'Ese texto es muy corto para estudiarlo (unos 300 caracteres como mínimo). Pega más texto o escribe un tema.', fromText: 'Fragmento de tu texto', fromAI: 'Explicación creada por la IA (no estaba en tu texto)', srcName: { link: 'Link', file: 'Archivo', text: 'Texto' }, ok2: 'Aceptar', chosen: function (n) { return n; } },
+    en: { tabTopic: 'Topic', tabLink: 'Link', tabFile: 'PDF or file', tabText: 'Text', phLink: 'Paste the link to an article or a PDF', phText: 'Paste your text here: a chapter, your notes, an article…', pickFile: 'Choose a PDF or text file', fileHint: 'PDF, TXT or MD. It is read on your device: only the fragments of each question go to the AI.', textHint: 'Questions come from your text, in its own words. The AI only fills in when something is not in it.', readingP: function (p, n) { return 'Reading page ' + p + ' of ' + n + '…'; }, fetching: 'Reading the link…', preparing: 'Preparing your text…', errNoText: 'I could not find enough text. A scanned PDF (images only) cannot be read: try another file or paste the text.', errUrl: 'That link is not valid or could not be opened.', errPoco: 'That page has almost no text (it may load it with JavaScript or require a login). Paste the text or upload the file.', errPdfBig: 'That PDF is too large to open from the link. Download it and upload it as a file.', errPdfLib: 'I could not load the PDF reader. Check your connection and try again.', errLen: 'That text is too short to study (about 300 characters minimum). Paste more text or type a topic.', fromText: 'Fragment from your text', fromAI: 'Explanation written by the AI (it was not in your text)', srcName: { link: 'Link', file: 'File', text: 'Text' } },
+    de: { tabTopic: 'Thema', tabLink: 'Link', tabFile: 'PDF oder Datei', tabText: 'Text', phLink: 'Link zu einem Artikel oder PDF einfügen', phText: 'Füge hier deinen Text ein: ein Kapitel, deine Notizen, einen Artikel …', pickFile: 'PDF oder Textdatei wählen', fileHint: 'PDF, TXT oder MD. Wird auf deinem Gerät gelesen: Nur die Ausschnitte jeder Frage gehen an die KI.', textHint: 'Die Fragen stammen aus deinem Text, mit seinen eigenen Worten. Die KI ergänzt nur, was nicht darin steht.', readingP: function (p, n) { return 'Seite ' + p + ' von ' + n + ' wird gelesen …'; }, fetching: 'Link wird gelesen …', preparing: 'Dein Text wird vorbereitet …', errNoText: 'Ich habe nicht genug Text gefunden. Ein gescanntes PDF (nur Bilder) kann nicht gelesen werden: Versuche eine andere Datei oder füge den Text ein.', errUrl: 'Dieser Link ist ungültig oder konnte nicht geöffnet werden.', errPoco: 'Diese Seite hat fast keinen Text (er wird evtl. per JavaScript geladen oder erfordert eine Anmeldung). Füge den Text ein oder lade die Datei hoch.', errPdfBig: 'Dieses PDF ist zu groß, um es über den Link zu öffnen. Lade es herunter und als Datei hoch.', errPdfLib: 'Der PDF-Leser konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.', errLen: 'Dieser Text ist zu kurz zum Lernen (mindestens etwa 300 Zeichen). Füge mehr Text ein oder gib ein Thema ein.', fromText: 'Ausschnitt aus deinem Text', fromAI: 'Von der KI geschriebene Erklärung (stand nicht in deinem Text)', srcName: { link: 'Link', file: 'Datei', text: 'Text' } },
+    fr: { tabTopic: 'Sujet', tabLink: 'Lien', tabFile: 'PDF ou fichier', tabText: 'Texte', phLink: 'Colle le lien d’un article ou d’un PDF', phText: 'Colle ici ton texte : un chapitre, tes notes, un article…', pickFile: 'Choisir un PDF ou un fichier texte', fileHint: 'PDF, TXT ou MD. Lu sur ton appareil : seuls les extraits de chaque question vont à l’IA.', textHint: 'Les questions viennent de ton texte, avec ses propres mots. L’IA ne complète que ce qui n’y figure pas.', readingP: function (p, n) { return 'Lecture de la page ' + p + ' sur ' + n + '…'; }, fetching: 'Lecture du lien…', preparing: 'Préparation de ton texte…', errNoText: 'Je n’ai pas trouvé assez de texte. Un PDF scanné (images seulement) ne peut pas être lu : essaie un autre fichier ou colle le texte.', errUrl: 'Ce lien n’est pas valide ou n’a pas pu être ouvert.', errPoco: 'Cette page contient presque pas de texte (elle le charge peut-être en JavaScript ou demande une connexion). Colle le texte ou téléverse le fichier.', errPdfBig: 'Ce PDF est trop gros pour être ouvert depuis le lien. Télécharge-le et téléverse-le comme fichier.', errPdfLib: 'Impossible de charger le lecteur PDF. Vérifie ta connexion et réessaie.', errLen: 'Ce texte est trop court pour être étudié (environ 300 caractères minimum). Colle plus de texte ou écris un sujet.', fromText: 'Extrait de ton texte', fromAI: 'Explication écrite par l’IA (elle ne figurait pas dans ton texte)', srcName: { link: 'Lien', file: 'Fichier', text: 'Texte' } }
+  };
+  var T = I[LANG]; Object.keys(IX[LANG]).forEach(function (k) { T[k] = IX[LANG][k]; });
   var KEY = 'prf_state_v2_' + LANG, ANON = (function () { try { var a = localStorage.getItem('prf_anon'); if (!a) { a = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('prf_anon', a); } return a; } catch (e) { return 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); } })();
   var $ = function (id) { return document.getElementById(id); };
   var main = $('main'), pile = $('pile'), learnEl = $('learn');
@@ -89,7 +96,7 @@
     if (!S) return; S.updated = Date.now(); var list = libAll().filter(function (x) { return x.id !== S.id; }); list.unshift(S);
     if (!libPut(list)) { list.forEach(function (x) { if (x.status === 'done') { x.stack = []; x.nodes = []; } }); libPut(list); }   // sin espacio: se aligeran los temas terminados (se conserva lo aprendido)
   }
-  function libDel(id) { libPut(libAll().filter(function (x) { return x.id !== id; })); }
+  function libDel(id) { var all = libAll(), it = all.filter(function (x) { return x.id === id; })[0], rest = all.filter(function (x) { return x.id !== id; }); libPut(rest); if (it && it.src && window.PRF_SRC && !rest.some(function (x) { return x.src && x.src.id === it.src.id; })) window.PRF_SRC.del(it.src.id); }
   function newId() { return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
   (function migrate() {   // el tema que estaba a medias en la versión anterior pasa a la biblioteca
     try { var old = JSON.parse(localStorage.getItem(KEY) || 'null'); if (old && old.stack && old.stack.length) { old.id = newId(); old.parts = old.parts || [old.topic]; old.part = old.part || 0; old.status = 'active'; var list = libAll(); list.unshift(old); libPut(list); } localStorage.removeItem(KEY); } catch (e) {}
@@ -114,12 +121,18 @@
   }
 
   function kindOf(k) { var v = (S.kinds || [])[k == null ? S.part : k]; return v === 'untold' || v === 'curiosity' ? v : ''; }
+  function aiCloze(term, parent, variant, avoid, k0) {
+    return fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cloze', anonId: ANON, lang: LANG, term: term, topic: S.topic, parent: parent || '', level: S.level, variant: variant || 0, avoid: avoid || [], partK: parent ? 0 : k0 + 1, partN: parent ? 0 : S.parts.length, kind: parent ? '' : kindOf(k0) }) })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'http'); return j; }); });
+  }
   function getCloze(term, parent, variant, avoid) {
-    var key = norm(term) + '|' + S.level + '|' + (variant || 0) + '|' + (parent ? '' : 'p' + S.part);
+    var k0 = S.part, key = norm(term) + '|' + S.level + '|' + (variant || 0) + '|' + (parent ? '' : 'p' + k0) + (S.src ? '|' + S.id : '');
     if (cache[key]) return cache[key];
-    var p = fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cloze', anonId: ANON, lang: LANG, term: term, topic: S.topic, parent: parent || '', level: S.level, variant: variant || 0, avoid: avoid || [], partK: parent ? 0 : S.part + 1, partN: parent ? 0 : S.parts.length, kind: parent ? '' : kindOf() }) })
-      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'http'); return j; }); })
-      .catch(function (e) { delete cache[key]; throw e; });
+    var ai = function () { return aiCloze(term, parent, variant, avoid, k0); }, p;
+    if (S.src && !parent) p = srcPart(k0, variant).then(function (r) { return r === 'nosrc' ? ai() : r; });
+    else if (S.src && parent) p = srcDefine(term).then(function (r) { return r || ai(); });
+    else p = ai();
+    p = p.then(function (c) { if (c && !c.skip && !c.from) c.from = 'ai'; return c; }, function (e) { delete cache[key]; throw e; });
     cache[key] = p; return p;
   }
 
@@ -161,18 +174,49 @@
     L.forEach(function (x) { var a = el('a', null, x[1]); a.href = x[2]; if (x[0] === LANG) a.setAttribute('aria-current', 'page'); d.appendChild(a); }); return d;
   }
 
-  function start() {
-    stopSpeech(); S = null; document.body.classList.remove('fin'); renderPile(); main.textContent = '';
+  function start(opt) {
+    opt = opt || {}; stopSpeech(); S = null; document.body.classList.remove('fin'); renderPile(); main.textContent = '';
     var hero = el('div', 'hero'), form = el('div', 'formcard'); hero.appendChild(el('h1', null, T.name));
     hero.appendChild(el('p', null, T.intro)); hero.appendChild(langs());
-    var inp = el('input', 'field'); inp.type = 'text'; inp.placeholder = T.ph; inp.maxLength = 80; inp.setAttribute('aria-label', T.topicAria); form.appendChild(inp);
+    var mode = opt.mode || 'topic', file = null, tabs = el('div', 'tabs'), panels = {};
+    tabs.setAttribute('role', 'tablist');
+    [['topic', T.tabTopic], ['link', T.tabLink], ['file', T.tabFile], ['text', T.tabText]].forEach(function (m) { var b = el('button', 'tab', m[1]); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.m = m[0]; b.onclick = function () { setMode(m[0]); }; tabs.appendChild(b); });
+    form.appendChild(tabs);
+    var inp = el('input', 'field'); inp.type = 'text'; inp.placeholder = T.ph; inp.maxLength = 80; inp.setAttribute('aria-label', T.topicAria);
+    var url = el('input', 'field'); url.type = 'url'; url.placeholder = T.phLink; url.maxLength = 600; url.setAttribute('aria-label', T.tabLink); url.autocomplete = 'off';
+    var fbox = el('div', 'filebox'), pick = el('button', 'btn ghost', '📄 ' + T.pickFile), fname = el('span', 'fname'), fin = el('input'); pick.type = 'button'; fin.type = 'file'; fin.accept = '.pdf,.txt,.md,application/pdf,text/plain'; fin.className = 'hide';
+    var setFile = function (f) { file = f || null; fname.textContent = file ? file.name + ' · ' + Math.max(1, Math.round(file.size / 1024)) + ' KB' : ''; fbox.classList.toggle('has', !!file); };
+    pick.onclick = function () { fin.click(); }; fin.onchange = function () { setFile(fin.files[0]); };
+    ['dragover', 'dragenter'].forEach(function (ev) { fbox.addEventListener(ev, function (e) { e.preventDefault(); fbox.classList.add('drag'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { fbox.addEventListener(ev, function (e) { e.preventDefault(); fbox.classList.remove('drag'); }); });
+    fbox.addEventListener('drop', function (e) { var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) setFile(f); });
+    fbox.appendChild(pick); fbox.appendChild(fname); fbox.appendChild(fin);
+    var ta = el('textarea', 'field area'); ta.placeholder = T.phText; ta.setAttribute('aria-label', T.tabText); ta.rows = 7;
+    var hint = el('p', 'muted small hint');
+    panels.topic = [inp]; panels.link = [url]; panels.file = [fbox]; panels.text = [ta];
+    var holder = el('div', 'panel'); form.appendChild(holder); form.appendChild(hint);
+    var err = el('p', 'err hide'); form.appendChild(err);
     var lvl = 'beginner', box = el('div', 'lvs'); box.setAttribute('role', 'group'); box.setAttribute('aria-label', T.levelAria);
     Object.keys(T.lv).forEach(function (k) { var b = el('button', 'lv'); b.type = 'button'; b.setAttribute('aria-pressed', k === lvl ? 'true' : 'false'); b.appendChild(el('b', null, T.lv[k][0])); b.appendChild(el('span', null, T.lv[k][1])); b.onclick = function () { lvl = k; [].forEach.call(box.children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); }; box.appendChild(b); });
     form.appendChild(box);
     var go = el('button', 'btn', T.go); go.type = 'button'; form.appendChild(go); main.appendChild(hero); main.appendChild(form);
+    function showErr(m) { err.textContent = m || ''; err.classList.toggle('hide', !m); }
+    function setMode(m) {
+      mode = m; showErr(''); holder.textContent = ''; panels[m].forEach(function (n) { holder.appendChild(n); });
+      [].forEach.call(tabs.children, function (t) { var on = t.dataset.m === m; t.setAttribute('aria-selected', on ? 'true' : 'false'); t.classList.toggle('on', on); });
+      hint.textContent = m === 'file' ? T.fileHint : m === 'text' || m === 'link' ? T.textHint : '';
+      var f = panels[m][0]; if (f.focus && m !== 'file') f.focus();
+    }
+    setMode(mode); if (opt.err) showErr(opt.err);
     library();
-    var run = function () { var t = inp.value.trim(); if (t.length < 2) { inp.focus(); return; } track('prf_start', { level: lvl }); begin(t, lvl); };
-    go.onclick = run; inp.onkeydown = function (e) { if (e.key === 'Enter') run(); }; inp.focus();
+    var run = function () {
+      showErr('');
+      if (mode === 'topic') { var t = inp.value.trim(); if (t.length < 2) { inp.focus(); return; } track('prf_start', { level: lvl }); begin(t, lvl); return; }
+      if (mode === 'link') { var u = url.value.trim(); if (u && !/^https?:\/\//i.test(u) && u.indexOf('.') > 0) u = 'https://' + u; if (!/^https?:\/\/[^\s]+\.[^\s]+/i.test(u)) { showErr(T.errUrl); url.focus(); return; } track('prf_start', { level: lvl, src: 'link' }); fromLink(u, lvl); return; }
+      if (mode === 'file') { if (!file) { fin.click(); return; } track('prf_start', { level: lvl, src: 'file' }); fromFile(file, lvl); return; }
+      var tx = ta.value.trim(); if (tx.length < 300) { showErr(T.errLen); ta.focus(); return; } track('prf_start', { level: lvl, src: 'text' }); beginSource({ title: '', text: tx, kind: 'text' }, lvl);
+    };
+    go.onclick = run; inp.onkeydown = function (e) { if (e.key === 'Enter') run(); }; url.onkeydown = function (e) { if (e.key === 'Enter') run(); };
   }
 
   function library() {
@@ -180,7 +224,7 @@
     var box = el('div', 'lib'); box.appendChild(el('h3', null, T.myTopics));
     list.forEach(function (x) {
       var row = el('div', 'libitem'), info = el('div', 'li-info'), n = (x.parts || [x.topic]).length;
-      info.appendChild(el('b', null, x.topic));
+      info.appendChild(el('b', null, (x.src ? '📄 ' : '') + x.topic));
       info.appendChild(el('span', null, (T.lv[x.level] ? T.lv[x.level][0] : '') + ' · ' + (x.status === 'done' ? T.doneTag : T.progT((x.part || 0) + 1, n))));
       if (x.status !== 'done' && n > 1) { var pb = el('div', 'pbar'), pi = el('i'); pi.style.width = Math.round((x.part || 0) / n * 100) + '%'; pb.appendChild(pi); info.appendChild(pb); }
       row.appendChild(info);
@@ -202,10 +246,83 @@
       }).catch(function () { fail(function () { begin(t, lvl); }); });
   }
 
+
+  /* ---------- fuentes propias (link, PDF, archivo, texto) ---------- */
+  var SRC = null;
+  function srcErr(code) { return code === 'url' ? T.errUrl : code === 'poco_texto' ? T.errPoco : code === 'pdf_grande' ? T.errPdfBig : code === 'pdflib' ? T.errPdfLib : T.errNoText; }
+  function fromLink(u, lvl) {
+    loading(T.fetching);
+    fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'fetchurl', anonId: ANON, url: u }) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.error || 'http'); throw e; } return j; }); })
+      .then(function (j) {
+        if (j.pdf) return window.PRF_SRC.readBase64Pdf(j.pdf, function (p, n) { loading(T.readingP(p, n)); }, j.title).then(function (r) { return { title: r.title || j.title, text: r.text, kind: 'link' }; });
+        return { title: j.title, text: j.text, kind: 'link' };
+      })
+      .then(function (info) { if (!info.text || info.text.length < 300) throw new Error('no_text'); beginSource(info, lvl); })
+      .catch(function (e) { track('prf_error', { where: 'link' }); start({ mode: 'link', err: srcErr(e.message) }); });
+  }
+  function fromFile(f, lvl) {
+    loading(T.preparing);
+    window.PRF_SRC.readFile(f, function (p, n) { loading(T.readingP(p, n)); })
+      .then(function (r) { if (!r.text || r.text.length < 300) throw new Error('no_text'); beginSource({ title: r.title, text: r.text, kind: 'file' }, lvl); })
+      .catch(function (e) { track('prf_error', { where: 'file' }); start({ mode: 'file', err: srcErr(e.message) }); });
+  }
+  function beginSource(info, lvl) {
+    loading(T.preparing);
+    setTimeout(function () {   // deja pintar la pantalla antes del trabajo pesado
+      var chunks = window.PRF_SRC.chunk(info.text);
+      if (!chunks.length) { start({ mode: info.kind === 'text' ? 'text' : 'topic', err: T.errNoText }); return; }
+      var sid = 's' + newId(); window.PRF_SRC.save(sid, chunks);
+      startFromChunks(chunks, (info.title || '').slice(0, 80), info.kind, lvl, sid, info.text.length);
+    }, 30);
+  }
+  function startFromChunks(chunks, title, kind, lvl, sid, chars) {
+    var P = PARTS[lvl], pl = window.PRF_SRC.plan(chunks, P);
+    if (!pl.length) { start({ err: T.errNoText }); return; }
+    SRC = { id: sid, chunks: chunks, idx: window.PRF_SRC.makeIndex(chunks) };
+    var base = { id: newId(), topic: title || window.PRF_SRC.title(chunks[0]), level: lvl, parts: pl.map(function (x) { return x.label; }), kinds: [], plan: pl, src: { auto: !title || kind === 'file', id: sid, kind: kind, chars: chars || chunks.join(' ').length, chunks: chunks.length }, part: 0, status: 'active', created: Date.now(), stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1, usedSrc: {} };
+    var go = function () { S = base; track('prf_src_start', { kind: kind, level: lvl, chunks: chunks.length, parts: S.parts.length }); save(); pushFrame(S.parts[0], '', null); };
+    if (pl.length < P && lvl === 'advanced') {   // texto corto en nivel avanzado: la IA amplía con partes complementarias (marcadas como suyas)
+      loading(T.loadO(base.topic));
+      fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'outline', anonId: ANON, lang: LANG, topic: base.topic, level: lvl, count: P - pl.length, context: chunks.slice(0, 2).join(' ').slice(0, 600) }) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.parts || !j.parts.length) throw new Error('x'); return j; }); })
+        .then(function (o) { base.parts = base.parts.concat(o.parts); base.kinds = base.parts.map(function (_, i) { return i < pl.length ? '' : (o.kinds || [])[i - pl.length] || ''; }); }).catch(function () {}).then(go);
+    } else go();
+  }
+  function ensureSrc() {
+    if (!S || !S.src) return Promise.resolve(null);
+    if (SRC && SRC.id === S.src.id) return Promise.resolve(SRC);
+    var id = S.src.id;
+    return window.PRF_SRC.load(id).then(function (ch) { if (!ch) return null; SRC = { id: id, chunks: ch, idx: window.PRF_SRC.makeIndex(ch) }; return SRC; });
+  }
+  function postSrc(body) {
+    body.action = 'srccloze'; body.anonId = ANON; body.lang = LANG; body.topic = S.topic; body.level = S.level;
+    return fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw new Error(j.error || 'http'); return j; }); });
+  }
+  function srcPart(k, variant) {   // una parte del documento: la IA elige un pasaje de los fragmentos candidatos (el pasaje sale tal cual del texto)
+    return ensureSrc().then(function (src) {
+      var pl = S.plan && S.plan[k]; if (!src || !pl) return 'nosrc';
+      var cands = pl.c.slice(variant || 0).map(function (i) { return { i: i, text: src.chunks[i] }; }); if (!cands.length) return 'nosrc';
+      var batches = [cands.slice(0, 3), cands.slice(3, 6)].filter(function (b) { return b.length; }), errs = 0;
+      function tryB(n) { if (n >= batches.length) return Promise.resolve(null); return postSrc({ mode: 'part', chunks: batches[n] }).then(function (r) { return r && r.text ? r : tryB(n + 1); }, function () { errs++; return tryB(n + 1); }); }
+      return tryB(0).then(function (r) { if (r) { track('prf_src_ok', {}); if (S.src.auto && r.topic) { S.topic = r.topic; S.src.auto = false; } return r; } if (errs === batches.length) throw new Error('src'); track('prf_src_fail', {}); return { skip: true }; });
+    });
+  }
+  function srcDefine(term) {   // busca en el texto algo que defina la palabra fallada; null si no hay (entonces la IA la explica)
+    return ensureSrc().then(function (src) {
+      if (!src) return null;
+      var k = norm(term); S.usedSrc = S.usedSrc || {};
+      var ex = S.stack.map(function (f) { return f.cloze && f.cloze.src; }).filter(function (x) { return x != null; }).concat(S.usedSrc[k] || []);
+      var c = window.PRF_SRC.find(src.idx, term, ex, 3); if (!c.length) { track('prf_src_define_none', { why: 'nocand' }); return null; }
+      return postSrc({ mode: 'define', term: term, chunks: c }).then(function (r) { if (r && r.text) { (S.usedSrc[k] = S.usedSrc[k] || []).push(r.src); track('prf_src_define', {}); return r; } track('prf_src_define_none', { why: 'ai' }); return null; }, function () { return null; });
+    });
+  }
+
   function pushFrame(term, parent, why, nodeId) {
     loading(T.loadQ(term));
     getCloze(term, parent, 0, []).then(function (c) {
-      var shown = (c.term && String(c.term).trim()) || term; if (nodeId == null) { nodeId = node(shown, null).id; } else if (S.nodes[nodeId]) S.nodes[nodeId].term = shown;
+      if (c && c.skip) { if (S.part < S.parts.length - 1) { S.part++; save(); pushFrame(S.parts[S.part], '', null); } else done(); return; }   // esa parte del documento no tenía un pasaje útil
+      var shown = (c.term && String(c.term).trim()) || term; if (!parent && S.src && S.plan && S.plan[S.part]) S.parts[S.part] = shown; if (nodeId == null) { nodeId = node(shown, null).id; } else if (S.nodes[nodeId]) S.nodes[nodeId].term = shown;
       setStatus(nodeId, 'active'); S.stack.push({ term: shown, parent: parent || '', nodeId: nodeId, cloze: c, pending: [], tries: 0, why: why || '', seen: [c.text] });
       S.maxDepth = Math.max(S.maxDepth, S.stack.length); save(); ask();
     }).catch(function () { fail(function () { pushFrame(term, parent, why, nodeId); }); });
@@ -213,7 +330,8 @@
 
   function ask() {
     var f = S.stack[S.stack.length - 1]; stopSpeech(); renderPile(); main.textContent = '';
-    crumb(main); if (f.why && f.tries === 0) main.appendChild(el('div', 'why', f.why));
+    crumb(main); if (S.src) { var fr = f.cloze.from === 'source' ? 'source' : 'ai'; main.appendChild(el('p', 'srctag ' + fr, (fr === 'source' ? '📄 ' + T.fromText : '✨ ' + T.fromAI))); }
+    if (f.why && f.tries === 0) main.appendChild(el('div', 'why', f.why));
     track('prf_cloze_shown', { depth: S.stack.length, tries: f.tries });
     var bar = ttsBar(function () { return f.term + '. ' + plain(f); }); if (bar) main.appendChild(bar);
     var p = el('p', 'cloze'), inputs = [];
@@ -310,7 +428,7 @@
     var withM = S.learned.filter(function (x) { return x.meaning; });
     if (withM.length) { main.appendChild(el('p', null, T.recap)); var ul = el('ul', 'recap'); withM.forEach(function (x) { var li = el('li'); li.appendChild(el('b', null, x.term)); if (TTS) li.appendChild(spk(x.term, T.listenWord)); li.appendChild(document.createTextNode(': ' + x.meaning)); ul.appendChild(li); }); main.appendChild(ul); }
     var row = el('div', 'row'), again = el('button', 'btn', T.again); again.onclick = function () { document.body.classList.remove('fin'); start(); }; row.appendChild(again);
-    var up = el('button', 'btn ghost', T.harder); up.onclick = function () { var t = S.topic, nl = S.level === 'beginner' ? 'intermediate' : 'advanced'; document.body.classList.remove('fin'); track('prf_start', { level: nl, harder: true }); begin(t, nl); }; if (S.level !== 'advanced') row.appendChild(up);
+    var up = el('button', 'btn ghost', T.harder); up.onclick = function () { var t = S.topic, nl = S.level === 'beginner' ? 'intermediate' : 'advanced'; document.body.classList.remove('fin'); track('prf_start', { level: nl, harder: true }); if (S.src) { var sr = S.src, ttl = S.topic; loading(T.preparing); window.PRF_SRC.load(sr.id).then(function (ch) { if (!ch) start({ err: T.errNoText }); else startFromChunks(ch, ttl, sr.kind, nl, sr.id, sr.chars); }); } else begin(t, nl); }; if (S.level !== 'advanced') row.appendChild(up);
     main.appendChild(row);
   }
 

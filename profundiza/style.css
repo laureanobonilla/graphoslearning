@@ -117,3 +117,36 @@ p{margin:0 0 12px}
 /* parte que es curiosidad o historia poco contada */
 .ktag{display:inline-block;font-size:.8rem;font-weight:600;margin:0 0 8px;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary)}
 .ktag.untold{background:#f3e6c8;color:#7a5410}
+/* fuentes propias: pestañas, archivo, texto */
+.tabs{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+.tab{background:var(--bg);border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:8px 15px;font:500 .92rem 'Instrument Sans',sans-serif;cursor:pointer}
+.tab.on{background:var(--primary);color:var(--primary-ink);border-color:var(--primary);font-weight:600}
+.tab:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 45%,transparent);outline-offset:2px}
+.panel{margin:0}
+.area{font:500 1.02rem/1.5 'Instrument Sans',sans-serif;resize:vertical;min-height:150px}
+.filebox{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border:2px dashed var(--line);border-radius:12px;padding:20px 16px;margin:0 0 14px;background:var(--bg)}
+.filebox.drag{border-color:var(--primary);background:color-mix(in srgb,var(--primary) 8%,var(--bg))}
+.filebox.has{border-style:solid;border-color:var(--primary)}
+.fname{font-size:.9rem;color:var(--ink);overflow-wrap:anywhere}
+.hint{margin:-4px 0 14px}
+.err{background:var(--badbg);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:.92rem;margin:0 0 14px}
+.srctag{display:inline-block;font-size:.8rem;font-weight:600;border-radius:999px;padding:3px 11px;margin:0 0 12px}
+.srctag.source{background:var(--okbg);color:var(--ok)}
+.srctag.ai{background:var(--badbg);color:var(--bad)}
+/* escritorio: aprovecha TODA la pantalla */
+@media(min-width:1000px){
+  .wrap{max-width:none;width:100%;grid-template-columns:clamp(260px,18vw,400px) minmax(0,1fr) clamp(280px,21vw,440px);gap:clamp(24px,2.4vw,52px);padding:clamp(22px,2.4vw,48px) clamp(24px,3vw,76px) 60px}
+  #main{padding:clamp(36px,3.5vw,72px) clamp(32px,4.5vw,96px)}
+  #main>*{max-width:none}
+  .cloze{max-width:none;font-size:clamp(1.7rem,1rem + 1.25vw,3rem);line-height:2.05}
+  h2{font-size:clamp(2rem,1.4rem + .9vw,3rem)}
+  .why,.mean,.ttsbar,.crumb,.srctag{max-width:none}
+  .mean{font-size:clamp(1.02rem,.9rem + .35vw,1.3rem)}
+  body.fin #main{max-width:min(1500px,100%)}
+  body.fin .recap{columns:2;column-gap:clamp(30px,4vw,80px)}
+  body.fin .recap li{break-inside:avoid}
+  body.start #main{padding:0}
+  .area{min-height:230px;font-size:1.1rem}
+}
+@media(min-width:1000px){.wrap:has(#learn:not(.on)){grid-template-columns:clamp(260px,18vw,400px) minmax(0,1fr)}.wrap:has(#pile:not(.on)):has(#learn:not(.on)){grid-template-columns:minmax(0,1fr)}}
+@media(min-width:1700px){.wrap{grid-template-columns:clamp(300px,17vw,440px) minmax(0,1fr) clamp(320px,20vw,480px)}.wrap:has(#learn:not(.on)){grid-template-columns:clamp(300px,17vw,440px) minmax(0,1fr)}}
