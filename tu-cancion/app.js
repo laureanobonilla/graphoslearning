@@ -348,12 +348,12 @@ function briefOf() {
 }
 const LOADING = ['Escuchando lo que nos contaste…', 'Buscando el estribillo…', 'Poniéndole ritmo a tus palabras…', 'Casi lista…'];
 let loadTimer = null;
-async function generate(variant) {
+async function generate(variant, auto) {
   showScreen('loading');
   let step = 0; $('loadLabel').textContent = LOADING[0];
   clearInterval(loadTimer); loadTimer = setInterval(() => { step = Math.min(step + 1, 3); $('loadLabel').textContent = LOADING[step]; }, 4500);
   const t0 = Date.now();
-  track('lyrics_generating', { variant: !!variant });
+  if (!auto) track('lyrics_generating', { variant: !!variant });
   try {
     const d = await postFn('tc-generate-song', { id, anonId, brief: briefOf(), variant: !!variant });
     clearInterval(loadTimer);
@@ -362,7 +362,8 @@ async function generate(variant) {
     showReview();
   } catch (err) {
     clearInterval(loadTimer);
-    track('lyrics_failed', { status: err.status || 0 });
+    track('lyrics_failed', { status: err.status || 0, auto: !!auto });
+    if (!auto && (!err.status || err.status >= 500)) { track('lyrics_auto_retry', {}); return generate(variant, true); }   // falla del servidor/IA: se reintenta una vez sola, sin pedirle nada a la persona
     $('errorMsg').textContent = err.status === 429 ? 'Hiciste varias letras seguidas' : 'No pudimos escribir la letra';
     $('errorDetail').textContent = err.status === 429 ? err.message : 'Tus respuestas siguen guardadas. Inténtalo de nuevo en un momento.';
     $('btnRetry').onclick = () => generate(variant);
