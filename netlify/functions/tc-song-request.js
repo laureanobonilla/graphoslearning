@@ -7,7 +7,7 @@
 // TODO queda en la tabla tc_songs (supabase/tu-cancion.sql) y en events (app = 'tu-cancion'). Si la tabla aún no existe,
 // el correo sale igual y el registro completo se guarda como evento `tc_record_fallback`.
 const store = require('./_lib/store');
-const { json, UUID_RE, scrub, scrubOne, countryOf, saveSong, cleanBrief, priceFor } = require('./_lib/tc-core');
+const { json, UUID_RE, scrub, scrubOne, countryOf, saveSong, cleanBrief, chargeFor } = require('./_lib/tc-core');
 const { cleanName, normalizePhone } = require('./_lib/qer-song');
 
 const FALLBACK_TO_EMAIL = 'bonillapretiz@gmail.com';
@@ -17,9 +17,14 @@ const pick = (main, other) => (other ? `${main ? main + ' / ' : ''}${other}` : m
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
     let body; try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
+    return run(event, body, null);
+};
+// `pay` solo lo pone tc-pay-capture (después de cobrar): sin pago no se acepta un pedido con correo/teléfono.
+async function run(event, body, pay) {
     const id = String(body.id || '');
     const via = ['draft', 'whatsapp', 'phone', 'email'].includes(body.via) ? body.via : '';
     if (!UUID_RE.test(id) || !via) return json(400, { error: 'Solicitud inválida' });
+    if ((via === 'email' || via === 'phone') && !pay) return json(402, { error: 'Para enviar tu canción primero se completa el pago.' });
     const anonId = typeof body.anonId === 'string' ? body.anonId.slice(0, 64) : '';
     const brief = cleanBrief(body.brief);
     const name = brief.named ? cleanName(brief.name) : '';
@@ -33,9 +38,9 @@ exports.handler = async (event) => {
     const contactName = via === 'email' ? scrubOne(body.contactName, 40) : '';
     if (via !== 'draft' && body.consent !== true) return json(400, { error: 'Falta tu permiso para que te escriba.' });
     if (!lyricsFinal && !lyrics) return json(400, { error: 'Falta la letra.' });
-    const country = countryOf(event), price = priceFor(country);
+    const country = countryOf(event), price = chargeFor(country);
     const utm = { campaign: scrubOne(body.utm && body.utm.campaign, 40), ad: scrubOne(body.utm && body.utm.ad, 40) };
-    const status = via === 'draft' ? 'own_lyrics_ready' : via === 'whatsapp' ? 'whatsapp_intent' : 'requested';
+    const status = pay ? 'paid' : via === 'draft' ? 'own_lyrics_ready' : via === 'whatsapp' ? 'whatsapp_intent' : 'requested';
     const label = via === 'email' ? 'CON CORREO' : via === 'phone' ? 'CON TELÉFONO' : 'SOLO ABRIÓ WHATSAPP';
 
     // 1) Registro completo (tabla) — nunca debe impedir el correo.
@@ -55,12 +60,13 @@ exports.handler = async (event) => {
     if (!apiKey) { console.error('[tc-song-request] falta RESEND_API_KEY'); return json(503, { error: 'No pudimos registrar tu solicitud ahora. Escríbeme por WhatsApp.' }); }
     let used = 0;
     try { used = await store.countEventsLastHour(id, 'tc_request_sent'); } catch (e) { console.error('[tc-song-request] conteo', e.message); }
-    if (used >= MAX_EMAILS_PER_HOUR) return json(429, { error: 'Ya recibí tu solicitud. Te escribo pronto por WhatsApp.' });
+    if (used >= (pay ? 1 : MAX_EMAILS_PER_HOUR)) { if (pay) return json(200, { ok: true, already: true }); } if (!pay && used >= MAX_EMAILS_PER_HOUR) return json(429, { error: 'Ya recibí tu solicitud. Te escribo pronto por WhatsApp.' });
 
     const digits = phone ? phone.slice(1) : '';
     const firstMsg = `Hola, soy quien hace "tu canción". Ya recibí tu pedido de «${title}»${brief.rhythm || brief.rhythmOther ? ` (${pick(brief.rhythm, brief.rhythmOther)})` : ''}. Voy a preparar una primera muestra. ¿Te la envío por aquí?`;
     const text = [
-        `Nueva solicitud · tu canción · ${label}`,
+        pay ? `✅ PAGADA · tu canción · ${pay.text}` : `Nueva solicitud · tu canción · ${label}`,
+        ...(pay ? [`PAGO RECIBIDO: ${pay.text}${pay.flag ? '  ⚠ ' + pay.flag : ''}`, `Orden PayPal: ${pay.orderID} · Pagador (PayPal): ${pay.payer || '?'}`, `ENTRÉGALA EN MÁXIMO 24 HORAS (se lo prometimos).`] : []),
         ``,
         ...(via === 'email'
             ? [`Correo: ${email}`, ...(contactName ? [`Nombre con el que te escribió: ${contactName}`] : []), `Contáctala por el MISMO medio por el que te escribió primero (Messenger/WhatsApp), con su muestra. El correo es para identificarla.`]
@@ -68,7 +74,7 @@ exports.handler = async (event) => {
             ? [`SOLO ABRIÓ WHATSAPP (no dejó teléfono): es una INTENCIÓN, no un pedido confirmado.`, `Solo cuenta si te llega su mensaje con el código ${id.slice(0, 8)}. Todo lo que armó queda guardado igual (tabla tc_songs, id ${id}).`]
             : [`Teléfono: ${phone}`, `WhatsApp (toca para escribirle con el mensaje listo): https://wa.me/${digits}?text=${encodeURIComponent(firstMsg)}`]),
         ``,
-        `Aceptó el precio (casilla marcada): ${body.priceAck === true ? 'SÍ' : 'no consta'}`,
+        ...(pay ? [] : [`Aceptó el precio (casilla marcada): ${body.priceAck === true ? 'SÍ' : 'no consta'}`]),
         `Precio que vio: ${price.text}${price.provisional ? ' (PRECIO PROVISIONAL de su país: revisa tc-core.js)' : ''} · País (aprox.): ${country || 'desconocido'}`,
         `Código: ${id}`,
         ``,
@@ -87,14 +93,14 @@ exports.handler = async (event) => {
         ...(lyricsFinal && lyrics && lyricsFinal !== lyrics ? [``, `=== LETRA ORIGINAL (antes de editar) ===\n${lyrics}`] : []),
         ``,
         `Registro en la base de datos: ${saved ? 'guardado en tc_songs' : 'LA TABLA tc_songs NO EXISTE O FALLÓ: guardado como evento tc_record_fallback (corre supabase/tu-cancion.sql)'}.`,
-        `Recordatorio: haz la muestra parcial, envíala y solo entonces habla de precio (la persona vio que no paga hasta escucharla y que el precio es ${price.text}).`
+        pay ? `Recordatorio: ya pagó. Haz la canción completa (video + cantada + instrumental) y envíala al correo de arriba en máximo 24 horas.` : `Recordatorio: haz la muestra parcial, envíala y solo entonces habla de precio (la persona vio que no paga hasta escucharla y que el precio es ${price.text}).`
     ].join('\n');
     try {
         const res = await fetch('https://api.resend.com/emails', {
             method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 from: 'Graphikosmos <onboarding@resend.dev>', to: [process.env.FEEDBACK_TO_EMAIL || FALLBACK_TO_EMAIL],
-                subject: `Tu canción${via === 'whatsapp' ? ' (clic WhatsApp, sin número)' : ''}: ${title} · ${pick(brief.rhythm, brief.rhythmOther) || 'sin ritmo'}${phone ? ' · ' + phone : ''}${email ? ' · ' + email : ''}${contactName ? ' · ' + contactName : ''} · ${price.text}`,
+                subject: `${pay ? 'PAGADA ' + pay.text + ' · ' : ''}Tu canción${via === 'whatsapp' ? ' (clic WhatsApp, sin número)' : ''}: ${title} · ${pick(brief.rhythm, brief.rhythmOther) || 'sin ritmo'}${phone ? ' · ' + phone : ''}${email ? ' · ' + email : ''}${contactName ? ' · ' + contactName : ''} · ${price.text}`,
                 ...(email ? { reply_to: email } : {}),
                 text
             })
@@ -112,4 +118,5 @@ exports.handler = async (event) => {
         console.error('[tc-song-request]', err.message);
         return json(502, { error: 'No pudimos registrar tu solicitud. Inténtalo de nuevo o escríbeme por WhatsApp.' });
     }
-};
+}
+exports.run = run;

@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Tu canción</title>
-<meta name="description" content="Cuéntanos para quién o por qué y la convertimos en letra y música. Primero la escuchas; solo si te gusta, la pagas.">
+<meta name="description" content="Cuéntanos para quién o por qué y la convertimos en letra y música. Pagas de forma segura y la recibes lista en máximo 24 horas.">
 <meta property="og:title" content="Tu canción, hecha solo para ti">
-<meta property="og:description" content="Una canción con tu historia, en el ritmo que quieras. Primero la escuchas; solo si te gusta, la pagas.">
+<meta property="og:description" content="Una canción con tu historia, en el ritmo que quieras. Pagas de forma segura y la recibes lista en máximo 24 horas.">
 <meta property="og:type" content="website">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -152,6 +152,7 @@
   .ack input{ width:22px; height:22px; flex:0 0 auto; margin:1px 0 0; accent-color:var(--magenta); }
   .btn-wa.is-disabled{ opacity:.45; }
   .send-box .fine{ font-size:.8rem; margin:8px 0 12px; }
+  .modal-card .err{ color:#b3261e; font-weight:600; font-size:.9rem; margin:0 0 10px; }
   .send-box .err{ color:#b3261e; font-weight:500; font-size:.9rem; margin:10px 0 0; }
   .send-box .btn{ width:100%; padding:14px 18px; }
   .send-box .label{ color:var(--ink); font-weight:600; margin:0 0 8px; }
@@ -208,17 +209,17 @@
       <h2 class="display">Así funciona</h2>
       <ol class="steps">
         <li><span class="n">1</span><div><b>Cuéntanos tu idea</b><span>Unas pocas preguntas, sin complicarte. Si ya tienes la letra, pégala.</span></div></li>
-        <li><span class="n">2</span><div><b>Revisa la letra</b><span>La ves completa, puedes cambiarla y recién entonces la envías.</span></div></li>
-        <li><span class="n">3</span><div><b>Escucha tu canción primero</b><span>Te envío una muestra. Si te gusta, la terminamos. Si no, no pagas nada.</span></div></li>
+        <li><span class="n">2</span><div><b>Revisa la letra</b><span>La ves completa y puedes cambiarla antes de enviarla.</span></div></li>
+        <li><span class="n">3</span><div><b>Recibe tu canción en 24 horas</b><span>Envías tu pedido con un pago seguro y te mando tu canción completa a tu correo en máximo 24 horas.</span></div></li>
       </ol>
     </div>
 
     <div class="sec">
       <h2 class="display">Por qué confiar</h2>
       <ul class="trust">
-        <li>Escuchas tu canción antes de pagar.</li>
+        <li>Pago seguro con PayPal o tarjeta: yo nunca veo los datos de tu tarjeta.</li>
         <li>La letra es tuya: la ves y la editas antes de enviarla.</li>
-        <li>Tu correo solo se usa para recibir tu letra y escribirte la muestra.</li>
+        <li>Tu correo solo se usa para entregarte tu canción.</li>
       </ul>
     </div>
 
@@ -278,13 +279,13 @@
           <input id="songEmail" class="field-in" type="email" inputmode="email" autocomplete="email" enterkeyhint="send" placeholder="tucorreo@ejemplo.com" maxlength="120">
           <p class="label" style="margin-top:12px"><label for="songWho">Tu nombre <span class="fine">· opcional, el de tu mensaje</span></label></p>
           <input id="songWho" class="field-in" type="text" autocomplete="name" maxlength="40" placeholder="Para saber quién eres">
-          <p class="fine">Solo lo uso para recibir tu letra y escribirte la muestra. No lo comparto.</p>
-          <button type="submit" id="btnEmailSend" class="btn btn-primary">Enviar mi letra</button>
+          <p class="fine">Solo lo uso para enviarte tu canción. No lo comparto.</p>
+          <button type="submit" id="btnEmailSend" class="btn btn-primary">Enviar mi canción</button>
         </form>
         <p id="sendErr" class="err is-hidden" role="alert"></p>
       </div>
       <div id="sendDone" class="is-hidden" role="status">
-        <p class="done-title display">¡Listo!</p>
+        <p class="done-title display" id="sendDoneTitle">¡Listo!</p>
         <p id="sendDoneText"></p>
       </div>
     </div>
@@ -294,18 +295,19 @@
 
 <div id="priceModal" class="modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="pmTitle">
   <div class="modal-card">
-    <h2 id="pmTitle" class="pm-big display">No pagas nada ahora</h2>
-    <p class="pm-lead">Primero te enviaré una muestra. Solo si te gusta, pagas.</p>
+    <h2 id="pmTitle" class="pm-big display">Tu canción en 24 horas</h2>
+    <p class="pm-lead">Paga ahora y la recibes en tu correo en un máximo de 24 horas.</p>
     <p class="pm-inc">El paquete incluye:</p>
     <ul class="pm-list"><li><span>🎬</span> Un video como el de la demo</li><li><span>🎤</span> Versión de la canción cantada</li><li><span>🎼</span> La versión instrumental, si la necesitas</li></ul>
     <p class="pm-price" id="pmPrice"></p>
-    <button type="button" id="pmOk" class="btn btn-primary">Entendido, enviar mi letra</button>
+    <div id="ppBox" style="min-height:50px;margin-bottom:10px"></div>
+    <p id="pmErr" class="err is-hidden" role="alert"></p>
     <button type="button" id="pmBack" class="btn-quiet">Volver</button>
   </div>
 </div>
 
 <div id="ctaBar" class="cta-bar"><button type="button" class="btn btn-primary" id="btnCta">Quiero mi canción</button></div>
 
-<script src="app.js?v=20261030c"></script>
+<script src="app.js?v=20261104a"></script>
 </body>
 </html>

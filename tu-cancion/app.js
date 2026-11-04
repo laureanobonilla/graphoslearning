@@ -194,8 +194,8 @@ const STEPS = {
   price: {
     title: 'Así va a funcionar', hint: '',
     render(body) {
-      body.innerHTML = `<div class="price-box"><p class="amt">Primero escuchas.</p><p class="lbl">Después decides.</p><ul>
-        <li>No pagas nada ahora.</li><li>Te envío una muestra para que la escuches.</li><li>Solo si te gusta, pagas y recibes tu canción completa.</li></ul><p class="inc"><b>Recibes:</b> un video como el de la demo, la canción cantada y la versión instrumental si la necesitas.</p></div>`;
+      body.innerHTML = `<div class="price-box"><p class="amt">Tu canción en 24 horas.</p><p class="lbl">Hecha a partir de tu historia.</p><ul>
+        <li>Cuéntanos tu idea y revisa tu letra completa.</li><li>La envías con un pago seguro (PayPal o tarjeta).</li><li>Recibes tu canción lista en máximo 24 horas.</li></ul><p class="inc"><b>Recibes:</b> un video como el de la demo, la canción cantada y la versión instrumental si la necesitas.</p></div>`;
     },
     ok: () => true, nextLabel: 'Entendido, empezar'
   },
@@ -462,38 +462,61 @@ $('btnRegen').addEventListener('click', () => { track('regen_clicked', {}); gene
 $('btnAdjust').addEventListener('click', () => { track('adjust_clicked', {}); lsDel('tc_song_v1'); stack = []; const path = pathOf(); stepId = ''; goTo(S.hasOwn === true ? 'paste' : 'reason', false); stack = []; });
 $('btnCopy').addEventListener('click', async () => { let ok = false; try { await navigator.clipboard.writeText(`${S.title}\n\n${S.lyricsFinal}`); ok = true; } catch { /* ok */ } $('btnCopy').textContent = ok ? 'Copiada' : 'No se pudo copiar'; setTimeout(() => { $('btnCopy').textContent = 'Copiar letra'; }, 1800); });
 
-// Correo: se abre una ventana que deja clarísimo que no se paga nada ahora (el precio va pequeño) y luego se envía.
+// Envío con pago: el correo se valida, se abre la ventana de pago y SOLO cuando PayPal cobra se te manda el pedido (lo hace el servidor).
 const EMAIL_RE2 = /^[^\s@<>]{1,64}@[^\s@<>]{1,200}\.[^\s@<>]{2,}$/;
 function payload(via, extra) { return Object.assign({ id, anonId, via, brief: briefOf(), title: S.title, lyrics: S.lyrics, lyricsFinal: S.lyricsFinal, utm: UTM, consent: true, priceAck: true }, extra || {}); }
+let ppLoad = null;
+function loadPayPal(clientId, currency) {
+  if (window.paypal) return Promise.resolve();
+  if (ppLoad) return ppLoad;
+  ppLoad = new Promise((ok, no) => { const s = document.createElement('script'); s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=${encodeURIComponent(currency)}&components=buttons&intent=capture`; s.onload = ok; s.onerror = () => { ppLoad = null; no(new Error('load')); }; document.head.appendChild(s); });
+  return ppLoad;
+}
 function setupSend() {
-  const email = $('songEmail'), who = $('songWho'), err = $('sendErr'), modal = $('priceModal'), box = $('emailBox'), send = $('btnEmailSend');
-  email.value = ''; who.value = ''; err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Enviar mi letra'; modal.classList.add('is-hidden');
-  const priceTxt = geo.price && geo.price.text ? geo.price.text : '';
-  $('pmPrice').textContent = (priceTxt ? `Si te llegara a gustar la muestra que te enviaré más tarde y vas a adquirir la canción completa, el costo es de ${priceTxt}. ` : 'Si te llegara a gustar la muestra que te enviaré más tarde y vas a adquirir la canción completa, te diré el costo entonces. ') + 'No vas a pagar nada aún: primero escucharás y decidirás según la calidad.';
+  const email = $('songEmail'), who = $('songWho'), err = $('sendErr'), modal = $('priceModal'), box = $('emailBox'), send = $('btnEmailSend'), ppBox = $('ppBox'), pmErr = $('pmErr');
+  email.value = ''; who.value = ''; err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Enviar mi canción'; modal.classList.add('is-hidden');
+  const ch = geo.charge || null, priceTxt = ch ? ch.text : '';
+  $('pmPrice').textContent = ch ? `Precio: ${ch.text}${ch.approx ? ` (aprox. ${ch.approx})` : ''}. Pago seguro con PayPal o tarjeta.` : 'Pago seguro con PayPal o tarjeta.';
   const closeModal = () => { modal.classList.add('is-hidden'); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') { track('price_modal_back', {}); closeModal(); } };
+  const showErr = (m) => { pmErr.textContent = m; pmErr.classList.remove('is-hidden'); };
+  async function renderPay() {
+    ppBox.textContent = ''; pmErr.classList.add('is-hidden');
+    const g = await (geoReady || Promise.resolve(geo)); const c = g.charge;
+    if (!g.paypalClientId || !c) { showErr('El pago no está disponible en este momento. Inténtalo en un rato.'); return; }
+    ppBox.textContent = 'Cargando el pago seguro…';
+    try { await loadPayPal(g.paypalClientId, c.currency); } catch { ppBox.textContent = ''; showErr('No se pudo cargar PayPal. Revisa tu conexión e inténtalo de nuevo.'); return; }
+    ppBox.textContent = '';
+    window.paypal.Buttons({
+      style: { layout: 'vertical', shape: 'pill', label: 'pay', tagline: false },
+      createOrder: async () => { track('pay_started', { price: c.text }); pmErr.classList.add('is-hidden'); const d = await postFn('tc-pay-create', { id }); return d.orderID; },
+      onApprove: async (data) => {
+        ppBox.textContent = 'Confirmando tu pago…';
+        try {
+          const d = await postFn('tc-pay-capture', payload('email', { orderID: data.orderID, email: email.value.trim(), contactName: who.value.trim() }));
+          if (!d.ok) throw new Error('fallo');
+          track('pay_confirmed', { price: c.text }); closeModal();
+          $('sendDoneTitle').textContent = '¡Pago recibido!';
+          $('sendDoneText').textContent = `Tu canción estará lista en un máximo de 24 horas. Te la enviaré a ${email.value.trim()}. Revisa también tu carpeta de spam.`;
+          $('sendForm').classList.add('is-hidden'); $('sendDone').classList.remove('is-hidden'); lsDel('tc_song_v1');
+        } catch (e) {
+          track('pay_capture_failed', { status: e.status || 0 }); renderPay();
+          showErr((e.message && e.status ? e.message : 'No pudimos confirmar tu pago.') + ' Si te cobraron, escríbeme y lo resuelvo enseguida.');
+        }
+      },
+      onCancel: () => { track('pay_cancelled', {}); },
+      onError: () => { track('pay_error', {}); showErr('No se pudo completar el pago. No se te cobró. Inténtalo de nuevo.'); }
+    }).render(ppBox);
+  }
   box.onsubmit = (ev) => {
     ev.preventDefault(); err.classList.add('is-hidden');
     const v = email.value.trim();
     if (!EMAIL_RE2.test(v) || v.length > 120) { track('email_invalid', {}); err.textContent = 'Revisa tu correo: debe verse como nombre@ejemplo.com'; err.classList.remove('is-hidden'); email.focus(); return; }
-    modal.classList.remove('is-hidden'); document.addEventListener('keydown', onKey); $('pmOk').focus();
-    track('price_modal_shown', { price: priceTxt, country: geo.country || '' });
+    modal.classList.remove('is-hidden'); document.addEventListener('keydown', onKey);
+    track('price_modal_shown', { price: priceTxt, country: geo.country || '' }); renderPay();
   };
   $('pmBack').onclick = () => { track('price_modal_back', {}); closeModal(); };
   modal.onclick = (e) => { if (e.target === modal) { track('price_modal_back', {}); closeModal(); } };
-  $('pmOk').onclick = async () => {
-    const pm = $('pmOk'); pm.disabled = true; pm.textContent = 'Enviando…'; track('request_submitted', {});
-    try {
-      const d = await postFn('tc-song-request', payload('email', { email: email.value.trim(), contactName: who.value.trim() }));
-      if (!d.ok) throw new Error('fallo');
-      track('request_confirmed', {}); closeModal();
-      $('sendDoneText').textContent = 'Recibí tu letra. Te escribo por el mismo medio por el que hablamos para darte tu muestra. No pagas nada hasta que la escuches.';
-      $('sendForm').classList.add('is-hidden'); $('sendDone').classList.remove('is-hidden');
-    } catch (e) {
-      track('request_failed', { status: e.status || 0 }); closeModal();
-      err.textContent = e.status ? (e.message || 'No pudimos registrar tu solicitud. Inténtalo de nuevo.') : 'Sin conexión. Inténtalo de nuevo.'; err.classList.remove('is-hidden');
-    } finally { pm.disabled = false; pm.textContent = 'Entendido, enviar mi letra'; }
-  };
   track('price_shown', { price: priceTxt, country: geo.country || '', where: 'review' });
 }
 $('btnSendTop').addEventListener('click', () => {

@@ -35,14 +35,14 @@ async function getAccessToken() {
 // Crea la orden con el monto que decidió EL SERVIDOR (ver packages.js), nunca
 // con un monto que mande el cliente.
 // `customId` (opcional): se guarda en la orden y permite reconocer después a qué compra pertenece aunque se pierda el enlace local.
-async function createOrder(usdAmount, customId) {
+async function createOrder(amount, customId, currency) {
     const token = await getAccessToken();
     const res = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
             intent: 'CAPTURE',
-            purchase_units: [Object.assign({ amount: { currency_code: 'USD', value: usdAmount } }, customId ? { custom_id: String(customId).slice(0, 127) } : {})]
+            purchase_units: [Object.assign({ amount: { currency_code: currency || 'USD', value: amount } }, customId ? { custom_id: String(customId).slice(0, 127) } : {})]
         })
     });
     const data = await res.json();

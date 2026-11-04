@@ -4,7 +4,7 @@ const crypto = require('crypto');
 // >>> EDITA AQUÍ los precios. Costa Rica paga CR_CRC colones; los demás países, el equivalente de BASE_CRC colones en su
 // moneda (tipos de cambio aproximados en _lib/currency.js). <<<
 const { currencyOf, convertCrc, fmtMoney, CRC_PER_USD } = require('./currency');
-const PRICE_USD = 50;   // precio base: US$50, mostrado en la moneda de cada país
+const PRICE_USD = 100;   // precio base: US$100 por canción
 const BASE_CRC = Math.ceil(PRICE_USD * CRC_PER_USD), CR_CRC = convertCrc(BASE_CRC, 'CRC');
 const PRICES = { CR: { amount: CR_CRC, currency: 'CRC' }, BASE_CRC };
 const priceFor = (country) => {
@@ -12,6 +12,15 @@ const priceFor = (country) => {
     if (c === 'CR') return { amount: CR_CRC, currency: 'CRC', text: fmtMoney('CRC', CR_CRC), provisional: false };
     const cur = currencyOf(c), amount = convertCrc(BASE_CRC, cur);
     return { amount, currency: cur, text: fmtMoney(cur, amount), provisional: !c };   // sin país detectado: se avisa en el correo
+};
+
+// Lo que SE COBRA en PayPal: la moneda del país si PayPal la acepta (convertida desde el precio base); si no (colón, peso colombiano…), US$.
+const PP_CUR = new Set(['USD', 'MXN', 'BRL', 'CAD', 'GBP', 'EUR', 'AUD', 'NZD', 'CHF']);
+const chargeFor = (country) => {
+    const c = String(country || '').toUpperCase(); let cur = currencyOf(c); if (!PP_CUR.has(cur)) cur = 'USD';
+    const amount = cur === 'USD' ? PRICE_USD : convertCrc(BASE_CRC, cur);
+    const local = currencyOf(c), approx = local !== cur && c ? fmtMoney(local, convertCrc(BASE_CRC, local)) : '';   // referencia para quien paga en US$
+    return { currency: cur, amount, value: Number(amount).toFixed(2), text: fmtMoney(cur, amount), approx, provisional: !c };
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -66,4 +75,4 @@ function cleanBrief(b) {
         details: scrub(b.details, 1500), notes: scrub(b.notes, 1200)
     };
 }
-module.exports = { PRICES, priceFor, UUID_RE, json, scrub, scrubOne, list, countryOf, ipOf, hashIp, saveSong, cleanBrief };
+module.exports = { PRICES, PRICE_USD, chargeFor, priceFor, UUID_RE, json, scrub, scrubOne, list, countryOf, ipOf, hashIp, saveSong, cleanBrief };
