@@ -1,21 +1,10 @@
-// «tu canción»: bienvenida + ejemplos + cuestionario inteligente + letra + envío. Registro: funciones tc-* (tabla tc_songs) y events (app = 'tu-cancion').
+// «tu canción»: bienvenida + cuestionario inteligente + letra + envío. Registro: funciones tc-* (tabla tc_songs) y events (app = 'tu-cancion').
 (function () {
 'use strict';
 const APP = 'tu-cancion', TRACK_URL = '/.netlify/functions/sfc-track-event', SVGNS = 'http://www.w3.org/2000/svg';
 const CONTACT_WHATSAPP = '50687772993';
 const $ = (id) => document.getElementById(id);
 
-// ---------- Ejemplos (pon los mp3 en tu-cancion/ejemplos/ con EXACTAMENTE estos nombres) ----------
-const EXAMPLES = [
-  { file: 'balada-lo-que-no-te-dije-a-tiempo.mp3', title: 'Lo que no te dije a tiempo', rhythm: 'Balada romántica' },
-  { file: 'bachata-quedate-otra-vez.mp3', title: 'Quédate otra vez', rhythm: 'Bachata' },
-  { file: 'cumbia-baila-conmigo-esta-noche.mp3', title: 'Baila conmigo esta noche', rhythm: 'Cumbia' },
-  { file: 'alabanza-tu-fidelidad-me-sostiene.mp3', title: 'Tu fidelidad me sostiene', rhythm: 'Alabanza' },
-  { file: 'ranchera-brindo-por-ti-mama.mp3', title: 'Brindo por ti, mamá', rhythm: 'Ranchera / Mariachi' },
-  { file: 'rock-no-me-voy-a-rendir.mp3', title: 'No me voy a rendir', rhythm: 'Rock' },
-  { file: 'rnb-quedate-hasta-el-amanecer.mp3', title: 'Quédate hasta el amanecer', rhythm: 'R&B' },
-  { file: 'acustica-lo-simple-de-quererte.mp3', title: 'Lo simple de quererte', rhythm: 'Acústica' }
-];
 const RHYTHMS = ['Balada romántica', 'Bachata', 'Cumbia', 'Alabanza', 'Ranchera / Mariachi', 'Rock', 'R&B', 'Acústica', 'Pop'];
 const REASONS = [
   { label: 'Para mi pareja', person: true }, { label: 'Un cumpleaños', person: true }, { label: 'Para mi mamá o papá', person: true },
@@ -87,38 +76,6 @@ function waveHeights(n, seed) { const o = []; for (let i = 0; i < n; i++) { cons
   const load = $('loadWave');
   for (let i = 0; i < 9; i++) { const r = document.createElementNS(SVGNS, 'rect'); r.setAttribute('x', i * 17); r.setAttribute('y', 4); r.setAttribute('width', 8); r.setAttribute('height', 56); r.setAttribute('rx', 4); r.style.setProperty('--i', i); load.appendChild(r); }
 })();
-
-// ---------- Ejemplos ----------
-(function buildExamples() {
-  const list = $('exList'); let current = null, audio = null;
-  const heroBtn = $('heroPlay'), wave = $('coverWave');
-  const sync = () => { const on = !!current; wave.classList.toggle('is-live', on); heroBtn.classList.toggle('is-live', on); heroBtn.querySelector('span').textContent = on ? 'Pausar' : 'Escucha cómo suena'; };
-  const stop = () => { if (audio) { audio.pause(); } if (current) { current.classList.remove('is-playing'); current = null; } sync(); };
-  const playable = () => [...list.children].filter(e => !e.classList.contains('soon'));
-  EXAMPLES.forEach((ex, i) => {
-    const el = document.createElement('div'); el.className = 'ex';
-    el.innerHTML = '<button type="button" class="play" aria-label="Escuchar"><svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg><svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button><div class="txt"><p class="t"></p><p class="m"></p><div class="bar"><i></i></div></div>';
-    el.querySelector('.t').textContent = ex.title; el.querySelector('.m').textContent = ex.rhythm;
-    const url = `ejemplos/${ex.file}`, btn = el.querySelector('.play'), fillEl = el.querySelector('.bar i');
-    fetch(url, { method: 'HEAD' }).then(r => { if (!r.ok || !/audio|mpeg|octet/i.test(r.headers.get('content-type') || '')) el.classList.add('soon'); }).catch(() => el.classList.add('soon'));
-    btn.addEventListener('click', () => {
-      if (el.classList.contains('soon')) return;
-      if (current === el) { stop(); return; }
-      stop();
-      audio = new Audio(url); current = el; el.classList.add('is-playing'); sync();
-      audio.addEventListener('timeupdate', () => { if (audio.duration) fillEl.style.width = `${(audio.currentTime / audio.duration) * 100}%`; });
-      audio.addEventListener('ended', () => { el.classList.remove('is-playing'); fillEl.style.width = '0'; current = null; sync(); const p = playable(), k = p.indexOf(el); if (p.length > 1 && k > -1) p[(k + 1) % p.length].querySelector('.play').click(); });
-      audio.addEventListener('error', () => { el.classList.remove('is-playing'); el.classList.add('soon'); current = null; sync(); });
-      audio.play().catch(() => { el.classList.remove('is-playing'); });
-      track('example_played', { index: i + 1, rhythm: ex.rhythm });
-    });
-    list.appendChild(el);
-    el._ready = fetch(url, { method: 'HEAD' }).then(r => r.ok && /audio|mpeg|octet/i.test(r.headers.get('content-type') || '')).catch(() => false);
-  });
-  Promise.all([...list.children].map(e => e._ready)).then(r => { if (r.some(Boolean)) heroBtn.classList.remove('is-hidden'); });
-  heroBtn.addEventListener('click', () => { track('hero_play_clicked', {}); if (current) { stop(); return; } const p = playable(); if (p.length) p[0].querySelector('.play').click(); });
-})();
-$('btnExamplesTop').addEventListener('click', () => { track('examples_clicked', {}); $('ejemplos').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 
 // ---------- Estado del cuestionario ----------
 const blank = () => ({ hasOwn: false, lyricsText: '', reason: '', reasonOther: '', named: null, name: '', qualities: [], qualitiesOther: '', feeling: '', feelingOther: '', extra: [], rhythm: '', rhythmOther: '', details: '', notes: '', aiStop: 3, title: '', lyrics: '', lyricsFinal: '', regen: 0 });
