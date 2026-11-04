@@ -476,7 +476,9 @@ function setupSend() {
   const email = $('songEmail'), who = $('songWho'), err = $('sendErr'), modal = $('priceModal'), box = $('emailBox'), send = $('btnEmailSend'), ppBox = $('ppBox'), pmErr = $('pmErr');
   email.value = ''; who.value = ''; err.classList.add('is-hidden'); send.disabled = false; send.textContent = 'Enviar mi canción'; modal.classList.add('is-hidden');
   const ch = geo.charge || null, priceTxt = ch ? ch.text : '';
-  $('pmPrice').textContent = ch ? `Precio: ${ch.text}${ch.approx ? ` (aprox. ${ch.approx})` : ''}. Pago seguro con PayPal o tarjeta.` : 'Pago seguro con PayPal o tarjeta.';
+  const priceLine = (c) => c ? `${c.text} ${c.name} (${c.currency})${c.approx ? ` · aprox. ${c.approx} ${c.approxName}` : ''}` : '';
+  const showPrice = (c) => { const l = priceLine(c); $('pmPrice').innerHTML = ''; if (c) { const b = document.createElement('b'); b.className = 'pm-total'; b.textContent = 'Total: ' + l; $('pmPrice').appendChild(b); const s = document.createElement('span'); s.textContent = c.currency === 'USD' ? ' El cobro es en dólares estadounidenses (USD); PayPal o tu banco lo convierte a tu moneda al tipo de cambio del día, por eso el monto en tu moneda es aproximado.' : ' Pago seguro con PayPal o tarjeta.'; $('pmPrice').appendChild(s); } else $('pmPrice').textContent = 'Pago seguro con PayPal o tarjeta.'; const sp = $('sendPrice'); if (sp) sp.textContent = c ? 'Total a pagar: ' + l : ''; };
+  showPrice(ch); geoReady && geoReady.then((g) => showPrice(g.charge));
   const closeModal = () => { modal.classList.add('is-hidden'); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') { track('price_modal_back', {}); closeModal(); } };
   const showErr = (m) => { pmErr.textContent = m; pmErr.classList.remove('is-hidden'); };

@@ -16,11 +16,13 @@ const priceFor = (country) => {
 
 // Lo que SE COBRA en PayPal: la moneda del país si PayPal la acepta (convertida desde el precio base); si no (colón, peso colombiano…), US$.
 const PP_CUR = new Set(['USD', 'MXN', 'BRL', 'CAD', 'GBP', 'EUR', 'AUD', 'NZD', 'CHF']);
+const CUR_NAME = { USD: 'dólares estadounidenses', MXN: 'pesos mexicanos', EUR: 'euros', BRL: 'reales', CAD: 'dólares canadienses', GBP: 'libras esterlinas', AUD: 'dólares australianos', NZD: 'dólares neozelandeses', CHF: 'francos suizos',
+    CRC: 'colones', COP: 'pesos colombianos', UYU: 'pesos uruguayos', ARS: 'pesos argentinos', CLP: 'pesos chilenos', PEN: 'soles', BOB: 'bolivianos', PYG: 'guaraníes', GTQ: 'quetzales', HNL: 'lempiras', NIO: 'córdobas', DOP: 'pesos dominicanos' };
 const chargeFor = (country) => {
     const c = String(country || '').toUpperCase(); let cur = currencyOf(c); if (!PP_CUR.has(cur)) cur = 'USD';
     const amount = cur === 'USD' ? PRICE_USD : convertCrc(BASE_CRC, cur);
     const local = currencyOf(c), approx = local !== cur && c ? fmtMoney(local, convertCrc(BASE_CRC, local)) : '';   // referencia para quien paga en US$
-    return { currency: cur, amount, value: Number(amount).toFixed(2), text: fmtMoney(cur, amount), approx, provisional: !c };
+    return { currency: cur, amount, value: Number(amount).toFixed(2), text: fmtMoney(cur, amount), name: CUR_NAME[cur] || cur, approx, approxName: approx ? (CUR_NAME[local] || local) : '', provisional: !c };
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
