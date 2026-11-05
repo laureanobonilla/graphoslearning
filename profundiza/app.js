@@ -7,7 +7,9 @@
 (function () {
   'use strict';
   var FN = '/.netlify/functions/profundiza';
+  var LEARN = document.documentElement.getAttribute('data-mode') === 'learn';   // modo idiomas: interfaz en español, texto en el idioma elegido
   var LANG = (document.documentElement.lang || 'es').slice(0, 2); if (['es', 'en', 'de', 'fr'].indexOf(LANG) < 0) LANG = 'es';
+  if (LEARN) { try { LANG = localStorage.getItem('prf_target') || 'de'; } catch (e) { LANG = 'de'; } if (['en', 'de', 'fr'].indexOf(LANG) < 0) LANG = 'de'; }
   var MAX_DEPTH = 6, MAX_TAUGHT = 2, PARTS = { beginner: 10, intermediate: 25, advanced: 65 };   // profundidad máxima y veces que se baja a una misma palabra antes de solo explicarla
   var TTS = LANG !== 'es' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   var LOC = { es: 'es-ES', en: 'en-US', de: 'de-DE', fr: 'fr-FR' };
@@ -73,8 +75,18 @@
     de: { tabTopic: 'Thema', tabLink: 'Link', tabFile: 'PDF oder Datei', tabText: 'Text', phLink: 'Link zu einem Artikel oder PDF einfügen', phText: 'Füge hier deinen Text ein: ein Kapitel, deine Notizen, einen Artikel …', pickFile: 'PDF oder Textdatei wählen', fileHint: 'PDF, TXT oder MD. Wird auf deinem Gerät gelesen: Nur die Ausschnitte jeder Frage gehen an die KI.', textHint: 'Die ersten Fragen stammen aus deinem Text, mit seinen eigenen Worten. Wörter, die du verfehlst, werden mit neuen Fragen erklärt, aus dem Kontext deines Textes.', readingP: function (p, n) { return 'Seite ' + p + ' von ' + n + ' wird gelesen …'; }, fetching: 'Link wird gelesen …', preparing: 'Dein Text wird vorbereitet …', errNoText: 'Ich habe nicht genug Text gefunden. Ein gescanntes PDF (nur Bilder) kann nicht gelesen werden: Versuche eine andere Datei oder füge den Text ein.', errUrl: 'Dieser Link ist ungültig oder konnte nicht geöffnet werden.', errPoco: 'Diese Seite hat fast keinen Text (er wird evtl. per JavaScript geladen oder erfordert eine Anmeldung). Füge den Text ein oder lade die Datei hoch.', errPdfBig: 'Dieses PDF ist zu groß, um es über den Link zu öffnen. Lade es herunter und als Datei hoch.', errPdfLib: 'Der PDF-Leser konnte nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.', errLen: 'Dieser Text ist zu kurz zum Lernen (mindestens etwa 300 Zeichen). Füge mehr Text ein oder gib ein Thema ein.', fromText: 'Ausschnitt aus deinem Text', fromAI: 'Von der KI geschriebene Erklärung (stand nicht in deinem Text)', fromCtx: 'Von der KI auf Basis deines Textes geschriebene Erklärung', srcName: { link: 'Link', file: 'Datei', text: 'Text' } },
     fr: { tabTopic: 'Sujet', tabLink: 'Lien', tabFile: 'PDF ou fichier', tabText: 'Texte', phLink: 'Colle le lien d’un article ou d’un PDF', phText: 'Colle ici ton texte : un chapitre, tes notes, un article…', pickFile: 'Choisir un PDF ou un fichier texte', fileHint: 'PDF, TXT ou MD. Lu sur ton appareil : seuls les extraits de chaque question vont à l’IA.', textHint: 'Les premières questions viennent de ton texte, avec ses propres mots. Les mots ratés sont expliqués par de nouvelles questions, écrites à partir du contexte de ton texte.', readingP: function (p, n) { return 'Lecture de la page ' + p + ' sur ' + n + '…'; }, fetching: 'Lecture du lien…', preparing: 'Préparation de ton texte…', errNoText: 'Je n’ai pas trouvé assez de texte. Un PDF scanné (images seulement) ne peut pas être lu : essaie un autre fichier ou colle le texte.', errUrl: 'Ce lien n’est pas valide ou n’a pas pu être ouvert.', errPoco: 'Cette page contient presque pas de texte (elle le charge peut-être en JavaScript ou demande une connexion). Colle le texte ou téléverse le fichier.', errPdfBig: 'Ce PDF est trop gros pour être ouvert depuis le lien. Télécharge-le et téléverse-le comme fichier.', errPdfLib: 'Impossible de charger le lecteur PDF. Vérifie ta connexion et réessaie.', errLen: 'Ce texte est trop court pour être étudié (environ 300 caractères minimum). Colle plus de texte ou écris un sujet.', fromText: 'Extrait de ton texte', fromAI: 'Explication écrite par l’IA (elle ne figurait pas dans ton texte)', fromCtx: 'Explication écrite par l’IA à partir de ton texte', srcName: { link: 'Lien', file: 'Fichier', text: 'Texte' } }
   };
-  var T = I[LANG]; Object.keys(IX[LANG]).forEach(function (k) { T[k] = IX[LANG][k]; });
-  var KEY = 'prf_state_v2_' + LANG, ANON = (function () { try { var a = localStorage.getItem('prf_anon'); if (!a) { a = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('prf_anon', a); } return a; } catch (e) { return 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); } })();
+  var T;
+  if (LEARN) {
+    T = {}; Object.keys(I.es).forEach(function (k) { T[k] = I.es[k]; }); Object.keys(IX.es).forEach(function (k) { T[k] = IX.es[k]; });
+    var TN = { en: 'inglés', de: 'alemán', fr: 'francés' }[LANG];
+    T.name = 'Profundiza idiomas'; T.langName = TN;
+    T.lv = { beginner: ['Principiante', 'A1–A2 · 10 partes · 1–2 espacios'], intermediate: ['Intermedio', 'B1 · 25 partes · 3 espacios'], advanced: ['Avanzado', 'B2–C1 · 65 partes · 4–5 espacios'] };
+    T.intro = 'Aprende ' + TN + ' con textos reales sobre cualquier tema. Escribe un tema (en español está bien): el texto con espacios en blanco sale en ' + TN + ', y debajo siempre lo tienes completo en español para ver qué palabra va con cuál. Cada palabra que falles se vuelve una pregunta nueva, también en ' + TN + ', con su traducción. Todo se puede escuchar y trae guía de pronunciación.';
+    T.ph = 'Por ejemplo: la Revolución Francesa'; T.topicAria = 'Tema que quieres practicar'; T.go = 'Empezar';
+    T.listen = 'Escuchar'; T.listenText = 'Escuchar el texto'; T.listenWord = 'Escuchar la palabra'; T.slow = 'Lento'; T.noVoice = 'No hay voz disponible en este navegador.';
+    T.inEs = 'En español'; T.pronT = 'Cómo se pronuncia'; T.pickLang = 'Idioma que quieres aprender';
+  } else { T = I[LANG]; Object.keys(IX[LANG]).forEach(function (k) { T[k] = IX[LANG][k]; }); }
+  var KEY = 'prf_state_v2_' + (LEARN ? 'i_' : '') + LANG, ANON = (function () { try { var a = localStorage.getItem('prf_anon'); if (!a) { a = 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('prf_anon', a); } return a; } catch (e) { return 'p' + Math.random().toString(36).slice(2) + Date.now().toString(36); } })();
   var $ = function (id) { return document.getElementById(id); };
   var main = $('main'), pile = $('pile'), learnEl = $('learn');
   var S = null, cache = {}, busy = false, slow = false; try { slow = localStorage.getItem('prf_slow') === '1'; } catch (e) {}
@@ -87,9 +99,9 @@
     var g = norm(given); if (!g) return false;
     return answers.some(function (a) { var x = norm(a); if (g === x) return true; var tol = x.length >= 9 ? 2 : x.length >= 5 ? 1 : 0; return tol > 0 && lev(g, x) <= tol; });
   }
-  function track(ev, md) { try { md = md || {}; md.lang = LANG; fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'track', anonId: ANON, event: ev, metadata: md }) }).catch(function () {}); } catch (e) {} }
+  function track(ev, md) { try { md = md || {}; md.lang = LANG; if (LEARN) md.learn = 1; fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'track', anonId: ANON, event: ev, metadata: md }) }).catch(function () {}); } catch (e) {} }
   /* ---------- biblioteca: TODOS los temas de la persona quedan guardados en este dispositivo ---------- */
-  var LIB = 'prf_lib_v3_' + LANG;
+  var LIB = 'prf_lib_v3_' + (LEARN ? 'i_' : '') + LANG;
   function libAll() { var a = []; try { a = JSON.parse(localStorage.getItem(LIB) || '[]'); } catch (e) {} return Array.isArray(a) ? a.filter(function (x) { return x && x.id && x.topic; }) : []; }
   function libPut(list) { try { localStorage.setItem(LIB, JSON.stringify(list)); return true; } catch (e) { return false; } }
   function save() {
@@ -115,6 +127,21 @@
   }
   function spk(getText, label) { var b = el('button', 'spk', '🔊'); b.type = 'button'; b.title = label; b.setAttribute('aria-label', label); b.onclick = function (e) { e.preventDefault(); speak(typeof getText === 'function' ? getText() : getText, b); }; return b; }
   function plain(f, res) { return f.cloze.text.replace(/\[\[(\d+)\]\]/g, function (m, n) { if (res) { var r = res.filter(function (x) { return x.b.n === Number(n); })[0]; return r ? r.b.answers[0] : ''; } return ', ' + T.blankWord + ', '; }); }
+  function trans(f, res) {   // el texto COMPLETO en español, sin espacios; las palabras de cada hueco van marcadas con su número
+    if (!LEARN || !f.cloze.translation) return null;
+    var box = el('div', 'trans'); box.appendChild(el('b', 'tl', T.inEs)); var p = el('p');
+    f.cloze.translation.split(/(\{\{\d+:[^{}]*\}\})/).forEach(function (part) {
+      var m = part.match(/^\{\{(\d+):([^{}]*)\}\}$/); if (!m) { p.appendChild(document.createTextNode(part)); return; }
+      var r = res && res.filter(function (x) { return x.b.n === Number(m[1]); })[0], k = el('mark', r ? (r.right ? 'ok' : 'bad') : '', m[2]); k.appendChild(el('sup', null, m[1])); p.appendChild(k);
+    }); box.appendChild(p); return box;
+  }
+  function pronBox(f, withText) {
+    if (!LEARN || !f.cloze.termPron) return null;
+    var d = el('details', 'pron'), sm = el('summary', null, '🗣 ' + T.pronT); d.appendChild(sm);
+    d.appendChild(el('p', null, f.term + ' → ' + f.cloze.termPron + (f.cloze.termEs ? '  (' + f.cloze.termEs + ')' : '')));
+    if (withText && f.cloze.textPron) d.appendChild(el('p', null, f.cloze.textPron)); return d;
+  }
+  function pronOf(b) { return b && b.pron ? ' /' + b.pron + '/' : ''; }
   function ttsBar(getText) {
     if (!TTS) return null; var bar = el('div', 'ttsbar'), b = el('button', 'spk', '🔊 ' + T.listenText); b.type = 'button'; b.onclick = function () { speak(getText(), b); }; bar.appendChild(b);
     var sl = el('button', 'spk' + (slow ? ' on' : ''), '🐢 ' + T.slow); sl.type = 'button'; sl.setAttribute('aria-pressed', slow ? 'true' : 'false'); sl.onclick = function () { slow = !slow; try { localStorage.setItem('prf_slow', slow ? '1' : '0'); } catch (e) {} sl.classList.toggle('on', slow); sl.setAttribute('aria-pressed', slow ? 'true' : 'false'); }; bar.appendChild(sl); return bar;
@@ -122,7 +149,7 @@
 
   function kindOf(k) { var v = (S.kinds || [])[k == null ? S.part : k]; return v === 'untold' || v === 'curiosity' ? v : ''; }
   function aiCloze(term, parent, variant, avoid, k0, ctx) {
-    return fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cloze', anonId: ANON, lang: LANG, term: term, topic: S.topic, parent: parent || '', level: S.level, variant: variant || 0, avoid: avoid || [], partK: parent ? 0 : k0 + 1, partN: parent ? 0 : S.parts.length, kind: parent ? '' : kindOf(k0), context: ctx || '' }) })
+    return fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cloze', anonId: ANON, lang: LANG, term: term, topic: S.topic, parent: parent || '', level: S.level, variant: variant || 0, avoid: avoid || [], partK: parent ? 0 : k0 + 1, partN: parent ? 0 : S.parts.length, kind: parent ? '' : kindOf(k0), context: ctx || '', learn: LEARN }) })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'http'); return j; }); });
   }
   function getCloze(term, parent, variant, avoid) {
@@ -170,7 +197,14 @@
     var b = el('button', 'btn', T.retry); b.onclick = retry; main.appendChild(b); track('prf_error', {});
   }
   function langs() {
-    var d = el('p', 'langs'), L = [['es', 'Español', '/profundiza/'], ['en', 'English', '/profundiza/en/'], ['de', 'Deutsch', '/profundiza/de/'], ['fr', 'Français', '/profundiza/fr/']];
+    if (LEARN) {
+      var w = el('div', 'tpick'); w.setAttribute('role', 'group'); w.setAttribute('aria-label', T.pickLang); w.appendChild(el('span', null, T.pickLang + ':'));
+      [['de', 'Deutsch · Alemán'], ['en', 'English · Inglés'], ['fr', 'Français · Francés']].forEach(function (x) {
+        var b = el('button', 'tp', x[1]); b.type = 'button'; b.setAttribute('aria-pressed', x[0] === LANG ? 'true' : 'false');
+        b.onclick = function () { if (x[0] === LANG) return; try { localStorage.setItem('prf_target', x[0]); } catch (e) {} location.reload(); }; w.appendChild(b);
+      }); return w;
+    }
+    var d = el('p', 'langs'), L = [['es', 'Español', '/profundiza/'], ['en', 'English', '/profundiza/en/'], ['de', 'Deutsch', '/profundiza/de/'], ['fr', 'Français', '/profundiza/fr/'], ['', 'Aprender idiomas', '/profundiza/idiomas/']];
     L.forEach(function (x) { var a = el('a', null, x[1]); a.href = x[2]; if (x[0] === LANG) a.setAttribute('aria-current', 'page'); d.appendChild(a); }); return d;
   }
 
@@ -180,8 +214,8 @@
     hero.appendChild(el('p', null, T.intro)); hero.appendChild(langs());
     var mode = opt.mode || 'topic', file = null, tabs = el('div', 'tabs'), panels = {};
     tabs.setAttribute('role', 'tablist');
-    [['topic', T.tabTopic], ['link', T.tabLink], ['file', T.tabFile], ['text', T.tabText]].forEach(function (m) { var b = el('button', 'tab', m[1]); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.m = m[0]; b.onclick = function () { setMode(m[0]); }; tabs.appendChild(b); });
-    form.appendChild(tabs);
+    [['topic', T.tabTopic], ['link', T.tabLink], ['file', T.tabFile], ['text', T.tabText]].filter(function (m) { return !LEARN || m[0] === 'topic'; }).forEach(function (m) { var b = el('button', 'tab', m[1]); b.type = 'button'; b.setAttribute('role', 'tab'); b.dataset.m = m[0]; b.onclick = function () { setMode(m[0]); }; tabs.appendChild(b); });
+    if (!LEARN) form.appendChild(tabs);
     var inp = el('input', 'field'); inp.type = 'text'; inp.placeholder = T.ph; inp.maxLength = 80; inp.setAttribute('aria-label', T.topicAria);
     var url = el('input', 'field'); url.type = 'url'; url.placeholder = T.phLink; url.maxLength = 600; url.setAttribute('aria-label', T.tabLink); url.autocomplete = 'off';
     var fbox = el('div', 'filebox'), pick = el('button', 'btn ghost', '📄 ' + T.pickFile), fname = el('span', 'fname'), fin = el('input'); pick.type = 'button'; fin.type = 'file'; fin.accept = '.pdf,.txt,.md,application/pdf,text/plain'; fin.className = 'hide';
@@ -344,9 +378,9 @@
     f.cloze.text.split(/(\[\[\d+\]\])/).forEach(function (part) {
       var m = part.match(/^\[\[(\d+)\]\]$/); if (!m) { p.appendChild(document.createTextNode(part)); return; }
       var b = f.cloze.blanks.filter(function (x) { return x.n === Number(m[1]); })[0], i = el('input'); i.type = 'text'; i.autocomplete = 'off'; i.autocapitalize = 'none'; i.spellcheck = false; i.setAttribute('aria-label', T.blankAria(m[1]));
-      i.style.width = Math.max(5, (b ? b.answers[0].length : 6) + 2) + 'ch'; i.dataset.n = m[1]; inputs.push(i); p.appendChild(i);
+      i.style.width = Math.max(5, (b ? b.answers[0].length : 6) + 2) + 'ch'; i.dataset.n = m[1]; if (LEARN) i.placeholder = m[1]; inputs.push(i); p.appendChild(i);
     });
-    main.appendChild(p);
+    main.appendChild(p); var tb = trans(f); if (tb) main.appendChild(tb); var pb0 = pronBox(f, false); if (pb0) main.appendChild(pb0);
     var row = el('div', 'row'), ok = el('button', 'btn', T.check); ok.type = 'button'; row.appendChild(ok); main.appendChild(row);
     inputs.forEach(function (i, k) { i.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); if (inputs[k + 1]) inputs[k + 1].focus(); else ok.click(); } }; });
     ok.onclick = function () { submit(f, inputs); };
@@ -356,12 +390,12 @@
   function submit(f, inputs) {
     var res = f.cloze.blanks.map(function (b) { var inp = inputs.filter(function (i) { return Number(i.dataset.n) === b.n; })[0], given = inp ? inp.value : ''; return { b: b, given: given, right: isRight(given, b.answers) }; });
     S.rounds++; var wrong = res.filter(function (r) { return !r.right; });
-    if (!wrong.length) { track('prf_cloze_ok', { depth: S.stack.length, tries: f.tries }); res.forEach(function (r) { learn(r.b.answers[0], r.b.meaning); }); learn(f.term, ''); success(f, res); return; }
-    f.tries++; f.pending = wrong.map(function (r) { var k = norm(r.b.answers[0]), n = S.nodes.filter(function (x) { return x.parentId === f.nodeId && norm(x.term) === k; })[0] || node(r.b.answers[0], f.nodeId); n.status = 'pending'; return { answer: r.b.answers[0], meaning: r.b.meaning, nodeId: n.id, crucial: r.b.crucial !== false }; }); save(); track('prf_cloze_fail', { depth: S.stack.length, wrong: wrong.length, of: res.length });
-    res.filter(function (r) { return r.right; }).forEach(function (r) { learn(r.b.answers[0], r.b.meaning); });
+    if (!wrong.length) { track('prf_cloze_ok', { depth: S.stack.length, tries: f.tries }); res.forEach(function (r) { learn(r.b.answers[0], r.b.meaning, r.b.pron); }); learn(f.term, ''); success(f, res); return; }
+    f.tries++; f.pending = wrong.map(function (r) { var k = norm(r.b.answers[0]), n = S.nodes.filter(function (x) { return x.parentId === f.nodeId && norm(x.term) === k; })[0] || node(r.b.answers[0], f.nodeId); n.status = 'pending'; return { answer: r.b.answers[0], meaning: r.b.meaning, pron: r.b.pron || '', nodeId: n.id, crucial: r.b.crucial !== false }; }); save(); track('prf_cloze_fail', { depth: S.stack.length, wrong: wrong.length, of: res.length });
+    res.filter(function (r) { return r.right; }).forEach(function (r) { learn(r.b.answers[0], r.b.meaning, r.b.pron); });
     feedback(f, res); prefetch(f);
   }
-  function learn(term, meaning) { var k = norm(term); if (!k) return; if (!S.learned.some(function (x) { return norm(x.term) === k; })) S.learned.push({ term: term, meaning: meaning || '' }); else if (meaning) S.learned.forEach(function (x) { if (norm(x.term) === k && !x.meaning) x.meaning = meaning; }); }
+  function learn(term, meaning, pron) { var k = norm(term); if (!k) return; if (!S.learned.some(function (x) { return norm(x.term) === k; })) S.learned.push({ term: term, meaning: meaning || '', pron: pron || '' }); else if (meaning) S.learned.forEach(function (x) { if (norm(x.term) === k && !x.meaning) x.meaning = meaning; }); }
   function canDescend(f, w) {
     var k = norm(w.answer); if (w.crucial === false) return false;   // palabra no clave para el tema central: se explica, no se profundiza
     if (S.stack.length >= MAX_DEPTH) return false; if ((S.taught[k] || 0) >= MAX_TAUGHT) return false;
@@ -382,8 +416,8 @@
     var wrong = res.filter(function (r) { return !r.right; });
     main.appendChild(el('h2', null, wrong.length === res.length ? T.almost : T.missed(wrong.length)));
     var bar = ttsBar(function () { return plain(f, res); }); if (bar) main.appendChild(bar);
-    main.appendChild(filled(f, res));
-    wrong.forEach(function (r) { var d = el('p', 'mean'); d.appendChild(el('b', null, r.b.answers[0])); if (TTS) d.appendChild(spk(r.b.answers[0], T.listenWord)); d.appendChild(document.createTextNode(': ' + r.b.meaning)); main.appendChild(d); });
+    main.appendChild(filled(f, res)); var tb = trans(f, res); if (tb) main.appendChild(tb); var pb1 = pronBox(f, true); if (pb1) { pb1.open = true; main.appendChild(pb1); }
+    wrong.forEach(function (r) { var d = el('p', 'mean'); d.appendChild(el('b', null, r.b.answers[0])); if (r.b.pron) d.appendChild(el('i', 'pr', pronOf(r.b))); if (TTS) d.appendChild(spk(r.b.answers[0], T.listenWord)); d.appendChild(document.createTextNode(': ' + r.b.meaning)); main.appendChild(d); });
     f.pending.sort(function (a, b) { return (b.crucial !== false) - (a.crucial !== false); });   // primero las palabras clave
     var allMinor = f.pending.every(function (w) { return w.crucial === false; });
     if (allMinor) { f.pending.forEach(function (w) { setStatus(w.nodeId, 'done'); }); f.pending = []; track('prf_minor', {}); }   // su significado ya se ve arriba: se reintenta sin bajar
@@ -396,7 +430,7 @@
     var isRoot = S.stack.length === 1, more = isRoot && S.part < S.parts.length - 1;
     main.appendChild(el('h2', null, more ? T.partWin(S.part + 1, S.parts.length) : isRoot ? T.win : T.okBack));
     var bar = ttsBar(function () { return plain(f, res); }); if (bar) main.appendChild(bar);
-    main.appendChild(filled(f, res));
+    main.appendChild(filled(f, res)); var tb2 = trans(f, res); if (tb2) main.appendChild(tb2); var pb2 = pronBox(f, true); if (pb2) main.appendChild(pb2);
     var b = el('button', 'btn', more ? T.nextPart(S.part + 2, S.parts.length) : isRoot ? T.seeLearned : T.backTo(S.stack[S.stack.length - 2].term));
     if (more) { S.part++; getCloze(S.parts[S.part], '', 0, []).catch(function () {}); S.part--; }   // la siguiente parte se prepara mientras lee
     b.onclick = function () {
@@ -423,7 +457,7 @@
   }
   function explain(f, w) {
     stopSpeech(); renderPile(); main.textContent = ''; crumb(main);
-    var h = el('h2', null, w.answer); if (TTS) h.appendChild(spk(w.answer, T.listenWord)); main.appendChild(h); main.appendChild(el('p', null, w.meaning));
+    var h = el('h2', null, w.answer); if (w.pron) h.appendChild(el('i', 'pr', pronOf(w))); if (TTS) h.appendChild(spk(w.answer, T.listenWord)); main.appendChild(h); main.appendChild(el('p', null, w.meaning));
     main.appendChild(el('p', 'muted small', w.crucial === false ? T.minorNote(S.topic) : T.explainNote));
     var b = el('button', 'btn', T.cont); b.onclick = next; main.appendChild(b); b.focus();
   }
@@ -432,7 +466,7 @@
     main.appendChild(el('h2', null, T.doneT(S.topic)));
     main.appendChild(el('p', 'muted', T.doneS(S.rounds, S.maxDepth, S.learned.length)));
     var withM = S.learned.filter(function (x) { return x.meaning; });
-    if (withM.length) { main.appendChild(el('p', null, T.recap)); var ul = el('ul', 'recap'); withM.forEach(function (x) { var li = el('li'); li.appendChild(el('b', null, x.term)); if (TTS) li.appendChild(spk(x.term, T.listenWord)); li.appendChild(document.createTextNode(': ' + x.meaning)); ul.appendChild(li); }); main.appendChild(ul); }
+    if (withM.length) { main.appendChild(el('p', null, T.recap)); var ul = el('ul', 'recap'); withM.forEach(function (x) { var li = el('li'); li.appendChild(el('b', null, x.term)); if (x.pron) li.appendChild(el('i', 'pr', ' /' + x.pron + '/')); if (TTS) li.appendChild(spk(x.term, T.listenWord)); li.appendChild(document.createTextNode(': ' + x.meaning)); ul.appendChild(li); }); main.appendChild(ul); }
     var row = el('div', 'row'), again = el('button', 'btn', T.again); again.onclick = function () { document.body.classList.remove('fin'); start(); }; row.appendChild(again);
     var up = el('button', 'btn ghost', T.harder); up.onclick = function () { var t = S.topic, nl = S.level === 'beginner' ? 'intermediate' : 'advanced'; document.body.classList.remove('fin'); track('prf_start', { level: nl, harder: true }); if (S.src) { var sr = S.src, ttl = S.topic; loading(T.preparing); window.PRF_SRC.load(sr.id).then(function (ch) { if (!ch) start({ err: T.errNoText }); else startFromChunks(ch, ttl, sr.kind, nl, sr.id, sr.chars); }); } else begin(t, nl); }; if (S.level !== 'advanced') row.appendChild(up);
     main.appendChild(row);

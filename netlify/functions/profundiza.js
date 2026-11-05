@@ -59,6 +59,34 @@ function strict(list) {
     }
     return out.slice(0, 3);
 }
+
+// ===== Modo idiomas: la persona (hispanohablante) aprende el idioma de «lang». Texto y respuestas en ese idioma; ayudas en español. =====
+const CEFR = { beginner: 'A1–A2 (frases muy cortas y simples, presente, vocabulario cotidiano y de alta frecuencia)', intermediate: 'B1 (frases claras, tiempos comunes, vocabulario de uso frecuente)', advanced: 'B2–C1 (vocabulario preciso y estructuras más complejas, texto natural)' };
+const SCHEMA_L = (() => {
+    const s = JSON.parse(JSON.stringify(SCHEMA));
+    s.properties.translation = { type: 'STRING', description: 'El MISMO texto completo traducido al español, sin espacios en blanco (con las palabras que van en los huecos puestas). Envuelve la traducción de cada palabra oculta así: {{n:palabras en español}}, con el mismo número n de su marca [[n]].' };
+    s.properties.termEs = { type: 'STRING', description: 'El concepto («term») en español, 1 a 6 palabras.' };
+    s.properties.termPron = { type: 'STRING', description: 'Guía de pronunciación de «term» para un hispanohablante, en sílabas separadas por guiones y la sílaba tónica en MAYÚSCULAS.' };
+    s.properties.textPron = { type: 'STRING', description: 'Guía de pronunciación de TODO el texto (con las palabras ocultas puestas), para un hispanohablante: la misma guía por sílabas, con la sílaba tónica en MAYÚSCULAS, palabra por palabra en el mismo orden.' };
+    s.properties.blanks.items.properties.es = { type: 'STRING', description: 'Traducción al español de la palabra oculta (1 a 4 palabras).' };
+    s.properties.blanks.items.properties.pron = { type: 'STRING', description: 'Guía de pronunciación de la respuesta para un hispanohablante: sílabas con guiones y la tónica en MAYÚSCULAS (ej.: «SHTRA-se»).' };
+    s.properties.blanks.items.required.push('es', 'pron');
+    s.required.push('translation', 'termEs', 'termPron', 'textPron');
+    return s;
+})();
+function learnAddendum(lang, lvl) {
+    return `
+MODO IDIOMAS (estas reglas mandan sobre lo anterior): la persona es hispanohablante y está APRENDIENDO ${LANGS[lang]} mientras estudia el tema. Escribe «term», «text» y las respuestas («answers») en ${LANGS[lang]} natural y correcto, con nivel ${CEFR[lvl]}; las frases deben ser gramaticalmente impecables. Las respuestas ocultas son palabras de ese idioma (con su artículo si lo tiene, por ejemplo «der Zar»; acepta también la forma sin artículo en «answers»).
+En cambio TODO lo que es ayuda va en ESPAÑOL: «meaning» (qué significa, una frase simple, sin usar la palabra), «es», «translation» y «termEs». 
+«translation» es el texto COMPLETO en español, sin huecos, fiel al texto (no un resumen), y cada palabra oculta aparece traducida envuelta como {{n:traducción}} con su mismo número. Las guías de pronunciación («pron», «termPron», «textPron») están escritas con letras del español en sílabas (con la tónica en MAYÚSCULAS), pensadas para que un hispanohablante lo lea en voz alta; no uses IPA.`;
+}
+function validateL(d, lvl) {
+    if (!validate(d, lvl)) return false;
+    if (typeof d.translation !== 'string' || d.translation.replace(/\{\{\d+:|\}\}/g, '').trim().length < 30 || /\[\[/.test(d.translation)) return false;
+    if (!String(d.textPron || '').trim() || !String(d.termPron || '').trim() || !String(d.termEs || '').trim()) return false;
+    const marks = [...d.text.matchAll(/\[\[(\d+)\]\]/g)].map((m) => Number(m[1]));
+    return marks.every((n) => { const b = d.blanks.find((x) => Number(x.n) === n); return b && String(b.es || '').trim() && String(b.pron || '').trim(); });
+}
 const OUTLINE = { type: 'OBJECT', properties: {
     topic: { type: 'STRING', description: 'El nombre del tema central en el idioma pedido, natural, máximo 8 palabras, sin comillas.' },
     parts: { type: 'ARRAY', items: { type: 'OBJECT', properties: {
@@ -259,11 +287,19 @@ exports.handler = async (event) => {
             const lang = LANGS[body.lang] ? body.lang : 'es', variant = Math.min(5, Math.max(0, parseInt(body.variant, 10) || 0)), avoid = (Array.isArray(body.avoid) ? body.avoid : []).slice(0, 2).map((x) => clean(x, 160)).filter(Boolean);
             const pk = parseInt(body.partK, 10), pn = parseInt(body.partN, 10), part = pk > 0 && pn >= pk && pn <= 100 ? { k: pk, n: pn } : null;
             const kind = !parent && (body.kind === 'untold' || body.kind === 'curiosity') ? body.kind : '', ctx = clean(body.context, 2200), t0 = Date.now();
-            const d = await generateWithRetries(prompt(term, topic, parent, lvl, variant, avoid, lang, part, kind, ctx), SCHEMA, (x) => validate(x, lvl), { tag: 'profundiza', maxOutputTokens: 1400, deadline: t0 + 22000, attemptMs: 9000 });
+            const learn = body.learn === true && lang !== 'es';
+            const d = await generateWithRetries(prompt(term, topic, parent, lvl, variant, avoid, lang, part, kind, ctx) + (learn ? learnAddendum(lang, lvl) : ''), learn ? SCHEMA_L : SCHEMA, (x) => (learn ? validateL(x, lvl) : validate(x, lvl)), { tag: learn ? 'profundiza-idiomas' : 'profundiza', maxOutputTokens: learn ? 3000 : 1400, deadline: t0 + 22000, attemptMs: learn ? 11000 : 9000 });
             const marks = [...d.text.matchAll(/\[\[(\d+)\]\]/g)].map((m) => Number(m[1]));
             const blanks = marks.map((n, i) => { const b = d.blanks.find((x) => Number(x.n) === n); return { n: i + 1, old: n, answers: strict(b.answers.map((s) => clean(s, 60)).filter(Boolean)), meaning: clean(b.meaning, 220), crucial: b.crucial !== false }; });
             // se renumera 1..k en orden de aparición (con marcas temporales para evitar choques)
             let text = d.text; blanks.forEach((b) => { text = text.split('[[' + b.old + ']]').join('{#' + b.n + '#}'); }); text = text.replace(/\{#(\d+)#\}/g, '[[$1]]');
+            if (learn) {
+                const map = {}; blanks.forEach((b) => { map[b.old] = b.n; });
+                const tr = clean(d.translation, 1400).replace(/\{\{(\d+):([^{}]*)\}\}/g, (m, n, t) => (map[Number(n)] ? '{{' + map[Number(n)] + ':' + t + '}}' : t));
+                const ex = (n) => { const b = d.blanks.find((x) => Number(x.n) === n); return b; };
+                return json(200, { term: clean(d.term, 80).replace(/[«»"“”„]/g, '').trim() || term, asked: term, level: lvl, lang, learn: true, text: clean(text, 900), translation: tr, termEs: clean(d.termEs, 80), termPron: clean(d.termPron, 120), textPron: clean(d.textPron, 1400),
+                    blanks: blanks.map(({ n, old, answers, meaning, crucial }) => ({ n, answers, meaning: clean(ex(old).es, 60) + ' — ' + meaning, es: clean(ex(old).es, 60), pron: clean(ex(old).pron, 80), crucial })), ms: Date.now() - t0 });
+            }
             return json(200, { term: clean(d.term, 80).replace(/[«»"“”„]/g, '').trim() || term, asked: term, level: lvl, lang, text: clean(text, 900), blanks: blanks.map(({ n, answers, meaning, crucial }) => ({ n, answers, meaning, crucial })), ms: Date.now() - t0 });
         }
         return json(400, { error: 'accion' });
