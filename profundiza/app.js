@@ -141,6 +141,8 @@
     d.appendChild(el('p', null, f.term + ' → ' + f.cloze.termPron + (f.cloze.termEs ? '  (' + f.cloze.termEs + ')' : '')));
     if (withText && f.cloze.textPron) d.appendChild(el('p', null, f.cloze.textPron)); return d;
   }
+  function tx(t) { if (!LEARN || !S || !S.es) return t; var e = S.es[norm(t)]; return e && norm(e) !== norm(t) ? t + ' (' + e + ')' : t; }   // el título va con su traducción al español
+  function setEs(t, e) { if (!LEARN || !S || !t || !e) return; S.es = S.es || {}; if (!S.es[norm(t)]) S.es[norm(t)] = e; }
   function pronOf(b) { return b && b.pron ? ' /' + b.pron + '/' : ''; }
   function ttsBar(getText) {
     if (!TTS) return null; var bar = el('div', 'ttsbar'), b = el('button', 'spk', '🔊 ' + T.listenText); b.type = 'button'; b.onclick = function () { speak(getText(), b); }; bar.appendChild(b);
@@ -174,7 +176,7 @@
     var depth = S.stack.length, g = el('div', 'gauge'); g.setAttribute('role', 'img'); g.setAttribute('aria-label', T.depth(depth, MAX_DEPTH));
     for (var i = 1; i <= MAX_DEPTH; i++) g.appendChild(el('i', i <= depth ? 'on' : ''));
     pile.appendChild(g); pile.appendChild(el('div', 'gl', T.depth(depth, MAX_DEPTH) + (depth > 1 ? T.up(depth) : T.atTopic)));
-    var tree = el('div', 'tree'); (function walk(pid, lvl) { S.nodes.forEach(function (n) { if (n.parentId !== pid || (n.part || 0) !== S.part) return; var st = n.status === 'active' && S.stack.length && S.stack[S.stack.length - 1].nodeId !== n.id ? 'wait' : n.status, r = el('div', 'tn ' + st); r.style.paddingLeft = (lvl * 14) + 'px'; r.appendChild(el('span', 'mk', st === 'done' ? '✓' : st === 'active' ? '●' : st === 'wait' ? '◐' : '○')); r.appendChild(document.createTextNode(n.term)); tree.appendChild(r); walk(n.id, lvl + 1); }); })(null, 0);
+    var tree = el('div', 'tree'); (function walk(pid, lvl) { S.nodes.forEach(function (n) { if (n.parentId !== pid || (n.part || 0) !== S.part) return; var st = n.status === 'active' && S.stack.length && S.stack[S.stack.length - 1].nodeId !== n.id ? 'wait' : n.status, r = el('div', 'tn ' + st); r.style.paddingLeft = (lvl * 14) + 'px'; r.appendChild(el('span', 'mk', st === 'done' ? '✓' : st === 'active' ? '●' : st === 'wait' ? '◐' : '○')); r.appendChild(document.createTextNode(tx(n.term))); tree.appendChild(r); walk(n.id, lvl + 1); }); })(null, 0);
     pile.appendChild(tree);
     var cur = S.nodes.filter(function (n) { return (n.part || 0) === S.part; }), done = cur.filter(function (n) { return n.status === 'done'; }).length, pend = cur.filter(function (n) { return n.status !== 'done'; }).length - 1;
     renderLearn();
@@ -187,9 +189,9 @@
     L.slice().reverse().forEach(function (x) { var d = el('div', 'lrn'); var b = el('b', null, x.term); if (TTS) b.appendChild(spk(x.term, T.listenWord)); d.appendChild(b); d.appendChild(el('span', null, x.meaning)); learnEl.appendChild(d); });
   }
   function crumb(parent) {
-    if (S.parts && S.parts.length > 1) parent.appendChild(el('p', 'ptag', (S.part === S.parts.length - 1 ? T.lastPart(S.parts.length) : T.partOf(S.part + 1, S.parts.length)) + ' · ' + S.topic));
+    if (S.parts && S.parts.length > 1) parent.appendChild(el('p', 'ptag', (S.part === S.parts.length - 1 ? T.lastPart(S.parts.length) : T.partOf(S.part + 1, S.parts.length)) + ' · ' + tx(S.topic)));
     if (S.stack.length === 1 && kindOf()) parent.appendChild(el('p', 'ktag ' + kindOf(), kindOf() === 'untold' ? '📜 ' + T.untK : '💡 ' + T.curK));
-    var c = el('p', 'crumb'); S.stack.forEach(function (f, i) { if (i) c.appendChild(document.createTextNode(' › ')); var last = i === S.stack.length - 1, b = last ? el('b', null, f.term) : document.createTextNode(f.term); c.appendChild(b); if (last && TTS) c.appendChild(spk(f.term, T.listenWord)); }); parent.appendChild(c);
+    var c = el('p', 'crumb'); S.stack.forEach(function (f, i) { if (i) c.appendChild(document.createTextNode(' › ')); var last = i === S.stack.length - 1, b = last ? el('b', null, tx(f.term)) : document.createTextNode(tx(f.term)); c.appendChild(b); if (last && TTS) c.appendChild(spk(f.term, T.listenWord)); }); parent.appendChild(c);
   }
   function loading(msg) { stopSpeech(); main.textContent = ''; var p = el('p', 'muted'); p.appendChild(el('span', 'spin')); p.appendChild(document.createTextNode(msg)); main.appendChild(p); }
   function fail(retry) {
@@ -272,11 +274,11 @@
   }
   function begin(t, lvl) {
     loading(T.loadO(t));
-    fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'outline', anonId: ANON, lang: LANG, topic: t, level: lvl }) })
+    fetch(FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'outline', anonId: ANON, lang: LANG, topic: t, level: lvl, learn: LEARN }) })
       .then(function (r) { return r.json().then(function (j) { if (!r.ok || !j.parts || !j.parts.length) throw new Error(j.error || 'http'); return j; }); })
       .then(function (o) {
         S = { id: newId(), topic: o.topic || t, level: lvl, parts: o.parts, kinds: o.kinds || [], part: 0, status: 'active', created: Date.now(), stack: [], nodes: [], taught: {}, learned: [], rounds: 0, maxDepth: 1 };
-        track('prf_outline', { level: lvl, parts: o.parts.length }); save(); pushFrame(S.parts[0], '', null);
+        if (LEARN) { setEs(S.topic, o.topicEs); (o.partsEs || []).forEach(function (e, i) { setEs(S.parts[i], e); }); } track('prf_outline', { level: lvl, parts: o.parts.length }); save(); pushFrame(S.parts[0], '', null);
       }).catch(function () { fail(function () { begin(t, lvl); }); });
   }
 
@@ -363,7 +365,7 @@
     getCloze(term, parent, 0, []).then(function (c) {
       if (c && c.skip) { if (S.part < S.parts.length - 1) { S.part++; save(); pushFrame(S.parts[S.part], '', null); } else done(); return; }   // esa parte del documento no tenía un pasaje útil
       var shown = (c.term && String(c.term).trim()) || term; if (!parent && S.src && S.plan && S.plan[S.part]) S.parts[S.part] = shown; if (nodeId == null) { nodeId = node(shown, null).id; } else if (S.nodes[nodeId]) S.nodes[nodeId].term = shown;
-      setStatus(nodeId, 'active'); S.stack.push({ term: shown, parent: parent || '', nodeId: nodeId, cloze: c, pending: [], tries: 0, why: why || '', seen: [c.text] });
+      setEs(shown, c.termEs); (c.blanks || []).forEach(function (b) { setEs(b.answers[0], b.es); }); setStatus(nodeId, 'active'); S.stack.push({ term: shown, parent: parent || '', nodeId: nodeId, cloze: c, pending: [], tries: 0, why: why || '', seen: [c.text] });
       S.maxDepth = Math.max(S.maxDepth, S.stack.length); save(); ask();
     }).catch(function () { fail(function () { pushFrame(term, parent, why, nodeId); }); });
   }
@@ -431,7 +433,7 @@
     main.appendChild(el('h2', null, more ? T.partWin(S.part + 1, S.parts.length) : isRoot ? T.win : T.okBack));
     var bar = ttsBar(function () { return plain(f, res); }); if (bar) main.appendChild(bar);
     main.appendChild(filled(f, res)); var tb2 = trans(f, res); if (tb2) main.appendChild(tb2); var pb2 = pronBox(f, true); if (pb2) main.appendChild(pb2);
-    var b = el('button', 'btn', more ? T.nextPart(S.part + 2, S.parts.length) : isRoot ? T.seeLearned : T.backTo(S.stack[S.stack.length - 2].term));
+    var b = el('button', 'btn', more ? T.nextPart(S.part + 2, S.parts.length) : isRoot ? T.seeLearned : T.backTo(tx(S.stack[S.stack.length - 2].term)));
     if (more) { S.part++; getCloze(S.parts[S.part], '', 0, []).catch(function () {}); S.part--; }   // la siguiente parte se prepara mientras lee
     b.onclick = function () {
       setStatus(f.nodeId, 'done'); S.stack.pop(); track('prf_return', { depth: S.stack.length }); save();
@@ -447,7 +449,7 @@
       var w = f.pending[0];
       if (!canDescend(f, w)) { f.pending.shift(); setStatus(w.nodeId, 'done'); save(); explain(f, w); return; }
       f.pending.shift(); var k = norm(w.answer); S.taught[k] = (S.taught[k] || 0) + 1; save(); track('prf_descend', { depth: S.stack.length + 1 });
-      pushFrame(w.answer, f.term, T.why(w.answer, f.term), w.nodeId); return;
+      pushFrame(w.answer, f.term, T.why(tx(w.answer), tx(f.term)), w.nodeId); return;
     }
     // sin pendientes: se vuelve a presentar la pregunta (después de dos fallos seguidos, con otra redacción)
     if (f.tries >= 2 && f.tries % 2 === 0) {
@@ -457,13 +459,13 @@
   }
   function explain(f, w) {
     stopSpeech(); renderPile(); main.textContent = ''; crumb(main);
-    var h = el('h2', null, w.answer); if (w.pron) h.appendChild(el('i', 'pr', pronOf(w))); if (TTS) h.appendChild(spk(w.answer, T.listenWord)); main.appendChild(h); main.appendChild(el('p', null, w.meaning));
+    var h = el('h2', null, tx(w.answer)); if (w.pron) h.appendChild(el('i', 'pr', pronOf(w))); if (TTS) h.appendChild(spk(w.answer, T.listenWord)); main.appendChild(h); main.appendChild(el('p', null, w.meaning));
     main.appendChild(el('p', 'muted small', w.crucial === false ? T.minorNote(S.topic) : T.explainNote));
     var b = el('button', 'btn', T.cont); b.onclick = next; main.appendChild(b); b.focus();
   }
   function done(review) {
     stopSpeech(); if (!review) { track('prf_done', { rounds: S.rounds, depth: S.maxDepth, learned: S.learned.length, parts: S.parts.length }); S.status = 'done'; S.stack = []; S.nodes = []; save(); } renderPile(); learnEl.classList.remove('on'); pile.classList.remove('on'); document.body.classList.add('fin'); main.textContent = '';
-    main.appendChild(el('h2', null, T.doneT(S.topic)));
+    main.appendChild(el('h2', null, T.doneT(tx(S.topic))));
     main.appendChild(el('p', 'muted', T.doneS(S.rounds, S.maxDepth, S.learned.length)));
     var withM = S.learned.filter(function (x) { return x.meaning; });
     if (withM.length) { main.appendChild(el('p', null, T.recap)); var ul = el('ul', 'recap'); withM.forEach(function (x) { var li = el('li'); li.appendChild(el('b', null, x.term)); if (x.pron) li.appendChild(el('i', 'pr', ' /' + x.pron + '/')); if (TTS) li.appendChild(spk(x.term, T.listenWord)); li.appendChild(document.createTextNode(': ' + x.meaning)); ul.appendChild(li); }); main.appendChild(ul); }

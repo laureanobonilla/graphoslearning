@@ -95,6 +95,10 @@ const OUTLINE = { type: 'OBJECT', properties: {
     }, required: ['title', 'kind'] }, description: 'Las partes del tema, con las curiosidades e historias poco contadas mezcladas entre los conceptos.' }
 }, required: ['topic', 'parts'] };
 const PARTS = { beginner: 10, intermediate: 25, advanced: 65 };
+const OUTLINE_L = (() => { const o = JSON.parse(JSON.stringify(OUTLINE));
+    o.properties.topicEs = { type: 'STRING', description: 'El nombre del tema central traducido al español, máximo 8 palabras.' };
+    o.properties.parts.items.properties.es = { type: 'STRING', description: 'El título de la parte traducido al español, 1 a 7 palabras.' };
+    o.properties.parts.items.required.push('es'); o.required.push('topicEs'); return o; })();
 function outlinePrompt(topic, lvl, n, lang, context) {
     return `Eres un profesor que arma un temario para estudiar a fondo un tema. Escribe todo en ${LANGS[lang]}, con ortografía correcta.
 Tema central: «${topic}» (la persona pudo escribirlo en otro idioma: en «topic» devuélvelo en ${LANGS[lang]}).
@@ -272,13 +276,13 @@ exports.handler = async (event) => {
             if (limited(ip + 'o', 12)) return json(429, { error: 'demasiadas' });
             const topic = clean(body.topic, 80), lvl = LEVELS[body.level] ? body.level : 'beginner', lang = LANGS[body.lang] ? body.lang : 'es', n = PARTS[lvl], cnt = parseInt(body.count, 10), ctx = clean(body.context, 700);
             if (topic.length < 2) return json(400, { error: 'tema' });
-            const nn = cnt > 0 && cnt < n ? cnt : n, tn = norm(topic), t0 = Date.now();
+            const learn = body.learn === true && lang !== 'es', nn = cnt > 0 && cnt < n ? cnt : n, tn = norm(topic), t0 = Date.now();
             const ttl = (x) => clean(x && x.title != null ? x.title : x, 70);
             const ok = (d) => d && typeof d.topic === 'string' && Array.isArray(d.parts) && d.parts.map((x) => ttl(x)).filter((x) => x.length >= 2 && norm(x) !== tn && norm(x) !== norm(d.topic)).length >= Math.ceil(nn * 0.9);
-            const d = await generateWithRetries(outlinePrompt(topic, lvl, nn, lang, ctx), OUTLINE, ok, { tag: 'profundiza-outline', maxOutputTokens: 3000, deadline: t0 + 24000, attemptMs: 14000 });
-            const seen = new Set(), parts = [], kinds = [];
-            d.parts.forEach((o) => { const x = ttl(o).replace(/[«»"“”„]/g, '').replace(/^\d+[.)-]\s*/, '').trim(), k = norm(x); if (x.length >= 2 && k !== tn && k !== norm(d.topic) && !seen.has(k)) { seen.add(k); parts.push(x); kinds.push(o && (o.kind === 'curiosity' || o.kind === 'untold') ? o.kind : 'concept'); } });
-            return json(200, { topic: clean(d.topic, 80).replace(/[«»"“”„]/g, '').trim() || topic, level: lvl, parts: parts.slice(0, nn), kinds: kinds.slice(0, nn), ms: Date.now() - t0 });
+            const d = await generateWithRetries(outlinePrompt(topic, lvl, nn, lang, ctx) + (learn ? '\nMODO IDIOMAS: la persona es hispanohablante y aprende ' + LANGS[lang] + '. Los títulos («title» y «topic») van en ' + LANGS[lang] + ' sencillo y natural; «es» y «topicEs» son su traducción al español.' : ''), learn ? OUTLINE_L : OUTLINE, (x) => ok(x) && (!learn || (String(x.topicEs || '').trim() && x.parts.every((q) => String(q && q.es || '').trim()))), { tag: 'profundiza-outline', maxOutputTokens: 3000, deadline: t0 + 24000, attemptMs: 14000 });
+            const seen = new Set(), parts = [], kinds = [], partsEs = [];
+            d.parts.forEach((o) => { const x = ttl(o).replace(/[«»"“”„]/g, '').replace(/^\d+[.)-]\s*/, '').trim(), k = norm(x); if (x.length >= 2 && k !== tn && k !== norm(d.topic) && !seen.has(k)) { seen.add(k); parts.push(x); partsEs.push(clean(o && o.es, 70)); kinds.push(o && (o.kind === 'curiosity' || o.kind === 'untold') ? o.kind : 'concept'); } });
+            return json(200, { topic: clean(d.topic, 80).replace(/[«»"“”„]/g, '').trim() || topic, level: lvl, parts: parts.slice(0, nn), kinds: kinds.slice(0, nn), ...(learn ? { topicEs: clean(d.topicEs, 80), partsEs: partsEs.slice(0, nn) } : {}), ms: Date.now() - t0 });
         }
         if (a === 'cloze') {
             if (limited(ip + 'c', 60)) return json(429, { error: 'demasiadas' });
