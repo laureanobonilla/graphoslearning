@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#8e5568">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Boda K&L">
     <title>Pendientes Boda - Kari & Lau</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -53,10 +60,23 @@
         .btn-icon { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; transition: var(--transition); padding: 8px; border-radius: 8px; }
         .btn-icon:hover { color: var(--primary); background: var(--primary-light); }
         .btn-icon.delete:hover { color: #c94a4a; background: rgba(201, 74, 74, 0.08); }
+        .install { display: none; width: 100%; max-width: 780px; margin: 0 0 1.25rem; padding: 0.9rem 1.1rem; background: var(--primary-light); border: 1px solid var(--border-color); border-radius: 14px; align-items: center; gap: 12px; font-size: 0.92rem; line-height: 1.4; }
+        .install.on { display: flex; }
+        .install .it { flex: 1; min-width: 0; }
+        .install .it b { display: block; font-family: 'Playfair Display', serif; font-size: 1.05rem; }
+        .install button { font: 600 0.88rem 'Plus Jakarta Sans', sans-serif; border-radius: 10px; padding: 0.55rem 0.95rem; cursor: pointer; border: 1px solid var(--primary); }
+        .install .go { background: var(--primary); color: #fff; }
+        .install .no { background: transparent; color: var(--primary); border-color: transparent; }
+        @media(max-width: 480px) { .install { flex-wrap: wrap; } .install .it { flex-basis: 100%; } }
         .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-style: italic; background: var(--card-bg); border-radius: var(--border-radius); border: 1px solid var(--border-color); box-shadow: var(--shadow-card); }
     </style>
 </head>
 <body>
+    <div class="install" id="install" role="region" aria-label="Instalar la app">
+        <div class="it"><b>Instala la app de la boda</b><span id="installMsg">Ábrela desde tu pantalla de inicio, como cualquier app.</span></div>
+        <button class="go" id="installGo" type="button">Instalar</button>
+        <button class="no" id="installNo" type="button">Ahora no</button>
+    </div>
     <div class="container">
         <header>
             <div class="couple-photo-container"><img src="https://bodakariylau.netlify.app/boda.jpg" alt="Kari y Lau"></div>
@@ -152,6 +172,22 @@
             if (!await call({ action: 'delete', id }, 'Guardado correctamente')) alert('Hubo un problema al eliminar. Intenta de nuevo.');
         }
         function escapeHtml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;'); }
+        // ---- Instalar como app ----
+        (function () {
+            const box = document.getElementById('install'), go = document.getElementById('installGo'), no = document.getElementById('installNo'), msg = document.getElementById('installMsg');
+            const KEY = 'boda_install_no';
+            const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+            let skipped = false; try { const t = Number(localStorage.getItem(KEY) || 0); skipped = t && Date.now() - t < 14 * 864e5; } catch (e) {}   // si dijo «ahora no», se vuelve a preguntar en 2 semanas
+            if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+            if (standalone || skipped) return;
+            let ev = null; const show = () => box.classList.add('on');
+            window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); ev = e; go.style.display = ''; show(); });
+            window.addEventListener('appinstalled', () => box.classList.remove('on'));
+            go.onclick = async () => { if (!ev) return; ev.prompt(); try { await ev.userChoice; } catch (e) {} ev = null; box.classList.remove('on'); };
+            no.onclick = () => { box.classList.remove('on'); try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {} };
+            const ua = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (ios) { go.style.display = 'none'; msg.textContent = 'En Safari toca Compartir (el cuadro con la flecha) y luego «Añadir a pantalla de inicio».'; no.textContent = 'Entendido'; show(); }
+        })();
         loadTasks();
         setInterval(() => { if (!document.hidden && !busy) loadTasks(); }, 60000);   // si Kari o Lau cambian algo, se ve solo
     </script>
