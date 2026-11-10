@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel · Mi historia</title>
+<style>
+:root{--ink:#2b2140;--muted:#6b6380;--paper:#faf8ff;--card:#fff;--line:#e8e1f7;--acc:#7a5ccf}
+@media (prefers-color-scheme:dark){:root{--ink:#f3eefc;--muted:#b7aed0;--paper:#17122a;--card:#211a3a;--line:#352c58;--acc:#cdbdf7}}
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;background:var(--paper);color:var(--ink);margin:0;padding:24px 16px;line-height:1.5}
+main{max-width:760px;margin:0 auto}h1{font-size:1.5rem;margin:0 0 4px}h2{font-size:1.1rem;margin:28px 0 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+input,button{font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--paper);color:var(--ink)}
+button{background:var(--acc);color:#fff;border:0;cursor:pointer;font-weight:600}button.g{background:transparent;color:var(--acc);border:1px solid var(--line)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>input{flex:1;min-width:140px}
+table{width:100%;border-collapse:collapse;font-size:.92rem}td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left}
+.muted{color:var(--muted);font-size:.9rem}.big{font:700 1.5rem ui-monospace,monospace;letter-spacing:.05em;color:var(--acc);word-break:break-all}.off{opacity:.5}
+</style></head><body><main>
+<h1>Panel · Mi historia</h1><p class="muted">Claves de acceso y fotos sin censura.</p>
+<div class="card row" id="login"><input id="pass" type="password" placeholder="Clave del panel" autocomplete="current-password"><button id="go">Entrar</button><span class="muted" id="err"></span></div>
+<div id="app" hidden>
+  <h2>Claves de acceso</h2>
+  <div class="card"><div class="row"><input id="label" placeholder="¿Para quién es? (ej. Juan, Messenger 10 nov)"><input id="own" placeholder="Clave (vacío = genera una)"><button id="mk">Crear clave</button></div>
+  <div id="newcode" style="margin-top:12px"></div></div>
+  <div class="card"><table><thead><tr><th>Para</th><th>Usos</th><th>Último uso</th><th></th></tr></thead><tbody id="claves"></tbody></table><p class="muted" id="noclaves" hidden>Aún no hay claves.</p></div>
+  <p class="muted">La clave solo se muestra al crearla; después no se puede ver (se guarda cifrada). Si alguien la comparte, anúlala aquí.</p>
+
+  <h2>Fotos sin censura</h2>
+  <div class="card"><div class="row"><input id="files" type="file" accept="image/*" multiple><button id="up">Subir</button></div><p class="muted" id="upmsg"></p>
+  <p class="muted">Se guardan en un espacio privado: nadie las ve sin una clave válida. El orden es el de subida.</p></div>
+  <div class="card"><table><tbody id="fotos"></tbody></table><p class="muted" id="nofotos" hidden>Aún no hay fotos.</p></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);let PASS='';
+async function api(body){const r=await fetch('/.netlify/functions/perfil-admin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pass:PASS,...body})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'error');return j}
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function load(){const s=await api({action:'state'});
+ $('claves').innerHTML=s.claves.map(c=>`<tr class="${c.active?'':'off'}"><td>${esc(c.label)||'(sin nombre)'}</td><td>${c.uses}</td><td>${c.last_used?new Date(c.last_used).toLocaleString('es-CR'):'—'}</td><td><button class="g" data-a="${c.id}" data-v="${c.active?0:1}">${c.active?'Anular':'Reactivar'}</button></td></tr>`).join('');
+ $('noclaves').hidden=s.claves.length>0;
+ $('fotos').innerHTML=s.fotos.map(f=>`<tr><td class="muted">${esc(f.path)}</td><td style="text-align:right"><button class="g" data-d="${f.id}">Borrar</button></td></tr>`).join('');$('nofotos').hidden=s.fotos.length>0;}
+$('go').onclick=async()=>{PASS=$('pass').value;$('err').textContent='';try{await load();$('login').hidden=true;$('app').hidden=false}catch(e){$('err').textContent=e.message==='clave'?'Clave incorrecta':e.message==='sin_configurar'?'Falta configurar PERFIL_ADMIN en Netlify':'No se pudo entrar'}};
+$('pass').onkeydown=e=>{if(e.key==='Enter')$('go').click()};
+$('mk').onclick=async()=>{try{const r=await api({action:'createCode',label:$('label').value,code:$('own').value});$('newcode').innerHTML=`<div class="muted">Clave creada (cópiala ahora, no se vuelve a mostrar):</div><div class="big">${esc(r.code)}</div>`;$('label').value='';$('own').value='';load()}catch(e){alert(e.message==='corta'?'La clave debe tener al menos 4 caracteres.':'No se pudo crear (¿ya existe esa clave?).')}};
+$('claves').onclick=async e=>{const b=e.target.closest('button');if(!b)return;await api({action:'setActive',id:Number(b.dataset.a),active:b.dataset.v==='1'});load()};
+$('fotos').onclick=async e=>{const b=e.target.closest('button');if(!b||!confirm('¿Borrar esta foto?'))return;await api({action:'deletePhoto',id:Number(b.dataset.d)});load()};
+$('up').onclick=async()=>{const fs=[...$('files').files];if(!fs.length)return;let n=0;
+ for(const f of fs){try{$('upmsg').textContent=`Subiendo ${n+1} de ${fs.length}…`;const s=await api({action:'signUpload',name:f.name});
+  const r=await fetch(s.uploadUrl,{method:'PUT',headers:{'Content-Type':f.type||'image/jpeg'},body:f});if(!r.ok)throw new Error('subida');
+  await api({action:'addPhoto',path:s.path,sort:Date.now()%1e9});n++}catch(e){$('upmsg').textContent='Falló '+f.name;return}}
+ $('upmsg').textContent=`Listo: ${n} foto(s) subida(s).`;$('files').value='';load()};
+</script></main></body></html>

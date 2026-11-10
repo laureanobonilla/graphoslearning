@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Mi historia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#2b2140;--muted:#6b6380;--paper:#faf8ff;--card:#fff;--lav:#cdbdf7;--lav-d:#7a5ccf;--sun:#ffc857;--rose:#ffd9e2;--sage:#d9ecde;--line:#e8e1f7;--r:22px}
+@media (prefers-color-scheme:dark){:root{--ink:#f3eefc;--muted:#b7aed0;--paper:#17122a;--card:#211a3a;--line:#352c58;--lav:#5a4a9c;--lav-d:#cdbdf7;--rose:#4a2c46;--sage:#24402f}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Nunito',system-ui,sans-serif;background:var(--paper);color:var(--ink);line-height:1.65;font-size:17px}
+h1,h2{font-family:'Fraunces',Georgia,serif;font-weight:700;line-height:1.1;letter-spacing:-.01em}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+a{color:var(--lav-d)}
+:focus-visible{outline:3px solid var(--lav-d);outline-offset:3px;border-radius:8px}
+
+/* Portada */
+.hero{padding:56px 0 40px;display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+.hero h1{font-size:clamp(2.4rem,6vw,4rem);margin-bottom:16px}
+.hero .sub{font-size:1.15rem;color:var(--muted);max-width:30em;margin-bottom:22px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--card);border:1px solid var(--line);padding:6px 14px;border-radius:99px;font-weight:600;font-size:.9rem}
+.arch{position:relative;aspect-ratio:4/5;max-width:380px;margin-left:auto;width:100%}
+.arch::before{content:"";position:absolute;inset:-14px 14px 14px -14px;background:var(--sun);border-radius:999px 999px 28px 28px;opacity:.9}
+.arch .ph{position:absolute;inset:0;border-radius:999px 999px 28px 28px;overflow:hidden;background:linear-gradient(160deg,var(--lav),var(--rose))}
+.arch img,.tile img{width:100%;height:100%;object-fit:cover;display:block}
+@media(max-width:760px){.hero{grid-template-columns:1fr;padding-top:32px}.arch{margin:0 auto 0;max-width:300px;order:-1}}
+
+/* Historia */
+.story{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:34px clamp(20px,5vw,48px);margin:24px 0 56px;display:grid;grid-template-columns:auto 1fr;gap:28px}
+.story h2{font-size:clamp(1.7rem,4vw,2.3rem)}
+.story p{margin-bottom:12px;max-width:36em}
+.story p:last-child{margin:0}
+@media(max-width:760px){.story{grid-template-columns:1fr;gap:10px}}
+
+/* Galerías */
+.sec{margin-bottom:64px}
+.sec>h2{font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:6px}
+.sec>.lead{color:var(--muted);margin-bottom:22px;max-width:34em}
+.grid{columns:3 220px;column-gap:14px}
+.tile{break-inside:avoid;margin-bottom:14px;border-radius:var(--r);overflow:hidden;background:linear-gradient(150deg,var(--lav),var(--rose));position:relative}
+.tile:nth-child(3n+2){border-radius:999px 999px var(--r) var(--r)}
+.tile.ph{min-height:200px}
+.tile:nth-child(2n).ph{min-height:260px}
+.tile:nth-child(3n).ph{min-height:170px;background:linear-gradient(150deg,var(--sage),var(--lav))}
+
+/* Parte +18 */
+.more{background:linear-gradient(160deg,var(--rose),var(--lav));border-radius:calc(var(--r) + 8px);padding:clamp(26px,5vw,52px);text-align:center}
+.more h2{font-size:clamp(1.8rem,4.5vw,2.7rem);margin-bottom:10px;color:#2b2140}
+.more p{max-width:30em;margin:0 auto 22px;color:#3d3160}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;cursor:pointer;font:700 1rem 'Nunito',sans-serif;padding:14px 26px;border-radius:99px;background:#2b2140;color:#fff;text-decoration:none;transition:transform .15s}
+.btn:hover{transform:translateY(-2px)}
+.btn.alt{background:var(--card);color:var(--ink);border:1px solid var(--line)}
+#adult{display:none}
+#adult.on{display:block}
+.lockbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 24px;margin:0 0 22px}
+.lockbar form{display:flex;gap:8px;flex-wrap:wrap}
+.lockbar input{font:600 1rem 'Nunito',sans-serif;padding:12px 16px;border-radius:99px;border:1px solid var(--line);background:var(--paper);color:var(--ink);min-width:200px}
+.msg{color:#c0392b;font-weight:700;min-height:1.4em;width:100%}
+.ok{color:#2e7d4f}
+.tile.lock::after{content:"";position:absolute;inset:0}
+footer{padding:30px 0 50px;color:var(--muted);font-size:.9rem;text-align:center}
+
+/* Aviso de 18 años */
+dialog{border:0;border-radius:var(--r);padding:30px;max-width:420px;width:calc(100% - 32px);background:var(--card);color:var(--ink);box-shadow:0 20px 60px rgba(43,33,64,.35)}
+dialog::backdrop{background:rgba(23,18,42,.6);backdrop-filter:blur(4px)}
+dialog h2{font-size:1.7rem;margin-bottom:8px}
+dialog p{color:var(--muted);margin-bottom:18px}
+dialog .row{display:flex;gap:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div>
+      <h1 id="nombre">Hola, soy…</h1>
+      <p class="sub">Tengo 25 años, estudié psicología y estoy empezando de nuevo. Pasa, te cuento cómo llegué hasta aquí.</p>
+      <div class="chips"><span class="chip">Psicóloga</span><span class="chip">25 años</span><span class="chip">Soñando con un doctorado</span></div>
+    </div>
+    <div class="arch"><div class="ph" id="portada"></div></div>
+  </header>
+
+  <section class="story" aria-labelledby="hist">
+    <h2 id="hist">Mi historia</h2>
+    <div>
+      <p>Terminé la universidad con muchas ganas de ejercer lo que estudié. Pero una situación económica difícil me hizo perder todo lo que tenía, y tuve que empezar desde cero.</p>
+      <p>Hoy tengo un sueño claro: hacer un doctorado. Para lograrlo necesito reunir dinero, y por eso estoy aquí.</p>
+      <p>Soy una persona alegre, tierna y agradecida. Lo único que quiero es ser feliz y seguir creciendo. Gracias por pasar a conocerme.</p>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="gal1">
+    <h2 id="gal1">Un poco de mí</h2>
+    <p class="lead">Así soy en mi día a día.</p>
+    <div class="grid" id="normales"></div>
+  </section>
+
+  <section class="sec" aria-labelledby="mas">
+    <div class="more" id="moreBox">
+      <h2 id="mas">¿Quieres conocerme más?</h2>
+      <p>Si quieres apoyarme con mi doctorado, a cambio te comparto mis fotos sin censura. Esta parte es solo para mayores de 18 años.</p>
+      <button class="btn" id="openAdult" type="button">Quiero ver más (+18)</button>
+    </div>
+    <div id="adult">
+      <h2 style="font-size:clamp(1.7rem,4vw,2.4rem);margin-bottom:6px">Mis fotos, sin censura para quien me apoya</h2>
+      <p class="lead" style="color:var(--muted);margin-bottom:22px">Escríbeme por Facebook, cuéntame que quieres apoyarme y te doy tu clave para verlas.</p>
+      <div class="lockbar" id="lockbar">
+        <a class="btn" id="fbLink" href="#" target="_blank" rel="noopener">Escribirme por Facebook</a>
+        <form id="codeForm" autocomplete="off">
+          <input id="code" type="password" placeholder="Tu clave" aria-label="Tu clave" maxlength="80">
+          <button class="btn alt" type="submit">Ver sin censura</button>
+        </form>
+        <div class="msg" id="msg" role="status"></div>
+      </div>
+      <div class="grid" id="censuradas"></div>
+    </div>
+  </section>
+
+  <footer>Gracias por pasar. Solo para mayores de 18 años en la parte final.</footer>
+</div>
+
+<dialog id="ageDlg">
+  <h2>¿Eres mayor de 18 años?</h2>
+  <p>La siguiente parte contiene fotos con contenido adulto (con partes cubiertas). Solo continúa si tienes 18 años o más.</p>
+  <div class="row"><button class="btn" id="ageYes" type="button">Sí, tengo 18 o más</button><button class="btn alt" id="ageNo" type="button">No, volver</button></div>
+</dialog>
+
+<script src="datos.js"></script>
+<script>
+(function () {
+  const P = window.PERFIL, $ = (id) => document.getElementById(id);
+  const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
+  $('nombre').textContent = 'Hola, soy ' + P.nombre;
+  document.title = 'Mi historia · ' + P.nombre;
+  $('fbLink').href = P.facebook;
+  if (P.portada) { const i = el('img'); i.src = P.portada; i.alt = P.nombre; $('portada').appendChild(i); }
+
+  function fill(box, list, n, lock) {
+    box.innerHTML = '';
+    const items = list.length ? list : Array.from({ length: n }, () => null);   // sin fotos todavía: mosaicos de color
+    items.forEach((f) => {
+      const t = el('div', 'tile' + (f ? '' : ' ph'));
+      if (f) { const i = el('img'); i.loading = 'lazy'; i.src = f.src; i.alt = f.alt || ''; if (lock) i.draggable = false; t.appendChild(i); }
+      box.appendChild(t);
+    });
+  }
+  fill($('normales'), P.normales, 6);
+  fill($('censuradas'), P.censuradas, 4, true);
+
+  // 18+: se pregunta una vez por visita antes de mostrar la parte adulta
+  const dlg = $('ageDlg'), adult = $('adult');
+  function showAdult() { $('moreBox').style.display = 'none'; adult.classList.add('on'); adult.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  let was = false; try { was = sessionStorage.getItem('adult') === '1'; } catch (e) {}
+  $('openAdult').onclick = () => { if (was) showAdult(); else dlg.showModal(); };
+  $('ageYes').onclick = () => { try { sessionStorage.setItem('adult', '1'); } catch (e) {} dlg.close(); showAdult(); };
+  $('ageNo').onclick = () => { dlg.close(); };
+
+  // Clave: se valida en el servidor; solo entonces llegan los enlaces (temporales) de las fotos privadas
+  const msg = $('msg'), form = $('codeForm');
+  async function unlock(code, silent) {
+    msg.className = 'msg'; msg.textContent = silent ? '' : 'Comprobando…';
+    try {
+      const r = await fetch('/.netlify/functions/perfil', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unlock', code }) });
+      if (r.status === 429) { msg.textContent = 'Demasiados intentos. Espera un minuto.'; return false; }
+      const j = await r.json().catch(() => ({}));
+      if (!j.ok) { msg.textContent = silent ? '' : 'Esa clave no es correcta. Si ya me apoyaste, escríbeme y la revisamos.'; return false; }
+      fill($('censuradas'), j.fotos.length ? j.fotos.map((s) => ({ src: s, alt: '' })) : P.censuradas, 4);
+      msg.className = 'msg ok'; msg.textContent = j.fotos.length ? 'Listo. Gracias por apoyarme 💜' : 'Clave correcta. Pronto subo más fotos 💜';
+      form.style.display = 'none'; $('fbLink').style.display = 'none';
+      try { sessionStorage.setItem('k', code); } catch (e) {}
+      return true;
+    } catch (e) { msg.textContent = 'No se pudo comprobar. Intenta de nuevo.'; return false; }
+  }
+  form.onsubmit = (e) => { e.preventDefault(); const c = $('code').value.trim(); if (c) unlock(c); };
+  try { const k = sessionStorage.getItem('k'); if (k && was) { showAdult(); unlock(k, true); } } catch (e) {}
+})();
+</script>
+</body>
+</html>
