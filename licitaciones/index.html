@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Licitaciones · Analiza un cartel y sabe qué te piden</title>
+<meta name="description" content="Sube el cartel de una licitación pública y recibe la lista de requisitos, documentos, alertas y borradores para preparar tu oferta.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+<header class="top"><div class="wrap bar"><a class="brand" href="./">Licitaciones</a><nav><a href="#ejemplo" id="navEj">Ver ejemplo</a><a href="#subir" class="pill">Subir un cartel</a></nav></div></header>
+
+<main>
+<section class="hero wrap">
+  <div class="hl">
+    <h1>Sube el cartel.<br>Sal sabiendo <mark>qué te piden</mark>.</h1>
+    <p class="sub">Para quien quiere venderle al Estado y se pierde entre cientos de páginas de condiciones. Lees el resumen gratis; si te sirve, desbloqueas la lista completa de requisitos, documentos, alertas y borradores.</p>
+    <div class="drop" id="subir" tabindex="0" role="button" aria-label="Subir el PDF del cartel">
+      <input type="file" id="file" accept="application/pdf,.pdf" hidden>
+      <strong id="dropMsg">Arrastra aquí el PDF del cartel</strong>
+      <span id="dropSub">o toca para elegirlo · PDF de hasta <span id="maxMb">12</span> MB</span>
+      <label class="mail"><span>Tu correo, para guardar el enlace (opcional)</span><input type="email" id="email" placeholder="tu@correo.com" autocomplete="email"></label>
+    </div>
+    <p class="fine">¿Aún no tienes un cartel a mano? <a href="#ejemplo" id="ejLink">Mira un ejemplo completo</a>.</p>
+  </div>
+  <figure class="mock" aria-label="Ejemplo: líneas resaltadas del cartel que pasan a la lista de requisitos">
+    <div class="sheet">
+      <div class="sheet-h">CARTEL · Licitación abreviada (ejemplo ficticio)</div>
+      <p>El oferente deberá encontrarse <mark>al día en el pago de las obligaciones con la CCSS</mark> al momento de la apertura de ofertas.</p>
+      <p>La garantía de participación será de <mark>un 1% del monto cotizado</mark>, con una vigencia mínima de 60 días hábiles.</p>
+      <p>Se exige <mark>experiencia comprobada de al menos 3 contratos similares</mark> en los últimos cinco años.</p>
+      <p class="dim">La entidad podrá declarar infructuoso el concurso cuando las ofertas excedan la disponibilidad presupuestaria…</p>
+    </div>
+    <div class="list">
+      <div class="li"><i></i><span>Estar al día con la CCSS</span><em>cl. 4.2</em></div>
+      <div class="li"><i></i><span>Garantía de participación 1 %</span><em>cl. 6.1</em></div>
+      <div class="li"><i></i><span>3 contratos similares, 5 años</span><em>cl. 5.3</em></div>
+    </div>
+  </figure>
+</section>
+
+<section class="wrap" id="stage" aria-live="polite"></section>
+
+<section class="wrap what">
+  <h2>Qué recibes con el análisis completo</h2>
+  <div class="cols">
+    <div><h3>Requisitos</h3><p>Todo lo que debes cumplir, clasificado, con la cláusula donde aparece y qué documento lo demuestra.</p></div>
+    <div><h3>Documentos y fechas</h3><p>La lista de papeles a presentar, quién los emite y el calendario del procedimiento.</p></div>
+    <div><h3>Alertas</h3><p>Multas, garantías y causales de exclusión que pueden dejarte fuera, y preguntas listas para enviar a la entidad.</p></div>
+    <div><h3>Borradores</h3><p>Carta de presentación y declaraciones juradas con tus datos en blanco, para ahorrar horas.</p></div>
+  </div>
+  <p class="fine">Es una herramienta de apoyo, no asesoría legal. Lee un cartel con inteligencia artificial y puede equivocarse o dejar algo fuera: verifica siempre contra el cartel oficial y, si la oferta es importante, que un profesional la revise antes de presentarla. No estamos afiliados a ninguna institución ni a SICOP.</p>
+</section>
+</main>
+<footer class="wrap foot">Tu PDF se guarda en un espacio privado solo para generar el análisis.</footer>
+<script src="app.js?v=1"></script>
+</body>
+</html>
