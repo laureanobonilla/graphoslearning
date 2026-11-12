@@ -356,7 +356,19 @@ window.CONFIG = {
     utm_source: params0.get('utm_source') || '',
     utm_campaign: params0.get('utm_campaign') || '',
     utm_content: params0.get('utm_content') || '',
-    from_fb: !!params0.get('fbclid') || /FBAN|FBAV|Instagram/i.test(navigator.userAgent)
+    from_fb: !!params0.get('fbclid') || /FBAN|FBAV|Instagram/i.test(navigator.userAgent),
+    // Robots (revisores automáticos de anuncios, rastreadores, navegadores sin pantalla)
+    bot: !!navigator.webdriver || /bot|crawl|spider|headless|facebookexternalhit|meta-external|lighthouse|preview/i.test(navigator.userAgent),
+    // Tus propias visitas: abre la página una vez con ?yo=1 en cada aparato tuyo
+    yo: (function(){
+      var k = 'me_levanto_yo';
+      try{
+        if (params0.get('yo') === '1') localStorage.setItem(k, '1');
+        if (params0.get('yo') === '0') localStorage.removeItem(k);
+        return localStorage.getItem(k) === '1';
+      }catch(e){ return params0.get('yo') === '1'; }
+    })(),
+    ua: navigator.userAgent.slice(0, 160)
   };
 
   // Envía un evento a todas las herramientas activas
