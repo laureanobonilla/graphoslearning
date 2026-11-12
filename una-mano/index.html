@@ -422,7 +422,8 @@ window.CONFIG = {
 
   vid.addEventListener('playing', function(){ trackOnce('video_autoplay_start'); }, {once:false});
 
-  unmuteBtn.addEventListener('click', function(){
+  function turnSoundOn(how){
+    if (soundOn) return;
     soundOn = true;
     vid.muted = false;
     vid.loop = false;
@@ -430,12 +431,21 @@ window.CONFIG = {
     vid.controls = true;
     var p = vid.play(); if (p && p.catch) p.catch(function(){});
     unmuteBtn.hidden = true;
-    track('video_unmute');            // = la persona decidió escuchar
+    track('video_unmute', {how: how}); // = la persona decidió escuchar
+  }
+  unmuteBtn.addEventListener('click', function(){ turnSoundOn('button'); });
+
+  // Cualquier toque en la página (que no sea un enlace o botón) también activa el sonido.
+  // Los navegadores no dejan sonar un video sin un toque previo; hacer scroll no cuenta.
+  document.addEventListener('click', function(e){
+    if (soundOn || placeholder.classList.contains('show')) return;
+    if (e.target.closest && e.target.closest('a, button, video')) return;
+    turnSoundOn('page_tap');
   });
 
   // Si activa el sonido desde los controles nativos
   vid.addEventListener('volumechange', function(){
-    if (!vid.muted && !soundOn){ soundOn = true; unmuteBtn.hidden = true; track('video_unmute'); }
+    if (!vid.muted && !soundOn){ soundOn = true; unmuteBtn.hidden = true; track('video_unmute', {how: 'controls'}); }
   });
 
   // Progreso: se distingue si lo vio con sonido o en silencio
