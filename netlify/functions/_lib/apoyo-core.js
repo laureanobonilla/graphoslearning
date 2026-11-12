@@ -3,12 +3,15 @@
 const store = require('./store');
 
 const APPS = ['una-mano', 'me-levanto'];
+// Moneda de cada página (la decide el servidor, nunca el navegador)
+const CURRENCY = { 'una-mano': 'USD', 'me-levanto': 'EUR' };
 const MIN_USD = 1;
 const MAX_USD = 500;
 
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
 
 function cleanApp(app) { return APPS.includes(app) ? app : null; }
+function currencyOf(app) { return CURRENCY[app] || 'USD'; }
 function cleanAnon(a) { return (typeof a === 'string' && /^[A-Za-z0-9_-]{6,64}$/.test(a)) ? a : null; }
 function cleanAmount(v) {
     const n = Math.round(Number(v) * 100) / 100;
@@ -29,4 +32,4 @@ async function log(app, anon, name, metadata) {
     catch (err) { console.error('[apoyo log]', err.message); }
 }
 
-module.exports = { APPS, MIN_USD, MAX_USD, json, cleanApp, cleanAnon, cleanAmount, countryOf, log };
+module.exports = { APPS, CURRENCY, MIN_USD, MAX_USD, json, cleanApp, currencyOf, cleanAnon, cleanAmount, countryOf, log };

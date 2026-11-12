@@ -40,7 +40,7 @@ exports.handler = async (event) => {
                 pending: cap.status === 'PENDING'
             });
         }
-        return core.json(200, { ok: true, amount: cap.amount?.value, pending: cap.status === 'PENDING' });
+        return core.json(200, { ok: true, amount: cap.amount?.value, currency: cap.amount?.currency_code, pending: cap.status === 'PENDING' });
     } catch (err) {
         console.error('[apoyo-pay-capture]', err.message);
         await core.log(app, anon, 'pay_failed', { step: 'capture_exception', message: String(err.message).slice(0, 300), orderID, country });
