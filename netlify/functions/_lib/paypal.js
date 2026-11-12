@@ -79,4 +79,21 @@ async function captureOrder(orderId) {
     return data;
 }
 
-module.exports = { createOrder, captureOrder, getOrder };
+// Igual que captureOrder, pero NUNCA lanza por un rechazo de PayPal: devuelve
+// { ok, order, issue, message } para que quien llama pueda registrar POR QUÉ
+// falló (ej. INSTRUMENT_DECLINED = la tarjeta fue rechazada) y decidir qué
+// mostrar. Solo lanza si no se puede hablar con PayPal en absoluto.
+async function captureOrderDetailed(orderId) {
+    const token = await getAccessToken();
+    const res = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${orderId}/capture`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) return { ok: true, order: data };
+    const issue = data?.details?.[0]?.issue || data?.name || String(res.status);
+    if (issue === 'ORDER_ALREADY_CAPTURED') return { ok: true, order: await getOrder(orderId, token), again: true };
+    return { ok: false, issue, message: data?.details?.[0]?.description || data?.message || '' };
+}
+
+module.exports = { createOrder, captureOrder, getOrder, captureOrderDetailed };

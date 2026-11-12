@@ -238,7 +238,7 @@ window.CONFIG = {
     <div class="micro">
       Cualquier monto suma · No necesitas cuenta de PayPal
     </div>
-    <div class="micro step">En la siguiente pantalla escribes el monto en dólares y eliges <b>“Tarjeta de débito o crédito”</b>.</div>
+    <div class="micro step">Eliges el monto y pagas aquí mismo, con <b>tarjeta de débito o crédito</b> o con PayPal.</div>
   </div>
 
   <!-- ===== LETRA ===== -->
@@ -281,9 +281,9 @@ window.CONFIG = {
       <p class="soft">Cualquier monto es bueno. Lo que cuesta un café ya hace la diferencia, y tú eliges cuánto.</p>
       <a class="btn" id="donateBottom" data-loc="bottom" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-        Apoyar con PayPal
+        Hacer mi aporte
       </a>
-      <div class="micro">Escribes el monto en dólares ($2, $3 o $5 ya hacen la diferencia) y pagas con tarjeta, sin cuenta de PayPal.</div>
+      <div class="micro">Eliges el monto ($2, $3 o $10 ya hacen la diferencia) y pagas con tarjeta, sin cuenta de PayPal.</div>
     </div>
   </section>
 
@@ -399,9 +399,10 @@ window.CONFIG = {
   donateLinks.forEach(function(a){
     a.href = C.PAYPAL_URL || '#';
     a.addEventListener('click', function(ev){
-      if (!C.PAYPAL_URL) ev.preventDefault();
       track('donate_click', {location: a.getAttribute('data-loc'), heard_with_sound: soundOn});
-      try{ if (window.fbq) fbq('track', 'Donate'); }catch(e){}
+      // Pago dentro de la página (apoyo-pago.js). Si no cargó, sigue al enlace de PayPal de siempre.
+      if (window.ApoyoPago && window.ApoyoPago.open){ ev.preventDefault(); window.ApoyoPago.open(a.getAttribute('data-loc')); return; }
+      if (!C.PAYPAL_URL) ev.preventDefault();
     });
   });
 
@@ -412,6 +413,12 @@ window.CONFIG = {
   document.querySelectorAll('.share a').forEach(function(a){
     a.addEventListener('click', function(){ track('share_click', {network: a.getAttribute('data-net')}); });
   });
+
+  // Datos para el pago dentro de la página (apoyo-pago.js)
+  window.APOYO_CTX = {
+    app: 'una-mano', anon: anon, track: track, fallbackUrl: C.PAYPAL_URL,
+    shareWa: document.getElementById('shareWa').href, shareFb: document.getElementById('shareFb').href
+  };
 
   /* =========================================================
      3. VIDEO: arranca solo (en silencio, porque los navegadores
@@ -531,5 +538,6 @@ window.CONFIG = {
   });
 })();
 </script>
+<script src="/apoyo-pago.js" defer></script>
 </body>
 </html>
