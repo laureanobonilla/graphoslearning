@@ -6,7 +6,7 @@
 <title>El vuelto</title>
 <meta name="description" content="Nadie cuenta el vuelto, pero el vuelto lo cuenta todo.">
 <meta property="og:title" content="El vuelto">
-<meta property="og:description" content="Nadie cuenta el vuelto, pero el vuelto lo cuenta todo.">
+<meta property="og:description" content="Música independiente hecha en Latinoamérica. Nadie cuenta el vuelto, pero el vuelto lo cuenta todo.">
 <meta property="og:type" content="video.other">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,7 +68,7 @@ window.CONFIG = {
 
   /* ---------- Encabezado ---------- */
   .eyebrow{
-    text-align:center; font-size:12px; letter-spacing:.18em; text-transform:uppercase;
+    text-align:center; font-size:11px; letter-spacing:.12em; text-transform:uppercase; white-space:nowrap;
     color:var(--ink-faint); padding:14px 0 10px;
   }
 
@@ -127,7 +127,7 @@ window.CONFIG = {
   .btn:hover{transform:translateY(-1px); box-shadow:0 14px 36px rgba(233,168,76,.45), inset 0 1px 0 rgba(255,255,255,.4)}
   .btn:active{transform:translateY(1px)}
   .btn svg{width:20px; height:20px; fill:currentColor}
-  .btn.full{width:100%; max-width:420px}
+  .btn.full{width:100%; max-width:420px; padding-left:18px; padding-right:18px; white-space:nowrap; font-size:17px}
   .micro{font-size:13px; color:var(--ink-faint); margin-top:10px; display:flex; gap:8px; justify-content:center; align-items:center; flex-wrap:wrap}
   .micro svg{width:14px; height:14px; fill:var(--ink-faint)}
   .micro.step{display:block; text-align:center; margin-top:4px; max-width:30em; margin-left:auto; margin-right:auto; line-height:1.4}
@@ -209,7 +209,7 @@ window.CONFIG = {
 <body>
 
 <div class="wrap">
-  <div class="eyebrow">Un proyecto musical independiente</div>
+  <div class="eyebrow">Música independiente latinoamericana</div>
 
   <!-- ===== VIDEO ===== -->
   <div class="video-box" id="videoBox">
@@ -230,10 +230,10 @@ window.CONFIG = {
   <!-- ===== FRASE PRINCIPAL + BOTÓN (visible sin hacer scroll) ===== -->
   <div class="hero-copy">
     <h1>Todavía queda una línea<br><em>en blanco.</em></h1>
-    <p class="lead">Esta canción nació sin disquera y sin patrocinadores. Si te llegó, esa línea puede ser la tuya: cualquier aporte ayuda a que existan más canciones como esta.</p>
+    <p class="lead">Esta canción nació sin disquera y sin patrocinadores. Si te llegó, esa línea puede ser la tuya: ayuda a que esta canción tenga hermanas.</p>
     <a class="btn full" id="donateHero" data-loc="hero" target="_blank" rel="noopener">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-      Apoyar el proyecto
+      Apoyar música independiente
     </a>
     <div class="micro">
       Cualquier monto suma · No necesitas cuenta de PayPal
@@ -254,7 +254,7 @@ window.CONFIG = {
 
   <!-- ===== EL PROYECTO ===== -->
   <section>
-    <h2>¿Qué es este proyecto?</h2>
+    <h2>La causa: música independiente latinoamericana</h2>
     <p class="soft">Hacemos canciones y videos sobre historias que se parecen a las nuestras: la mamá que sacó todo adelante, el papá que madrugó toda la vida, la gente que con muy poco cambió el día de alguien.</p>
     <p class="soft">Es un proyecto autónomo. No hay empresa ni patrocinador detrás. Lo que lo mantiene vivo es la gente que lo escucha.</p>
 
@@ -277,8 +277,8 @@ window.CONFIG = {
   <!-- ===== LLAMADO FINAL ===== -->
   <section>
     <div class="cta-card">
-      <h2>Cualquier monto es bueno</h2>
-      <p class="soft">Lo que cuesta un café ya hace la diferencia. Tú eliges cuánto.</p>
+      <h2>Ayuda a que esta canción tenga hermanas</h2>
+      <p class="soft">Cualquier monto es bueno. Lo que cuesta un café ya hace la diferencia, y tú eliges cuánto.</p>
       <a class="btn" id="donateBottom" data-loc="bottom" target="_blank" rel="noopener">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
         Apoyar con PayPal
@@ -312,7 +312,7 @@ window.CONFIG = {
 <!-- ===== BARRA FIJA (aparece cuando el botón principal sale de pantalla) ===== -->
 <div class="sticky" id="sticky" aria-hidden="true">
   <div class="row">
-    <div class="txt"><b>¿Te llegó esta canción?</b>Cualquier monto suma.</div>
+    <div class="txt"><b>¿Te llegó esta canción?</b>Ayuda a que tenga hermanas.</div>
     <a class="btn" id="donateSticky" data-loc="sticky" target="_blank" rel="noopener" tabindex="-1">Apoyar</a>
   </div>
 </div>
