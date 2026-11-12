@@ -8,9 +8,18 @@
   var ctx = window.APOYO_CTX;
   if (!ctx || !ctx.app) return;
 
-  var AMOUNTS = [2, 3, 10];
-  var DEFAULT_AMOUNT = 3;
+  var CUR = ctx.currency === 'EUR' ? 'EUR' : 'USD';
+  var AMOUNTS = ctx.amounts || [2, 3, 10];
+  var DEFAULT_AMOUNT = ctx.defaultAmount || 3;
   var MIN = 1, MAX = 500;
+  // Cómo se escribe un monto: 10 € (euros) o $10 (dólares)
+  function fmt(n, long) {
+    var v = (n % 1) ? Number(n).toFixed(2) : String(Number(n));
+    if (CUR === 'EUR') v = v.replace('.', ',');
+    if (CUR === 'EUR') return v + ' €';
+    return (long ? 'US$' : '$') + v;
+  }
+  var CUR_WORD = CUR === 'EUR' ? 'en euros' : 'en dólares';
 
   var track = function (n, p) { try { ctx.track(n, p || {}); } catch (e) {} };
   var post = function (url, body) {
@@ -65,11 +74,11 @@
         '<h3 id="apTitle">Tu aporte</h3>' +
         '<p class="ap-sub">Elige cuánto quieres aportar. Tú decides.</p>' +
         '<div class="ap-chips">' +
-          AMOUNTS.map(function (a) { return '<button type="button" class="ap-chip" data-amt="' + a + '" aria-pressed="false">$' + a + '</button>'; }).join('') +
+          AMOUNTS.map(function (a) { return '<button type="button" class="ap-chip" data-amt="' + a + '" aria-pressed="false">' + fmt(a) + '</button>'; }).join('') +
           '<button type="button" class="ap-chip other" data-amt="other" aria-pressed="false">Otro monto</button>' +
         '</div>' +
-        '<label class="ap-other"><span>$</span><input type="number" inputmode="decimal" min="' + MIN + '" max="' + MAX + '" step="1" placeholder="Escribe el monto" aria-label="Otro monto en dólares"></label>' +
-        '<div class="ap-sum"><span>Tu aporte (en dólares)</span><b class="ap-total">US$3</b></div>' +
+        '<label class="ap-other"><span>' + (CUR === 'EUR' ? '€' : '$') + '</span><input type="number" inputmode="decimal" min="' + MIN + '" max="' + MAX + '" step="1" placeholder="Escribe el monto" aria-label="Otro monto ' + CUR_WORD + '"></label>' +
+        '<div class="ap-sum"><span>Tu aporte (' + CUR_WORD + ')</span><b class="ap-total">' + fmt(DEFAULT_AMOUNT, true) + '</b></div>' +
         '<div class="ap-box"><div class="ap-load">Cargando opciones de pago…</div><div class="ap-pp"></div></div>' +
         '<div class="ap-msg" aria-live="polite"></div>' +
         '<p class="ap-note">Puedes pagar con <b>tarjeta de débito o crédito sin cuenta de PayPal</b>, o con tu cuenta de PayPal. Pago seguro procesado por PayPal.</p>' +
@@ -107,7 +116,7 @@
   }
   function showTotal() {
     var n = validAmount();
-    totalEl.textContent = n ? 'US$' + (n % 1 ? n.toFixed(2) : n) : '—';
+    totalEl.textContent = n ? fmt(n, true) : '—';
   }
   function pick(val, silent) {
     chips.forEach(function (c) { c.setAttribute('aria-pressed', String(c.getAttribute('data-amt') === String(val))); });
@@ -120,7 +129,7 @@
       amount = Number(val);
     }
     showTotal(); setMsg('');
-    if (!silent) track('pay_amount_select', { amount: val === 'other' ? 'other' : amount });
+    if (!silent) track('pay_amount_select', { amount: val === 'other' ? 'other' : amount, currency: CUR });
   }
   chips.forEach(function (c) { c.addEventListener('click', function () { pick(c.getAttribute('data-amt')); }); });
   otherIn.addEventListener('input', function () { amount = Number(otherIn.value) || 0; showTotal(); setMsg(''); });
@@ -169,7 +178,7 @@
           if (window.paypal && window.paypal.Buttons) return ok();
           var sc = document.createElement('script');
           sc.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(c.clientId) +
-            '&currency=USD&intent=capture&components=buttons&enable-funding=card&locale=es_XC';
+            '&currency=' + CUR + '&intent=capture&components=buttons&enable-funding=card&locale=es_XC';
           sc.onload = function () { (window.paypal && window.paypal.Buttons) ? ok() : no(new Error('sdk vacío')); };
           sc.onerror = function () { no(new Error('sdk no cargó')); };
           document.head.appendChild(sc);
@@ -185,8 +194,8 @@
       style: { layout: 'vertical', color: 'gold', shape: 'pill', label: 'pay', height: 48 },
       onClick: function (data, actions) {
         var n = validAmount();
-        track('pay_start', { method: data && data.fundingSource, amount: n });
-        if (!n) { setMsg('Escribe un monto entre $' + MIN + ' y $' + MAX + '.'); return actions.reject(); }
+        track('pay_start', { method: data && data.fundingSource, amount: n, currency: CUR });
+        if (!n) { setMsg('Escribe un monto entre ' + fmt(MIN) + ' y ' + fmt(MAX) + '.'); return actions.reject(); }
         setMsg('');
         return actions.resolve();
       },
@@ -220,11 +229,11 @@
   function done(amt) {
     paid = true;
     var n = Number(amt) || validAmount();
-    track('pay_completed_client', { amount: n });
-    try { if (window.fbq) window.fbq('track', 'Donate', { value: n, currency: 'USD' }); } catch (e) {}
+    track('pay_completed_client', { amount: n, currency: CUR });
+    try { if (window.fbq) window.fbq('track', 'Donate', { value: n, currency: CUR }); } catch (e) {}
     $('.ap-form').hidden = true;
     var t = $('.ap-thanks'); t.hidden = false;
-    $('.ap-thx-text').textContent = 'Tu aporte de US$' + (n % 1 ? n.toFixed(2) : n) + ' ya es parte de la próxima canción. Si quieres ayudar todavía más, compártela con alguien.';
+    $('.ap-thx-text').textContent = 'Tu aporte de ' + fmt(n, true) + ' ya es parte de la próxima canción. Si quieres ayudar todavía más, compártela con alguien.';
     setMsg('');
   }
 

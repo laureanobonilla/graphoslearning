@@ -7,15 +7,16 @@ exports.handler = async (event) => {
     let body; try { body = JSON.parse(event.body || '{}'); } catch { return core.json(400, { error: 'JSON inválido' }); }
     const app = core.cleanApp(body.app), anon = core.cleanAnon(body.anonId), amount = core.cleanAmount(body.amount);
     if (!app || !anon) return core.json(400, { error: 'Solicitud inválida' });
-    if (!amount) return core.json(400, { error: `El monto debe estar entre $${core.MIN_USD} y $${core.MAX_USD}.` });
+    if (!amount) return core.json(400, { error: `El monto debe estar entre ${core.MIN_USD} y ${core.MAX_USD}.` });
     const country = core.countryOf(event);
+    const currency = core.currencyOf(app);
     try {
-        const orderID = await createOrder(amount, `${app}|${anon}`);
-        await core.log(app, anon, 'pay_order_created', { amount, orderID, country });
+        const orderID = await createOrder(amount, `${app}|${anon}`, currency);
+        await core.log(app, anon, 'pay_order_created', { amount, currency, orderID, country });
         return core.json(200, { orderID });
     } catch (err) {
         console.error('[apoyo-pay-create]', err.message);
-        await core.log(app, anon, 'pay_failed', { step: 'create', amount, country, message: String(err.message).slice(0, 300) });
+        await core.log(app, anon, 'pay_failed', { step: 'create', amount, currency, country, message: String(err.message).slice(0, 300) });
         return core.json(502, { error: 'No se pudo iniciar el pago. Intenta de nuevo en un momento.' });
     }
 };
