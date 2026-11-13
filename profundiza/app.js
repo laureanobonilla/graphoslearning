@@ -10,7 +10,7 @@
   var LEARN = document.documentElement.getAttribute('data-mode') === 'learn';   // modo idiomas: interfaz en español, texto en el idioma elegido
   var LANG = (document.documentElement.lang || 'es').slice(0, 2); if (['es', 'en', 'de', 'fr'].indexOf(LANG) < 0) LANG = 'es';
   if (LEARN) { try { LANG = localStorage.getItem('prf_target') || 'de'; } catch (e) { LANG = 'de'; } if (['en', 'de', 'fr'].indexOf(LANG) < 0) LANG = 'de'; }
-  var MAX_DEPTH = 6, MAX_TAUGHT = 2, PARTS = { beginner: 10, intermediate: 25, advanced: 65 };   // profundidad máxima y veces que se baja a una misma palabra antes de solo explicarla
+  var MAX_DEPTH = 4, MAX_TAUGHT = 2, PARTS = { beginner: 10, intermediate: 25, advanced: 65 };   // profundidad máxima y veces que se baja a una misma palabra antes de solo explicarla
   var TTS = LANG !== 'es' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   var LOC = { es: 'es-ES', en: 'en-US', de: 'de-DE', fr: 'fr-FR' };
 
