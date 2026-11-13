@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var MAX_SEC = 90, S = { lines: [], style: 'tuanis', dur: 0, file: null, url: null };
+  var MAX_SEC = 90, CODE_KEY = 'rot_codigo', S = { code: '', plan: null,  lines: [], style: 'tuanis', dur: 0, file: null, url: null };
   var STYLES = { tuanis: 'Tuanis', karaoke: 'Karaoke', pop: 'Pop', limpio: 'Limpio' };
   function fmt(t) { t = Math.max(0, t); return Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2); }
   function err(m) { var e = $('err'); e.textContent = m || ''; e.hidden = !m; }
@@ -113,9 +113,9 @@
       if (S.dur > MAX_SEC) return fail('Tu video dura ' + Math.round(S.dur) + ' s. Por ahora el máximo es ' + MAX_SEC + ' segundos.');
       $('stage').classList.toggle('land', vid.videoWidth > vid.videoHeight);
       busy(true, 'Sacando el audio…');
-      extractAudio(f).then(function (a) { busy(true, 'Escuchando y escribiendo… (unos segundos)'); return b64(a.blob).then(function (d) { return fetch('/.netlify/functions/rot-transcribir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: d, dur: a.dur, lang: 'es' }) }); }); })
-        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error || 'Error'); return j; }); })
-        .then(function (j) { if (!j.words || !j.words.length) return fail(j.aviso || 'No se escuchó voz en el video.'); S.lines = toLines(j.words); track('rot_transcribed', { words: j.words.length, precise: !!j.preciso }); ready(); })
+      extractAudio(f).then(function (a) { busy(true, 'Escuchando y escribiendo… (unos segundos)'); return b64(a.blob).then(function (d) { return fetch('/.netlify/functions/rot-transcribir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: d, dur: a.dur, lang: 'es', codigo: S.plan && S.plan.ok ? S.code : undefined }) }); }); })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) { if (j.codigo) { S.plan = null; showPlan(); } throw new Error(j.error || 'Error'); } return j; }); })
+        .then(function (j) { if (!j.words || !j.words.length) return fail(j.aviso || 'No se escuchó voz en el video.'); S.lines = toLines(j.words); if (j.restantes != null && S.plan) { S.plan.restantes = j.restantes; S.plan.ok = j.restantes > 0 || true; showPlan(); } track('rot_transcribed', { words: j.words.length, precise: !!j.preciso }); ready(); })
         .catch(function (e) { fail(/decode|EncodingError|null/i.test(String(e && e.message)) || !e.message ? 'No pude leer el audio de este video. Prueba con un MP4 normal.' : e.message); });
     };
     vid.onerror = function () { fail('Este formato de video no se puede abrir aquí. Prueba con MP4.'); };
@@ -141,16 +141,43 @@
         var type = (rec.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(chunks, { type: type }), a = $('dl'); a.href = URL.createObjectURL(blob); a.download = 'rotulo-video.' + (type.indexOf('mp4') >= 0 ? 'mp4' : 'webm'); a.textContent = 'Guardar video (' + (blob.size / 1048576).toFixed(1) + ' MB)'; a.hidden = false;
         $('prog').hidden = true; $('exp').disabled = false; try { ac.close(); } catch (e) {} track('rot_exported', { style: S.style, mime: type });
       };
-      var draw = function () { c.drawImage(v, 0, 0, W, H); drawCaps(c, W, H, v.currentTime); mark(c, W, H); var p = v.currentTime / (v.duration || 1); $('prog').firstElementChild.style.width = (p * 100) + '%'; $('progt').textContent = 'Creando tu video… ' + Math.round(p * 100) + ' %'; if (!v.ended) requestAnimationFrame(draw); };
+      var draw = function () { c.drawImage(v, 0, 0, W, H); drawCaps(c, W, H, v.currentTime); if (!(S.plan && S.plan.ok)) mark(c, W, H); var p = v.currentTime / (v.duration || 1); $('prog').firstElementChild.style.width = (p * 100) + '%'; $('progt').textContent = 'Creando tu video… ' + Math.round(p * 100) + ' %'; if (!v.ended) requestAnimationFrame(draw); };
       v.onended = function () { setTimeout(function () { rec.stop(); }, 250); };
       ac.resume().then(function () { rec.start(500); v.currentTime = 0; return v.play(); }).then(function () { requestAnimationFrame(draw); }).catch(function () { rec.state !== 'inactive' && rec.stop(); err('No se pudo exportar en este navegador.'); $('exp').disabled = false; $('prog').hidden = true; });
     };
   };
-  // ---------- lista de espera (mide interés antes de construir el cobro) ----------
-  $('nomark').onclick = function (e) { e.preventDefault(); track('rot_nomark_click'); $('wmsg').textContent = ''; $('dlg').showModal(); };
-  $('wsend').onclick = function (e) {
-    e.preventDefault(); var em = $('em').value.trim(); if (!/^\S+@\S+\.\S+$/.test(em)) { $('wmsg').textContent = 'Escribe un correo válido.'; return; }
-    var plan = (document.querySelector('input[name=plan]:checked') || {}).value || 'mensual'; $('wmsg').textContent = 'Guardando…';
-    fetch('/.netlify/functions/rot-lista', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: em, plan: plan }) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(j.error); track('rot_waitlist', { plan: plan }); $('wmsg').textContent = '¡Listo! Te escribimos pronto.'; setTimeout(function () { $('dlg').close(); }, 1400); }); }).catch(function (x) { $('wmsg').textContent = x.message || 'No se pudo guardar.'; });
-  };
+  // ---------- cobro: planes, PayPal y códigos ----------
+  function post(fn, body) { return fetch('/.netlify/functions/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Error'); e.data = j; throw e; } return j; }); }); }
+  function showPlan() {
+    var p = S.plan, el = $('plan'), has = p && p.ok;
+    $('exph').hidden = !!has; el.hidden = !has;
+    if (has) el.textContent = (p.tipo === 'mensual' ? 'Plan mensual activo' : 'Paquete activo') + ' · ' + p.restantes + ' video' + (p.restantes === 1 ? '' : 's') + ' disponible' + (p.restantes === 1 ? '' : 's') + (p.vence ? ' · vence el ' + new Date(p.vence).toLocaleDateString('es-CR') : '');
+  }
+  function useCode(code, quiet) {
+    return post('rot-codigo', { codigo: code }).then(function (e) { S.code = code; S.plan = e; try { localStorage.setItem(CODE_KEY, code); } catch (x) {} showPlan(); if (!e.ok) throw new Error(e.restantes <= 0 ? 'A ese código ya no le quedan videos.' : 'Ese código ya venció.'); return e; });
+  }
+  var CFG = null, ppLoad = null;
+  function cfg() { return CFG || (CFG = fetch('/.netlify/functions/rot-config').then(function (r) { return r.json(); })); }
+  function loadPayPal(id) { if (window.paypal) return Promise.resolve(); if (ppLoad) return ppLoad; ppLoad = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(id) + '&currency=USD&components=buttons&intent=capture'; s.onload = ok; s.onerror = function () { ppLoad = null; no(new Error('load')); }; document.head.appendChild(s); }); return ppLoad; }
+  function perr(m) { var e = $('perr'); e.textContent = m || ''; e.hidden = !m; }
+  function openPay() {
+    track('rot_nomark_click'); perr(''); $('cmsg').textContent = ''; $('pay').hidden = false; $('done').hidden = true; $('pp').innerHTML = ''; $('dlg').showModal();
+    cfg().then(function (c) { var box = $('plans'); box.innerHTML = ''; Object.keys(c.planes).forEach(function (k) { var p = c.planes[k], b = document.createElement('button'); b.className = 'plan'; b.innerHTML = '<span><b>' + p.nombre + '</b><small>' + p.detalle + '</small></span><span class="pr">US$' + p.usd + '<small>' + (p.crc ? '≈ ₡' + String(p.crc).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : 'pago único') + '</small></span>'; b.onclick = function () { choose(p, b, c); }; box.appendChild(b); }); });
+  }
+  function choose(p, btn, c) {
+    document.querySelectorAll('.plan').forEach(function (x) { x.classList.toggle('on', x === btn); }); perr(''); $('pp').textContent = 'Cargando el pago seguro…'; track('rot_plan_pick', { plan: p.id });
+    if (!c.paypalClientId) { $('pp').textContent = ''; return perr('El pago no está disponible ahora. Inténtalo en un rato.'); }
+    loadPayPal(c.paypalClientId).then(function () {
+      $('pp').innerHTML = '';
+      window.paypal.Buttons({ style: { layout: 'vertical', shape: 'pill', label: 'pay', tagline: false },
+        createOrder: function () { perr(''); return post('rot-pay-create', { plan: p.id }).then(function (d) { return d.orderID; }); },
+        onApprove: function (data) { $('pp').textContent = 'Confirmando tu pago…'; return post('rot-pay-capture', { orderID: data.orderID }).then(function (d) { $('pp').textContent = ''; track('rot_paid', { plan: p.id }); S.code = d.codigo; S.plan = { ok: true, tipo: d.tipo, restantes: d.restantes, vence: d.vence }; try { localStorage.setItem(CODE_KEY, d.codigo); } catch (x) {} showPlan(); $('pay').hidden = true; $('done').hidden = false; $('codeshow').textContent = d.codigo; $('codeinfo').textContent = d.restantes + ' videos disponibles. También te lo enviamos al correo de PayPal.'; }).catch(function (e) { $('pp').textContent = ''; perr((e.message || 'No pudimos confirmar tu pago.') + ' Si te cobraron, escríbeme con tu comprobante de PayPal y te doy tu código.'); }); },
+        onError: function () { perr('No se pudo completar el pago. No se te cobró. Inténtalo de nuevo.'); } }).render('#pp');
+    }).catch(function () { $('pp').textContent = ''; perr('No se pudo cargar PayPal. Revisa tu conexión.'); });
+  }
+  $('nomark').onclick = function (e) { e.preventDefault(); openPay(); };
+  $('closed').onclick = $('closed2').onclick = function (e) { e.preventDefault(); $('dlg').close(); };
+  $('copyc').onclick = function () { try { navigator.clipboard.writeText($('codeshow').textContent); $('copyc').textContent = '¡Copiado!'; } catch (e) {} };
+  $('usecod').onclick = function () { var c = $('cod').value.trim().toUpperCase(); if (!c) return; $('cmsg').textContent = 'Revisando…'; useCode(c).then(function (e) { $('cmsg').textContent = '¡Código activo! Te quedan ' + e.restantes + ' videos.'; track('rot_code_used'); setTimeout(function () { $('dlg').close(); }, 1200); }).catch(function (e) { $('cmsg').textContent = e.message; }); };
+  try { var saved = localStorage.getItem(CODE_KEY); if (saved) useCode(saved, true).catch(function () {}); } catch (e) {}
 })();

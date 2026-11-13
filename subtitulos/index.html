@@ -5,7 +5,7 @@
 <meta name="theme-color" content="#14110f">
 <title>Rótulo · subtítulos automáticos para tus videos</title>
 <meta name="description" content="Sube un video corto, Rótulo escribe los subtítulos en español y los anima. Pensado para reels, TikTok y Shorts de Costa Rica.">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head><body>
 <header><b class="logo">Rótulo</b><span>Subtítulos para videos cortos</span></header>
 <main>
@@ -26,14 +26,16 @@
       <h3>Texto <small>corrige lo que haga falta</small></h3>
       <div id="lines"></div>
       <button id="exp" class="btn big">Descargar video</button>
-      <p class="hint" id="exph">El video sale con una marca pequeña de Rótulo. <a href="#" id="nomark">Quitar la marca</a></p>
+      <p class="hint" id="exph">El video sale con una marca pequeña de Rótulo. <a href="#" id="nomark">Quitar la marca</a></p><p class="hint" id="plan" hidden></p>
       <div class="prog" id="prog" hidden><i></i><span id="progt"></span></div>
       <a id="dl" class="btn big" hidden download>Guardar video</a>
     </div>
   </section>
 </main>
-<dialog id="dlg"><form method="dialog" id="wl"><h2>Sin marca de agua</h2><p>Estamos terminando los planes. Deja tu correo y te avisamos cuando esté listo, con precio de lanzamiento.</p>
-<label class="pl"><input type="radio" name="plan" value="mensual" checked> Suscripción mensual (videos ilimitados)</label><label class="pl"><input type="radio" name="plan" value="paquete"> Paquete de videos, sin suscripción</label>
-<input type="email" id="em" placeholder="tu@correo.com" required><div class="row"><button class="btn" id="wsend" value="x">Avisarme</button><button class="btn ghost" value="c" formnovalidate>Cerrar</button></div><p id="wmsg" class="hint"></p></form></dialog>
-<script src="app.js?v=1"></script>
+<dialog id="dlg"><div id="pay"><h2>Sin marca de agua</h2><p class="hint" style="text-align:left">Pago único con PayPal (tarjeta o cuenta). Recibes un código para usar en este teléfono o en cualquier otro.</p>
+<div id="plans"></div><div id="pp"></div><p id="perr" class="err" hidden></p>
+<h3>¿Ya tienes un código?</h3><div class="row"><input id="cod" placeholder="ROT-XXXX-XXXX" autocapitalize="characters" autocomplete="off"><button class="btn sm" id="usecod">Usar</button></div><p id="cmsg" class="hint"></p>
+<div class="row" style="margin-top:12px"><button class="btn ghost" id="closed">Cerrar</button></div></div>
+<div id="done" hidden><h2>¡Listo, gracias!</h2><p>Este es tu código. Guárdalo: lo necesitas si cambias de teléfono.</p><p class="code" id="codeshow"></p><p class="hint" id="codeinfo"></p><div class="row"><button class="btn" id="copyc">Copiar</button><button class="btn ghost" id="closed2">Seguir</button></div></div></dialog>
+<script src="app.js?v=2"></script>
 </body></html>

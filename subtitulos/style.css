@@ -29,3 +29,11 @@ h3{margin:22px 0 8px;font-size:16px}h3 small{color:var(--mut);font-weight:400;ma
 dialog{border:0;border-radius:20px;background:var(--pan);color:var(--tx);max-width:420px;width:calc(100% - 32px);padding:22px}dialog::backdrop{background:#000a}
 dialog h2{margin:0 0 8px;font:800 24px Georgia,serif}dialog input[type=email]{width:100%;padding:12px;border-radius:12px;border:1px solid var(--ln);background:var(--bg);color:var(--tx);font:inherit;margin:10px 0}
 .pl{display:block;margin:6px 0;font-size:15px}.row{display:flex;gap:10px}
+
+#plans{display:grid;gap:10px;margin:12px 0}
+.plan{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px;border-radius:16px;border:1.5px solid var(--ln);background:var(--bg);text-align:left;color:var(--tx);font:inherit;cursor:pointer;width:100%}
+.plan.on{border-color:var(--ac);box-shadow:0 0 0 2px #ffd23f55}.plan b{display:block;font-size:17px}.plan small{color:var(--mut)}.plan .pr{font:800 22px Georgia,serif;color:var(--ac);text-align:right;white-space:nowrap}.plan .pr small{display:block;font:400 12px "Trebuchet MS",sans-serif}
+#pp{min-height:8px;margin-top:6px}
+#dlg input#cod{flex:1;min-width:0;margin:0;text-transform:uppercase;letter-spacing:1px}
+.code{font:800 28px ui-monospace,monospace;text-align:center;color:var(--ac);background:var(--bg);border-radius:14px;padding:14px;margin:10px 0;user-select:all;-webkit-user-select:all}
+dialog{max-height:92vh;overflow:auto}

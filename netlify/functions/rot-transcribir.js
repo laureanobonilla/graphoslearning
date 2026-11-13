@@ -1,5 +1,6 @@
 // «Rótulo»: transcribe el audio de un video corto (WAV 16 kHz mono que arma el navegador) y devuelve palabras con tiempos.
 // Preferido: Whisper en Groq (GROQ_API_KEY): da tiempos por palabra. Respaldo: Gemini (tiempos por frase, repartidos por palabra).
+const { estado, gastar, normCode } = require('./_lib/rot-core');
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(obj) });
 const MAX_B64 = 4.6 * 1048576, MAX_SEC = 95, PER_IP_HOUR = Number(process.env.ROT_POR_IP_HORA || 6), DAILY = Number(process.env.ROT_DIARIO || 300);
 const hits = new Map(); let day = { d: '', n: 0 };
@@ -33,14 +34,17 @@ exports.handler = async (event) => {
     const dur = Number(b.dur), lang = /^[a-z]{2}$/.test(String(b.lang || '')) ? b.lang : 'es', a = String(b.audio || '');
     if (!a || a.length > MAX_B64 || !Number.isFinite(dur) || dur < 0.5) return json(400, { error: 'Audio no válido.' });
     if (dur > MAX_SEC) return json(400, { error: `Por ahora el máximo es ${MAX_SEC - 5} segundos por video.` });
-    if (limited(ipOf(event))) return json(429, { error: 'Ya hiciste varios videos seguidos. Espera un rato y vuelve a intentar.' });
-    if (dayFull()) return json(503, { error: 'Hoy hay mucha demanda y se acabaron los videos gratis. Vuelve mañana.' });
+    const codigo = b.codigo ? normCode(b.codigo) : '';
+    if (codigo) { let e = null; try { e = await estado(codigo); } catch (x) { console.error('[rot] código:', x.message); return json(502, { error: 'No se pudo revisar tu código. Intenta de nuevo.' }); } if (!e || !e.ok) return json(402, { error: e && e.vencido ? 'Tu código ya venció.' : e ? 'A tu código ya no le quedan videos.' : 'Código no válido.', codigo: true }); }
+    else if (limited(ipOf(event))) return json(429, { error: 'Ya hiciste varios videos seguidos. Espera un rato y vuelve a intentar.' });
+    if (!codigo && dayFull()) return json(503, { error: 'Hoy hay mucha demanda y se acabaron los videos gratis. Vuelve mañana.' });
     try {
         const buf = Buffer.from(a, 'base64'); if (buf.length < 2000 || buf.toString('ascii', 0, 4) !== 'RIFF') return json(400, { error: 'Audio no válido.' });
         let r; if (process.env.GROQ_API_KEY) { try { r = await groq(buf, lang); } catch (e) { console.error('[rot] groq falló:', e.message); } }
         if (!r) r = await gemini(a, lang, dur);
         r.words = r.words.filter((w) => w.s < dur + 1).slice(0, 700);
         if (!r.words.length) return json(200, { words: [], aviso: 'No se detectó voz en el video.' });
-        return json(200, { words: r.words, preciso: !!r.preciso });
+        let restantes = null; if (codigo) { try { restantes = await gastar(codigo); } catch (x) { console.error('[rot] gastar:', x.message); } }
+        return json(200, { words: r.words, preciso: !!r.preciso, restantes });
     } catch (e) { console.error('[rot-transcribir]', e.message); return json(502, { error: 'No se pudo transcribir. Intenta de nuevo en un momento.' }); }
 };
