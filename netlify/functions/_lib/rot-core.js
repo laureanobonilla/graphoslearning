@@ -3,8 +3,8 @@ const crypto = require('crypto');
 const { CRC_PER_USD } = require('./currency');
 // >>> EDITA AQUÍ los precios y lo que incluye cada plan. <<<
 const PLANS = {
-    paquete: { id: 'paquete', usd: 5, creditos: 10, dias: null, nombre: 'Paquete de 10 videos', detalle: '10 videos sin marca de agua. No vence.' },
-    mensual: { id: 'mensual', usd: 9, creditos: 150, dias: 30, nombre: 'Plan mensual', detalle: 'Videos sin marca durante 30 días (hasta 150).' }
+    paquete: { id: 'paquete', usd: 12, creditos: 10, dias: null, nombre: 'Paquete de 10 videos', detalle: '10 videos sin marca de agua. No vence.' },
+    mensual: { id: 'mensual', usd: 19, creditos: 150, dias: 30, nombre: 'Plan mensual', detalle: 'Videos sin marca durante 30 días (hasta 150).' }
 };
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(obj) });
 const ipOf = (e) => (e.headers && (e.headers['x-nf-client-connection-ip'] || (e.headers['x-forwarded-for'] || '').split(',')[0].trim())) || 'unknown';
