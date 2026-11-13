@@ -1,6 +1,6 @@
 // «Rótulo»: transcribe el audio de un video corto (WAV 16 kHz mono que arma el navegador) y devuelve palabras con tiempos.
 // Preferido: Whisper en Groq (GROQ_API_KEY): da tiempos por palabra. Respaldo: Gemini (tiempos por frase, repartidos por palabra).
-const { estado, normCode } = require('./_lib/rot-core');
+const { userOf, cuenta, contar, devolver, hashIp, today, FREE_DAILY } = require('./_lib/rot-core');
 const json = (statusCode, obj) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(obj) });
 const MAX_B64 = 4.6 * 1048576, MAX_SEC = 95, PER_IP_HOUR = Number(process.env.ROT_POR_IP_HORA || 6), DAILY = Number(process.env.ROT_DIARIO || 300);
 const hits = new Map(); let day = { d: '', n: 0 };
@@ -27,23 +27,26 @@ async function gemini(b64, lang, dur) {
     for (const sg of d.segments) { const ws = clean(sg.text).split(' ').filter(Boolean), s = Math.max(0, +sg.start || 0), e = Math.min(dur, Math.max(s + 0.2, +sg.end || s + 1)); if (!ws.length) continue; const tot = ws.reduce((a, w) => a + w.length + 2, 0); let t = s; for (const w of ws) { const len = (e - s) * (w.length + 2) / tot; words.push({ w, s: +t.toFixed(2), e: +(t + len).toFixed(2) }); t += len; } }
     return { words, lang };
 }
-exports.handler = async (event) => {
+exports.handler = async (event, context) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
     if (event.body && event.body.length > MAX_B64 * 1.05) return json(413, { error: 'El audio es muy grande. Usa un video de hasta 90 segundos.' });
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Solicitud inválida' }); }
     const dur = Number(b.dur), lang = /^[a-z]{2}$/.test(String(b.lang || '')) ? b.lang : 'es', a = String(b.audio || '');
     if (!a || a.length > MAX_B64 || !Number.isFinite(dur) || dur < 0.5) return json(400, { error: 'Audio no válido.' });
     if (dur > MAX_SEC) return json(400, { error: `Por ahora el máximo es ${MAX_SEC - 5} segundos por video.` });
-    const codigo = b.codigo ? normCode(b.codigo) : '';
-    if (codigo) { let e = null; try { e = await estado(codigo); } catch (x) { console.error('[rot] código:', x.message); return json(502, { error: 'No se pudo revisar tu código. Intenta de nuevo.' }); } if (!e || !e.ok) return json(402, { error: e && e.vencido ? 'Tu código ya venció.' : e ? 'A tu código ya no le quedan videos.' : 'Código no válido.', codigo: true }); }
-    if (limited(ipOf(event), codigo ? 40 : PER_IP_HOUR)) return json(429, { error: 'Ya hiciste varios videos seguidos. Espera un rato y vuelve a intentar.' });
-    if (!codigo && dayFull()) return json(503, { error: 'Hoy hay mucha demanda y se acabaron los videos gratis. Vuelve mañana.' });
+    // Quién puede transcribir: sin cuenta, UN video por conexión (IP) para siempre; con cuenta gratis, FREE_DAILY al día; con videos comprados, hasta 40 por hora.
+    const u = userOf(context); let key = null, paid = false;
     try {
-        const buf = Buffer.from(a, 'base64'); if (buf.length < 2000 || buf.toString('ascii', 0, 4) !== 'RIFF') return json(400, { error: 'Audio no válido.' });
+        if (!u) { key = 'ip:' + hashIp(ipOf(event)); if ((await contar(key, 1)) < 0) { key = null; return json(401, { error: 'Ya usaste tu video gratis. Crea tu cuenta gratis para seguir.', registro: true }); } }
+        else { paid = (await cuenta(u)).restantes > 0; if (paid) { if (limited(u.id, 40)) return json(429, { error: 'Ya hiciste muchos videos seguidos. Espera un rato.' }); } else { key = `u:${u.id}:${today()}`; if ((await contar(key, FREE_DAILY)) < 0) { key = null; return json(429, { error: `Usaste tus ${FREE_DAILY} videos gratis de hoy. Vuelve mañana o elige un plan.`, limite: true }); } } }
+    } catch (e) { console.error('[rot] límites:', e.message); return json(502, { error: 'No se pudo verificar tu acceso. Intenta de nuevo.' }); }
+    if (!paid && dayFull()) { if (key) await devolver(key); return json(503, { error: 'Hoy hay mucha demanda y se acabaron los videos gratis. Vuelve mañana.' }); }
+    try {
+        const buf = Buffer.from(a, 'base64'); if (buf.length < 2000 || buf.toString('ascii', 0, 4) !== 'RIFF') { if (key) await devolver(key); return json(400, { error: 'Audio no válido.' }); }
         let r; if (process.env.GROQ_API_KEY) { try { r = await groq(buf, lang); } catch (e) { console.error('[rot] groq falló:', e.message); } }
         if (!r) r = await gemini(a, lang, dur);
         r.words = r.words.filter((w) => w.s < dur + 1).slice(0, 700);
-        if (!r.words.length) return json(200, { words: [], aviso: 'No se detectó voz en el video.' });
+        if (!r.words.length) { if (key) await devolver(key); return json(200, { words: [], aviso: 'No se detectó voz en el video.' }); }
         return json(200, { words: r.words, preciso: !!r.preciso });   // el video se descuenta al DESCARGAR (rot-exportar), no al transcribir
-    } catch (e) { console.error('[rot-transcribir]', e.message); return json(502, { error: 'No se pudo transcribir. Intenta de nuevo en un momento.' }); }
+    } catch (e) { if (key) await devolver(key); console.error('[rot-transcribir]', e.message); return json(502, { error: 'No se pudo transcribir. Intenta de nuevo en un momento.' }); }
 };

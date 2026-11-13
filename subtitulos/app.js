@@ -95,7 +95,7 @@
   var lastLn = -1;
   function loop() {
     oc.clearRect(0, 0, ov.width, ov.height);
-    if (!$('editor').hidden) { var b = videoBox(ov.width, ov.height); oc.save(); oc.translate(b.x, b.y); oc.beginPath(); oc.rect(0, 0, b.w, b.h); oc.clip(); drawCaps(oc, b.w, b.h, vid.currentTime); if (!(S.plan && S.plan.ok)) { oc.save(); oc.translate(b.x, b.y); previewMark(oc, b.w, b.h); oc.restore(); } oc.restore();
+    if (!$('editor').hidden) { var b = videoBox(ov.width, ov.height); oc.save(); oc.translate(b.x, b.y); oc.beginPath(); oc.rect(0, 0, b.w, b.h); oc.clip(); drawCaps(oc, b.w, b.h, vid.currentTime); if (!hasPlan()) { oc.save(); oc.translate(b.x, b.y); previewMark(oc, b.w, b.h); oc.restore(); } oc.restore();
       $('clock').textContent = fmt(vid.currentTime) + ' / ' + fmt(S.dur); var a = activeLine(vid.currentTime), i = a ? a.i : -1; if (i !== lastLn) { var o = document.querySelector('.ln.on'); if (o) o.classList.remove('on'); if (i >= 0) { var n = $('ln' + i); if (n) { n.classList.add('on'); } } lastLn = i; } }
     requestAnimationFrame(loop);
   }
@@ -113,10 +113,10 @@
       if (S.dur > MAX_SEC) return fail('Tu video dura ' + Math.round(S.dur) + ' s. Por ahora el máximo es ' + MAX_SEC + ' segundos.');
       $('stage').classList.toggle('land', vid.videoWidth > vid.videoHeight);
       busy(true, 'Sacando el audio…');
-      extractAudio(f).then(function (a) { busy(true, 'Escuchando y escribiendo… (unos segundos)'); return b64(a.blob).then(function (d) { return fetch('/.netlify/functions/rot-transcribir', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: d, dur: a.dur, lang: 'es', codigo: S.plan && S.plan.ok ? S.code : undefined }) }); }); })
-        .then(function (r) { return r.json().then(function (j) { if (!r.ok) { if (j.codigo) { S.plan = null; showPlan(); } throw new Error(j.error || 'Error'); } return j; }); })
-        .then(function (j) { if (!j.words || !j.words.length) return fail(j.aviso || 'No se escuchó voz en el video.'); S.lines = toLines(j.words); if (j.restantes != null && S.plan) { S.plan.restantes = j.restantes; S.plan.ok = j.restantes > 0 || true; showPlan(); } track('rot_transcribed', { words: j.words.length, precise: !!j.preciso }); ready(); })
-        .catch(function (e) { fail(/decode|EncodingError|null/i.test(String(e && e.message)) || !e.message ? 'No pude leer el audio de este video. Prueba con un MP4 normal.' : e.message); });
+      extractAudio(f).then(function (a) { busy(true, 'Escuchando y escribiendo… (unos segundos)'); return b64(a.blob).then(function (d) { return authHeaders().then(function (hd) { return fetch('/.netlify/functions/rot-transcribir', { method: 'POST', headers: hd, body: JSON.stringify({ audio: d, dur: a.dur, lang: 'es' }) }); }); }); })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Error'); e.registro = !!j.registro; throw e; } return j; }); })
+        .then(function (j) { if (!j.words || !j.words.length) return fail(j.aviso || 'No se escuchó voz en el video.'); S.lines = toLines(j.words); refreshAcc(); track('rot_transcribed', { words: j.words.length, precise: !!j.preciso }); ready(); })
+        .catch(function (e) { fail(/decode|EncodingError|null/i.test(String(e && e.message)) || !e.message ? 'No pude leer el audio de este video. Prueba con un MP4 normal.' : e.message); if (e && e.registro) openAuth('Ya usaste tu video gratis. Crea tu cuenta gratis y sigue con más videos.'); });
     };
     vid.onerror = function () { fail('Este formato de video no se puede abrir aquí. Prueba con MP4.'); };
   }
@@ -147,30 +147,52 @@
     };
   };
 
-  // Descargar exige un plan con saldo. El servidor descuenta UN video por descarga (rot-exportar); re-exportar el mismo video con otro estilo no vuelve a cobrar.
+  // ---------- cuenta (Netlify Identity: correo o Google) ----------
+  var ID = function () { return window.netlifyIdentity; };
+  function authHeaders() {
+    var h = { 'Content-Type': 'application/json' }, u = ID() && ID().currentUser();
+    if (!u) return Promise.resolve(h);
+    return Promise.resolve(u.jwt()).then(function (t) { if (t) h.Authorization = 'Bearer ' + t; return h; }, function () { return h; });
+  }
+  function post(fn, body) { return authHeaders().then(function (hd) { return fetch('/.netlify/functions/' + fn, { method: 'POST', headers: hd, body: JSON.stringify(body || {}) }); }).then(function (r) { return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Error'); e.data = j; throw e; } return j; }); }); }
+  function hasPlan() { return !!(S.acc && S.acc.logueado && S.acc.restantes > 0); }
+  function showPlan() {
+    var a = S.acc, el = $('plan'), has = hasPlan(), box = $('acc'); box.innerHTML = '';
+    if (a && a.logueado) { var s = document.createElement('span'); s.textContent = a.email; var b = document.createElement('button'); b.textContent = 'Salir'; b.onclick = function () { ID() && ID().logout(); }; box.appendChild(s); box.appendChild(b); }
+    else { var e = document.createElement('button'); e.textContent = 'Entrar'; e.onclick = function () { openAuth(''); }; box.appendChild(e); }
+    $('exph').hidden = has; el.hidden = !has; $('exp').textContent = has ? 'Descargar video' : 'Desbloquear y descargar';
+    if (has) el.textContent = a.restantes + ' video' + (a.restantes === 1 ? '' : 's') + ' disponible' + (a.restantes === 1 ? '' : 's') + ' en tu cuenta' + (a.vence ? ' · el plan mensual vence el ' + new Date(a.vence).toLocaleDateString('es-CR') : '');
+  }
+  function refreshAcc() { return post('rot-cuenta').then(function (d) { S.acc = d; showPlan(); return d; }).catch(function () { S.acc = null; showPlan(); }); }
+  function openAuth(msg) { $('authmsg').textContent = msg || 'Para descargar tus videos y guardar tus compras necesitas una cuenta. Es gratis.'; track('rot_auth_open'); $('auth').showModal(); }
+  $('gbtn').onclick = function () { track('rot_auth_google'); try { sessionStorage.setItem('rot_volver', '1'); } catch (e) {} location.href = '/.netlify/identity/authorize?provider=google&redirect_to=' + encodeURIComponent(location.origin + '/subtitulos/'); };
+  $('ebtn').onclick = function () { track('rot_auth_email'); $('auth').close(); if (ID()) ID().open('signup'); else err('No se pudo cargar el registro. Recarga la página.'); };
+  $('closea').onclick = function () { $('auth').close(); };
+  if (ID()) {
+    ID().on('init', function () { refreshAcc(); });
+    ID().on('login', function () { ID().close(); if ($('auth').open) $('auth').close(); track('rot_login'); refreshAcc(); });
+    ID().on('logout', function () { S.acc = { logueado: false }; showPlan(); });
+    ID().init({ locale: 'es' });
+  } else showPlan();
+
+  // Descargar exige cuenta con saldo. El servidor descuenta UN video por descarga (rot-exportar); re-exportar el mismo video con otro estilo no vuelve a cobrar.
   $('exp').onclick = function () {
-    err(''); if (!(S.plan && S.plan.ok)) return openPay();
+    err('');
+    if (!(S.acc && S.acc.logueado)) return openAuth('Crea tu cuenta gratis para descargar tu video.');
+    if (!hasPlan()) return openPay();
     if (S.spent) return doExport();
     $('exp').disabled = true;
-    post('rot-exportar', { codigo: S.code }).then(function (d) { S.spent = true; S.plan.restantes = d.restantes; S.plan.ok = true; showPlan(); doExport(); })
-      .catch(function (e) { $('exp').disabled = false; if (e.data) { S.plan = null; showPlan(); } err(e.message || 'No se pudo autorizar la descarga.'); openPay(); });
+    post('rot-exportar').then(function () { S.spent = true; return refreshAcc(); }).then(function () { doExport(); })
+      .catch(function (e) { $('exp').disabled = false; if (e.data && e.data.registro) return openAuth('Entra a tu cuenta para descargar.'); err(e.message || 'No se pudo autorizar la descarga.'); if (e.data && e.data.sinSaldo) { refreshAcc(); openPay(); } });
   };
-  // ---------- cobro: planes, PayPal y códigos ----------
-  function post(fn, body) { return fetch('/.netlify/functions/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Error'); e.data = j; throw e; } return j; }); }); }
-  function showPlan() {
-    var p = S.plan, el = $('plan'), has = p && p.ok;
-    $('exph').hidden = !!has; el.hidden = !has; $('exp').textContent = has ? 'Descargar video' : 'Desbloquear y descargar';
-    if (has) el.textContent = (p.tipo === 'mensual' ? 'Plan mensual activo' : 'Paquete activo') + ' · ' + p.restantes + ' video' + (p.restantes === 1 ? '' : 's') + ' disponible' + (p.restantes === 1 ? '' : 's') + (p.vence ? ' · vence el ' + new Date(p.vence).toLocaleDateString('es-CR') : '');
-  }
-  function useCode(code, quiet) {
-    return post('rot-codigo', { codigo: code }).then(function (e) { S.code = code; S.plan = e; try { localStorage.setItem(CODE_KEY, code); } catch (x) {} showPlan(); if (!e.ok) throw new Error(e.restantes <= 0 ? 'A ese código ya no le quedan videos.' : 'Ese código ya venció.'); return e; });
-  }
+  // ---------- compra con PayPal ----------
   var CFG = null, ppLoad = null;
   function cfg() { return CFG || (CFG = fetch('/.netlify/functions/rot-config').then(function (r) { return r.json(); })); }
   function loadPayPal(id) { if (window.paypal) return Promise.resolve(); if (ppLoad) return ppLoad; ppLoad = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(id) + '&currency=USD&components=buttons&intent=capture'; s.onload = ok; s.onerror = function () { ppLoad = null; no(new Error('load')); }; document.head.appendChild(s); }); return ppLoad; }
   function perr(m) { var e = $('perr'); e.textContent = m || ''; e.hidden = !m; }
   function openPay() {
-    track('rot_nomark_click'); perr(''); $('cmsg').textContent = ''; $('pay').hidden = false; $('done').hidden = true; $('pp').innerHTML = ''; $('dlg').showModal();
+    if (!(S.acc && S.acc.logueado)) return openAuth('Crea tu cuenta gratis para comprar.');
+    track('rot_nomark_click'); perr(''); $('pay').hidden = false; $('done').hidden = true; $('pp').innerHTML = ''; $('dlg').showModal();
     cfg().then(function (c) { var box = $('plans'); box.innerHTML = ''; Object.keys(c.planes).forEach(function (k) { var p = c.planes[k], b = document.createElement('button'); b.className = 'plan'; b.innerHTML = '<span><b>' + p.nombre + '</b><small>' + p.detalle + '</small></span><span class="pr">US$' + p.usd + '<small>' + (p.crc ? '≈ ₡' + String(p.crc).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : 'pago único') + '</small></span>'; b.onclick = function () { choose(p, b, c); }; box.appendChild(b); }); });
   }
   function choose(p, btn, c) {
@@ -180,13 +202,25 @@
       $('pp').innerHTML = '';
       window.paypal.Buttons({ style: { layout: 'vertical', shape: 'pill', label: 'pay', tagline: false },
         createOrder: function () { perr(''); return post('rot-pay-create', { plan: p.id }).then(function (d) { return d.orderID; }); },
-        onApprove: function (data) { $('pp').textContent = 'Confirmando tu pago…'; return post('rot-pay-capture', { orderID: data.orderID }).then(function (d) { $('pp').textContent = ''; track('rot_paid', { plan: p.id }); S.code = d.codigo; S.plan = { ok: true, tipo: d.tipo, restantes: d.restantes, vence: d.vence }; try { localStorage.setItem(CODE_KEY, d.codigo); } catch (x) {} showPlan(); $('pay').hidden = true; $('done').hidden = false; $('codeshow').textContent = d.codigo; $('codeinfo').textContent = d.restantes + ' videos disponibles. También te lo enviamos al correo de PayPal.'; }).catch(function (e) { $('pp').textContent = ''; perr((e.message || 'No pudimos confirmar tu pago.') + ' Si te cobraron, escríbeme con tu comprobante de PayPal y te doy tu código.'); }); },
+        onApprove: function (data) { $('pp').textContent = 'Confirmando tu pago…'; return post('rot-pay-capture', { orderID: data.orderID }).then(function (d) { $('pp').textContent = ''; track('rot_paid', { plan: p.id }); return refreshAcc().then(function () { $('pay').hidden = true; $('done').hidden = false; $('doneinfo').textContent = 'Ya tienes ' + d.restantes + ' videos disponibles en tu cuenta. También te enviamos un correo de confirmación.'; }); }).catch(function (e) { $('pp').textContent = ''; perr((e.message || 'No pudimos confirmar tu pago.') + ' Si te cobraron, escríbeme con tu comprobante de PayPal y te abono los videos.'); }); },
         onError: function () { perr('No se pudo completar el pago. No se te cobró. Inténtalo de nuevo.'); } }).render('#pp');
     }).catch(function () { $('pp').textContent = ''; perr('No se pudo cargar PayPal. Revisa tu conexión.'); });
   }
   $('nomark').onclick = function (e) { e.preventDefault(); openPay(); };
   $('closed').onclick = $('closed2').onclick = function (e) { e.preventDefault(); $('dlg').close(); };
-  $('copyc').onclick = function () { try { navigator.clipboard.writeText($('codeshow').textContent); $('copyc').textContent = '¡Copiado!'; } catch (e) {} };
-  $('usecod').onclick = function () { var c = $('cod').value.trim().toUpperCase(); if (!c) return; $('cmsg').textContent = 'Revisando…'; useCode(c).then(function (e) { $('cmsg').textContent = '¡Código activo! Te quedan ' + e.restantes + ' videos.'; track('rot_code_used'); setTimeout(function () { $('dlg').close(); }, 1200); }).catch(function (e) { $('cmsg').textContent = e.message; }); };
-  try { var saved = localStorage.getItem(CODE_KEY); if (saved) useCode(saved, true).catch(function () {}); } catch (e) {}
+  // ---------- instalar como app (Android: un toque; iPhone: instrucciones) ----------
+  (function () {
+    var box = $('install'), go = $('installGo'), no = $('installNo'), msg = $('installMsg'), KEY = 'rot_install_no';
+    var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true, skipped = false;
+    try { var t = Number(localStorage.getItem(KEY) || 0); skipped = t && Date.now() - t < 14 * 864e5; } catch (e) {}   // si dijo «ahora no», se vuelve a preguntar en 2 semanas
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+    if (standalone || skipped) return;
+    var ev = null, show = function () { box.classList.add('on'); };
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); ev = e; go.style.display = ''; show(); track('rot_install_offer'); });
+    window.addEventListener('appinstalled', function () { box.classList.remove('on'); track('rot_installed'); });
+    go.onclick = function () { if (!ev) return; ev.prompt(); (ev.userChoice || Promise.resolve()).catch(function () {}).then(function () { ev = null; box.classList.remove('on'); }); };
+    no.onclick = function () { box.classList.remove('on'); try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {} };
+    var ua = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (ios) { go.style.display = 'none'; msg.textContent = 'En Safari toca Compartir (el cuadro con la flecha) y luego «Añadir a pantalla de inicio».'; no.textContent = 'Entendido'; show(); }
+  })();
 })();

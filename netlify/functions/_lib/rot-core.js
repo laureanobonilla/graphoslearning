@@ -17,16 +17,24 @@ async function sb(path, opt = {}) {
     return text ? JSON.parse(text) : null;
 }
 const ALPHA = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // sin letras que se confunden (I, L, O, 0, 1)
-function newCode() { const b = crypto.randomBytes(8); let s = ''; for (let i = 0; i < 8; i++) s += ALPHA[b[i] % ALPHA.length]; return `ROT-${s.slice(0, 4)}-${s.slice(4)}`; }
-const CODE_RE = /^ROT-[A-Z2-9]{4}-[A-Z2-9]{4}$/;
-const normCode = (s) => String(s || '').trim().toUpperCase().replace(/\s+/g, '');
-// Estado de un código: {ok, tipo, restantes, vence} o null si no existe / venció / se agotó.
-async function estado(codigo) {
-    if (!CODE_RE.test(codigo)) return null;
-    const r = await sb(`/rest/v1/rot_codigos?codigo=eq.${codigo}&select=codigo,tipo,creditos,usados,vence&limit=1`); const c = r && r[0]; if (!c) return null;
-    const vencido = c.vence && new Date(c.vence) < new Date(), restantes = Math.max(0, c.creditos - c.usados);
-    return { ok: !vencido && restantes > 0, tipo: c.tipo, restantes, vence: c.vence, vencido: !!vencido };
+function newCode() { const b = crypto.randomBytes(8); let s = ''; for (let i = 0; i < 8; i++) s += ALPHA[b[i] % ALPHA.length]; return `ROT-${s.slice(0, 4)}-${s.slice(4)}`; }   // número de recibo de cada compra
+const { getUser } = require('./auth');
+const hashIp = (ip) => crypto.createHash('sha256').update('rot:' + ip).digest('hex').slice(0, 24);
+const today = () => new Date().toISOString().slice(0, 10);
+// Quién llama: Netlify Identity valida la firma del JWT y deja al usuario en context.clientContext.user.
+const userOf = (context) => { const u = getUser(context); return u && u.email ? { id: u.id, email: String(u.email).toLowerCase() } : null; };
+// Compras de una cuenta (por id de cuenta, o por correo si el dueño regaló un paquete a mano). Devuelve lo que le queda.
+async function cuenta(u) {
+    const rows = await sb(`/rest/v1/rot_codigos?or=(uid.eq.${encodeURIComponent(u.id)},and(uid.is.null,email.eq.${encodeURIComponent(u.email)}))&select=tipo,creditos,usados,vence`) || [];
+    const vivas = rows.filter((r) => r.creditos > r.usados && (!r.vence || new Date(r.vence) > new Date()));
+    const restantes = vivas.reduce((a, r) => a + (r.creditos - r.usados), 0), vencen = vivas.filter((r) => r.vence).map((r) => r.vence).sort()[0] || null;
+    return { restantes, vence: vencen, compras: rows.length };
 }
-const gastar = async (codigo) => Number(await sb('/rest/v1/rpc/rot_gastar', { method: 'POST', body: JSON.stringify({ p_codigo: codigo }) }));
+// Gasta UN video de la compra que vence primero. Devuelve cuántos le quedan en total, o -1 si no tenía.
+const gastarCuenta = async (u) => Number(await sb('/rest/v1/rpc/rot_gastar_cuenta', { method: 'POST', body: JSON.stringify({ p_uid: u.id, p_email: u.email }) }));
+// Contadores atómicos de uso gratis: reservan un uso (devuelve el nuevo total, o -1 si ya llegó al máximo) y se pueden devolver si algo falla.
+const contar = async (clave, max) => Number(await sb('/rest/v1/rpc/rot_contar', { method: 'POST', body: JSON.stringify({ p_clave: clave, p_max: max }) }));
+const devolver = (clave) => sb('/rest/v1/rpc/rot_devolver', { method: 'POST', body: JSON.stringify({ p_clave: clave }) }).catch(() => {});
 const priceView = (country) => { const out = {}; Object.values(PLANS).forEach((p) => { out[p.id] = { id: p.id, usd: p.usd, nombre: p.nombre, detalle: p.detalle, crc: country === 'CR' ? Math.ceil(p.usd * CRC_PER_USD / 100) * 100 : null }; }); return out; };
-module.exports = { PLANS, json, ipOf, countryOf, sb, newCode, CODE_RE, normCode, estado, gastar, priceView };
+const FREE_DAILY = Number(process.env.ROT_GRATIS_DIA || 5);
+module.exports = { PLANS, json, ipOf, countryOf, sb, newCode, userOf, hashIp, today, cuenta, gastarCuenta, contar, devolver, priceView, FREE_DAILY };
