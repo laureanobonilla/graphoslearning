@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Rótulo">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=6">
 </head><body>
 <header><b class="logo">Rótulo</b><span class="tag">Subtítulos para videos cortos</span><span id="acc"></span></header>
 <div class="install" id="install" role="region" aria-label="Instalar la app"><div class="it"><b>Instala Rótulo en tu teléfono</b><span id="installMsg">Ábrela desde tu pantalla de inicio, como cualquier app.</span></div><button class="go" id="installGo" type="button">Instalar</button><button class="no" id="installNo" type="button">Ahora no</button></div>
@@ -28,7 +28,24 @@
       <div class="bar"><button id="play" class="btn sm">▶ Ver</button><span id="clock">0:00</span></div>
       <h3>Estilo</h3>
       <div class="styles" id="styles"></div>
-      <div class="opts"><label>Posición <select id="pos"><option value="b">Abajo</option><option value="m">Centro</option></select></label><label>Color <input type="color" id="col" value="#ffd23f"></label></div>
+      <h3>Ajustes</h3>
+      <div class="adj">
+        <div class="row1"><span>Posición</span><div class="seg" id="posb"></div></div>
+        <div class="row1"><span>Tamaño</span><input type="range" id="size" min="70" max="150" value="100" aria-label="Tamaño del texto"></div>
+        <div class="row1"><span>Color</span><div class="sw" id="sw"></div><input type="color" id="col" value="#ffd23f" aria-label="Otro color"></div>
+        <details class="more"><summary>Más ajustes</summary>
+          <div class="grid2">
+            <label>Letra <select id="o_font"><option value="negrita">Negrita</option><option value="impact">Compacta</option><option value="redonda">Redonda</option><option value="serif">Elegante</option><option value="maquina">Máquina de escribir</option></select></label>
+            <label>Palabras por línea <select id="o_n"><option value="0">Automático</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+            <label>Cómo aparece <select id="o_mode"><option value="line">Línea completa</option><option value="word">Una palabra a la vez</option><option value="type">Palabra tras palabra</option></select></label>
+            <label>Palabra que se dice <select id="o_hl"><option value="color">Cambia de color</option><option value="box">Con caja de color</option><option value="under">Subrayada</option><option value="none">Sin resaltar</option></select></label>
+            <label>Fondo <select id="o_bg"><option value="none">Sin fondo</option><option value="row">Caja por línea</option><option value="bar">Barra ancha</option></select></label>
+            <label>Movimiento <select id="o_anim"><option value="none">Quieto</option><option value="pop">Rebote</option></select></label>
+          </div>
+          <div class="chk"><label><input type="checkbox" id="o_upper"> MAYÚSCULAS</label><label><input type="checkbox" id="o_out"> Contorno</label><label><input type="checkbox" id="o_shadow"> Sombra</label><label><input type="checkbox" id="o_glow"> Brillo</label></div>
+          <button type="button" class="btn ghost sm" id="o_reset">Volver al estilo original</button>
+        </details>
+      </div>
       <h3>Texto <small>corrige lo que haga falta</small></h3>
       <div id="lines"></div>
       <button id="exp" class="btn big">Desbloquear y descargar</button>
@@ -49,5 +66,5 @@
 <div class="row" style="margin-top:12px"><button class="btn ghost" id="closed" type="button">Cerrar</button></div></div>
 <div id="done" hidden><h2>¡Listo, gracias!</h2><p id="doneinfo"></p><div class="row"><button class="btn" id="closed2" type="button">Seguir</button></div></div></dialog>
 <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=8"></script>
 </body></html>
