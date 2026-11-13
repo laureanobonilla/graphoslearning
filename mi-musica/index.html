@@ -17,17 +17,19 @@
    CONFIGURACIÓN — lo que tienes que llenar o cambiar
    ========================================================= */
 window.CONFIG = {
-  NAME: "",                     // PENDIENTE: tu nombre artístico, ej. "Laura Méndez"
-  PLACE: "",                    // opcional: "Costa Rica"
-  PHOTO: "foto.jpg",            // tu foto, junto a este archivo
+  NAME: "Lau",
+  PLACE: "Costa Rica",
+  PHOTO: "foto.jpg",            // por ahora, un cuadro de «Estrellas chocan»; cámbiala por tu foto
 
   // Canción que suena primero (arriba de todo)
-  FEATURED: { src: "primera.mp4", poster: "", title: "" },   // PENDIENTE: título de la canción
+  FEATURED: { src: "primera.mp4", poster: "primera.jpg", title: "Estrellas chocan" },
 
   // Tus videos. type: "original" o "cover". Para covers pon también el artista original.
   VIDEOS: [
-    // { src: "videos/mi-cancion.mp4", title: "Mi canción", type: "original" },
-    // { src: "videos/cover-1.mp4",    title: "Nombre de la canción", artist: "Artista original", type: "cover" },
+    { src: "videos/original-1.mp4", poster: "videos/original-1.jpg", title: "Canción original", type: "original" },  // PENDIENTE: título
+    { src: "videos/cover-1.mp4", poster: "videos/cover-1.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
+    { src: "videos/cover-2.mp4", poster: "videos/cover-2.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
+    { src: "videos/cover-3.mp4", poster: "videos/cover-3.jpg", title: "The Man Who…", artist: "", type: "cover" },  // PENDIENTE: título completo y artista
   ],
 
   // Metas de estudio, en orden. La barra de progreso suma los aportes reales.
@@ -86,8 +88,9 @@ window.CONFIG = {
   .who span{font-size:13px; color:var(--ink-faint)}
 
   /* ---------- Video principal ---------- */
-  .video-box{position:relative; border-radius:var(--radius); overflow:hidden; background:#000;
-    box-shadow:0 20px 60px rgba(0,0,0,.55), 0 0 0 1px var(--line); aspect-ratio:16/9; max-height:52vh}
+  .video-box{position:relative; border-radius:var(--radius); overflow:hidden; background:#000; margin:0 auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.55), 0 0 0 1px var(--line);
+    --ar:1.7778; aspect-ratio:var(--ar); width:min(100%, calc(56vh * var(--ar)))}
   .video-box video{width:100%; height:100%; display:block; object-fit:contain; background:#000}
   .unmute{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     background:linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.45)); border:0; cursor:pointer; color:var(--ink); font:inherit; padding:0}
@@ -137,7 +140,7 @@ window.CONFIG = {
   .grid{display:grid; grid-template-columns:1fr; gap:16px}
   @media (min-width:640px){ .grid{grid-template-columns:1fr 1fr} }
   .card{background:var(--bg-2); border:1px solid var(--line); border-radius:16px; overflow:hidden}
-  .card video{width:100%; aspect-ratio:16/9; display:block; background:#000; object-fit:contain}
+  .card video{width:100%; height:auto; max-height:72vh; display:block; background:#000; object-fit:contain}
   .card .meta{padding:12px 14px 14px}
   .card .meta b{display:block; font-size:16px; line-height:1.3}
   .card .meta span{font-size:13px; color:var(--ink-faint)}
@@ -152,6 +155,12 @@ window.CONFIG = {
   .story img{width:100%; aspect-ratio:4/5; object-fit:cover; border-radius:18px; box-shadow:0 0 0 1px var(--line)}
   .story .ph{width:100%; aspect-ratio:4/5; border-radius:18px; background:linear-gradient(160deg,#2b2033,#121014); display:flex; align-items:center; justify-content:center; color:var(--ink-faint); font-size:14px; text-align:center; padding:16px; border:1px dashed var(--line)}
 
+  .more{margin-top:4px}
+  .more summary{cursor:pointer; color:var(--gold-hi); font-weight:700; list-style:none; padding:8px 0; display:inline-flex; align-items:center; gap:6px}
+  .more summary::-webkit-details-marker{display:none}
+  .more summary::after{content:"▾"; transition:transform .2s}
+  .more[open] summary::after{transform:rotate(180deg)}
+  .more h3{font-family:var(--serif); font-size:21px; margin:18px 0 8px}
   .uses{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px}
   .use{background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:14px 10px; text-align:center}
   .use b{display:block; font-size:22px; color:var(--gold-hi)}
@@ -198,8 +207,8 @@ window.CONFIG = {
   <div class="now" id="nowPlaying"><i></i><span>Canción original</span></div>
 
   <div class="hero-copy">
-    <h1>Estoy aprendiendo a cantar, tocar guitarra y piano. <em>Ayúdame a llegar más lejos.</em></h1>
-    <p class="lead">Escribo mis propias canciones y quiero estudiar en serio. Cada aporte va directo a mis clases, y cada mes subo un video de mi avance para que escuches en qué se convirtió tu ayuda.</p>
+    <h1>De tirar líneas de código a perseguir el contrapunto. <em>Ayúdame a estudiar música.</em></h1>
+    <p class="lead">Soy Lau, ingeniero de software en Costa Rica. A mis 43 años empiezo a estudiar en serio canto, guitarra, piano y teoría. Cada aporte va directo a mis clases, y voy compartiendo aquí mi avance.</p>
   </div>
 
   <!-- ===== META ACTUAL ===== -->
@@ -231,11 +240,20 @@ window.CONFIG = {
       <div id="storyPhoto"><div class="ph">Tu foto<br>(foto.jpg)</div></div>
       <div>
         <p class="kicker">Quién soy</p>
-        <h2>La música llegó tarde, pero llegó para quedarse</h2>
-        <!-- PENDIENTE: cambia este texto por tu historia, en tus palabras -->
-        <p class="soft">Siempre he escrito canciones, pero nunca pude estudiar música formalmente. Aprendí lo que sé con tutoriales, oído y muchas horas de práctica.</p>
-        <p class="soft">Ahora quiero hacerlo en serio: técnica vocal para cuidar la voz y llegar más alto, guitarra y piano para acompañarme bien, y teoría para componer mejor.</p>
-        <p class="soft">No te pido que creas en mí a ciegas. Te pido que me escuches, y si te gusta lo que oyes, que me acompañes en el camino.</p>
+        <h2>Hola, soy Lau</h2>
+        <p class="soft">Llevo 18 años como ingeniero de software en Costa Rica, convirtiendo ideas abstractas en sistemas que funcionan. Pero detrás del código siempre hubo otra arquitectura que me obsesionaba en silencio: la música. Escribo letras y poemas, y estudié por mi cuenta armonía y contrapunto, de Haydn y Mozart a Stravinsky y Debussy.</p>
+        <p class="soft">Hoy la teoría y el oído analítico ya no me alcanzan. Quiero dejar de ser el arquitecto que diseña la estructura desde afuera y convertirme en el intérprete que la habita desde adentro. A mis 43 años empiezo en serio: canto, guitarra, piano y teoría aplicada.</p>
+        <p class="soft">Cada aporte va directo a clases, tutorías y equipo de práctica. A cambio, voy a documentar el proceso sin filtros: avances, errores y las canciones que vayan naciendo.</p>
+        <details class="more" id="moreStory">
+          <summary>Leer mi historia completa</summary>
+          <p class="soft">Durante mucho tiempo, la música fue para mí un territorio de exploración intelectual y experimental. Incluso encontré la forma de cruzar mis dos mundos: empecé a producir música asistida por inteligencia artificial y a crear un servicio donde ayudo a otras personas a convertir sus grabaciones de voz y sus letras en canciones con arreglos completos, de la salsa brava o la chacarera al jazz de cámara o el rock industrial.</p>
+          <p class="soft">Pero ha llegado un punto en el que la teoría, el oído analítico y las herramientas digitales ya no me alcanzan. Los videos de esta página no son eso: ahí canto y toco yo.</p>
+          <h3>¿Por qué pido tu apoyo?</h3>
+          <p class="soft">Aprender música de verdad requiere tiempo, constancia, instrumentos adecuados y buenos maestros. Con esta campaña financio mi formación: clases de técnica vocal, piano, guitarra y teoría aplicada.</p>
+          <p class="soft">No busco ser una estrella de rock ni hacer de esto un pasatiempo de fin de semana. Lo abordo con la misma disciplina y curiosidad con la que he construido cada proyecto en mi vida: desde primeros principios, entendiendo cómo funciona cada pieza para poder crear obras propias con rigor, honestidad y emoción.</p>
+          <p class="soft">Cada contribución, por pequeña que sea, va directo a horas de estudio, tutorías y equipo básico de práctica. A cambio, me comprometo a documentar este proceso sin filtros: mis avances, mis errores, las composiciones que vayan naciendo en el camino y lo que vaya aprendiendo, puesto al servicio de nuevos proyectos creativos.</p>
+          <p class="soft">Gracias por leer hasta aquí, por creer en los giros de timón a mitad del camino y por ayudarme a darle voz e instrumentos a todo lo que llevo años escribiendo y escuchando en mi cabeza.</p>
+        </details>
       </div>
     </div>
 
@@ -335,6 +353,9 @@ window.CONFIG = {
     var p0 = vid.play(); if (p0 && p0.catch) p0.catch(function(){});
   } else showPlaceholder();
   vid.addEventListener('playing', function(){ trackOnce('video_autoplay_start'); });
+  vid.addEventListener('loadedmetadata', function(){
+    if (vid.videoWidth && vid.videoHeight) vid.parentNode.style.setProperty('--ar', (vid.videoWidth / vid.videoHeight).toFixed(4));
+  });
 
   function pauseOthers(except){ document.querySelectorAll('video').forEach(function(v){ if (v !== except && !v.paused) v.pause(); }); }
   function turnSoundOn(how){
@@ -389,6 +410,10 @@ window.CONFIG = {
     $('panelOriginal').hidden = !o; $('panelCover').hidden = o;
     track('tab_select', {tab: which});
   }
+  if (!vids.some(function(v){ return v.type !== 'cover'; }) && vids.some(function(v){ return v.type === 'cover'; })){
+    $('tabOriginal').setAttribute('aria-selected','false'); $('tabCover').setAttribute('aria-selected','true');
+    $('panelOriginal').hidden = true; $('panelCover').hidden = false;
+  }
   $('tabOriginal').addEventListener('click', function(){ selectTab('original'); });
   $('tabCover').addEventListener('click', function(){ selectTab('cover'); });
 
@@ -425,6 +450,8 @@ window.CONFIG = {
       .then(function(j){ if (j && typeof j.total === 'number') renderGoals(j.total); }).catch(function(){});
   }
   loadProgress();
+
+  var more = $('moreStory'); if (more) more.addEventListener('toggle', function(){ if (more.open) trackOnce('story_expand'); });
 
   /* ---------- compartir ---------- */
   var shareUrl = C.SHARE_URL || location.href.split('#')[0].split('?')[0];
