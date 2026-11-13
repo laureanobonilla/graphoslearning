@@ -2,9 +2,9 @@
 // El monto lo elige la persona; el servidor solo lo valida (mínimo y máximo).
 const store = require('./store');
 
-const APPS = ['una-mano', 'me-levanto'];
+const APPS = ['una-mano', 'me-levanto', 'mi-musica'];
 // Moneda de cada página (la decide el servidor, nunca el navegador)
-const CURRENCY = { 'una-mano': 'USD', 'me-levanto': 'EUR' };
+const CURRENCY = { 'una-mano': 'USD', 'me-levanto': 'EUR', 'mi-musica': 'USD' };
 const MIN_USD = 1;
 const MAX_USD = 500;
 

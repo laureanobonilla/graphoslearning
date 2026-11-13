@@ -59,6 +59,13 @@
     '.ap-thanks{text-align:center;padding:10px 0 6px}' +
     '.ap-thanks .big{font-size:46px;line-height:1;margin-bottom:8px}' +
     '.ap-thanks p{color:var(--ink-soft,#cbbba7);margin:0 0 16px}' +
+    '.ap-song{margin:0 0 18px;text-align:left}' +
+    '.ap-song label{display:block;font-size:14px;color:var(--ink-soft,#cbbba7);margin-bottom:6px}' +
+    '.ap-song-row{display:flex;gap:8px}' +
+    '.ap-song input{flex:1;min-width:0;background:rgba(255,255,255,.05);border:1px solid var(--line,rgba(246,236,223,.18));border-radius:12px;color:var(--ink,#f6ecdf);font:inherit;font-size:16px;padding:11px 12px}' +
+    '.ap-song button{border:0;border-radius:12px;padding:0 16px;font:inherit;font-weight:700;background:var(--gold,#e9a84c);color:var(--gold-ink,#2a1a06);cursor:pointer}' +
+    '.ap-song small{display:block;margin-top:6px;color:var(--gold-hi,#f5bf6a)}' +
+    '.ap-song small[hidden]{display:none}' +
     '.ap-thanks .ap-share{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}' +
     '.ap-thanks .ap-share a{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink,#f6ecdf);border:1px solid var(--line,rgba(246,236,223,.18));padding:11px 18px;border-radius:999px;font-weight:500;font-size:15px}';
   var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
@@ -71,7 +78,7 @@
     '<div class="ap-sheet">' +
       '<button class="ap-x" type="button" aria-label="Cerrar">×</button>' +
       '<div class="ap-form">' +
-        '<h3 id="apTitle">Tu aporte</h3>' +
+        '<h3 id="apTitle">' + (ctx.title || 'Tu aporte') + '</h3>' +
         '<p class="ap-sub">Elige cuánto quieres aportar. Tú decides.</p>' +
         '<div class="ap-chips">' +
           AMOUNTS.map(function (a) { return '<button type="button" class="ap-chip" data-amt="' + a + '" aria-pressed="false">' + fmt(a) + '</button>'; }).join('') +
@@ -88,6 +95,7 @@
         '<div class="big">♡</div>' +
         '<h3 class="ap-thx-title">¡Gracias!</h3>' +
         '<p class="ap-thx-text"></p>' +
+        (ctx.askSong ? '<form class="ap-song"><label for="apSong">¿Qué canción te gustaría escucharme cantar?</label><div class="ap-song-row"><input id="apSong" maxlength="120" placeholder="Canción y artista" autocomplete="off"><button type="submit">Enviar</button></div><small class="ap-song-ok" hidden>¡Anotada! Gracias.</small></form>' : '') +
         '<div class="ap-share">' +
           '<a class="ap-wa" target="_blank" rel="noopener">Compartir por WhatsApp</a>' +
           '<a class="ap-fbk" target="_blank" rel="noopener">Compartir en Facebook</a>' +
@@ -106,6 +114,14 @@
   $('.ap-wa') && $('.ap-wa').addEventListener('click', function () { track('share_click', { network: 'whatsapp', from: 'thanks' }); });
   $('.ap-fbk') && $('.ap-fbk').addEventListener('click', function () { track('share_click', { network: 'facebook', from: 'thanks' }); });
   $('.ap-fb-link').addEventListener('click', function () { track('pay_fallback_link'); });
+  var songForm = $('.ap-song');
+  if (songForm) songForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = $('#apSong').value.trim();
+    if (!v) return;
+    track('song_request', { song: v.slice(0, 120) });
+    $('#apSong').value = ''; $('.ap-song-ok').hidden = false;
+  });
 
   /* ---------- monto ---------- */
   var amount = DEFAULT_AMOUNT;
@@ -137,13 +153,14 @@
 
   /* ---------- abrir / cerrar ---------- */
   var lastFocus = null, opened = false, paid = false;
-  function open(loc) {
+  function open(loc, preset) {
     lastFocus = document.activeElement;
     back.hidden = false;
     requestAnimationFrame(function () { back.classList.add('on'); });
     document.documentElement.style.overflow = 'hidden';
-    if (!opened) { opened = true; pick(DEFAULT_AMOUNT, true); }
-    track('pay_sheet_open', { location: loc || '' });
+    if (preset != null && (preset === 'other' || AMOUNTS.indexOf(Number(preset)) >= 0)) { opened = true; pick(preset === 'other' ? 'other' : Number(preset), true); }
+    else if (!opened) { opened = true; pick(DEFAULT_AMOUNT, true); }
+    track('pay_sheet_open', { location: loc || '', preset: preset == null ? null : preset });
     setTimeout(function () { try { $('.ap-x').focus(); } catch (e) {} }, 60);
     loadButtons();
   }
@@ -233,8 +250,9 @@
     try { if (window.fbq) window.fbq('track', 'Donate', { value: n, currency: CUR }); } catch (e) {}
     $('.ap-form').hidden = true;
     var t = $('.ap-thanks'); t.hidden = false;
-    $('.ap-thx-text').textContent = 'Tu aporte de ' + fmt(n, true) + ' ya es parte de la próxima canción. Si quieres ayudar todavía más, compártela con alguien.';
+    $('.ap-thx-text').textContent = (ctx.thanksText || 'Tu aporte de {monto} ya es parte de la próxima canción. Si quieres ayudar todavía más, compártela con alguien.').replace('{monto}', fmt(n, true));
     setMsg('');
+    try { if (typeof ctx.onPaid === 'function') ctx.onPaid(n); } catch (e) {}
   }
 
   window.ApoyoPago = { open: open, close: close };

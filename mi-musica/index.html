@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ayúdame a estudiar música</title>
+<meta name="description" content="Estoy aprendiendo a cantar, tocar guitarra y piano. Escucha mis canciones y ayúdame a seguir estudiando.">
+<meta property="og:title" content="Ayúdame a estudiar música">
+<meta property="og:description" content="Canciones originales, covers y mi camino aprendiendo música. Cada aporte va a mis clases.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+<script>
+/* =========================================================
+   CONFIGURACIÓN — lo que tienes que llenar o cambiar
+   ========================================================= */
+window.CONFIG = {
+  NAME: "Lau",
+  PLACE: "Costa Rica",
+  PHOTO: "foto.jpg",
+  AVATAR: "avatar.jpg",
+
+  // Canción que suena primero (arriba de todo)
+  FEATURED: { src: "primera.mp4", poster: "primera.jpg", title: "" },   // PENDIENTE: título de esta canción
+
+  // Tus videos. type: "original" o "cover". Para covers pon también el artista original.
+  VIDEOS: [
+    { src: "videos/original-1.mp4", poster: "videos/original-1.jpg", title: "Estrellas Chocan", type: "original" },
+    { src: "videos/cover-1.mp4", poster: "videos/cover-1.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
+    { src: "videos/cover-2.mp4", poster: "videos/cover-2.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
+    { src: "videos/cover-3.mp4", poster: "videos/cover-3.jpg", title: "The Man Who Sold the World", artist: "David Bowie", type: "cover" },
+  ],
+
+  // Metas de estudio, en orden. La barra de progreso suma los aportes reales.
+  // Vacío = la sección de metas no se muestra. Para activarla, pon los precios reales, ej.:
+  // { title: "Clases de canto", detail: "8 clases con un profesor de técnica vocal", amount: 160 },
+  GOALS: [],
+
+  // Aportes (en dólares)
+  AMOUNTS: [2, 5, 20],
+  DEFAULT_AMOUNT: 5,
+  PAYPAL_URL: "https://www.paypal.com/ncp/payment/X3B3MDTZP8DFS",  // respaldo si el botón de PayPal no carga
+
+  OWN_TRACKING: true,
+  META_PIXEL_ID: "",
+  SHARE_URL: ""
+};
+</script>
+
+<style>
+  :root{
+    --bg:#121014; --bg-2:#1c1820; --bg-3:#25202b;
+    --ink:#f5efe6; --ink-soft:#c9bfb3; --ink-faint:#8e8478;
+    --gold:#e9a84c; --gold-hi:#f5bf6a; --gold-ink:#2a1a06;
+    --line:rgba(245,239,230,.12);
+    --radius:16px;
+    --serif:"Fraunces", Georgia, serif;
+    --sans:"DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --bar-h:76px;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:17px; line-height:1.6;
+    background-image:
+      radial-gradient(900px 500px at 15% -5%, rgba(233,168,76,.14), transparent 60%),
+      radial-gradient(700px 500px at 100% 60%, rgba(150,110,200,.08), transparent 60%);
+    background-attachment:fixed;
+    padding-bottom:calc(var(--bar-h) + 24px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:0 18px}
+  p{margin:0 0 14px}
+  .soft{color:var(--ink-soft)}
+  h2{font-family:var(--serif); font-weight:600; font-size:27px; line-height:1.2; margin:0 0 8px}
+  .kicker{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold-hi); margin:0 0 6px; font-weight:700}
+  section{padding:52px 0 0}
+
+  /* ---------- Encabezado ---------- */
+  .who{display:flex; align-items:center; gap:12px; padding:14px 0 12px}
+  .avatar{width:46px; height:46px; border-radius:50%; object-fit:cover; flex:0 0 46px;
+    background:linear-gradient(135deg,var(--gold),#8b5cf6); display:flex; align-items:center; justify-content:center;
+    font-family:var(--serif); font-weight:600; font-size:20px; color:#fff; box-shadow:0 0 0 2px rgba(245,191,106,.6)}
+  .who b{display:block; font-size:16px; line-height:1.2}
+  .who span{font-size:13px; color:var(--ink-faint)}
+
+  /* ---------- Video principal ---------- */
+  .video-box{position:relative; border-radius:var(--radius); overflow:hidden; background:#000; margin:0 auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.55), 0 0 0 1px var(--line);
+    --ar:1.7778; aspect-ratio:var(--ar); width:min(100%, calc(56vh * var(--ar)))}
+  .video-box video{width:100%; height:100%; display:block; object-fit:contain; background:#000}
+  .unmute{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,.45)); border:0; cursor:pointer; color:var(--ink); font:inherit; padding:0}
+  .unmute span{display:inline-flex; align-items:center; gap:10px; background:rgba(18,16,20,.82); backdrop-filter:blur(6px);
+    border:1px solid rgba(245,191,106,.5); padding:12px 20px; border-radius:999px; font-weight:700; font-size:16px; animation:pulse 2.2s ease-in-out infinite}
+  .unmute svg{width:22px; height:22px; fill:var(--gold-hi)}
+  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+  .unmute[hidden]{display:none}
+  .now{font-size:13px; color:var(--ink-faint); margin:10px 2px 0; display:flex; gap:8px; align-items:center}
+  .now i{width:8px; height:8px; border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px rgba(233,168,76,.2)}
+  .placeholder{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    background:radial-gradient(circle at 50% 40%, rgba(233,168,76,.3), transparent 55%), linear-gradient(160deg,#2b2033,#121014);
+    color:var(--ink-soft); text-align:center; padding:20px}
+  .placeholder.show{display:flex}
+  .placeholder small{font-size:13px; color:var(--ink-faint)}
+
+  /* ---------- Frase principal ---------- */
+  .hero-copy{padding:22px 2px 0}
+  h1{font-family:var(--serif); font-weight:600; letter-spacing:-.01em; font-size:clamp(26px, 6.4vw, 40px); line-height:1.15; margin:0 0 10px; text-wrap:balance}
+  h1 em{font-style:italic; font-weight:400; color:var(--gold-hi)}
+  .lead{color:var(--ink-soft); margin:0; font-size:16px; text-wrap:pretty}
+
+  /* ---------- Metas ---------- */
+  .goal-now{background:var(--bg-2); border:1px solid rgba(233,168,76,.3); border-radius:20px; padding:22px 20px; margin-top:16px}
+  .goal-now .row{display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap}
+  .goal-now b{font-size:19px}
+  .goal-now .nums{font-size:15px; color:var(--ink-soft)}
+  .goal-now .nums strong{color:var(--ink); font-size:20px}
+  .bar{height:12px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; margin:12px 0 8px}
+  .bar > div{height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,var(--gold),var(--gold-hi)); transition:width 1s ease}
+  .goal-now small{color:var(--ink-faint); font-size:13px}
+  .goals{list-style:none; margin:14px 0 0; padding:0; display:grid; gap:10px}
+  .goals li{display:flex; gap:14px; align-items:center; background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:14px 16px}
+  .goals .n{flex:0 0 32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px;
+    background:rgba(233,168,76,.14); color:var(--gold-hi)}
+  .goals li.done .n{background:var(--gold); color:var(--gold-ink)}
+  .goals .t{flex:1}
+  .goals .t b{display:block; font-size:16px}
+  .goals .t span{color:var(--ink-soft); font-size:14px}
+  .goals .a{font-weight:700; color:var(--ink-soft); white-space:nowrap}
+
+  /* ---------- Videos ---------- */
+  .tabs{display:flex; gap:8px; margin:14px 0 16px; border-bottom:1px solid var(--line)}
+  .tab{background:none; border:0; color:var(--ink-faint); font:inherit; font-weight:700; font-size:16px; padding:10px 6px 12px; cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px}
+  .tab[aria-selected="true"]{color:var(--ink); border-bottom-color:var(--gold)}
+  .tab .c{font-weight:500; color:var(--ink-faint); font-size:13px; margin-left:4px}
+  .grid{display:grid; grid-template-columns:1fr; gap:16px}
+  @media (min-width:640px){ .grid{grid-template-columns:1fr 1fr} }
+  .card{background:var(--bg-2); border:1px solid var(--line); border-radius:16px; overflow:hidden}
+  .card video{width:100%; height:auto; max-height:72vh; display:block; background:#000; object-fit:contain}
+  .card .meta{padding:12px 14px 14px}
+  .card .meta b{display:block; font-size:16px; line-height:1.3}
+  .card .meta span{font-size:13px; color:var(--ink-faint)}
+  .badge{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:3px 8px; border-radius:999px; margin-bottom:6px}
+  .badge.original{background:rgba(233,168,76,.16); color:var(--gold-hi)}
+  .badge.cover{background:rgba(150,110,200,.18); color:#c9b3f0}
+  .empty{background:var(--bg-2); border:1px dashed var(--line); border-radius:16px; padding:28px 18px; text-align:center; color:var(--ink-faint)}
+
+  /* ---------- Historia ---------- */
+  .story{display:grid; gap:18px; align-items:start}
+  @media (min-width:640px){ .story{grid-template-columns:220px 1fr} }
+  .story img{width:100%; aspect-ratio:4/5; object-fit:cover; object-position:72% 40%; border-radius:18px; box-shadow:0 0 0 1px var(--line)}
+  .story .ph{width:100%; aspect-ratio:4/5; border-radius:18px; background:linear-gradient(160deg,#2b2033,#121014); display:flex; align-items:center; justify-content:center; color:var(--ink-faint); font-size:14px; text-align:center; padding:16px; border:1px dashed var(--line)}
+
+  .more{margin-top:4px}
+  .more summary{cursor:pointer; color:var(--gold-hi); font-weight:700; list-style:none; padding:8px 0; display:inline-flex; align-items:center; gap:6px}
+  .more summary::-webkit-details-marker{display:none}
+  .more summary::after{content:"▾"; transition:transform .2s}
+  .more[open] summary::after{transform:rotate(180deg)}
+  .more h3{font-family:var(--serif); font-size:21px; margin:18px 0 8px}
+  .uses{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px}
+  .use{background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:14px 10px; text-align:center}
+  .use b{display:block; font-size:22px; color:var(--gold-hi)}
+  .use span{font-size:13px; color:var(--ink-soft); line-height:1.35; display:block; margin-top:4px}
+
+  .share{display:flex; gap:10px; flex-wrap:wrap; margin-top:8px}
+  .share a{display:inline-flex; align-items:center; gap:8px; text-decoration:none; color:var(--ink); border:1px solid var(--line); padding:11px 18px; border-radius:999px; font-weight:500; font-size:15px; background:rgba(255,255,255,.03)}
+
+  footer{text-align:center; color:var(--ink-faint); font-size:13px; padding:48px 0 10px}
+  footer p{max-width:36em; margin:0 auto 8px}
+
+  /* ---------- Barra de apoyo SIEMPRE visible ---------- */
+  .dock{position:fixed; left:0; right:0; bottom:0; z-index:20; background:rgba(18,16,20,.94); backdrop-filter:blur(10px);
+    border-top:1px solid rgba(233,168,76,.35); padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+  .dock .in{max-width:760px; margin:0 auto; display:flex; align-items:center; gap:8px}
+  .dock .lbl{font-size:13px; line-height:1.2; color:var(--ink-soft); flex:0 0 auto; max-width:74px}
+  .dock .lbl b{display:block; color:var(--ink); font-size:14px}
+  .dock .amts{flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
+  .amt{border:0; border-radius:12px; min-height:50px; font:inherit; font-weight:700; font-size:18px; cursor:pointer;
+    background:linear-gradient(180deg,var(--gold-hi),var(--gold)); color:var(--gold-ink); box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+  .amt.other{background:rgba(255,255,255,.06); color:var(--ink); border:1px solid rgba(245,191,106,.45); font-size:13px; line-height:1.15; box-shadow:none}
+  .amt:active{transform:translateY(1px)}
+  @media (min-width:640px){ .dock .lbl{max-width:none} }
+
+  @media (prefers-reduced-motion:reduce){ .unmute span{animation:none} .bar > div{transition:none} }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="who">
+    <div class="avatar" id="avatar" aria-hidden="true">♪</div>
+    <div><b id="whoName">Músico en formación</b><span id="whoSub">Canto · guitarra · piano</span></div>
+  </header>
+
+  <!-- ===== CANCIÓN QUE SUENA PRIMERO ===== -->
+  <div class="video-box">
+    <video id="vid" autoplay muted playsinline loop preload="auto"></video>
+    <button class="unmute" id="unmuteBtn" type="button" aria-label="Activar el sonido">
+      <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06A9 9 0 0 0 14 3.23z"/></svg>Toca para escuchar</span>
+    </button>
+    <div class="placeholder" id="placeholder"><div>Aquí va tu canción original</div><small>Sube <code>primera.mp4</code> junto a esta página</small></div>
+  </div>
+  <div class="now" id="nowPlaying"><i></i><span>Canción original</span></div>
+
+  <div class="hero-copy">
+    <h1>De tirar líneas de código a perseguir el contrapunto. <em>Ayúdame a estudiar música.</em></h1>
+    <p class="lead">Soy Lau, ingeniero de software en Costa Rica. A mis 45 años empiezo a estudiar en serio canto, guitarra, piano y teoría. Cada aporte va directo a mis clases, y voy compartiendo aquí mi avance.</p>
+  </div>
+
+  <!-- ===== META ACTUAL ===== -->
+  <section id="metas" style="padding-top:28px">
+    <div class="goal-now">
+      <p class="kicker">Mi meta ahora</p>
+      <div class="row"><b id="gTitle">—</b><span class="nums"><strong id="gRaised">$0</strong> de <span id="gAmount">$0</span></span></div>
+      <div class="bar" role="progressbar" aria-labelledby="gTitle" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="gBarWrap"><div id="gBar"></div></div>
+      <small id="gNote">Se actualiza con cada aporte.</small>
+    </div>
+    <ul class="goals" id="goalList"></ul>
+  </section>
+
+  <!-- ===== VIDEOS ===== -->
+  <section id="videos">
+    <p class="kicker">Escúchame</p>
+    <h2>Mis canciones y covers</h2>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tabOriginal" aria-selected="true" aria-controls="panelOriginal">Mis canciones<span class="c" id="cOriginal"></span></button>
+      <button class="tab" role="tab" id="tabCover" aria-selected="false" aria-controls="panelCover">Covers<span class="c" id="cCover"></span></button>
+    </div>
+    <div id="panelOriginal" role="tabpanel" aria-labelledby="tabOriginal"><div class="grid" id="gridOriginal"></div></div>
+    <div id="panelCover" role="tabpanel" aria-labelledby="tabCover" hidden><div class="grid" id="gridCover"></div></div>
+  </section>
+
+  <!-- ===== HISTORIA ===== -->
+  <section id="historia">
+    <div class="story">
+      <div id="storyPhoto"><div class="ph">Tu foto<br>(foto.jpg)</div></div>
+      <div>
+        <p class="kicker">Quién soy</p>
+        <h2>Hola, soy Lau</h2>
+        <p class="soft">Llevo 18 años como ingeniero de software en Costa Rica, convirtiendo ideas abstractas en sistemas que funcionan. Pero detrás del código siempre hubo otra arquitectura que me obsesionaba en silencio: la música. Escribo letras y poemas, y estudié por mi cuenta armonía y contrapunto, de Haydn y Mozart a Stravinsky y Debussy.</p>
+        <p class="soft">Hoy la teoría y el oído analítico ya no me alcanzan. Quiero dejar de ser el arquitecto que diseña la estructura desde afuera y convertirme en el intérprete que la habita desde adentro. A mis 45 años empiezo en serio: canto, guitarra, piano y teoría aplicada.</p>
+        <p class="soft">Cada aporte va directo a clases, tutorías y equipo de práctica. A cambio, voy a documentar el proceso sin filtros: avances, errores y las canciones que vayan naciendo.</p>
+        <details class="more" id="moreStory">
+          <summary>Leer mi historia completa</summary>
+          <p class="soft">Durante mucho tiempo, la música fue para mí un territorio de exploración intelectual y experimental. Incluso encontré la forma de cruzar mis dos mundos: empecé a producir música asistida por inteligencia artificial y a crear un servicio donde ayudo a otras personas a convertir sus grabaciones de voz y sus letras en canciones con arreglos completos, de la salsa brava o la chacarera al jazz de cámara o el rock industrial.</p>
+          <p class="soft">Pero ha llegado un punto en el que la teoría, el oído analítico y las herramientas digitales ya no me alcanzan. Los videos de esta página no son eso: ahí canto y toco yo.</p>
+          <h3>¿Por qué pido tu apoyo?</h3>
+          <p class="soft">Aprender música de verdad requiere tiempo, constancia, instrumentos adecuados y buenos maestros. Con esta campaña financio mi formación: clases de técnica vocal, piano, guitarra y teoría aplicada.</p>
+          <p class="soft">No busco ser una estrella de rock ni hacer de esto un pasatiempo de fin de semana. Lo abordo con la misma disciplina y curiosidad con la que he construido cada proyecto en mi vida: desde primeros principios, entendiendo cómo funciona cada pieza para poder crear obras propias con rigor, honestidad y emoción.</p>
+          <p class="soft">Cada contribución, por pequeña que sea, va directo a horas de estudio, tutorías y equipo básico de práctica. A cambio, me comprometo a documentar este proceso sin filtros: mis avances, mis errores, las composiciones que vayan naciendo en el camino y lo que vaya aprendiendo, puesto al servicio de nuevos proyectos creativos.</p>
+          <p class="soft">Gracias por leer hasta aquí, por creer en los giros de timón a mitad del camino y por ayudarme a darle voz e instrumentos a todo lo que llevo años escribiendo y escuchando en mi cabeza.</p>
+        </details>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ===== COMPARTIR ===== -->
+  <section>
+    <h2>¿No puedes aportar ahora?</h2>
+    <p class="soft">Compartir mi música también me ayuda muchísimo.</p>
+    <div class="share">
+      <a id="shareWa" data-net="whatsapp" target="_blank" rel="noopener">WhatsApp</a>
+      <a id="shareFb" data-net="facebook" target="_blank" rel="noopener">Facebook</a>
+    </div>
+  </section>
+
+  <footer>
+    <p>Los aportes son voluntarios y se usan para mis clases y estudios de música. No es una organización benéfica.</p>
+    <p>Los covers son interpretaciones mías de canciones de otros artistas; los derechos de esas canciones son de sus autores.</p>
+  </footer>
+</div>
+
+<!-- ===== BARRA DE APOYO (siempre visible) ===== -->
+<div class="dock" role="region" aria-label="Apoyar">
+  <div class="in">
+    <div class="lbl"><b>Apóyame</b>con lo que quieras</div>
+    <div class="amts" id="amts"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var C = window.CONFIG || {};
+  var t0 = Date.now();
+  var APP = 'mi-musica';
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ---------- medición ---------- */
+  if (C.META_PIXEL_ID){
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init', C.META_PIXEL_ID); fbq('track', 'PageView');
+  }
+  var anon = (function(){
+    var k = 'mi_musica_anon', v = null;
+    try{ v = localStorage.getItem(k); }catch(e){}
+    if (!v){ v = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2,10); try{ localStorage.setItem(k, v); }catch(e){} }
+    return v;
+  })();
+  var q = new URLSearchParams(location.search);
+  var source = {
+    utm_source: q.get('utm_source') || '', utm_campaign: q.get('utm_campaign') || '', utm_content: q.get('utm_content') || '',
+    from_fb: !!q.get('fbclid') || /FBAN|FBAV|Instagram/i.test(navigator.userAgent),
+    bot: !!navigator.webdriver || /bot|crawl|spider|headless|facebookexternalhit|meta-external|lighthouse|preview/i.test(navigator.userAgent),
+    yo: (function(){ var k='mi_musica_yo'; try{ if(q.get('yo')==='1') localStorage.setItem(k,'1'); if(q.get('yo')==='0') localStorage.removeItem(k); return localStorage.getItem(k)==='1'; }catch(e){ return q.get('yo')==='1'; } })(),
+    ua: navigator.userAgent.slice(0,160)
+  };
+  function track(name, params){
+    params = params || {};
+    params.seconds_on_page = Math.round((Date.now()-t0)/1000);
+    try{ console.log('[medición]', name, params); }catch(e){}
+    try{
+      if (C.OWN_TRACKING && /^https?:/.test(location.protocol)){
+        fetch('/.netlify/functions/qer-track-event', { method:'POST', headers:{'Content-Type':'application/json'}, keepalive:true,
+          body: JSON.stringify({event:name, anonId:anon, app:APP, metadata:Object.assign({}, source, params)}) }).catch(function(){});
+      }
+    }catch(e){}
+    try{ if (window.fbq) fbq('trackCustom', name, params); }catch(e){}
+  }
+  var once = {}; function trackOnce(n,p){ if(once[n]) return; once[n]=1; track(n,p); }
+
+  /* ---------- nombre y foto ---------- */
+  if (C.NAME){ $('whoName').textContent = C.NAME; $('avatar').textContent = C.NAME.trim().charAt(0).toUpperCase(); document.title = C.NAME + ' · Ayúdame a estudiar música'; }
+  if (C.PLACE) $('whoSub').textContent = 'Canto · guitarra · piano · ' + C.PLACE;
+  if (C.PHOTO){
+    var probe = new Image();
+    probe.onload = function(){
+      var a = document.createElement('img'); a.className = 'avatar'; a.src = C.AVATAR || C.PHOTO; a.alt = ''; $('avatar').replaceWith(a);
+      var big = document.createElement('img'); big.src = C.PHOTO; big.alt = C.NAME ? 'Foto de ' + C.NAME : 'Mi foto'; big.loading = 'lazy';
+      $('storyPhoto').innerHTML = ''; $('storyPhoto').appendChild(big);
+    };
+    probe.src = C.PHOTO;
+  }
+
+  /* ---------- canción principal ---------- */
+  var vid = $('vid'), unmuteBtn = $('unmuteBtn'), soundOn = false;
+  var F = C.FEATURED || {};
+  if (F.title) $('nowPlaying').lastElementChild.textContent = 'Canción original · ' + F.title;
+  function showPlaceholder(){ $('placeholder').classList.add('show'); unmuteBtn.hidden = true; }
+  if (F.src){
+    if (F.poster) vid.poster = F.poster;
+    var s = document.createElement('source'); s.src = F.src; s.type = 'video/mp4';
+    s.addEventListener('error', showPlaceholder); vid.appendChild(s); vid.load();
+    var p0 = vid.play(); if (p0 && p0.catch) p0.catch(function(){});
+  } else showPlaceholder();
+  vid.addEventListener('playing', function(){ trackOnce('video_autoplay_start'); });
+  vid.addEventListener('loadedmetadata', function(){
+    if (vid.videoWidth && vid.videoHeight) vid.parentNode.style.setProperty('--ar', (vid.videoWidth / vid.videoHeight).toFixed(4));
+  });
+
+  function pauseOthers(except){ document.querySelectorAll('video').forEach(function(v){ if (v !== except && !v.paused) v.pause(); }); }
+  function turnSoundOn(how){
+    if (soundOn) return; soundOn = true;
+    vid.muted = false; vid.loop = false; vid.currentTime = 0; vid.controls = true;
+    pauseOthers(vid);
+    var p = vid.play(); if (p && p.catch) p.catch(function(){});
+    unmuteBtn.hidden = true; track('video_unmute', {how: how});
+  }
+  unmuteBtn.addEventListener('click', function(){ turnSoundOn('button'); });
+  document.addEventListener('click', function(e){
+    if (soundOn || $('placeholder').classList.contains('show')) return;
+    if (e.target.closest && e.target.closest('a, button, video, input, .dock, .ap-back')) return;
+    turnSoundOn('page_tap');
+  });
+  vid.addEventListener('volumechange', function(){ if (!vid.muted && !soundOn){ soundOn = true; unmuteBtn.hidden = true; track('video_unmute', {how:'controls'}); } });
+  vid.addEventListener('play', function(){ if (soundOn) pauseOthers(vid); });
+  [25,50,75,95].forEach(function(m){
+    vid.addEventListener('timeupdate', function(){
+      if (!vid.duration || !isFinite(vid.duration)) return;
+      if (vid.currentTime / vid.duration * 100 >= m) trackOnce((soundOn ? 'video_sound_' : 'video_muted_') + m, {percent:m, sound:soundOn});
+    });
+  });
+
+  /* ---------- videos: canciones y covers ---------- */
+  var vids = (C.VIDEOS || []).filter(function(v){ return v && v.src; });
+  function card(v, i){
+    var el = document.createElement('article'); el.className = 'card';
+    var video = document.createElement('video');
+    video.src = v.src + (v.poster ? '' : '#t=0.5'); video.preload = 'metadata'; video.controls = true; video.playsInline = true;
+    if (v.poster) video.poster = v.poster;
+    video.addEventListener('play', function(){ pauseOthers(video); track('song_play', {title: v.title || v.src, type: v.type}); });
+    video.addEventListener('ended', function(){ track('song_complete', {title: v.title || v.src, type: v.type}); });
+    var meta = document.createElement('div'); meta.className = 'meta';
+    meta.innerHTML = '<span class="badge ' + (v.type === 'cover' ? 'cover' : 'original') + '">' + (v.type === 'cover' ? 'Cover' : 'Original') + '</span>';
+    var b = document.createElement('b'); b.textContent = v.title || 'Sin título'; meta.appendChild(b);
+    if (v.type === 'cover' && v.artist){ var sp = document.createElement('span'); sp.textContent = 'Original de ' + v.artist; meta.appendChild(sp); }
+    el.appendChild(video); el.appendChild(meta); return el;
+  }
+  function fill(gridId, countId, type, emptyText){
+    var list = vids.filter(function(v){ return (v.type === 'cover') === (type === 'cover'); });
+    var g = $(gridId); g.innerHTML = '';
+    $(countId).textContent = list.length ? '(' + list.length + ')' : '';
+    if (!list.length){ var e = document.createElement('div'); e.className = 'empty'; e.textContent = emptyText; g.appendChild(e); g.style.gridTemplateColumns = '1fr'; return; }
+    list.forEach(function(v, i){ g.appendChild(card(v, i)); });
+  }
+  fill('gridOriginal', 'cOriginal', 'original', 'Muy pronto: más canciones mías.');
+  fill('gridCover', 'cCover', 'cover', 'Muy pronto: los covers que estoy aprendiendo.');
+  function selectTab(which){
+    var o = which === 'original';
+    $('tabOriginal').setAttribute('aria-selected', String(o)); $('tabCover').setAttribute('aria-selected', String(!o));
+    $('panelOriginal').hidden = !o; $('panelCover').hidden = o;
+    track('tab_select', {tab: which});
+  }
+  if (!vids.some(function(v){ return v.type !== 'cover'; }) && vids.some(function(v){ return v.type === 'cover'; })){
+    $('tabOriginal').setAttribute('aria-selected','false'); $('tabCover').setAttribute('aria-selected','true');
+    $('panelOriginal').hidden = true; $('panelCover').hidden = false;
+  }
+  $('tabOriginal').addEventListener('click', function(){ selectTab('original'); });
+  $('tabCover').addEventListener('click', function(){ selectTab('cover'); });
+
+  /* ---------- metas y progreso real ---------- */
+  var GOALS = (C.GOALS || []).filter(function(g){ return g && g.amount > 0; });
+  var money = function(n){ n = Math.round(n * 100) / 100; return '$' + (n % 1 ? n.toFixed(2) : n); };
+  function renderGoals(raised){
+    var left = raised, current = GOALS.length - 1, inCurrent = 0;
+    for (var i = 0; i < GOALS.length; i++){
+      if (left < GOALS[i].amount){ current = i; inCurrent = left; break; }
+      left -= GOALS[i].amount;
+      if (i === GOALS.length - 1){ current = i; inCurrent = GOALS[i].amount; }
+    }
+    var g = GOALS[current]; if (!g) return;
+    $('gTitle').textContent = g.title;
+    $('gRaised').textContent = money(inCurrent);
+    $('gAmount').textContent = money(g.amount);
+    var pct = Math.min(100, inCurrent / g.amount * 100);
+    $('gBarWrap').setAttribute('aria-valuenow', String(Math.round(pct)));
+    requestAnimationFrame(function(){ $('gBar').style.width = Math.max(pct, raised > 0 ? 2 : 0) + '%'; });
+    $('gNote').textContent = raised > 0 ? 'Se actualiza con cada aporte. ¡Gracias a quienes ya aportaron!' : 'Todavía nadie ha aportado. Puedes ser la primera persona.';
+    var ul = $('goalList'); ul.innerHTML = '';
+    GOALS.forEach(function(x, i){
+      var li = document.createElement('li'); if (i < current || (i === current && inCurrent >= x.amount)) li.className = 'done';
+      li.innerHTML = '<div class="n">' + (li.className ? '✓' : (i + 1)) + '</div><div class="t"><b></b><span></span></div><div class="a"></div>';
+      li.querySelector('b').textContent = x.title; li.querySelector('.t span').textContent = x.detail || ''; li.querySelector('.a').textContent = money(x.amount);
+      ul.appendChild(li);
+    });
+  }
+  if (!GOALS.length) $('metas').hidden = true; else renderGoals(0);
+  function loadProgress(){
+    if (!/^https?:/.test(location.protocol)) return;
+    fetch('/.netlify/functions/apoyo-progress?app=' + APP, {cache:'no-store'}).then(function(r){ return r.json(); })
+      .then(function(j){ if (GOALS.length && j && typeof j.total === 'number') renderGoals(j.total); }).catch(function(){});
+  }
+  loadProgress();
+
+  var more = $('moreStory'); if (more) more.addEventListener('toggle', function(){ if (more.open) trackOnce('story_expand'); });
+
+  /* ---------- compartir ---------- */
+  var shareUrl = C.SHARE_URL || location.href.split('#')[0].split('?')[0];
+  var shareText = 'Escucha esta canción, la escribió alguien que está aprendiendo música: ';
+  $('shareWa').href = 'https://wa.me/?text=' + encodeURIComponent(shareText + shareUrl);
+  $('shareFb').href = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(shareUrl);
+  document.querySelectorAll('.share a').forEach(function(a){ a.addEventListener('click', function(){ track('share_click', {network: a.getAttribute('data-net')}); }); });
+
+  /* ---------- barra de apoyo ---------- */
+  var amts = $('amts');
+  (C.AMOUNTS || [2,5,20]).forEach(function(a){
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'amt'; b.textContent = '$' + a;
+    b.addEventListener('click', function(){ openPay(a, 'dock_' + a); }); amts.appendChild(b);
+  });
+  var ob = document.createElement('button'); ob.type = 'button'; ob.className = 'amt other'; ob.textContent = 'Otro monto';
+  ob.addEventListener('click', function(){ openPay('other', 'dock_other'); }); amts.appendChild(ob);
+  function openPay(amount, loc){
+    track('donate_click', {location: loc, amount: amount, heard_with_sound: soundOn});
+    if (window.ApoyoPago && window.ApoyoPago.open){ window.ApoyoPago.open(loc, amount); return; }
+    if (C.PAYPAL_URL) window.open(C.PAYPAL_URL, '_blank', 'noopener');
+  }
+
+  window.APOYO_CTX = {
+    app: APP, anon: anon, track: track, fallbackUrl: C.PAYPAL_URL,
+    currency: 'USD', amounts: C.AMOUNTS || [2,5,20], defaultAmount: C.DEFAULT_AMOUNT || 5,
+    title: 'Tu aporte para mis clases',
+    shareWa: $('shareWa').href, shareFb: $('shareFb').href,
+    askSong: true,
+    thanksText: 'Tu aporte de {monto} va directo a mis clases. Cuando suba mi próximo video de avance, ahí también estará tu ayuda.',
+    onPaid: function(){ setTimeout(loadProgress, 1500); }
+  };
+
+  /* ---------- scroll y tiempo ---------- */
+  window.addEventListener('scroll', function(){
+    var d = document.documentElement, max = d.scrollHeight - innerHeight, pct = max <= 0 ? 100 : scrollY / max * 100;
+    [25,50,75,100].forEach(function(m){ if (pct >= m - 1) trackOnce('scroll_' + m, {percent:m}); });
+  }, {passive:true});
+  var visible = 0;
+  setInterval(function(){ if (document.visibilityState !== 'visible') return; visible++; [10,30,60,120,180,300].forEach(function(m){ if (visible === m) trackOnce('time_' + m + 's', {visible_seconds:m}); }); }, 1000);
+  window.addEventListener('load', function(){ track('page_ready', {screen_h: innerHeight}); });
+})();
+</script>
+<script src="/apoyo-pago.js" defer></script>
+</body>
+</html>
