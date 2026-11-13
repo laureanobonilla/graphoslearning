@@ -11,7 +11,7 @@
 <main>
   <section id="s1">
     <h1>Tu video, con subtítulos que se leen.</h1>
-    <p class="lead">Sube un video de hasta 90 segundos. Escribimos lo que dices, con tus modismos, y lo animamos palabra por palabra.</p>
+    <p class="lead">Sube un video de hasta 90 segundos. Escribimos lo que dices y lo animamos palabra por palabra.</p>
     <label class="drop" id="drop"><input type="file" id="file" accept="video/*" hidden><b>Elegir video</b><small>MP4 o MOV · máximo 90 segundos · se procesa en tu teléfono</small></label>
     <p id="err" class="err" hidden></p>
   </section>
@@ -25,17 +25,17 @@
       <div class="opts"><label>Posición <select id="pos"><option value="b">Abajo</option><option value="m">Centro</option></select></label><label>Color <input type="color" id="col" value="#ffd23f"></label></div>
       <h3>Texto <small>corrige lo que haga falta</small></h3>
       <div id="lines"></div>
-      <button id="exp" class="btn big">Descargar video</button>
-      <p class="hint" id="exph">El video sale con una marca pequeña de Rótulo. <a href="#" id="nomark">Quitar la marca</a></p><p class="hint" id="plan" hidden></p>
+      <button id="exp" class="btn big">Desbloquear y descargar</button>
+      <p class="hint" id="exph">Ver el resultado y corregir el texto es gratis. Para descargar el video elige un plan: <a href="#" id="nomark">ver precios</a></p><p class="hint" id="plan" hidden></p>
       <div class="prog" id="prog" hidden><i></i><span id="progt"></span></div>
       <a id="dl" class="btn big" hidden download>Guardar video</a>
     </div>
   </section>
 </main>
-<dialog id="dlg"><div id="pay"><h2>Sin marca de agua</h2><p class="hint" style="text-align:left">Pago único con PayPal (tarjeta o cuenta). Recibes un código para usar en este teléfono o en cualquier otro.</p>
+<dialog id="dlg"><div id="pay"><h2>Descarga tu video</h2><p class="hint" style="text-align:left">Pago único con PayPal (tarjeta o cuenta). Recibes un código para usar en este teléfono o en cualquier otro.</p>
 <div id="plans"></div><div id="pp"></div><p id="perr" class="err" hidden></p>
 <h3>¿Ya tienes un código?</h3><div class="row"><input id="cod" placeholder="ROT-XXXX-XXXX" autocapitalize="characters" autocomplete="off"><button class="btn sm" id="usecod">Usar</button></div><p id="cmsg" class="hint"></p>
 <div class="row" style="margin-top:12px"><button class="btn ghost" id="closed">Cerrar</button></div></div>
 <div id="done" hidden><h2>¡Listo, gracias!</h2><p>Este es tu código. Guárdalo: lo necesitas si cambias de teléfono.</p><p class="code" id="codeshow"></p><p class="hint" id="codeinfo"></p><div class="row"><button class="btn" id="copyc">Copiar</button><button class="btn ghost" id="closed2">Seguir</button></div></div></dialog>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=4"></script>
 </body></html>

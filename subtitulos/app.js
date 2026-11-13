@@ -1,8 +1,8 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var MAX_SEC = 90, CODE_KEY = 'rot_codigo', S = { code: '', plan: null,  lines: [], style: 'tuanis', dur: 0, file: null, url: null };
-  var STYLES = { tuanis: 'Tuanis', karaoke: 'Karaoke', pop: 'Pop', limpio: 'Limpio' };
+  var MAX_SEC = 90, CODE_KEY = 'rot_codigo', S = { code: '', plan: null,  lines: [], style: 'impacto', dur: 0, file: null, url: null };
+  var STYLES = { impacto: 'Impacto', karaoke: 'Karaoke', pop: 'Pop', limpio: 'Limpio' };
   function fmt(t) { t = Math.max(0, t); return Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2); }
   function err(m) { var e = $('err'); e.textContent = m || ''; e.hidden = !m; }
   function busy(on, txt) { $('s2').hidden = false; $('busy').hidden = !on; if (txt) $('busyt').textContent = txt; }
@@ -64,7 +64,7 @@
     var a = activeLine(t); if (!a) return; var l = a.l, st = S.style, acc = $('col').value, mid = $('pos').value === 'm';
     var fs = Math.round(H * (st === 'pop' ? 0.085 : st === 'limpio' ? 0.04 : 0.05)); c.font = '900 ' + fs + 'px ' + FONT; c.textBaseline = 'middle'; c.lineJoin = 'round';
     var wi = -1; l.t.forEach(function (w, i) { if (t >= w.s - 0.02) wi = i; });
-    var words = l.t.map(function (w) { var s = w.w; return st === 'tuanis' || st === 'pop' ? s.toUpperCase() : s; });
+    var words = l.t.map(function (w) { var s = w.w; return st === 'impacto' || st === 'pop' ? s.toUpperCase() : s; });
     var maxW = W * 0.88;
     if (st === 'pop') {   // una palabra a la vez, con rebote al aparecer
       var w = l.t[Math.max(0, wi)], age = Math.max(0, t - w.s), k = age < 0.14 ? 0.7 + 3 * age * 2.1 : 1 + Math.max(0, 0.06 - (age - 0.14) * 0.3), txt = words[Math.max(0, wi)];
@@ -81,12 +81,12 @@
       row.forEach(function (it) {
         var on = it.i === wi && st !== 'limpio'; c.textAlign = 'left';
         if (st === 'karaoke' && on) { c.fillStyle = acc; rr(c, x - fs * 0.12, y - lh * 0.44, it.w + fs * 0.24, lh * 0.88, fs * 0.25); c.fill(); }
-        if (st === 'tuanis') { c.lineWidth = fs * 0.2; c.strokeStyle = '#000'; c.strokeText(it.s, x, y); }
+        if (st === 'impacto') { c.lineWidth = fs * 0.2; c.strokeStyle = '#000'; c.strokeText(it.s, x, y); }
         c.fillStyle = st === 'karaoke' ? (on ? '#1a1200' : '#fff') : st === 'limpio' ? '#fff' : (on ? acc : '#fff'); c.fillText(it.s, x, y); x += it.w + sp;
       });
     });
   }
-  function mark(c, W, H) { var fs = Math.round(H * 0.026); c.font = '800 ' + fs + 'px ' + FONT; c.textAlign = 'right'; c.textBaseline = 'top'; c.fillStyle = 'rgba(255,255,255,.75)'; c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = 4; c.fillText('Rótulo', W - fs * 0.8, fs * 0.8); c.shadowBlur = 0; }
+  function previewMark(c, W, H) { var fs = Math.round(H * 0.045); c.save(); c.translate(W / 2, H / 2); c.rotate(-0.45); c.font = '800 ' + fs + 'px ' + FONT; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = 'rgba(255,255,255,.22)'; c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 2; for (var y = -H; y <= H; y += fs * 3.2) for (var x = -W; x <= W; x += fs * 9) { c.strokeText('Rótulo · vista previa', x + ((y / (fs * 3.2)) % 2 ? fs * 4.5 : 0), y); c.fillText('Rótulo · vista previa', x + ((y / (fs * 3.2)) % 2 ? fs * 4.5 : 0), y); } c.restore(); }
 
   // ---------- vista previa ----------
   var vid = $('vid'), ov = $('ov'), oc = ov.getContext('2d');
@@ -95,7 +95,7 @@
   var lastLn = -1;
   function loop() {
     oc.clearRect(0, 0, ov.width, ov.height);
-    if (!$('editor').hidden) { var b = videoBox(ov.width, ov.height); oc.save(); oc.translate(b.x, b.y); oc.beginPath(); oc.rect(0, 0, b.w, b.h); oc.clip(); drawCaps(oc, b.w, b.h, vid.currentTime); oc.restore();
+    if (!$('editor').hidden) { var b = videoBox(ov.width, ov.height); oc.save(); oc.translate(b.x, b.y); oc.beginPath(); oc.rect(0, 0, b.w, b.h); oc.clip(); drawCaps(oc, b.w, b.h, vid.currentTime); if (!(S.plan && S.plan.ok)) { oc.save(); oc.translate(b.x, b.y); previewMark(oc, b.w, b.h); oc.restore(); } oc.restore();
       $('clock').textContent = fmt(vid.currentTime) + ' / ' + fmt(S.dur); var a = activeLine(vid.currentTime), i = a ? a.i : -1; if (i !== lastLn) { var o = document.querySelector('.ln.on'); if (o) o.classList.remove('on'); if (i >= 0) { var n = $('ln' + i); if (n) { n.classList.add('on'); } } lastLn = i; } }
     requestAnimationFrame(loop);
   }
@@ -106,7 +106,7 @@
   // ---------- flujo ----------
   function pick(f) {
     err(''); if (!f) return; if (f.size > 250 * 1048576) return err('El archivo pesa demasiado (máximo 250 MB).');
-    S.file = f; if (S.url) URL.revokeObjectURL(S.url); S.url = URL.createObjectURL(f); vid.src = S.url; vid.muted = true;
+    S.file = f; S.spent = false; if (S.url) URL.revokeObjectURL(S.url); S.url = URL.createObjectURL(f); vid.src = S.url; vid.muted = true;
     $('s1').hidden = true; busy(true, 'Leyendo tu video…'); $('editor').hidden = true;
     vid.onloadedmetadata = function () {
       S.dur = vid.duration; if (!isFinite(S.dur) || S.dur < 1) return fail('No pude leer este video.');
@@ -127,7 +127,7 @@
 
   // ---------- exportar (todo ocurre en el navegador) ----------
   function pickMime() { var c = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']; for (var i = 0; i < c.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; return ''; }
-  $('exp').onclick = function () {
+  function doExport() {
     if (!window.MediaRecorder) return err('Tu navegador no puede exportar video. Prueba con Chrome o Safari actualizado.');
     vid.pause(); $('exp').disabled = true; $('dl').hidden = true; $('prog').hidden = false; $('progt').textContent = 'Preparando…';
     var v = document.createElement('video'); v.src = S.url; v.playsInline = true; v.preload = 'auto';
@@ -141,16 +141,25 @@
         var type = (rec.mimeType || mime || 'video/webm').split(';')[0], blob = new Blob(chunks, { type: type }), a = $('dl'); a.href = URL.createObjectURL(blob); a.download = 'rotulo-video.' + (type.indexOf('mp4') >= 0 ? 'mp4' : 'webm'); a.textContent = 'Guardar video (' + (blob.size / 1048576).toFixed(1) + ' MB)'; a.hidden = false;
         $('prog').hidden = true; $('exp').disabled = false; try { ac.close(); } catch (e) {} track('rot_exported', { style: S.style, mime: type });
       };
-      var draw = function () { c.drawImage(v, 0, 0, W, H); drawCaps(c, W, H, v.currentTime); if (!(S.plan && S.plan.ok)) mark(c, W, H); var p = v.currentTime / (v.duration || 1); $('prog').firstElementChild.style.width = (p * 100) + '%'; $('progt').textContent = 'Creando tu video… ' + Math.round(p * 100) + ' %'; if (!v.ended) requestAnimationFrame(draw); };
+      var draw = function () { c.drawImage(v, 0, 0, W, H); drawCaps(c, W, H, v.currentTime); var p = v.currentTime / (v.duration || 1); $('prog').firstElementChild.style.width = (p * 100) + '%'; $('progt').textContent = 'Creando tu video… ' + Math.round(p * 100) + ' %'; if (!v.ended) requestAnimationFrame(draw); };
       v.onended = function () { setTimeout(function () { rec.stop(); }, 250); };
       ac.resume().then(function () { rec.start(500); v.currentTime = 0; return v.play(); }).then(function () { requestAnimationFrame(draw); }).catch(function () { rec.state !== 'inactive' && rec.stop(); err('No se pudo exportar en este navegador.'); $('exp').disabled = false; $('prog').hidden = true; });
     };
+  };
+
+  // Descargar exige un plan con saldo. El servidor descuenta UN video por descarga (rot-exportar); re-exportar el mismo video con otro estilo no vuelve a cobrar.
+  $('exp').onclick = function () {
+    err(''); if (!(S.plan && S.plan.ok)) return openPay();
+    if (S.spent) return doExport();
+    $('exp').disabled = true;
+    post('rot-exportar', { codigo: S.code }).then(function (d) { S.spent = true; S.plan.restantes = d.restantes; S.plan.ok = true; showPlan(); doExport(); })
+      .catch(function (e) { $('exp').disabled = false; if (e.data) { S.plan = null; showPlan(); } err(e.message || 'No se pudo autorizar la descarga.'); openPay(); });
   };
   // ---------- cobro: planes, PayPal y códigos ----------
   function post(fn, body) { return fetch('/.netlify/functions/' + fn, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(function (r) { return r.json().then(function (j) { if (!r.ok) { var e = new Error(j.error || 'Error'); e.data = j; throw e; } return j; }); }); }
   function showPlan() {
     var p = S.plan, el = $('plan'), has = p && p.ok;
-    $('exph').hidden = !!has; el.hidden = !has;
+    $('exph').hidden = !!has; el.hidden = !has; $('exp').textContent = has ? 'Descargar video' : 'Desbloquear y descargar';
     if (has) el.textContent = (p.tipo === 'mensual' ? 'Plan mensual activo' : 'Paquete activo') + ' · ' + p.restantes + ' video' + (p.restantes === 1 ? '' : 's') + ' disponible' + (p.restantes === 1 ? '' : 's') + (p.vence ? ' · vence el ' + new Date(p.vence).toLocaleDateString('es-CR') : '');
   }
   function useCode(code, quiet) {
