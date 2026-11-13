@@ -40,6 +40,8 @@ window.CONFIG = {
 
   // Aportes (en dólares)
   AMOUNTS: [2, 5, 20],
+  // Lo que se ve debajo de cada monto en la barra de apoyo
+  AMOUNT_LABELS: { 2: "una cuerda", 5: "media clase de canto", 20: "una clase completa" },
   DEFAULT_AMOUNT: 5,
   PAYPAL_URL: "https://www.paypal.com/ncp/payment/X3B3MDTZP8DFS",  // respaldo si el botón de PayPal no carga
 
@@ -58,7 +60,7 @@ window.CONFIG = {
     --radius:16px;
     --serif:"Fraunces", Georgia, serif;
     --sans:"DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --bar-h:76px;
+    --bar-h:104px;
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
@@ -174,15 +176,19 @@ window.CONFIG = {
   /* ---------- Barra de apoyo SIEMPRE visible ---------- */
   .dock{position:fixed; left:0; right:0; bottom:0; z-index:20; background:rgba(18,16,20,.94); backdrop-filter:blur(10px);
     border-top:1px solid rgba(233,168,76,.35); padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
-  .dock .in{max-width:760px; margin:0 auto; display:flex; align-items:center; gap:8px}
-  .dock .lbl{font-size:13px; line-height:1.2; color:var(--ink-soft); flex:0 0 auto; max-width:74px}
-  .dock .lbl b{display:block; color:var(--ink); font-size:14px}
-  .dock .amts{flex:1; display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
-  .amt{border:0; border-radius:12px; min-height:50px; font:inherit; font-weight:700; font-size:18px; cursor:pointer;
+  .dock .in{max-width:760px; margin:0 auto}
+  .dock .lbl{font-size:13px; line-height:1.2; color:var(--ink-soft); margin:0 2px 7px}
+  .dock .lbl b{color:var(--ink)}
+  .dock .amts{display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
+  .amt{border:0; border-radius:12px; min-height:58px; padding:6px 4px; font:inherit; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px;
     background:linear-gradient(180deg,var(--gold-hi),var(--gold)); color:var(--gold-ink); box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
-  .amt.other{background:rgba(255,255,255,.06); color:var(--ink); border:1px solid rgba(245,191,106,.45); font-size:13px; line-height:1.15; box-shadow:none}
+  .amt .v{font-weight:700; font-size:19px; line-height:1.1}
+  .amt .w{font-size:11px; line-height:1.15; font-weight:500; opacity:.85}
+  .amt.other{background:rgba(255,255,255,.06); color:var(--ink); border:1px solid rgba(245,191,106,.45); box-shadow:none}
+  .amt.other .v{font-size:14px}
   .amt:active{transform:translateY(1px)}
-  @media (min-width:640px){ .dock .lbl{max-width:none} }
+  @media (min-width:640px){ .amt .w{font-size:12px} }
 
   @media (prefers-reduced-motion:reduce){ .unmute span{animation:none} .bar > div{transition:none} }
 </style>
@@ -283,7 +289,7 @@ window.CONFIG = {
 <!-- ===== BARRA DE APOYO (siempre visible) ===== -->
 <div class="dock" role="region" aria-label="Apoyar">
   <div class="in">
-    <div class="lbl"><b>Apóyame</b>con lo que quieras</div>
+    <div class="lbl"><b>Apóyame</b> con lo que quieras:</div>
     <div class="amts" id="amts"></div>
   </div>
 </div>
@@ -493,10 +499,14 @@ window.CONFIG = {
   /* ---------- barra de apoyo ---------- */
   var amts = $('amts');
   (C.AMOUNTS || [2,5,20]).forEach(function(a){
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'amt'; b.textContent = '$' + a;
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'amt';
+    var lab = (C.AMOUNT_LABELS || {})[a];
+    b.innerHTML = '<span class="v"></span>' + (lab ? '<span class="w"></span>' : '');
+    b.querySelector('.v').textContent = '$' + a; if (lab) b.querySelector('.w').textContent = lab;
+    b.setAttribute('aria-label', 'Aportar $' + a + (lab ? ' (' + lab + ')' : ''));
     b.addEventListener('click', function(){ openPay(a, 'dock_' + a); }); amts.appendChild(b);
   });
-  var ob = document.createElement('button'); ob.type = 'button'; ob.className = 'amt other'; ob.textContent = 'Otro monto';
+  var ob = document.createElement('button'); ob.type = 'button'; ob.className = 'amt other'; ob.innerHTML = '<span class="v">Otro monto</span><span class="w">tú eliges</span>';
   ob.addEventListener('click', function(){ openPay('other', 'dock_other'); }); amts.appendChild(ob);
   function openPay(amount, loc){
     track('donate_click', {location: loc, amount: amount, heard_with_sound: soundOn});
