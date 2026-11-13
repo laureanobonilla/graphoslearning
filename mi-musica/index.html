@@ -19,25 +19,24 @@
 window.CONFIG = {
   NAME: "Lau",
   PLACE: "Costa Rica",
-  PHOTO: "foto.jpg",            // por ahora, un cuadro de «Estrellas chocan»; cámbiala por tu foto
+  PHOTO: "foto.jpg",
+  AVATAR: "avatar.jpg",
 
   // Canción que suena primero (arriba de todo)
-  FEATURED: { src: "primera.mp4", poster: "primera.jpg", title: "Estrellas chocan" },
+  FEATURED: { src: "primera.mp4", poster: "primera.jpg", title: "" },   // PENDIENTE: título de esta canción
 
   // Tus videos. type: "original" o "cover". Para covers pon también el artista original.
   VIDEOS: [
-    { src: "videos/original-1.mp4", poster: "videos/original-1.jpg", title: "Canción original", type: "original" },  // PENDIENTE: título
+    { src: "videos/original-1.mp4", poster: "videos/original-1.jpg", title: "Estrellas Chocan", type: "original" },
     { src: "videos/cover-1.mp4", poster: "videos/cover-1.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
     { src: "videos/cover-2.mp4", poster: "videos/cover-2.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
-    { src: "videos/cover-3.mp4", poster: "videos/cover-3.jpg", title: "The Man Who…", artist: "", type: "cover" },  // PENDIENTE: título completo y artista
+    { src: "videos/cover-3.mp4", poster: "videos/cover-3.jpg", title: "The Man Who Sold the World", artist: "David Bowie", type: "cover" },
   ],
 
   // Metas de estudio, en orden. La barra de progreso suma los aportes reales.
-  GOALS: [
-    { title: "Clases de canto",   detail: "8 clases con un profesor de técnica vocal",          amount: 160 },  // PENDIENTE: precio real
-    { title: "Guitarra y piano",  detail: "Un curso de 3 meses para tocar y cantar a la vez",   amount: 240 },  // PENDIENTE
-    { title: "Teoría musical",    detail: "Aprender a leer música y componer mejor",             amount: 120 }   // PENDIENTE
-  ],
+  // Vacío = la sección de metas no se muestra. Para activarla, pon los precios reales, ej.:
+  // { title: "Clases de canto", detail: "8 clases con un profesor de técnica vocal", amount: 160 },
+  GOALS: [],
 
   // Aportes (en dólares)
   AMOUNTS: [2, 5, 20],
@@ -152,7 +151,7 @@ window.CONFIG = {
   /* ---------- Historia ---------- */
   .story{display:grid; gap:18px; align-items:start}
   @media (min-width:640px){ .story{grid-template-columns:220px 1fr} }
-  .story img{width:100%; aspect-ratio:4/5; object-fit:cover; border-radius:18px; box-shadow:0 0 0 1px var(--line)}
+  .story img{width:100%; aspect-ratio:4/5; object-fit:cover; object-position:72% 40%; border-radius:18px; box-shadow:0 0 0 1px var(--line)}
   .story .ph{width:100%; aspect-ratio:4/5; border-radius:18px; background:linear-gradient(160deg,#2b2033,#121014); display:flex; align-items:center; justify-content:center; color:var(--ink-faint); font-size:14px; text-align:center; padding:16px; border:1px dashed var(--line)}
 
   .more{margin-top:4px}
@@ -208,7 +207,7 @@ window.CONFIG = {
 
   <div class="hero-copy">
     <h1>De tirar líneas de código a perseguir el contrapunto. <em>Ayúdame a estudiar música.</em></h1>
-    <p class="lead">Soy Lau, ingeniero de software en Costa Rica. A mis 43 años empiezo a estudiar en serio canto, guitarra, piano y teoría. Cada aporte va directo a mis clases, y voy compartiendo aquí mi avance.</p>
+    <p class="lead">Soy Lau, ingeniero de software en Costa Rica. A mis 45 años empiezo a estudiar en serio canto, guitarra, piano y teoría. Cada aporte va directo a mis clases, y voy compartiendo aquí mi avance.</p>
   </div>
 
   <!-- ===== META ACTUAL ===== -->
@@ -242,7 +241,7 @@ window.CONFIG = {
         <p class="kicker">Quién soy</p>
         <h2>Hola, soy Lau</h2>
         <p class="soft">Llevo 18 años como ingeniero de software en Costa Rica, convirtiendo ideas abstractas en sistemas que funcionan. Pero detrás del código siempre hubo otra arquitectura que me obsesionaba en silencio: la música. Escribo letras y poemas, y estudié por mi cuenta armonía y contrapunto, de Haydn y Mozart a Stravinsky y Debussy.</p>
-        <p class="soft">Hoy la teoría y el oído analítico ya no me alcanzan. Quiero dejar de ser el arquitecto que diseña la estructura desde afuera y convertirme en el intérprete que la habita desde adentro. A mis 43 años empiezo en serio: canto, guitarra, piano y teoría aplicada.</p>
+        <p class="soft">Hoy la teoría y el oído analítico ya no me alcanzan. Quiero dejar de ser el arquitecto que diseña la estructura desde afuera y convertirme en el intérprete que la habita desde adentro. A mis 45 años empiezo en serio: canto, guitarra, piano y teoría aplicada.</p>
         <p class="soft">Cada aporte va directo a clases, tutorías y equipo de práctica. A cambio, voy a documentar el proceso sin filtros: avances, errores y las canciones que vayan naciendo.</p>
         <details class="more" id="moreStory">
           <summary>Leer mi historia completa</summary>
@@ -257,11 +256,6 @@ window.CONFIG = {
       </div>
     </div>
 
-    <div class="uses">
-      <div class="use"><b>$2</b><span>Una cuerda nueva de guitarra</span></div>
-      <div class="use"><b>$5</b><span>Media hora de clase de canto</span></div>
-      <div class="use"><b>$20</b><span>Una clase completa</span></div>
-    </div>
   </section>
 
   <!-- ===== COMPARTIR ===== -->
@@ -334,7 +328,7 @@ window.CONFIG = {
   if (C.PHOTO){
     var probe = new Image();
     probe.onload = function(){
-      var a = document.createElement('img'); a.className = 'avatar'; a.src = C.PHOTO; a.alt = ''; $('avatar').replaceWith(a);
+      var a = document.createElement('img'); a.className = 'avatar'; a.src = C.AVATAR || C.PHOTO; a.alt = ''; $('avatar').replaceWith(a);
       var big = document.createElement('img'); big.src = C.PHOTO; big.alt = C.NAME ? 'Foto de ' + C.NAME : 'Mi foto'; big.loading = 'lazy';
       $('storyPhoto').innerHTML = ''; $('storyPhoto').appendChild(big);
     };
@@ -443,11 +437,11 @@ window.CONFIG = {
       ul.appendChild(li);
     });
   }
-  renderGoals(0);
+  if (!GOALS.length) $('metas').hidden = true; else renderGoals(0);
   function loadProgress(){
     if (!/^https?:/.test(location.protocol)) return;
     fetch('/.netlify/functions/apoyo-progress?app=' + APP, {cache:'no-store'}).then(function(r){ return r.json(); })
-      .then(function(j){ if (j && typeof j.total === 'number') renderGoals(j.total); }).catch(function(){});
+      .then(function(j){ if (GOALS.length && j && typeof j.total === 'number') renderGoals(j.total); }).catch(function(){});
   }
   loadProgress();
 
