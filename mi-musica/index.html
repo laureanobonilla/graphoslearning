@@ -27,7 +27,7 @@ window.CONFIG = {
 
   // Tus videos. type: "original" o "cover". Para covers pon también el artista original.
   VIDEOS: [
-    { src: "videos/original-1.mp4", poster: "videos/original-1.jpg", title: "Estrellas Chocan", type: "original" },
+    { src: "videos/original-2.mp4", poster: "videos/original-2.jpg", title: "Canción original", type: "original" },  // PENDIENTE: título
     { src: "videos/cover-1.mp4", poster: "videos/cover-1.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
     { src: "videos/cover-2.mp4", poster: "videos/cover-2.jpg", title: "Cover en piano", artist: "", type: "cover" },  // PENDIENTE: canción y artista
     { src: "videos/cover-3.mp4", poster: "videos/cover-3.jpg", title: "The Man Who Sold the World", artist: "David Bowie", type: "cover" },
@@ -256,6 +256,12 @@ window.CONFIG = {
       </div>
     </div>
 
+    <div class="uses">
+      <div class="use"><b>$2</b><span>Una cuerda nueva de guitarra</span></div>
+      <div class="use"><b>$5</b><span>Media hora de clase de canto</span></div>
+      <div class="use"><b>$20</b><span>Una clase completa</span></div>
+    </div>
+
   </section>
 
   <!-- ===== COMPARTIR ===== -->
@@ -352,6 +358,34 @@ window.CONFIG = {
   });
 
   function pauseOthers(except){ document.querySelectorAll('video').forEach(function(v){ if (v !== except && !v.paused) v.pause(); }); }
+
+  // Segundos que cada persona escucha de verdad cada video (con sonido, sin contar saltos).
+  // Se envía al pausar, al terminar y al salir de la página: evento listen_time {video, seconds, duration}.
+  var flushers = [];
+  function watchListen(v, label, type){
+    var last = null, secs = 0, sent = 0;
+    v.addEventListener('timeupdate', function(){
+      var t = v.currentTime;
+      if (v.paused || v.muted){ last = t; return; }
+      if (last != null){ var d = t - last; if (d > 0 && d < 1.5) secs += d; }
+      last = t;
+    });
+    v.addEventListener('seeking', function(){ last = null; });
+    function flush(reason){
+      var sNow = Math.round(secs);
+      if (sNow >= 1 && sNow !== sent){
+        sent = sNow;
+        track('listen_time', { video: label, type: type, seconds: sNow, duration: Math.round(v.duration || 0),
+          percent: v.duration ? Math.min(100, Math.round(sNow / v.duration * 100)) : null, reason: reason });
+      }
+    }
+    v.addEventListener('pause', function(){ flush('pause'); });
+    v.addEventListener('ended', function(){ flush('ended'); });
+    flushers.push(flush);
+  }
+  function flushAll(reason){ flushers.forEach(function(f){ f(reason); }); }
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') flushAll('hide'); });
+  window.addEventListener('pagehide', function(){ flushAll('leave'); });
   function turnSoundOn(how){
     if (soundOn) return; soundOn = true;
     vid.muted = false; vid.loop = false; vid.currentTime = 0; vid.controls = true;
@@ -359,6 +393,7 @@ window.CONFIG = {
     var p = vid.play(); if (p && p.catch) p.catch(function(){});
     unmuteBtn.hidden = true; track('video_unmute', {how: how});
   }
+  watchListen(vid, (F.title || 'Canción principal'), 'principal');
   unmuteBtn.addEventListener('click', function(){ turnSoundOn('button'); });
   document.addEventListener('click', function(e){
     if (soundOn || $('placeholder').classList.contains('show')) return;
@@ -383,6 +418,7 @@ window.CONFIG = {
     if (v.poster) video.poster = v.poster;
     video.addEventListener('play', function(){ pauseOthers(video); track('song_play', {title: v.title || v.src, type: v.type}); });
     video.addEventListener('ended', function(){ track('song_complete', {title: v.title || v.src, type: v.type}); });
+    watchListen(video, v.title + (v.artist ? ' (' + v.artist + ')' : '') + ' · ' + v.src.split('/').pop(), v.type);
     var meta = document.createElement('div'); meta.className = 'meta';
     meta.innerHTML = '<span class="badge ' + (v.type === 'cover' ? 'cover' : 'original') + '">' + (v.type === 'cover' ? 'Cover' : 'Original') + '</span>';
     var b = document.createElement('b'); b.textContent = v.title || 'Sin título'; meta.appendChild(b);
