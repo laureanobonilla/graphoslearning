@@ -18,7 +18,9 @@
   function fmt(t) { t = Math.max(0, t); return Math.floor(t / 60) + ':' + ('0' + Math.floor(t % 60)).slice(-2); }
   function err(m) { var e = $('err'); e.textContent = m || ''; e.hidden = !m; }
   function busy(on, txt) { $('s2').hidden = false; $('busy').hidden = !on; if (txt) $('busyt').textContent = txt; }
-  function track(n, p) { try { if (window.fbq) window.fbq('trackCustom', n, p || {}); if (window.gtag) window.gtag('event', n, p || {}); } catch (e) {} }
+  var INAPP = /FBAN|FBAV|FB_IAB|Instagram|TikTok|musical_ly|Bytedance|Snapchat|Line\//i.test(navigator.userAgent || ''), seenEv = {};
+  function track(n, p) { try { if (window.fbq) window.fbq('trackCustom', n, p || {}); if (window.gtag) window.gtag('event', n, p || {}); } catch (e) {}
+    try { if (!seenEv[n]) { seenEv[n] = 1; fetch('/.netlify/functions/rot-evento', { method: 'POST', body: JSON.stringify({ e: n, app: INAPP ? 1 : 0 }), keepalive: true }).catch(function () {}); } } catch (e) {} }
 
   // ---------- 1) video -> audio 16 kHz mono (WAV) ----------
   function wavOf(f32, sr) {
@@ -146,7 +148,7 @@
     vid.onerror = function () { fail('Este formato de video no se puede abrir aquí. Prueba con MP4.'); };
   }
   function fail(m) { $('s2').hidden = true; $('s1').hidden = false; err(m); $('file').value = ''; }
-  function ready() { $('busy').hidden = true; $('editor').hidden = false; sizeOv(); renderLines(); vid.currentTime = 0.01; }
+  function ready() { track('rot_video_ready'); $('busy').hidden = true; $('editor').hidden = false; sizeOv(); renderLines(); vid.currentTime = 0.01; }
   $('file').onchange = function (e) { pick(e.target.files[0]); };
   // ---------- estilos y ajustes ----------
   var SAMPLE = { l: { t: [{ w: 'Pura', s: 0, e: 0.5 }, { w: 'vida', s: 0.5, e: 1 }, { w: 'mae', s: 1, e: 1.5 }], s: 0, e: 1.5 }, i: 0 };
@@ -237,7 +239,7 @@
   } else showPlan();
 
   // Descargar exige cuenta con saldo. El servidor descuenta UN video por descarga (rot-exportar); re-exportar el mismo video con otro estilo no vuelve a cobrar.
-  $('exp').onclick = function () {
+  $('exp').onclick = function () { track('rot_export_click');
     err('');
     if (!(S.acc && S.acc.logueado)) return openAuth('Crea tu cuenta gratis para descargar tu video.');
     if (!hasPlan()) return openPay();
@@ -252,7 +254,7 @@
   function loadPayPal(id) { if (window.paypal) return Promise.resolve(); if (ppLoad) return ppLoad; ppLoad = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(id) + '&currency=USD&components=buttons&intent=capture'; s.onload = ok; s.onerror = function () { ppLoad = null; no(new Error('load')); }; document.head.appendChild(s); }); return ppLoad; }
   // ---------- avisos y contacto ----------
   var sentRep = {};
-  function reportPay(paso, plan, msg) { var k = plan || 'x'; if (sentRep[k]) return; sentRep[k] = 1; post('rot-contacto', { tipo: 'auto', ctx: { plan: plan, paso: paso, error: msg, ua: navigator.userAgent } }).catch(function () {}); }
+  function reportPay(paso, plan, msg) { track('rot_pay_fail'); var k = plan || 'x'; if (sentRep[k]) return; sentRep[k] = 1; post('rot-contacto', { tipo: 'auto', ctx: { plan: plan, paso: paso, error: msg, ua: navigator.userAgent } }).catch(function () {}); }
   function openContact(tipo, ctx, titulo, pista) {
     var lg = S.acc && S.acc.logueado; S.ct = { tipo: tipo, ctx: ctx || {} };
     $('cth').textContent = titulo || 'Escríbenos'; $('cthint').textContent = pista || 'Te leo yo directamente y respondo a tu correo.'; $('cmsg').value = ''; $('cst').hidden = true; $('cmailw').hidden = false; $('cmail').value = lg && S.acc.email ? S.acc.email : $('cmail').value; $('csend').disabled = false; $('csend').textContent = 'Enviar';
@@ -303,5 +305,19 @@
     no.onclick = function () { box.classList.remove('on'); try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {} };
     var ua = navigator.userAgent, ios = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (ios) { go.style.display = 'none'; msg.textContent = 'En Safari toca Compartir (el cuadro con la flecha) y luego «Añadir a pantalla de inicio».'; no.textContent = 'Entendido'; show(); }
+  })();
+
+  // ---------- navegador interno de Facebook / Instagram / TikTok ----------
+  // Ahí el pago con PayPal y el acceso con Google suelen fallar (Google lo bloquea). Se avisa con claridad y se ofrece abrir el navegador de verdad.
+  track('rot_visit');
+  (function () {
+    if (!INAPP) return;
+    var box = $('inapp'), ua = navigator.userAgent || '', android = /Android/i.test(ua), link = location.origin + '/subtitulos/';
+    box.hidden = false; track('rot_inapp_banner');
+    $('inappMsg').textContent = android ? 'Estás dentro de otra app. Para que el pago y tu cuenta funcionen bien, ábrelo en Chrome.' : 'Estás dentro de otra app. Para pagar sin problemas, ábrelo en Safari: toca ••• (o el ícono de compartir) y elige "Abrir en Safari".';
+    var go = $('inappGo'); if (!android) go.style.display = 'none';
+    go.onclick = function () { track('rot_inapp_open'); location.href = 'intent://' + location.host + '/subtitulos/#Intent;scheme=https;package=com.android.chrome;end'; };
+    $('inappCopy').onclick = function () { track('rot_inapp_copy'); var b = this; function ok() { b.textContent = 'Enlace copiado'; } try { navigator.clipboard.writeText(link).then(ok, function () { window.prompt('Copia este enlace y ábrelo en tu navegador:', link); }); } catch (e) { window.prompt('Copia este enlace y ábrelo en tu navegador:', link); } };
+    var g = $('gbtn'); if (g) { g.style.display = 'none'; var o = document.querySelector('#auth .or'); if (o) o.style.display = 'none'; }
   })();
 })();
