@@ -195,7 +195,7 @@
           if (window.paypal && window.paypal.Buttons) return ok();
           var sc = document.createElement('script');
           sc.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(c.clientId) +
-            '&currency=' + CUR + '&intent=capture&components=buttons&enable-funding=card&locale=es_XC';
+            '&currency=' + CUR + '&intent=capture&components=buttons&enable-funding=card';  // sin locale: PayPal usa el idioma del navegador (es_XC da error 400)
           sc.onload = function () { (window.paypal && window.paypal.Buttons) ? ok() : no(new Error('sdk vacío')); };
           sc.onerror = function () { no(new Error('sdk no cargó')); };
           document.head.appendChild(sc);
