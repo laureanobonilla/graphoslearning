@@ -95,7 +95,7 @@
         '</div>' +
         '<label class="ap-other"><span>' + (CUR === 'EUR' ? '€' : '$') + '</span><input type="number" inputmode="decimal" min="' + MIN + '" max="' + MAX + '" step="1" placeholder="Escribe el monto" aria-label="Otro monto ' + CUR_WORD + '"></label>' +
         '<div class="ap-sum"><span>Tu aporte (' + CUR_WORD + ')</span><b class="ap-total">' + fmt(DEFAULT_AMOUNT, true) + '</b></div>' +
-        '<div class="ap-box"><div class="ap-need" aria-live="polite">Escribe arriba cuánto quieres aportar y aquí aparece el pago.</div><div class="ap-load">Cargando opciones de pago…</div><div class="ap-pp"></div></div>' +
+        '<div class="ap-box"><div class="ap-need" aria-live="polite">Toca aquí y escribe cuánto quieres aportar. Luego aparece el pago.</div><div class="ap-load">Cargando opciones de pago…</div><div class="ap-pp"></div></div>' +
         '<div class="ap-msg" aria-live="polite"></div>' +
         '<p class="ap-note">Puedes pagar con <b>tarjeta de débito o crédito sin cuenta de PayPal</b>, o con tu cuenta de PayPal. Pago seguro procesado por PayPal.</p>' +
         '<div class="ap-fallback">¿No te carga? <a class="ap-fb-link" target="_blank" rel="noopener">Abrir el pago en PayPal</a></div>' +
@@ -173,7 +173,6 @@
     if (val === 'other') {
       otherBox.classList.add('on');
       amount = Number(otherIn.value) || 0;
-      setTimeout(function () { try { otherIn.focus(); } catch (e) {} }, 50);
     } else {
       otherBox.classList.remove('on');
       amount = Number(val);
@@ -182,6 +181,7 @@
     if (!silent) track('pay_amount_select', { amount: val === 'other' ? 'other' : amount, currency: CUR });
   }
   chips.forEach(function (c) { c.addEventListener('click', function () { pick(c.getAttribute('data-amt')); }); });
+  needEl.addEventListener('click', function () { try { otherIn.focus(); } catch (e) {} });   // el toque de la persona sí puede abrir el teclado
   otherIn.addEventListener('input', function () { amount = Number(otherIn.value) || 0; showTotal(); setMsg(''); });
   otherIn.addEventListener('change', function () { if (validAmount()) { try { otherIn.blur(); } catch (e) {} }
     if (validAmount()) track('pay_amount_select', { amount: validAmount(), custom: true }); });
