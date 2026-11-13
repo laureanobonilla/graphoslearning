@@ -187,9 +187,9 @@
     if (validAmount()) track('pay_amount_select', { amount: validAmount(), custom: true }); });
 
   /* ---------- abrir / cerrar ---------- */
-  var lastFocus = null, opened = false, paid = false;
+  var lastFocus = null, opened = false, paid = false, openedAt = 0;
   function open(loc, preset) {
-    lastFocus = document.activeElement;
+    lastFocus = document.activeElement; openedAt = Date.now();
     back.hidden = false;
     requestAnimationFrame(function () { back.classList.add('on'); });
     document.documentElement.style.overflow = 'hidden';
@@ -207,7 +207,7 @@
     try { lastFocus && lastFocus.focus(); } catch (e) {}
   }
   $('.ap-x').addEventListener('click', close);
-  back.addEventListener('click', function (e) { if (e.target === back) close(); });
+  back.addEventListener('click', function (e) { if (e.target === back && Date.now() - openedAt > 800) close(); });   // un segundo toque seguido no debe cerrarla
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !back.hidden) close(); });
 
   /* ---------- PayPal ---------- */
