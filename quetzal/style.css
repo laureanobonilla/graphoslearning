@@ -1,0 +1,24 @@
+:root{--jade:#0b2a2a;--oro:#f5c542;--quetzal:#27c38a;--rojo:#e8483a;--crema:#fff6dc}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--jade);color:var(--crema);font-family:"Trebuchet MS",system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#hud{position:fixed;inset:0;pointer-events:none;padding:env(safe-area-inset-top) 16px 0}
+#hud .row{display:flex;justify-content:space-between;align-items:center;padding-top:14px}
+#score{font-size:34px;font-weight:800;color:var(--oro);text-shadow:0 2px 8px #0008}
+#lives{font-size:24px;letter-spacing:4px;color:var(--rojo);text-shadow:0 2px 6px #0008}
+#zone{margin-top:2px;font-size:14px;opacity:.85;text-shadow:0 1px 4px #000a}
+#toast{position:absolute;left:0;right:0;top:34%;text-align:center;font-size:30px;font-weight:800;color:var(--oro);text-shadow:0 3px 12px #000a;opacity:0;transition:opacity .4s}
+#toast.on{opacity:1}
+#mute{position:absolute;right:16px;bottom:calc(18px + env(safe-area-inset-bottom));pointer-events:auto;width:46px;height:46px;border-radius:50%;border:0;background:#0006;color:var(--crema);font-size:22px}
+#mute.off{opacity:.45;text-decoration:line-through}
+#flash{position:fixed;inset:0;background:var(--rojo);opacity:0;pointer-events:none;transition:opacity .35s}
+section{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;background:radial-gradient(ellipse at 50% 30%,#0b2a2acc,#04100fee)}
+section[hidden],#hud[hidden]{display:none}
+h1{font-size:64px;margin:0;color:var(--quetzal);letter-spacing:2px;text-shadow:0 0 30px #27c38a66}
+h2{font-size:40px;margin:0;color:var(--oro)}
+.sub{margin:0;font-size:20px;color:var(--oro)}
+.how{max-width:320px;line-height:1.45;opacity:.9;margin:6px 0}
+.big{font:800 24px "Trebuchet MS",system-ui,sans-serif;padding:16px 48px;border:0;border-radius:40px;background:var(--oro);color:#2a1c00;box-shadow:0 6px 0 #a47d12}
+.big:active{transform:translateY(4px);box-shadow:0 2px 0 #a47d12}
+.tilt{font-size:15px;opacity:.85}
+#best,#res{margin:0;font-size:18px;line-height:1.5}
