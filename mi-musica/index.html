@@ -188,6 +188,10 @@ window.CONFIG = {
   .amt.other{background:rgba(255,255,255,.06); color:var(--ink); border:1px solid rgba(245,191,106,.45); box-shadow:none}
   .amt.other .v{font-size:14px}
   .amt:active{transform:translateY(1px)}
+  .msgform{display:grid;gap:10px;max-width:520px;margin-top:12px}
+  .msgform textarea,.msgform input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid rgba(245,191,106,.35);border-radius:12px;color:var(--ink);font:inherit;font-size:16px;padding:12px}
+  .msgform button{border:0;border-radius:12px;padding:13px 18px;font:inherit;font-weight:700;background:linear-gradient(180deg,var(--gold-hi,#f5bf6a),var(--gold,#e9a84c));color:var(--gold-ink,#2a1a06);cursor:pointer;justify-self:start}
+  .msgst{min-height:20px;margin:0;color:#ffb4a2}.msgst.ok{color:var(--gold-hi,#f5bf6a)}
   @media (min-width:640px){ .amt .w{font-size:12px} }
 
   @media (prefers-reduced-motion:reduce){ .unmute span{animation:none} .bar > div{transition:none} }
@@ -268,6 +272,18 @@ window.CONFIG = {
       <div class="use"><b>$20</b><span>Una clase completa</span></div>
     </div>
 
+  </section>
+
+  <!-- ===== ESCRÍBEME ===== -->
+  <section id="escribeme">
+    <h2>¿Quieres decirme algo?</h2>
+    <p class="soft">Una duda, una idea o si algo no te funcionó al aportar: escríbeme y te respondo a tu correo.</p>
+    <form class="msgform" id="msgForm">
+      <textarea id="msgText" rows="4" maxlength="1500" placeholder="Tu mensaje" aria-label="Tu mensaje" required></textarea>
+      <input type="email" id="msgMail" placeholder="Tu correo (obligatorio, para responderte)" aria-label="Tu correo" autocomplete="email" required>
+      <button type="submit" id="msgBtn">Enviar</button>
+      <p class="msgst" id="msgSt" aria-live="polite"></p>
+    </form>
   </section>
 
   <!-- ===== COMPARTIR ===== -->
@@ -523,6 +539,22 @@ window.CONFIG = {
     thanksText: 'Tu aporte de {monto} va directo a mis clases. Cuando suba mi próximo video de avance, ahí también estará tu ayuda.',
     onPaid: function(){ setTimeout(loadProgress, 1500); }
   };
+
+  /* ---------- mensaje al correo del dueño ---------- */
+  (function(){
+    var f = $('msgForm'); if (!f) return;
+    f.addEventListener('submit', function(e){
+      e.preventDefault(); var t = $('msgText').value.trim(), m = $('msgMail').value.trim(), st = $('msgSt'), b = $('msgBtn');
+      if (t.length < 3) { st.className = 'msgst'; st.textContent = 'Escribe tu mensaje.'; return; }
+      b.disabled = true; st.className = 'msgst'; st.textContent = 'Enviando…';
+      fetch('/.netlify/functions/send-feedback', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ kind:'feedback', message:'['+APP+'] '+t, email:m }) })
+        .then(function(r){ return r.json().catch(function(){return {};}).then(function(j){ return {ok:r.ok, j:j}; }); })
+        .then(function(r){ b.disabled = false;
+          if (r.ok) { st.className = 'msgst ok'; st.textContent = 'Recibido, gracias. Te respondo a tu correo.'; $('msgText').value = ''; track('message_sent', {}); }
+          else st.textContent = r.j.error === 'rate_limited' ? 'Ya recibí varios mensajes tuyos. Te respondo pronto.' : 'No se pudo enviar. Revisa tu correo e inténtalo de nuevo.'; })
+        .catch(function(){ b.disabled = false; st.textContent = 'No se pudo enviar. Inténtalo de nuevo.'; });
+    });
+  })();
 
   /* ---------- scroll y tiempo ---------- */
   window.addEventListener('scroll', function(){

@@ -56,6 +56,15 @@
     '.ap-fallback{display:none;margin-top:10px;text-align:center}' +
     '.ap-fallback.on{display:block}' +
     '.ap-fallback a{color:var(--gold-hi,#f5bf6a);font-weight:700}' +
+    '.ap-box{position:relative}' +
+    '.ap-need{position:absolute;inset:0;z-index:2;display:none;align-items:center;justify-content:center;text-align:center;padding:16px;border-radius:16px;background:rgba(255,255,255,.93);color:#2a1a06;font-weight:700;font-size:16px;line-height:1.3}' +
+    '.ap-need.on{display:flex}' +
+    '.ap-help{margin-top:14px;border:1px solid var(--line,rgba(246,236,223,.18));border-radius:14px;padding:10px 12px;font-size:14px;color:var(--ink-soft,#cbbba7)}' +
+    '.ap-help-btn{background:none;border:0;color:var(--gold-hi,#f5bf6a);font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:6px 0}' +
+    '.ap-help-form{display:grid;gap:8px;margin-top:6px}.ap-help-form[hidden]{display:none}' +
+    '.ap-help-form textarea,.ap-help-form input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.05);border:1px solid var(--line,rgba(246,236,223,.18));border-radius:12px;color:var(--ink,#f6ecdf);font:inherit;font-size:16px;padding:10px 12px}' +
+    '.ap-help-form button{border:0;border-radius:12px;padding:11px 16px;font:inherit;font-weight:700;background:var(--gold,#e9a84c);color:var(--gold-ink,#2a1a06);cursor:pointer}' +
+    '.ap-help-st{min-height:18px;color:#ffb4a2}.ap-help-st.ok{color:var(--gold-hi,#f5bf6a)}' +
     '.ap-thanks{text-align:center;padding:10px 0 6px}' +
     '.ap-thanks .big{font-size:46px;line-height:1;margin-bottom:8px}' +
     '.ap-thanks p{color:var(--ink-soft,#cbbba7);margin:0 0 16px}' +
@@ -86,10 +95,12 @@
         '</div>' +
         '<label class="ap-other"><span>' + (CUR === 'EUR' ? '€' : '$') + '</span><input type="number" inputmode="decimal" min="' + MIN + '" max="' + MAX + '" step="1" placeholder="Escribe el monto" aria-label="Otro monto ' + CUR_WORD + '"></label>' +
         '<div class="ap-sum"><span>Tu aporte (' + CUR_WORD + ')</span><b class="ap-total">' + fmt(DEFAULT_AMOUNT, true) + '</b></div>' +
-        '<div class="ap-box"><div class="ap-load">Cargando opciones de pago…</div><div class="ap-pp"></div></div>' +
+        '<div class="ap-box"><div class="ap-need" aria-live="polite">Escribe arriba cuánto quieres aportar y aquí aparece el pago.</div><div class="ap-load">Cargando opciones de pago…</div><div class="ap-pp"></div></div>' +
         '<div class="ap-msg" aria-live="polite"></div>' +
         '<p class="ap-note">Puedes pagar con <b>tarjeta de débito o crédito sin cuenta de PayPal</b>, o con tu cuenta de PayPal. Pago seguro procesado por PayPal.</p>' +
         '<div class="ap-fallback">¿No te carga? <a class="ap-fb-link" target="_blank" rel="noopener">Abrir el pago en PayPal</a></div>' +
+        '<div class="ap-help"><button type="button" class="ap-help-btn">¿No pudiste aportar o tienes una duda? Escríbeme</button>' +
+          '<form class="ap-help-form" hidden><textarea rows="3" maxlength="1500" placeholder="Cuéntame qué pasó" aria-label="Tu mensaje" required></textarea><input type="email" placeholder="Tu correo (obligatorio, para responderte)" aria-label="Tu correo" autocomplete="email" required><button type="submit">Enviar</button><div class="ap-help-st" aria-live="polite"></div></form></div>' +
       '</div>' +
       '<div class="ap-thanks" hidden>' +
         '<div class="big">♡</div>' +
@@ -107,7 +118,7 @@
   var $ = function (s) { return back.querySelector(s); };
   var chips = back.querySelectorAll('.ap-chip');
   var otherBox = $('.ap-other'), otherIn = $('.ap-other input'), totalEl = $('.ap-total');
-  var msg = $('.ap-msg'), load = $('.ap-load'), fallback = $('.ap-fallback');
+  var needEl = $('.ap-need'), msg = $('.ap-msg'), load = $('.ap-load'), fallback = $('.ap-fallback');
   $('.ap-fb-link').href = ctx.fallbackUrl || '#';
   if (ctx.shareWa) $('.ap-wa').href = ctx.shareWa; else $('.ap-wa').remove();
   if (ctx.shareFb) $('.ap-fbk').href = ctx.shareFb; else $('.ap-fbk').remove();
@@ -123,6 +134,28 @@
     $('#apSong').value = ''; $('.ap-song-ok').hidden = false;
   });
 
+  /* ---------- mensajes al dueño ---------- */
+  function sendMail(message, email) {
+    return post('/.netlify/functions/send-feedback', { kind: 'feedback', message: '[' + ctx.app + '] ' + message, email: email || '' });
+  }
+  var autoSent = {};
+  function autoReport(why, extra) {   // aviso silencioso: llega aunque la persona no escriba nada
+    if (autoSent[why]) return; autoSent[why] = 1;
+    sendMail('AVISO AUTOMÁTICO: pago con problemas (' + why + ').\nMonto: ' + (validAmount() || 'sin monto') + '\nDetalle: ' + String(extra || '') + '\nNavegador: ' + navigator.userAgent.slice(0, 200)).catch(function () {});
+  }
+  var helpBtn = $('.ap-help-btn'), helpForm = $('.ap-help-form'), helpSt = $('.ap-help-st');
+  helpBtn.addEventListener('click', function () { helpForm.hidden = !helpForm.hidden; track('help_open', { from: 'pay_sheet' }); });
+  helpForm.addEventListener('submit', function (e) {
+    e.preventDefault(); var t = helpForm.querySelector('textarea').value.trim(), em = helpForm.querySelector('input').value.trim(), b = helpForm.querySelector('button');
+    if (t.length < 3) { helpSt.className = 'ap-help-st'; helpSt.textContent = 'Escribe tu mensaje.'; return; }
+    b.disabled = true; helpSt.className = 'ap-help-st'; helpSt.textContent = 'Enviando…';
+    sendMail(t + '\n\nMonto que intentaba: ' + (validAmount() || '—'), em).then(function (r) {
+      b.disabled = false;
+      if (r.ok) { helpSt.className = 'ap-help-st ok'; helpSt.textContent = 'Recibido, gracias. Te respondo a tu correo.'; helpForm.querySelector('textarea').value = ''; track('help_sent', { from: 'pay_sheet' }); }
+      else { helpSt.textContent = (r.j && r.j.error === 'rate_limited') ? 'Ya recibí varios mensajes tuyos. Te respondo pronto.' : 'No se pudo enviar. Revisa tu correo e inténtalo de nuevo.'; }
+    }).catch(function () { b.disabled = false; helpSt.textContent = 'No se pudo enviar. Inténtalo de nuevo.'; });
+  });
+
   /* ---------- monto ---------- */
   var amount = DEFAULT_AMOUNT;
   function setMsg(t, ok) { msg.textContent = t || ''; msg.classList.toggle('ok', !!ok); }
@@ -133,6 +166,7 @@
   function showTotal() {
     var n = validAmount();
     totalEl.textContent = n ? fmt(n, true) : '—';
+    needEl.classList.toggle('on', !n);
   }
   function pick(val, silent) {
     chips.forEach(function (c) { c.setAttribute('aria-pressed', String(c.getAttribute('data-amt') === String(val))); });
@@ -149,7 +183,8 @@
   }
   chips.forEach(function (c) { c.addEventListener('click', function () { pick(c.getAttribute('data-amt')); }); });
   otherIn.addEventListener('input', function () { amount = Number(otherIn.value) || 0; showTotal(); setMsg(''); });
-  otherIn.addEventListener('change', function () { if (validAmount()) track('pay_amount_select', { amount: validAmount(), custom: true }); });
+  otherIn.addEventListener('change', function () { if (validAmount()) { try { otherIn.blur(); } catch (e) {} }
+    if (validAmount()) track('pay_amount_select', { amount: validAmount(), custom: true }); });
 
   /* ---------- abrir / cerrar ---------- */
   var lastFocus = null, opened = false, paid = false;
@@ -181,7 +216,7 @@
     sdkState = 'failed';
     load.textContent = 'No pudimos cargar las opciones de pago aquí.';
     fallback.classList.add('on');
-    track('pay_sdk_failed', { reason: String(reason || '').slice(0, 120) });
+    track('pay_sdk_failed', { reason: String(reason || '').slice(0, 120) }); autoReport('no cargó PayPal', reason);
   }
   function loadButtons() {
     if (sdkState !== 'idle') return;
@@ -228,7 +263,7 @@
         return post('/.netlify/functions/apoyo-pay-capture', { app: ctx.app, anonId: ctx.anon, orderID: data.orderID })
           .then(function (r) {
             if (r.ok && r.j.ok) return done(r.j.amount);
-            track('pay_declined', { issue: r.j.issue || 'unknown' });
+            track('pay_declined', { issue: r.j.issue || 'unknown' }); autoReport('pago rechazado', (r.j.issue || '') + ' ' + (r.j.error || ''));
             setMsg(r.j.error || 'No se pudo completar el pago. Intenta de nuevo.');
             // Tarjeta rechazada: PayPal deja elegir otra forma de pago sin empezar de cero
             if (r.j.issue === 'INSTRUMENT_DECLINED' && actions && actions.restart) return actions.restart();
@@ -236,7 +271,7 @@
       },
       onCancel: function () { track('pay_cancel', { amount: validAmount() }); setMsg('Cancelaste el pago. Puedes intentarlo de nuevo cuando quieras.', true); },
       onError: function (err) {
-        track('pay_error', { message: String((err && err.message) || err || '').slice(0, 200) });
+        track('pay_error', { message: String((err && err.message) || err || '').slice(0, 200) }); autoReport('error de PayPal', (err && err.message) || err);
         if (!msg.textContent || msg.classList.contains('ok')) setMsg('Algo falló con el pago. Intenta de nuevo o usa el enlace de PayPal de abajo.');
         fallback.classList.add('on');
       }
