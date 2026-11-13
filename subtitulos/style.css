@@ -67,3 +67,7 @@ header{flex-wrap:wrap}header .tag{flex:1}#acc{font-size:13px;color:var(--mut);di
 .foot{text-align:center;padding:26px 16px 36px;font-size:13px}.foot a,.hint a{color:var(--mut)}
 #ctc textarea,#ctc input{width:100%;box-sizing:border-box;background:var(--bg);color:var(--tx);border:1px solid var(--ln);border-radius:12px;padding:12px;font:16px system-ui,sans-serif;margin-top:8px}
 #ctc textarea{resize:vertical;min-height:110px}
+
+.help{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-top:22px;padding:14px 16px;border:1.5px solid #ffd23f55;border-radius:16px;background:var(--pan)}
+.help div{display:flex;flex-direction:column;gap:2px;font-size:14px}.help b{color:var(--tx)}.help span{color:var(--mut)}
+.help .btn{flex:none;margin:0;border-color:var(--ac);color:var(--ac)}

@@ -255,11 +255,12 @@
   function reportPay(paso, plan, msg) { var k = plan || 'x'; if (sentRep[k]) return; sentRep[k] = 1; post('rot-contacto', { tipo: 'auto', ctx: { plan: plan, paso: paso, error: msg, ua: navigator.userAgent } }).catch(function () {}); }
   function openContact(tipo, ctx, titulo, pista) {
     var lg = S.acc && S.acc.logueado; S.ct = { tipo: tipo, ctx: ctx || {} };
-    $('cth').textContent = titulo || 'Escríbenos'; $('cthint').textContent = pista || 'Te leo yo directamente y respondo a tu correo.'; $('cmsg').value = ''; $('cst').hidden = true; $('cmailw').hidden = !!lg; $('csend').disabled = false; $('csend').textContent = 'Enviar';
+    $('cth').textContent = titulo || 'Escríbenos'; $('cthint').textContent = pista || 'Te leo yo directamente y respondo a tu correo.'; $('cmsg').value = ''; $('cst').hidden = true; $('cmailw').hidden = false; $('cmail').value = lg && S.acc.email ? S.acc.email : $('cmail').value; $('csend').disabled = false; $('csend').textContent = 'Enviar';
     track('rot_contact_open', { tipo: tipo }); $('ctc').showModal();
   }
   $('csend').onclick = function () {
-    var m = $('cmsg').value.trim(), st = $('cst'); if (m.length < 3) { st.hidden = false; st.className = 'err'; st.textContent = 'Escribe tu mensaje.'; return; }
+    var m = $('cmsg').value.trim(), st = $('cst'); var em = $('cmail').value.trim(); if (m.length < 3) { st.hidden = false; st.className = 'err'; st.textContent = 'Escribe tu mensaje.'; return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(em)) { st.hidden = false; st.className = 'err'; st.textContent = 'Escribe tu correo para poder responderte.'; $('cmail').focus(); return; }
     $('csend').disabled = true; $('csend').textContent = 'Enviando…'; st.hidden = true;
     var ctx = Object.assign({ ua: navigator.userAgent }, S.ct.ctx);
     post('rot-contacto', { tipo: S.ct.tipo, mensaje: m, email: $('cmail').value, ctx: ctx }).then(function () { track('rot_contact_sent', { tipo: S.ct.tipo }); $('ctform').hidden = true; $('ctok').hidden = false; })
@@ -267,8 +268,8 @@
   };
   $('ctclose').onclick = $('ctclose2').onclick = function () { $('ctc').close(); };
   $('ctc').addEventListener('close', function () { $('ctform').hidden = false; $('ctok').hidden = true; });
-  $('ayuda').onclick = function (e) { e.preventDefault(); openContact('ayuda', { paso: 'pie de página' }, 'Escríbenos', 'Dudas, problemas o ideas: cuéntame y te respondo.'); };
-  $('payhelp').onclick = function (e) { e.preventDefault(); $('dlg').close(); openContact('pago', { paso: 'pago', plan: S.plan_pick || '', error: S.lastPayErr || '' }, '¿No pudiste pagar?', 'Cuéntame qué pasó y lo resuelvo. Si ya te cobraron, dime y te abono los videos.'); };
+  document.querySelectorAll('.openhelp').forEach(function (b) { b.onclick = function () { openContact('ayuda', { paso: $('editor').hidden ? 'inicio' : 'editor' }, 'Escríbeme', 'Dudas, problemas o ideas: cuéntame y te respondo a tu correo.'); }; });
+  $('payhelp').onclick = function (e) { $('dlg').close(); openContact('pago', { paso: 'pago', plan: S.plan_pick || '', error: S.lastPayErr || '' }, '¿No pudiste pagar?', 'Cuéntame qué pasó y lo resuelvo. Si ya te cobraron, dime y te abono los videos.'); };
   function perr(m) { var e = $('perr'); e.textContent = m || ''; e.hidden = !m; }
   function openPay() {
     if (!(S.acc && S.acc.logueado)) return openAuth('Crea tu cuenta gratis para comprar.');

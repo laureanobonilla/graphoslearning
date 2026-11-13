@@ -13,6 +13,7 @@ exports.handler = async (event, context) => {
     const mensaje = String(b.mensaje || '').trim().slice(0, 3000);
     if (tipo !== 'auto' && mensaje.length < 3) return json(400, { error: 'Escribe tu mensaje.' });
     const email = isEmail(b.email) ? String(b.email).trim() : (u ? u.email : '');
+    if (tipo !== 'auto' && !email) return json(400, { error: 'Escribe tu correo para poder responderte.' });
     // tope diario por persona (cuenta o conexión); si el contador no responde, no se bloquea a nadie
     try { const n = await contar(`ct:${tipo === 'auto' ? 'a' : 'm'}:${u ? u.id : hashIp(ip)}:${today()}`, tipo === 'auto' ? 6 : 8); if (n < 0) return json(429, { error: 'Ya recibimos varios mensajes tuyos hoy. Te respondemos pronto.' }); } catch (e) { /* sigue */ }
     const c = b.ctx && typeof b.ctx === 'object' ? b.ctx : {};
