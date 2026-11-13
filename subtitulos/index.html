@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14110f">
+<title>Rótulo · subtítulos automáticos para tus videos</title>
+<meta name="description" content="Sube un video corto, Rótulo escribe los subtítulos en español y los anima. Pensado para reels, TikTok y Shorts de Costa Rica.">
+<link rel="stylesheet" href="style.css?v=1">
+</head><body>
+<header><b class="logo">Rótulo</b><span>Subtítulos para videos cortos</span></header>
+<main>
+  <section id="s1">
+    <h1>Tu video, con subtítulos que se leen.</h1>
+    <p class="lead">Sube un video de hasta 90 segundos. Escribimos lo que dices, con tus modismos, y lo animamos palabra por palabra.</p>
+    <label class="drop" id="drop"><input type="file" id="file" accept="video/*" hidden><b>Elegir video</b><small>MP4 o MOV · máximo 90 segundos · se procesa en tu teléfono</small></label>
+    <p id="err" class="err" hidden></p>
+  </section>
+  <section id="s2" hidden>
+    <div id="busy" class="busy"><i></i><span id="busyt">Preparando…</span></div>
+    <div id="editor" hidden>
+      <div class="stage" id="stage"><video id="vid" playsinline muted></video><canvas id="ov"></canvas></div>
+      <div class="bar"><button id="play" class="btn sm">▶ Ver</button><span id="clock">0:00</span></div>
+      <h3>Estilo</h3>
+      <div class="styles" id="styles"></div>
+      <div class="opts"><label>Posición <select id="pos"><option value="b">Abajo</option><option value="m">Centro</option></select></label><label>Color <input type="color" id="col" value="#ffd23f"></label></div>
+      <h3>Texto <small>corrige lo que haga falta</small></h3>
+      <div id="lines"></div>
+      <button id="exp" class="btn big">Descargar video</button>
+      <p class="hint" id="exph">El video sale con una marca pequeña de Rótulo. <a href="#" id="nomark">Quitar la marca</a></p>
+      <div class="prog" id="prog" hidden><i></i><span id="progt"></span></div>
+      <a id="dl" class="btn big" hidden download>Guardar video</a>
+    </div>
+  </section>
+</main>
+<dialog id="dlg"><form method="dialog" id="wl"><h2>Sin marca de agua</h2><p>Estamos terminando los planes. Deja tu correo y te avisamos cuando esté listo, con precio de lanzamiento.</p>
+<label class="pl"><input type="radio" name="plan" value="mensual" checked> Suscripción mensual (videos ilimitados)</label><label class="pl"><input type="radio" name="plan" value="paquete"> Paquete de videos, sin suscripción</label>
+<input type="email" id="em" placeholder="tu@correo.com" required><div class="row"><button class="btn" id="wsend" value="x">Avisarme</button><button class="btn ghost" value="c" formnovalidate>Cerrar</button></div><p id="wmsg" class="hint"></p></form></dialog>
+<script src="app.js?v=1"></script>
+</body></html>
