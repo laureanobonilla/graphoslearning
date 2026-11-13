@@ -206,6 +206,11 @@
     if (!paid) track('pay_sheet_close', { amount: validAmount() });
     try { lastFocus && lastFocus.focus(); } catch (e) {}
   }
+  // Quien se va de la página con la ventana de pago abierta (cerrar la pestaña, volver atrás, cambiar de app) no dispara «cerrar»: se registra aparte, con lo que había pasado.
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden' && !back.hidden && !paid)
+      track('pay_leave_open', { amount: validAmount(), sdk: sdkState, secs_open: Math.round((Date.now() - openedAt) / 1000), typed: !!otherIn.value, other: otherBox.classList.contains('on') });
+  });
   $('.ap-x').addEventListener('click', close);
   back.addEventListener('click', function (e) { if (e.target === back && Date.now() - openedAt > 800) close(); });   // un segundo toque seguido no debe cerrarla
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !back.hidden) close(); });
