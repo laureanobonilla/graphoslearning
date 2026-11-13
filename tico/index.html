@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#1b1230">
+<title>Travesía Tica · cultura de Costa Rica</title>
+<meta name="description" content="Cruza las siete provincias de Costa Rica en carreta respondiendo preguntas de historia, cultura y geografía. Con mapa, cronologías y música de marimba.">
+<link rel="stylesheet" href="style.css?v=1">
+</head><body>
+<canvas id="scene"></canvas>
+<div id="hud" hidden>
+  <div class="hl"><b id="score">0</b><span id="zone"></span><span id="streak"></span></div>
+  <div class="hr"><span id="lives"></span><canvas id="mini" width="200" height="190"></canvas></div>
+  <button id="mute" aria-label="Sonido">♪</button>
+</div>
+<div id="fx"></div>
+<main id="card" hidden>
+  <div id="timer"><i></i></div>
+  <div id="qhead"><span id="cat"></span><span id="comodines"><button id="c5050"></button><button id="ctime"></button></span></div>
+  <h2 id="q"></h2>
+  <div id="opts"></div>
+  <div id="extra"></div>
+  <div id="fb" hidden><b id="fbt"></b><p id="fbx"></p><button id="next" class="btn"></button></div>
+</main>
+<section id="menu" class="screen">
+  <p class="kick" id="m_sub"></p>
+  <h1 id="m_title">…</h1>
+  <p class="how" id="m_how"></p>
+  <button id="play" class="btn big" disabled></button>
+  <p id="best"></p>
+</section>
+<section id="splash" class="screen" hidden>
+  <p class="kick" id="s_n"></p><h1 id="s_name"></h1><p class="nick" id="s_nick"></p><p class="how" id="s_intro"></p><p class="dato" id="s_dato"></p>
+  <button id="go" class="btn big"></button>
+</section>
+<section id="end" class="screen" hidden>
+  <h1 id="e_title"></h1><p class="nick" id="e_rank"></p><p class="how" id="e_text"></p><p class="res" id="e_res"></p>
+  <button id="again" class="btn big"></button>
+</section>
+<script type="module" src="game.js?v=1"></script>
+</body></html>
