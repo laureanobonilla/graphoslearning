@@ -10,7 +10,7 @@
   var LEARN = document.documentElement.getAttribute('data-mode') === 'learn';   // modo idiomas: interfaz en español, texto en el idioma elegido
   var LANG = (document.documentElement.lang || 'es').slice(0, 2); if (['es', 'en', 'de', 'fr'].indexOf(LANG) < 0) LANG = 'es';
   if (LEARN) { try { LANG = localStorage.getItem('prf_target') || 'de'; } catch (e) { LANG = 'de'; } if (['en', 'de', 'fr'].indexOf(LANG) < 0) LANG = 'de'; }
-  var MAX_DEPTH = 6, MAX_TAUGHT = 2, PARTS = { beginner: 10, intermediate: 25, advanced: 65 };   // profundidad máxima y veces que se baja a una misma palabra antes de solo explicarla
+  var MAX_DEPTH = 4, MAX_TAUGHT = 2, PARTS = { beginner: 10, intermediate: 25, advanced: 65 };   // profundidad máxima y veces que se baja a una misma palabra antes de solo explicarla
   var TTS = LANG !== 'es' && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
   var LOC = { es: 'es-ES', en: 'en-US', de: 'de-DE', fr: 'fr-FR' };
 
@@ -173,9 +173,9 @@
     document.body.classList.toggle('start', !S || !S.nodes.length); if (!S || !S.nodes.length) { pile.classList.remove('on'); learnEl.classList.remove('on'); return; }
     pile.classList.add('on'); pile.appendChild(el('h3', null, T.map));
     if (S.parts && S.parts.length > 1) { var pg = el('div', 'parts'), pb = el('div', 'pbar'), pi = el('i'); pi.style.width = Math.round(S.part / S.parts.length * 100) + '%'; pb.appendChild(pi); pg.appendChild(el('b', null, S.part === S.parts.length - 1 ? T.lastPart(S.parts.length) : T.partOf(S.part + 1, S.parts.length))); pg.appendChild(pb); pile.appendChild(pg); }
-    var depth = S.stack.length, g = el('div', 'gauge'); g.setAttribute('role', 'img'); g.setAttribute('aria-label', T.depth(depth, MAX_DEPTH));
-    for (var i = 1; i <= MAX_DEPTH; i++) g.appendChild(el('i', i <= depth ? 'on' : ''));
-    pile.appendChild(g); pile.appendChild(el('div', 'gl', T.depth(depth, MAX_DEPTH) + (depth > 1 ? T.up(depth) : T.atTopic)));
+    var depth = S.stack.length, top = Math.max(MAX_DEPTH, depth), g = el('div', 'gauge'); g.setAttribute('role', 'img'); g.setAttribute('aria-label', T.depth(depth, top));   // top: recorridos guardados antes del límite de 4 pueden ir más hondo
+    for (var i = 1; i <= top; i++) g.appendChild(el('i', i <= depth ? 'on' : ''));
+    pile.appendChild(g); pile.appendChild(el('div', 'gl', T.depth(depth, top) + (depth > 1 ? T.up(depth) : T.atTopic)));
     var tree = el('div', 'tree'); (function walk(pid, lvl) { S.nodes.forEach(function (n) { if (n.parentId !== pid || (n.part || 0) !== S.part) return; var st = n.status === 'active' && S.stack.length && S.stack[S.stack.length - 1].nodeId !== n.id ? 'wait' : n.status, r = el('div', 'tn ' + st); r.style.paddingLeft = (lvl * 14) + 'px'; r.appendChild(el('span', 'mk', st === 'done' ? '✓' : st === 'active' ? '●' : st === 'wait' ? '◐' : '○')); r.appendChild(document.createTextNode(tx(n.term))); tree.appendChild(r); walk(n.id, lvl + 1); }); })(null, 0);
     pile.appendChild(tree);
     var cur = S.nodes.filter(function (n) { return (n.part || 0) === S.part; }), done = cur.filter(function (n) { return n.status === 'done'; }).length, pend = cur.filter(function (n) { return n.status !== 'done'; }).length - 1;
