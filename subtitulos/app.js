@@ -250,6 +250,25 @@
   var CFG = null, ppLoad = null;
   function cfg() { return CFG || (CFG = fetch('/.netlify/functions/rot-config').then(function (r) { return r.json(); })); }
   function loadPayPal(id) { if (window.paypal) return Promise.resolve(); if (ppLoad) return ppLoad; ppLoad = new Promise(function (ok, no) { var s = document.createElement('script'); s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(id) + '&currency=USD&components=buttons&intent=capture'; s.onload = ok; s.onerror = function () { ppLoad = null; no(new Error('load')); }; document.head.appendChild(s); }); return ppLoad; }
+  // ---------- avisos y contacto ----------
+  var sentRep = {};
+  function reportPay(paso, plan, msg) { var k = plan || 'x'; if (sentRep[k]) return; sentRep[k] = 1; post('rot-contacto', { tipo: 'auto', ctx: { plan: plan, paso: paso, error: msg, ua: navigator.userAgent } }).catch(function () {}); }
+  function openContact(tipo, ctx, titulo, pista) {
+    var lg = S.acc && S.acc.logueado; S.ct = { tipo: tipo, ctx: ctx || {} };
+    $('cth').textContent = titulo || 'Escríbenos'; $('cthint').textContent = pista || 'Te leo yo directamente y respondo a tu correo.'; $('cmsg').value = ''; $('cst').hidden = true; $('cmailw').hidden = !!lg; $('csend').disabled = false; $('csend').textContent = 'Enviar';
+    track('rot_contact_open', { tipo: tipo }); $('ctc').showModal();
+  }
+  $('csend').onclick = function () {
+    var m = $('cmsg').value.trim(), st = $('cst'); if (m.length < 3) { st.hidden = false; st.className = 'err'; st.textContent = 'Escribe tu mensaje.'; return; }
+    $('csend').disabled = true; $('csend').textContent = 'Enviando…'; st.hidden = true;
+    var ctx = Object.assign({ ua: navigator.userAgent }, S.ct.ctx);
+    post('rot-contacto', { tipo: S.ct.tipo, mensaje: m, email: $('cmail').value, ctx: ctx }).then(function () { track('rot_contact_sent', { tipo: S.ct.tipo }); $('ctform').hidden = true; $('ctok').hidden = false; })
+      .catch(function (e) { $('csend').disabled = false; $('csend').textContent = 'Enviar'; st.hidden = false; st.className = 'err'; st.textContent = e.message || 'No se pudo enviar. Inténtalo de nuevo.'; });
+  };
+  $('ctclose').onclick = $('ctclose2').onclick = function () { $('ctc').close(); };
+  $('ctc').addEventListener('close', function () { $('ctform').hidden = false; $('ctok').hidden = true; });
+  $('ayuda').onclick = function (e) { e.preventDefault(); openContact('ayuda', { paso: 'pie de página' }, 'Escríbenos', 'Dudas, problemas o ideas: cuéntame y te respondo.'); };
+  $('payhelp').onclick = function (e) { e.preventDefault(); $('dlg').close(); openContact('pago', { paso: 'pago', plan: S.plan_pick || '', error: S.lastPayErr || '' }, '¿No pudiste pagar?', 'Cuéntame qué pasó y lo resuelvo. Si ya te cobraron, dime y te abono los videos.'); };
   function perr(m) { var e = $('perr'); e.textContent = m || ''; e.hidden = !m; }
   function openPay() {
     if (!(S.acc && S.acc.logueado)) return openAuth('Crea tu cuenta gratis para comprar.');
@@ -257,15 +276,15 @@
     cfg().then(function (c) { var box = $('plans'); box.innerHTML = ''; Object.keys(c.planes).forEach(function (k) { var p = c.planes[k], b = document.createElement('button'); b.className = 'plan'; b.innerHTML = '<span><b>' + p.nombre + '</b><small>' + p.detalle + '</small></span><span class="pr">US$' + p.usd + '<small>' + (p.crc ? '≈ ₡' + String(p.crc).replace(/\B(?=(\d{3})+(?!\d))/g, '.') : 'pago único') + '</small></span>'; b.onclick = function () { choose(p, b, c); }; box.appendChild(b); }); });
   }
   function choose(p, btn, c) {
-    document.querySelectorAll('.plan').forEach(function (x) { x.classList.toggle('on', x === btn); }); perr(''); $('pp').textContent = 'Cargando el pago seguro…'; track('rot_plan_pick', { plan: p.id });
+    document.querySelectorAll('.plan').forEach(function (x) { x.classList.toggle('on', x === btn); }); perr(''); $('pp').textContent = 'Cargando el pago seguro…'; track('rot_plan_pick', { plan: p.id }); S.plan_pick = p.id;
     if (!c.paypalClientId) { $('pp').textContent = ''; return perr('El pago no está disponible ahora. Inténtalo en un rato.'); }
     loadPayPal(c.paypalClientId).then(function () {
       $('pp').innerHTML = '';
       window.paypal.Buttons({ style: { layout: 'vertical', shape: 'pill', label: 'pay', tagline: false },
-        createOrder: function () { perr(''); return post('rot-pay-create', { plan: p.id }).then(function (d) { return d.orderID; }); },
-        onApprove: function (data) { $('pp').textContent = 'Confirmando tu pago…'; return post('rot-pay-capture', { orderID: data.orderID }).then(function (d) { $('pp').textContent = ''; track('rot_paid', { plan: p.id }); return refreshAcc().then(function () { $('pay').hidden = true; $('done').hidden = false; $('doneinfo').textContent = 'Ya tienes ' + d.restantes + ' videos disponibles en tu cuenta. También te enviamos un correo de confirmación.'; }); }).catch(function (e) { $('pp').textContent = ''; perr((e.message || 'No pudimos confirmar tu pago.') + ' Si te cobraron, escríbeme con tu comprobante de PayPal y te abono los videos.'); }); },
-        onError: function () { perr('No se pudo completar el pago. No se te cobró. Inténtalo de nuevo.'); } }).render('#pp');
-    }).catch(function () { $('pp').textContent = ''; perr('No se pudo cargar PayPal. Revisa tu conexión.'); });
+        createOrder: function () { perr(''); return post('rot-pay-create', { plan: p.id }).then(function (d) { return d.orderID; }).catch(function (e) { S.lastPayErr = e.message; reportPay('crear orden', p.id, e.message); throw e; }); },
+        onApprove: function (data) { $('pp').textContent = 'Confirmando tu pago…'; return post('rot-pay-capture', { orderID: data.orderID }).then(function (d) { $('pp').textContent = ''; track('rot_paid', { plan: p.id }); return refreshAcc().then(function () { $('pay').hidden = true; $('done').hidden = false; $('doneinfo').textContent = 'Ya tienes ' + d.restantes + ' videos disponibles en tu cuenta. También te enviamos un correo de confirmación.'; }); }).catch(function (e) { $('pp').textContent = ''; S.lastPayErr = e.message; reportPay('confirmar pago', p.id, e.message); perr((e.message || 'No pudimos confirmar tu pago.') + ' Si te cobraron, escríbeme con tu comprobante de PayPal y te abono los videos.'); }); },
+        onError: function (er) { S.lastPayErr = String(er && er.message || er || ''); reportPay('PayPal error', p.id, S.lastPayErr); perr('No se pudo completar el pago. No se te cobró. Inténtalo de nuevo o cuéntanos qué pasó abajo.'); } }).render('#pp');
+    }).catch(function () { $('pp').textContent = ''; reportPay('cargar PayPal', p.id, 'no cargó el SDK'); perr('No se pudo cargar PayPal. Revisa tu conexión o cuéntanos abajo.'); });
   }
   $('nomark').onclick = function (e) { e.preventDefault(); openPay(); };
   $('closed').onclick = $('closed2').onclick = function (e) { e.preventDefault(); $('dlg').close(); };
