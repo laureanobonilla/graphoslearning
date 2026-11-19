@@ -6,9 +6,9 @@ const { json, sb, ipOf, hashIp, today, contar } = require('./rot-core');
 // >>> EDITA AQUÍ los precios, los créditos de la prueba y lo que incluye cada paquete (₡ = colones). <<<
 const TRIAL = { creditos: 8, horas: 24 };
 const PACKS = [
-    { id: 'basico', nombre: 'Básico', creditos: 30, crc: 3000, dias: 180, detalle: 'Para probar en una finca pequeña.' },
-    { id: 'finca', nombre: 'Finca', creditos: 100, crc: 7500, dias: 180, detalle: 'El más usado. Cada cálculo sale a ₡75.' },
-    { id: 'asesor', nombre: 'Asesor o cooperativa', creditos: 300, crc: 18000, dias: 365, detalle: 'Para quien calcula para varios productores. Sale a ₡60.' }
+    { id: 'siempre', nombre: 'Para siempre', permanente: true, crc: 15000, detalle: 'Pague una vez y úselo siempre, sin límite de cálculos.' },
+    { id: 'basico', nombre: 'Por uso: 30 créditos', creditos: 30, crc: 3000, dias: 180, detalle: 'Para ir probando con poco. Sale a ₡100 por cálculo.' },
+    { id: 'finca', nombre: 'Por uso: 100 créditos', creditos: 100, crc: 7500, dias: 180, detalle: 'Sale a ₡75 por cálculo.' }
 ];
 const SINPE = () => ({ numero: process.env.AGRO_SINPE_NUMBER || process.env.QER_SINPE_NUMBER || '8777-2993', nombre: process.env.AGRO_SINPE_NAME || process.env.QER_SINPE_NAME || 'Laureano Bonilla' });
 const WHATSAPP = () => String(process.env.AGRO_WHATSAPP || '').replace(/\D/g, '');   // opcional: 506XXXXXXXX. Si está vacío, el botón no aparece
@@ -37,14 +37,16 @@ function normCode(s) {
 }
 const MOTIVOS = {
     no_existe: 'Ese código no existe o ya no está activo. Revise que lo escribió igual que se lo enviaron.',
-    vencido: 'Su código ya venció. Si le sirvió, escríbame y se lo recargo.',
-    sin_creditos: 'Se le acabaron los créditos. Si le sirvió, escríbame y se lo recargo; lo que le sobre no se pierde.'
+    vencido: 'Su código ya venció. Si le sirvió, compre el programa para siempre o recargue y le reactivo todo.',
+    sin_creditos: 'Se le acabaron los créditos. Si le sirvió, compre el programa para siempre o recargue; lo que le sobre no se pierde.',
+    demasiado_uso: 'Hoy se hicieron demasiados cálculos con este código (más de 150 en 24 horas). Intente mañana o escríbame.'
 };
 async function estadoDe(codigo) {
-    const rows = await sb(`/rest/v1/agro_codigos?codigo=eq.${encodeURIComponent(codigo)}&select=tipo,creditos,usados,vence,activo`);
+    const rows = await sb(`/rest/v1/agro_codigos?codigo=eq.${encodeURIComponent(codigo)}&select=tipo,creditos,usados,vence,activo,ilimitado`);
     const r = rows && rows[0]; if (!r || !r.activo) return null;
+    if (r.ilimitado) return { tipo: 'pago', ilimitado: true, creditos: null, usados: r.usados, restantes: null, vence: null, vencido: false };
     const venceMs = r.vence ? new Date(r.vence).getTime() : null;
-    return { tipo: r.tipo, creditos: r.creditos, usados: r.usados, restantes: Math.max(0, r.creditos - r.usados), vence: r.vence || null, vencido: venceMs != null && venceMs <= Date.now() };
+    return { tipo: r.tipo, ilimitado: false, creditos: r.creditos, usados: r.usados, restantes: Math.max(0, r.creditos - r.usados), vence: r.vence || null, vencido: venceMs != null && venceMs <= Date.now() };
 }
 // Protección contra adivinar códigos: tope de intentos fallidos por conexión y día.
 async function falloDeCodigo(event) {

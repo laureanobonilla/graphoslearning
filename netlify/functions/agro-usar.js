@@ -14,10 +14,11 @@ exports.handler = async (event) => {
     try { r = Number(await sb('/rest/v1/rpc/agro_gastar', { method: 'POST', body: JSON.stringify({ p_codigo: codigo, p_herramienta: herr }) })); }
     catch (e) { console.error('[agro-usar] gastar', e.message); return json(502, { error: 'No se pudo revisar el código. Intente de nuevo; no se le cobró nada.' }); }
     if (r < 0) {
-        const motivo = r === -2 ? 'vencido' : r === -3 ? 'sin_creditos' : 'no_existe';
+        const motivo = r === -2 ? 'vencido' : r === -3 ? 'sin_creditos' : r === -4 ? 'demasiado_uso' : 'no_existe';
         if (motivo === 'no_existe' && await falloDeCodigo(event)) return json(429, { error: 'Demasiados intentos. Intente más tarde o escríbame.' });
         return json(r === -1 ? 404 : 402, { motivo, error: MOTIVOS[motivo] });
     }
     let estado = null; try { estado = await estadoDe(codigo); } catch (e) { /* el resultado ya está pagado: se entrega igual */ }
-    return json(200, { resultado, restantes: r, vence: estado ? estado.vence : null, creditos: estado ? estado.creditos : null });
+    const ilim = estado ? !!estado.ilimitado : r === 999999;
+    return json(200, { resultado, ilimitado: ilim, restantes: ilim ? null : r, vence: estado ? estado.vence : null, creditos: estado ? estado.creditos : null });
 };

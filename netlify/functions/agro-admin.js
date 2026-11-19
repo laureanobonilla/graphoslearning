@@ -13,11 +13,16 @@ exports.handler = async (event) => {
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Solicitud inválida' }); }
     try {
         if (b.accion === 'listar') {
-            const rows = await sb('/rest/v1/agro_codigos?select=codigo,nota,tipo,creditos,usados,vence,activo,creado,ultimo_uso,recargas&order=creado.desc&limit=300');
+            const rows = await sb('/rest/v1/agro_codigos?select=codigo,nota,tipo,creditos,usados,vence,activo,creado,ultimo_uso,recargas,ilimitado&order=creado.desc&limit=300');
             return json(200, { codigos: rows || [], packs: PACKS, trial: TRIAL });
         }
         if (b.accion === 'crear') {
-            const tipo = b.tipo === 'pago' ? 'pago' : 'prueba';
+            const tipo = b.tipo === 'pago' ? 'pago' : 'prueba', perm = b.permanente === true;
+            if (perm) {   // licencia para siempre: sin créditos ni vencimiento
+                let cod = newCode(); for (let i = 0; i < 3; i++) { const ex = await sb(`/rest/v1/agro_codigos?codigo=eq.${cod}&select=codigo`); if (!ex || !ex.length) break; cod = newCode(); }
+                await sb('/rest/v1/agro_codigos', { method: 'POST', body: JSON.stringify({ codigo: cod, nota: txt(b.nota, 120), tipo: 'pago', creditos: 0, vence: null, ilimitado: true }) });
+                return json(200, { ok: true, codigo: cod, ilimitado: true });
+            }
             const creditos = Math.round(Number(b.creditos)), nd = Number(b.dias);
             if (!(creditos >= 1 && creditos <= 5000)) throw new Err('Créditos: entre 1 y 5000.');
             if (!(nd > 0 && nd <= 1000)) throw new Err('Días de vigencia: entre 0,04 y 1000.');
@@ -27,7 +32,12 @@ exports.handler = async (event) => {
         }
         if (b.accion === 'recargar') {
             const codigo = normCode(b.codigo), creditos = Math.round(Number(b.creditos)), nd = Number(b.dias);
-            if (!codigo) throw new Err('Código inválido.'); if (!(creditos >= 1 && creditos <= 5000)) throw new Err('Créditos: entre 1 y 5000.'); if (!(nd > 0 && nd <= 1000)) throw new Err('Días: entre 0,04 y 1000.');
+            if (!codigo) throw new Err('Código inválido.');
+            if (b.permanente === true) {   // «Para siempre»: se activa la licencia permanente en su mismo código
+                const ex = await sb(`/rest/v1/agro_codigos?codigo=eq.${codigo}&select=recargas`); if (!ex || !ex[0]) throw new Err('Ese código no existe.', 404);
+                await sb(`/rest/v1/agro_codigos?codigo=eq.${codigo}`, { method: 'PATCH', body: JSON.stringify({ ilimitado: true, vence: null, activo: true, tipo: 'pago', recargas: (ex[0].recargas || 0) + 1 }) });
+                return json(200, { ok: true, codigo, ilimitado: true });
+            } if (!(creditos >= 1 && creditos <= 5000)) throw new Err('Créditos: entre 1 y 5000.'); if (!(nd > 0 && nd <= 1000)) throw new Err('Días: entre 0,04 y 1000.');
             const rows = await sb(`/rest/v1/agro_codigos?codigo=eq.${codigo}&select=creditos,usados,vence,recargas`); const c = rows && rows[0]; if (!c) throw new Err('Ese código no existe.', 404);
             // Lo que le sobraba NO se pierde: se suman los créditos nuevos a los que le quedaban y se renueva la vigencia.
             const nuevoVence = new Date(Math.max(Date.now() + nd * 86400000, c.vence ? new Date(c.vence).getTime() : 0)).toISOString();

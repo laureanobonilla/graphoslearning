@@ -74,3 +74,5 @@ table{width:100%;border-collapse:collapse;font-size:16px}th,td{padding:7px 4px;t
 @media(min-width:520px){.two{grid-template-columns:1fr 1fr}}
 @media(prefers-reduced-motion:no-preference){.res{animation:in .25s ease-out}@keyframes in{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}}
 @media print{header.top,.tabs,form,.pay,.btn,.copy{display:none!important}body{background:#fff;color:#000}}
+
+.pack.best{border-width:3px;background:var(--campo)}.tag{display:inline-block;font:700 14px/1 Barlow,sans-serif;font-style:normal;background:var(--sol);color:#14261a;border:2px solid var(--tinta);border-radius:6px;padding:3px 7px;margin-bottom:4px}.pay.hot .pack{background:var(--blanco)}

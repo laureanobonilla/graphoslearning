@@ -10,20 +10,30 @@ create table if not exists agro_codigos (
   activo boolean not null default true,
   creado timestamptz not null default now(),
   ultimo_uso timestamptz,
-  recargas int not null default 0                      -- cuántas veces pagó y se le recargó
+  recargas int not null default 0,                     -- cuántas veces pagó y se le recargó
+  ilimitado boolean not null default false             -- licencia permanente: sin límite de créditos y sin vencimiento
 );
+alter table agro_codigos add column if not exists ilimitado boolean not null default false;   -- por si ya había creado la tabla antes
 alter table agro_codigos enable row level security;    -- sin políticas: solo las funciones de Netlify (clave de servicio) entran
 create table if not exists agro_usos (id bigserial primary key, codigo text not null, herramienta text not null, creado timestamptz not null default now());
 alter table agro_usos enable row level security;
 create index if not exists agro_usos_codigo on agro_usos (codigo, creado desc);
 
 -- Gasta UN crédito de forma atómica (dos cálculos a la vez no pueden pasarse del límite).
--- Devuelve: créditos que le quedan (>= 0)  |  -1 código no existe o desactivado  |  -2 vencido  |  -3 sin créditos
+-- Con licencia permanente no gasta créditos, pero hay un tope de uso justo por día (150 cálculos) para frenar códigos compartidos o scripts.
+-- Devuelve: créditos que le quedan (>= 0; 999999 si es permanente)  |  -1 no existe o desactivado  |  -2 vencido  |  -3 sin créditos  |  -4 demasiado uso hoy
 create or replace function agro_gastar(p_codigo text, p_herramienta text) returns int language plpgsql security definer as $$
-declare c agro_codigos%rowtype;
+declare c agro_codigos%rowtype; hoy int;
 begin
   select * into c from agro_codigos where codigo = upper(trim(p_codigo)) for update;
   if not found or not c.activo then return -1; end if;
+  if c.ilimitado then
+    select count(*) into hoy from agro_usos where codigo = c.codigo and creado > now() - interval '1 day';
+    if hoy >= 150 then return -4; end if;
+    update agro_codigos set usados = usados + 1, ultimo_uso = now() where codigo = c.codigo;
+    insert into agro_usos (codigo, herramienta) values (c.codigo, left(coalesce(p_herramienta,''), 20));
+    return 999999;
+  end if;
   if c.vence is not null and c.vence <= now() then return -2; end if;
   if c.usados >= c.creditos then return -3; end if;
   update agro_codigos set usados = usados + 1, ultimo_uso = now() where codigo = c.codigo;
