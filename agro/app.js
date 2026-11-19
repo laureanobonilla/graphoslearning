@@ -36,66 +36,21 @@
         salir.classList.remove('hide');
     }
 
-    // ---------- pago ----------
-    function packsHtml(sel) {
-        var uno = function (p) {
-            return '<label class="pack' + (p.permanente ? ' best' : '') + '"><input type="radio" name="pack" value="' + h(p.id) + '"' + (p.id === sel ? ' checked' : '') + '><span>' + (p.permanente ? '<em class="tag">Recomendado</em>' : '') + '<b>' + h(p.nombre) + '</b><small>' + h(p.detalle) + '</small></span><span class="pr">' + money(p.crc) + '</span></label>';
-        };
-        var perm = S.cfg.packs.filter(function (p) { return p.permanente; }), uso = S.cfg.packs.filter(function (p) { return !p.permanente; });
-        return perm.map(uno).join('') + (uso.length ? '<p class="sub" style="margin:14px 0 0">¿Prefiere ir de a poco? Pague solo por uso:</p>' + uso.map(uno).join('') : '');
+    // ---------- contacto (los precios y pagos se tratan por WhatsApp, no en la app) ----------
+    function waBtn(texto, label, cls) {
+        var wa = S.cfg && S.cfg.whatsapp;
+        return wa ? '<a class="btn ' + (cls || 'sol') + '" style="margin-top:12px" target="_blank" rel="noopener" href="https://wa.me/' + h(wa) + '?text=' + encodeURIComponent(texto) + '">' + h(label) + '</a>' : '';
     }
-    var packLabel = function (p) { return p.nombre + ' · ' + money(p.crc); };
-    function payHtml(hot, intro) {
-        var c = S.cfg, wa = c.whatsapp;
-        return '<section class="card pay' + (hot ? ' hot' : '') + '" id="pagar"><h2>' + (hot ? 'Siga usándolo' : 'Compre el programa') + '</h2>' +
-            '<p>' + (intro || '<b>Pague una vez y le sirve siempre</b>, sin límite de cálculos. No tiene que esperar a que se acabe la prueba: puede pagar cuando quiera, y si prefiere créditos, los que le sobren se suman.') + '</p>' +
-            '<div id="packs">' + packsHtml('siempre') + '</div>' +
-            '<ol class="steps"><li>Haga un SINPE Móvil por el monto del paquete al <b id="sinpeNum">' + h(c.sinpe.numero) + '</b> a nombre de ' + h(c.sinpe.nombre) + ' <button class="btn ghost sm" type="button" id="copiarSinpe">Copiar número</button></li>' +
-            '<li>Mándeme el comprobante' + (wa ? ' por WhatsApp o llene el aviso de abajo' : ' con el aviso de abajo') + '.</li>' +
-            '<li>Le activo su mismo código y le aviso.</li></ol>' +
-            '<form id="fPago" novalidate><label for="pn">Su nombre</label><input id="pn" autocomplete="name" maxlength="80">' +
-            '<label for="pc">Su WhatsApp o correo</label><input id="pc" inputmode="email" autocomplete="tel" maxlength="120">' +
-            '<label for="pk">Número del comprobante <span class="hint">Opcional, si ya hizo el SINPE.</span></label><input id="pk" maxlength="60" inputmode="numeric">' +
-            '<p class="err hide" id="pe" role="alert"></p><p class="ok hide" id="po" role="status"></p>' +
-            '<button class="btn' + (hot ? '' : ' sol') + '" type="submit" style="margin-top:14px;' + (hot ? 'background:#14261a;color:#fff' : '') + '">Avisar que pagué o quiero pagar</button>' +
-            (wa ? '<a class="btn ghost" id="waPago" style="margin-top:10px" target="_blank" rel="noopener" href="#">Escribir por WhatsApp</a>' : '') + '</form></section>';
-    }
-    function wirePay() {
-        var f = $('#fPago'); if (!f) return;
-        var pack = function () { var r = $('input[name=pack]:checked'); return S.cfg.packs.filter(function (p) { return p.id === (r && r.value); })[0] || S.cfg.packs[0]; };
-        var wa = $('#waPago');
-        var upd = function () { if (wa) { var p = pack(); wa.href = 'https://wa.me/' + S.cfg.whatsapp + '?text=' + encodeURIComponent('Hola, quiero pagar: ' + p.nombre + ' (' + money(p.crc) + ')' + (S.code ? '. Mi código es ' + S.code : '') + '.'); } };
-        upd(); $('#packs').addEventListener('change', upd);
-        $('#copiarSinpe').addEventListener('click', function () { var b = this, n = $('#sinpeNum').textContent; (navigator.clipboard ? navigator.clipboard.writeText(n) : Promise.reject()).then(function () { b.textContent = 'Copiado'; }, function () { b.textContent = n; }); });
-        f.addEventListener('submit', function (ev) {
-            ev.preventDefault(); var e = $('#pe'), o = $('#po'), btn = f.querySelector('button[type=submit]'); e.classList.add('hide'); o.classList.add('hide'); btn.disabled = true; var p = pack();
-            api('agro-pedir', { tipo: 'pago', nombre: $('#pn').value, contacto: $('#pc').value, comprobante: $('#pk').value, codigo: S.code, paquete: packLabel(p), ua: UA }).then(function (j) {
-                btn.disabled = false; if (j.ok) { o.textContent = 'Listo, recibí su aviso. Apenas vea el pago le recargo el código y le escribo.'; o.classList.remove('hide'); } else { e.textContent = j.error || 'No se pudo enviar.'; e.classList.remove('hide'); }
-            });
-        });
-    }
-    function goPay() { var el = $('#pagar'); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
 
     // ---------- pantalla de entrada ----------
     function gate(msg) {
         S.est = null; paintChip();
-        var t = S.cfg.trial;
         root.innerHTML = '<section class="hero"><h1>Cuánto mezclar y a cuánto vender.</h1><p class="lead">Dos cuentas que en el campo se hacen mal o se hacen a ojo, resueltas en el celular.</p>' +
             '<div class="two"><div class="card mini"><span class="ic">1</span><div><h3>Mezcla de fumigación</h3><p class="sub">Cuántos mL o gramos echar en cada bomba y cuántas bombas necesita para su lote.</p></div></div>' +
             '<div class="card mini"><span class="ic">2</span><div><h3>Costos y precio mínimo</h3><p class="sub">A qué precio no pierde, a cuánto le conviene vender y qué pasa si el precio baja.</p></div></div></div></section>' +
             '<section class="card" id="tengo"><h2>Ya tengo mi código</h2><form id="fCod" novalidate><label for="cod" class="hide">Código</label><input id="cod" placeholder="AG-XXXX-XXXX" autocapitalize="characters" autocomplete="off" maxlength="20" style="text-transform:uppercase"><p class="err ' + (msg ? '' : 'hide') + '" id="ce" role="alert">' + h(msg || '') + '</p><button class="btn" type="submit" style="margin-top:12px">Entrar</button></form></section>' +
-            '<section class="card"><h2>Pruébela gratis ' + (t.horas === 24 ? 'por 1 día' : 'por ' + t.horas + ' horas') + '</h2><p>Escríbame y le doy un código con ' + t.creditos + ' créditos para probarlo. Si le sirve, compra el programa una sola vez y es suyo para siempre; no tiene que esperar a que se acabe la prueba.</p>' +
-            '<form id="fPrueba" novalidate><label for="n1">Su nombre</label><input id="n1" autocomplete="name" maxlength="80"><label for="c1">Su WhatsApp o correo</label><input id="c1" inputmode="email" autocomplete="tel" maxlength="120"><label for="m1">¿Qué cultivo trabaja? <span class="hint">Opcional.</span></label><input id="m1" maxlength="120">' +
-            '<p class="err hide" id="e1" role="alert"></p><p class="ok hide" id="o1" role="status"></p><button class="btn sol" type="submit" style="margin-top:14px">Pedir mi código de prueba</button>' + (S.cfg.whatsapp ? '<a class="btn ghost" style="margin-top:10px" target="_blank" rel="noopener" href="https://wa.me/' + S.cfg.whatsapp + '?text=' + encodeURIComponent('Hola, quiero probar las calculadoras de Cuentas de finca.') + '">Pedirla por WhatsApp</a>' : '') + '</form></section>' +
-            '' + payHtml(false, '<b>Pague una vez y le sirve siempre.</b> Si ya la probó y quiere comprarla, haga el SINPE y avíseme aquí. Si todavía no tiene código, pida la prueba primero.');
+            '<section class="card"><h2>¿Todavía no tiene código?</h2><p>Escríbame por WhatsApp y le doy uno para que pruebe las calculadoras.</p>' + (S.cfg.whatsapp ? waBtn('Hola, quiero probar las calculadoras de Cuentas de finca.', 'Escribir por WhatsApp') : '<p class="sub">Pídale el código a quien le compartió esta página.</p>') + '</section>';
         $('#fCod').addEventListener('submit', function (ev) { ev.preventDefault(); entrar($('#cod').value); });
-        $('#fPrueba').addEventListener('submit', function (ev) {
-            ev.preventDefault(); var e = $('#e1'), o = $('#o1'), btn = ev.target.querySelector('button[type=submit]'); e.classList.add('hide'); o.classList.add('hide'); btn.disabled = true;
-            api('agro-pedir', { tipo: 'prueba', nombre: $('#n1').value, contacto: $('#c1').value, mensaje: 'Cultivo: ' + ($('#m1').value || '—'), ua: UA }).then(function (j) {
-                btn.disabled = false; if (j.ok) { o.textContent = 'Listo. Le escribo pronto con su código de prueba.'; o.classList.remove('hide'); } else { e.textContent = j.error || 'No se pudo enviar.'; e.classList.remove('hide'); }
-            });
-        });
-        wirePay();
     }
     function entrar(raw) {
         var codigo = String(raw || '').trim(); if (!codigo) return gate('Escriba su código.');
@@ -107,33 +62,26 @@
     // ---------- pantalla de trabajo ----------
     function nudge() {
         var e = S.est; if (e.ilimitado) return '';
-        var out = e.vencido || e.restantes <= 0, low = e.restantes <= 2, prueba = e.tipo === 'prueba', perm = S.cfg.packs.filter(function (p) { return p.permanente; })[0];
-        var cta = perm ? 'Comprar para siempre · ' + money(perm.crc) : 'Ver precios';
-        if (out) return payHtml(true, e.vencido ? 'Su código venció. <b>Compre el programa una vez y le sirve siempre</b>, o recargue créditos: lo que le sobró se suma.' : 'Se le acabaron los créditos. <b>Compre el programa una vez y le sirve siempre</b>, o recargue créditos en su mismo código.');
-        if (prueba || e.restantes <= 5) return '<section class="card flat"><p style="margin:0">' + (prueba ? '<b>Está en la prueba gratis</b> (' + h(venceTxt(e.vence)) + '). Si le sirve, <b>compre el programa una vez y le sirve siempre</b>; no espere a que se acabe.' : '<b>Le quedan pocos créditos.</b> Pase a <b>Para siempre</b> y no se preocupe más por límites.') + '</p><button class="btn' + (low ? ' sol' : ' ghost') + ' sm" style="margin-top:10px" type="button" id="verPaq">' + h(cta) + '</button></section>';
+        if (e.vencido || e.restantes <= 0) return '<section class="card flat"><p style="margin:0"><b>' + (e.vencido ? 'Su código venció.' : 'Se le acabaron los créditos.') + '</b> Escríbame por WhatsApp para que siga usándolo.</p>' + waBtn('Hola, mi código es ' + S.code + ' y quiero seguir usando Cuentas de finca.', 'Escribir por WhatsApp') + '</section>';
         return '';
     }
     function app() {
         paintChip();
         root.innerHTML = '<div class="tabs" role="tablist"><button role="tab" id="t-mezcla" aria-selected="' + (S.tab === 'mezcla') + '">Mezcla de fumigación</button><button role="tab" id="t-costos" aria-selected="' + (S.tab === 'costos') + '">Costos y precio</button></div>' +
-            '<div id="tool"></div><div id="nudge">' + nudge() + '</div><div id="payslot">' + (S.est.ilimitado || S.est.vencido || S.est.restantes <= 0 ? '' : payHtml(false)) + '</div><p class="note">Los resultados son una ayuda de cálculo. En fumigación, la dosis, el equipo de protección y los días de espera antes de cosechar son los que dice la etiqueta del producto y su asistente técnico.</p>';
+            '<div id="tool"></div><div id="nudge">' + nudge() + '</div><p class="note">Los resultados son una ayuda de cálculo. En fumigación, la dosis, el equipo de protección y los días de espera antes de cosechar son los que dice la etiqueta del producto y su asistente técnico.</p>';
         $('#t-mezcla').onclick = function () { S.tab = 'mezcla'; S.last = null; app(); }; $('#t-costos').onclick = function () { S.tab = 'costos'; S.last = null; app(); };
-        wireVerPaq();
         if (S.tab === 'mezcla') formMezcla(); else formCostos();
-        wirePay();
     }
-    function wireVerPaq() { var vp = $('#verPaq'); if (vp) vp.onclick = function () { var slot = $('#payslot'); if (!$('#pagar')) { slot.innerHTML = payHtml(false); wirePay(); } goPay(); }; }
     function done(j, onOk) {
         var btn = $('#go'); if (btn) btn.disabled = false; var e = $('#err');
         if (j.__status === 200) {
             S.est.vencido = false;
             if (j.ilimitado) { S.est.ilimitado = true; S.est.restantes = null; } else { S.est.restantes = j.restantes; if (j.vence) S.est.vence = j.vence; if (j.creditos != null) S.est.creditos = j.creditos; }
-            paintChip(); onOk(j.resultado); $('#nudge').innerHTML = nudge(); wireVerPaq();
-            if (!S.est.ilimitado && S.est.restantes <= 0) { $('#payslot').innerHTML = ''; wirePay(); }
+            paintChip(); onOk(j.resultado); $('#nudge').innerHTML = nudge();
             return;
         }
         e.textContent = j.error || 'No se pudo calcular.'; e.classList.remove('hide');
-        if (j.motivo === 'vencido' || j.motivo === 'sin_creditos') { S.est.vencido = j.motivo === 'vencido'; if (j.motivo === 'sin_creditos') S.est.restantes = 0; paintChip(); $('#nudge').innerHTML = nudge(); $('#payslot').innerHTML = ''; wirePay(); setTimeout(goPay, 100); }
+        if (j.motivo === 'vencido' || j.motivo === 'sin_creditos') { S.est.vencido = j.motivo === 'vencido'; if (j.motivo === 'sin_creditos') S.est.restantes = 0; paintChip(); $('#nudge').innerHTML = nudge(); var nd = $('#nudge'); if (nd.scrollIntoView) nd.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
         if (j.motivo === 'no_existe') { LS.del('agro_code'); gate(j.error); }
     }
     function copyBtns(texto) {
