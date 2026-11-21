@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#8e5568">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <title>Música de la misa - Kari & Lau</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #8e5568; --primary-hover: #754353; --primary-light: #f3ecef; --accent: #dfad76; --bg: #fcf8f8; --card: #fff; --text: #2b2527; --muted: #756e71; --border: #ebd7de; --good: #3f8a4f; --shadow: 0 10px 30px -5px rgba(142, 85, 104, .08); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; padding: 1.5rem 1rem 3rem; }
+        .wrap { max-width: 1180px; margin: 0 auto; }
+        a.back { display: inline-block; color: var(--primary); font-weight: 600; text-decoration: none; margin-bottom: 1rem; padding: .4rem .2rem; }
+        h1 { font-family: 'Playfair Display', serif; font-size: clamp(1.9rem, 4.5vw, 2.5rem); font-weight: 600; }
+        .lead { color: var(--muted); margin: .4rem 0 1.2rem; line-height: 1.5; max-width: 62ch; }
+        .bar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1rem; }
+        .bar label { font-size: .8rem; font-weight: 600; color: var(--muted); }
+        select, input[type=text], input[type=url], input[type=number], textarea { font: inherit; font-size: .95rem; color: var(--text); background: #faf6f7; border: 1px solid var(--border); border-radius: 10px; padding: .6rem .75rem; width: 100%; min-height: 44px; }
+        select { width: auto; }
+        select:focus, input:focus, textarea:focus { outline: none; border-color: var(--primary); background: #fff; box-shadow: 0 0 0 4px rgba(142, 85, 104, .1); }
+        button { font: inherit; cursor: pointer; }
+        .btn { background: var(--primary); color: #fff; border: 0; border-radius: 10px; padding: .65rem 1.1rem; font-weight: 600; min-height: 44px; box-shadow: 0 4px 12px rgba(142, 85, 104, .2); }
+        .btn:hover { background: var(--primary-hover); }
+        .btn.ghost { background: #fff; color: var(--primary); border: 1px solid var(--border); box-shadow: none; }
+        .btn:disabled { opacity: .6; cursor: default; }
+        .status { font-size: .8rem; color: var(--muted); margin-left: auto; display: flex; align-items: center; gap: 6px; }
+        .dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; } .dot.on { background: #5bb361; } .dot.busy { background: #e09f3e; }
+
+        .table { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); overflow: hidden; }
+        .grid { display: grid; grid-template-columns: minmax(250px, 1.5fr) 130px minmax(170px, 1fr) 96px 96px 110px 44px; gap: 14px; align-items: start; padding: 14px 16px; }
+        .head { background: var(--primary-light); border-bottom: 1px solid var(--border); font-size: .78rem; font-weight: 700; color: var(--primary); align-items: center; }
+        .head button { background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 6px 0; min-height: 36px; }
+        .head button[aria-pressed=true]::after { content: attr(data-dir); margin-left: 4px; }
+        .item { border-top: 1px solid var(--border); }
+        .item:first-of-type { border-top: 0; }
+        .cell label { display: none; font-size: .72rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+        .titulo { font-weight: 600; margin-bottom: 8px; }
+        .media video { width: 100%; max-height: 340px; background: #000; border-radius: 10px; display: block; }
+        .media .ig { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+        .media iframe { width: 100%; max-width: 330px; height: 480px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+        .media a.open { color: var(--primary); font-weight: 600; word-break: break-all; }
+        .price { position: relative; } .price span { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; } .price input { padding-left: 26px; }
+        input[type=number] { text-align: center; padding-left: .4rem; padding-right: .4rem; }
+        .gen { text-align: center; padding-top: 4px; }
+        .gen b { display: block; font-family: 'Playfair Display', serif; font-size: 1.9rem; line-height: 1.1; color: var(--primary); }
+        .gen small { color: var(--muted); font-size: .72rem; }
+        .gen.top b { color: var(--good); }
+        .del { background: none; border: 0; color: var(--muted); font-size: 1.3rem; border-radius: 8px; min-height: 44px; min-width: 44px; }
+        .del:hover { color: #c94a4a; background: rgba(201, 74, 74, .08); }
+        .empty { padding: 2.5rem 1rem; text-align: center; color: var(--muted); font-style: italic; }
+        .note { font-size: .85rem; color: var(--muted); margin-top: 1rem; line-height: 1.5; max-width: 80ch; }
+
+        .add { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: var(--shadow); padding: 1.25rem; margin-top: 1.5rem; }
+        .add h2 { font-family: 'Playfair Display', serif; font-size: 1.35rem; margin-bottom: .8rem; }
+        .tabs { display: flex; gap: 8px; margin-bottom: .8rem; }
+        .tabs button { flex: 1; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: .6rem; font-weight: 600; color: var(--muted); min-height: 44px; }
+        .tabs button[aria-selected=true] { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+        .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+        .add label.l { display: block; font-size: .78rem; font-weight: 700; color: var(--muted); margin: 12px 0 4px; }
+        .msg { margin-top: 10px; font-size: .9rem; } .msg.err { color: #c0392b; } .msg.ok { color: var(--good); }
+        .prog { height: 8px; border-radius: 99px; background: var(--primary-light); overflow: hidden; margin-top: 10px; } .prog i { display: block; height: 100%; width: 0; background: var(--primary); transition: width .2s; }
+
+        @media (max-width: 860px) {
+            .head { display: none; }
+            .grid { grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+            .grid .c-media, .grid .c-extra { grid-column: 1 / -1; }
+            .grid .c-price { grid-column: 1 / 3; } .grid .c-gen { grid-column: 3; grid-row: auto; }
+            .cell label { display: block; }
+            .grid .c-del { grid-column: 1 / -1; justify-self: end; }
+            .frow { grid-template-columns: 1fr; }
+        }
+        :focus-visible { outline: 3px solid rgba(142, 85, 104, .45); outline-offset: 2px; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <a class="back" href="./">← Volver a los pendientes</a>
+    <h1>Música de la misa 🎻</h1>
+    <p class="lead">Escuchen cada opción, pongan su nota del 1 al 10 y el precio. La nota general se calcula sola: pesa 70 % el promedio de Kari y Lau, y 30 % qué tan barata es frente a las demás. Todo se puede editar.</p>
+
+    <div class="bar">
+        <label for="orden">Ordenar por</label>
+        <select id="orden">
+            <option value="general">Puntuación general</option>
+            <option value="precio">Precio</option>
+            <option value="nota_k">Puntuación Karina</option>
+            <option value="nota_l">Puntuación Laureano</option>
+        </select>
+        <button class="btn ghost" id="dir" type="button" aria-label="Cambiar dirección del orden">Mayor a menor ↓</button>
+        <div class="status"><span class="dot" id="dot"></span><span id="st">Conectando…</span></div>
+    </div>
+
+    <div class="table" role="table" aria-label="Opciones de música para la misa">
+        <div class="grid head" role="row">
+            <div role="columnheader">Video o enlace</div>
+            <button type="button" role="columnheader" data-k="precio">Precio (₡)</button>
+            <div role="columnheader">Instrumentación extra</div>
+            <button type="button" role="columnheader" data-k="nota_k">Karina (1-10)</button>
+            <button type="button" role="columnheader" data-k="nota_l">Laureano (1-10)</button>
+            <button type="button" role="columnheader" data-k="general">General</button>
+            <div></div>
+        </div>
+        <div id="rows"><div class="empty">Cargando opciones…</div></div>
+    </div>
+    <p class="note">La nota general usa el precio solo si al menos dos opciones tienen precio; una opción sin precio se califica solo con las notas. Si solo uno de los dos ha puesto nota, cuenta esa. El orden se actualiza al tocar «Ordenar por» o un encabezado.</p>
+
+    <section class="add" aria-labelledby="addT">
+        <h2 id="addT">Agregar otra opción</h2>
+        <div class="tabs" role="tablist">
+            <button type="button" role="tab" id="tabV" aria-selected="true">Subir un video</button>
+            <button type="button" role="tab" id="tabL" aria-selected="false">Pegar un enlace</button>
+        </div>
+        <form id="fAdd" novalidate>
+            <label class="l" for="aT">Nombre <span style="font-weight:400">(opcional)</span></label>
+            <input type="text" id="aT" maxlength="120" placeholder="Ej.: Cuarteto de cuerdas">
+            <div id="pV"><label class="l" for="aF">Video (hasta 50 MB)</label><input type="file" id="aF" accept="video/*"></div>
+            <div id="pL" hidden><label class="l" for="aU">Enlace (Instagram, YouTube, etc.)</label><input type="url" id="aU" placeholder="https://"></div>
+            <div class="frow"><div><label class="l" for="aP">Precio (₡) <span style="font-weight:400">(opcional)</span></label><input type="text" id="aP" inputmode="numeric" placeholder="150.000"></div><div><label class="l" for="aE">Instrumentación extra <span style="font-weight:400">(opcional)</span></label><input type="text" id="aE" maxlength="300" placeholder="Ej.: arpa, órgano"></div></div>
+            <div class="prog" id="prog" hidden><i></i></div>
+            <p class="msg" id="aMsg" role="status"></p>
+            <button class="btn" id="aGo" type="submit" style="margin-top:12px">Agregar a la tabla</button>
+        </form>
+    </section>
+</div>
+
+<script>
+const API = '/.netlify/functions/boda-musica';
+let rows = [], orden = [], busy = 0, sort = { k: 'general', dir: -1 };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const miles = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const parsePrecio = (v) => { const t = String(v || '').replace(/[\s.₡]/g, '').replace(',', '.'); return t === '' ? null : Number(t); };
+function setStatus(kind, t) { $('#dot').className = 'dot ' + kind; $('#st').textContent = t; }
+
+async function call(body) {
+    busy++; setStatus('busy', 'Guardando…');
+    try {
+        const r = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw Object.assign(new Error(j.error || 'http'), { code: j.error });
+        if (j.rows) rows = j.rows;
+        setStatus('on', 'Guardado'); return j;
+    } catch (e) { setStatus('', 'Error de conexión'); throw e; } finally { busy--; }
+}
+
+// ----- nota general -----
+function generales() {
+    const ps = rows.map((r) => r.precio).filter((p) => p != null), lo = Math.min(...ps), hi = Math.max(...ps), usaPrecio = ps.length >= 2 && hi > lo;
+    const out = new Map();
+    for (const r of rows) {
+        const n = [r.nota_k, r.nota_l].filter((x) => x != null);
+        if (!n.length) { out.set(r.id, null); continue; }
+        const prom = n.reduce((a, b) => a + b, 0) / n.length;
+        out.set(r.id, usaPrecio && r.precio != null ? prom * 0.7 + 10 * ((hi - r.precio) / (hi - lo)) * 0.3 : prom);
+    }
+    return out;
+}
+const fmt = (g) => g == null ? '—' : g.toFixed(1).replace('.', ',');
+
+// ----- orden -----
+function ordenadas() {
+    const gen = generales(), val = (r) => sort.k === 'general' ? gen.get(r.id) : r[sort.k];
+    return rows.slice().sort((a, b) => {
+        const x = val(a), y = val(b);
+        if (x == null && y == null) return a.id - b.id;
+        if (x == null) return 1; if (y == null) return -1;   // lo que no tiene dato va al final
+        return (x - y) * sort.dir || a.id - b.id;
+    });
+}
+function reordenar() { orden = ordenadas().map((r) => r.id); }
+function enOrden() { const m = new Map(rows.map((r) => [r.id, r])); const a = orden.filter((id) => m.has(id)).map((id) => m.get(id)); const vistos = new Set(a.map((r) => r.id)); return a.concat(rows.filter((r) => !vistos.has(r.id))); }
+function pintarOrden() {
+    $('#orden').value = sort.k;
+    $('#dir').textContent = sort.k === 'precio' ? (sort.dir > 0 ? 'Menor a mayor ↑' : 'Mayor a menor ↓') : (sort.dir > 0 ? 'Menor a mayor ↑' : 'Mayor a menor ↓');
+    document.querySelectorAll('.head button').forEach((b) => { const on = b.dataset.k === sort.k; b.setAttribute('aria-pressed', on); b.dataset.dir = sort.dir > 0 ? '↑' : '↓'; });
+}
+function setSort(k) { if (k === sort.k) sort.dir *= -1; else sort = { k, dir: k === 'precio' ? 1 : -1 }; pintarOrden(); reordenar(); render(); }   // precio: lo más barato primero
+
+// ----- tabla -----
+function mediaHtml(r) {
+    if (r.tipo === 'video') return `<video controls preload="metadata" playsinline src="${esc(r.url)}"></video>`;
+    const m = r.url.match(/instagram\.com\/(?:reel|p)\/([\w-]+)/);
+    return `<div class="ig"><a class="open" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))} ↗</a>${m ? `<button class="btn ghost" type="button" data-embed="${esc(m[1])}">Ver aquí mismo</button>` : ''}</div>`;
+}
+function render() {
+    const box = $('#rows'), gen = generales(), list = enOrden(), max = Math.max(...[...gen.values()].filter((v) => v != null));
+    if (!list.length) { box.innerHTML = '<div class="empty">Todavía no hay opciones. ¡Agreguen la primera abajo!</div>'; return; }
+    box.innerHTML = list.map((r) => { const g = gen.get(r.id); return `
+    <div class="grid item" data-id="${r.id}" role="row">
+        <div class="cell c-media" role="cell"><input class="titulo" data-f="titulo" type="text" maxlength="120" value="${esc(r.titulo)}" aria-label="Nombre de la opción"><div class="media">${mediaHtml(r)}</div></div>
+        <div class="cell c-price" role="cell"><label>Precio (₡)</label><div class="price"><span>₡</span><input data-f="precio" type="text" inputmode="numeric" value="${r.precio == null ? '' : miles(r.precio)}" placeholder="—" aria-label="Precio en colones"></div></div>
+        <div class="cell c-extra" role="cell"><label>Instrumentación extra</label><input data-f="extra" type="text" maxlength="300" value="${esc(r.extra)}" placeholder="Ej.: arpa, órgano" aria-label="Instrumentación extra"></div>
+        <div class="cell" role="cell"><label>Karina</label><input data-f="nota_k" type="number" min="1" max="10" step="1" inputmode="numeric" value="${r.nota_k == null ? '' : r.nota_k}" aria-label="Puntuación de Karina, 1 a 10"></div>
+        <div class="cell" role="cell"><label>Laureano</label><input data-f="nota_l" type="number" min="1" max="10" step="1" inputmode="numeric" value="${r.nota_l == null ? '' : r.nota_l}" aria-label="Puntuación de Laureano, 1 a 10"></div>
+        <div class="cell c-gen" role="cell"><label>General</label><div class="gen${g != null && g === max && list.length > 1 ? ' top' : ''}"><b>${fmt(g)}</b><small>${g != null && g === max && list.length > 1 ? 'la mejor hasta ahora' : 'de 10'}</small></div></div>
+        <div class="cell c-del" role="cell"><button class="del" type="button" data-del="1" aria-label="Quitar esta opción" title="Quitar">🗑</button></div>
+    </div>`; }).join('');
+}
+// Solo se actualizan los números generales (sin reordenar ni redibujar), para no quitarle el cursor a quien está escribiendo.
+function refrescarGenerales() {
+    const gen = generales(), max = Math.max(...[...gen.values()].filter((v) => v != null));
+    document.querySelectorAll('.item').forEach((el) => { const g = gen.get(Number(el.dataset.id)), d = el.querySelector('.gen'), top = g != null && g === max && rows.length > 1; d.className = 'gen' + (top ? ' top' : ''); d.querySelector('b').textContent = fmt(g); d.querySelector('small').textContent = top ? 'la mejor hasta ahora' : 'de 10'; });
+}
+
+$('#rows').addEventListener('change', async (e) => {
+    const inp = e.target.closest('input[data-f]'); if (!inp) return;
+    const id = Number(inp.closest('.item').dataset.id), f = inp.dataset.f, row = rows.find((r) => r.id === id); if (!row) return;
+    let v = inp.value;
+    if (f === 'precio') { v = parsePrecio(v); if (v != null && (!Number.isFinite(v) || v < 0)) { inp.value = row.precio == null ? '' : miles(row.precio); return; } }
+    if (f === 'nota_k' || f === 'nota_l') { v = v === '' ? null : Math.round(Number(v)); if (v != null && (!(v >= 1 && v <= 10))) { inp.value = row[f] == null ? '' : row[f]; setStatus('', 'La nota va del 1 al 10'); return; } }
+    row[f] = v; if (f === 'precio') inp.value = v == null ? '' : miles(v); else if (f.startsWith('nota')) inp.value = v == null ? '' : v;
+    refrescarGenerales();
+    try { const j = await call({ action: 'update', id, [f]: v }); if (j.rows && !document.activeElement.closest('.item')) render(); }
+    catch (err) { setStatus('', 'No se guardó. Revisa tu internet.'); }
+});
+$('#rows').addEventListener('click', async (e) => {
+    const del = e.target.closest('[data-del]'), emb = e.target.closest('[data-embed]');
+    if (emb) { const w = emb.parentElement; w.insertAdjacentHTML('beforeend', `<iframe src="https://www.instagram.com/reel/${esc(emb.dataset.embed)}/embed" loading="lazy" allowfullscreen title="Reel de Instagram"></iframe>`); emb.remove(); return; }
+    if (!del) return;
+    const id = Number(del.closest('.item').dataset.id), r = rows.find((x) => x.id === id);
+    if (!confirm('¿Quitar «' + (r ? r.titulo : 'esta opción') + '» de la tabla? No se puede deshacer.')) return;
+    try { await call({ action: 'delete', id }); render(); } catch (err) { alert('No se pudo quitar. Intenta de nuevo.'); }
+});
+$('#orden').onchange = (e) => { sort = { k: e.target.value, dir: e.target.value === 'precio' ? 1 : -1 }; pintarOrden(); reordenar(); render(); };
+$('#dir').onclick = () => { sort.dir *= -1; pintarOrden(); reordenar(); render(); };
+document.querySelectorAll('.head button').forEach((b) => b.onclick = () => setSort(b.dataset.k));
+
+// ----- agregar -----
+let modo = 'video';
+function setModo(m) { modo = m; $('#tabV').setAttribute('aria-selected', m === 'video'); $('#tabL').setAttribute('aria-selected', m === 'link'); $('#pV').hidden = m !== 'video'; $('#pL').hidden = m !== 'link'; }
+$('#tabV').onclick = () => setModo('video'); $('#tabL').onclick = () => setModo('link');
+const msg = (t, k) => { const m = $('#aMsg'); m.textContent = t; m.className = 'msg ' + (k || ''); };
+function subir(url, file, onProg) {   // PUT directo a Supabase Storage con progreso
+    return new Promise((ok, fail) => { const x = new XMLHttpRequest(); x.open('PUT', url); x.setRequestHeader('Content-Type', file.type || 'video/mp4'); x.setRequestHeader('x-upsert', 'false');
+        x.upload.onprogress = (e) => e.lengthComputable && onProg(e.loaded / e.total); x.onload = () => x.status < 300 ? ok() : fail(new Error('subida ' + x.status)); x.onerror = () => fail(new Error('red')); x.send(file); });
+}
+$('#fAdd').addEventListener('submit', async (e) => {
+    e.preventDefault(); const go = $('#aGo'); msg('');
+    const extra = { titulo: $('#aT').value, extra: $('#aE').value }, p = parsePrecio($('#aP').value);
+    if (p != null) { if (!Number.isFinite(p) || p < 0) return msg('El precio debe ser un número.', 'err'); extra.precio = p; }
+    go.disabled = true;
+    try {
+        let body;
+        if (modo === 'link') { const u = $('#aU').value.trim(); if (!/^https?:\/\//i.test(u)) { msg('Pega un enlace que empiece con https://', 'err'); go.disabled = false; return; } body = { action: 'add', tipo: 'link', url: u, ...extra }; }
+        else {
+            const f = $('#aF').files[0]; if (!f) { msg('Elige un video.', 'err'); go.disabled = false; return; }
+            if (f.size > 50 * 1024 * 1024) { msg('El video pesa más de 50 MB. Envíalo por enlace o comprímelo.', 'err'); go.disabled = false; return; }
+            msg('Subiendo el video…'); $('#prog').hidden = false;
+            const s = await call({ action: 'signUpload', name: f.name }); await subir(s.uploadUrl, f, (q) => { $('#prog i').style.width = Math.round(q * 100) + '%'; });
+            body = { action: 'add', tipo: 'video', url: s.publicUrl, ...extra };
+        }
+        await call(body); render(); $('#fAdd').reset(); msg('Agregado a la tabla.', 'ok'); $('#prog').hidden = true; $('#prog i').style.width = '0';
+        setTimeout(() => $('#rows').lastElementChild && $('#rows').lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+    } catch (err) { $('#prog').hidden = true; msg(err.code === 'formato' ? 'Ese formato no se acepta. Usa mp4, mov o webm.' : err.code === 'enlace' ? 'Ese enlace no es válido.' : 'No se pudo agregar. Intenta de nuevo.', 'err'); }
+    go.disabled = false;
+});
+
+async function cargar(primera) { try { await call({ action: 'list' }); if (primera) reordenar(); if (primera || !document.activeElement.closest('.item')) render(); } catch (e) { if (primera) $('#rows').innerHTML = '<div class="empty">No se pudo cargar. Revisa tu internet e intenta de nuevo.</div>'; } }
+pintarOrden(); cargar(true);
+setInterval(() => { if (!document.hidden && !busy && !document.activeElement.closest('.item') && ![...document.querySelectorAll('video')].some((v) => !v.paused)) cargar(false); }, 60000);   // si el otro cambia algo, se ve solo
+</script>
+</body>
+</html>

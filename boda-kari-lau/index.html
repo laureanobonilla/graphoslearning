@@ -68,6 +68,12 @@
         .install .go { background: var(--primary); color: #fff; }
         .install .no { background: transparent; color: var(--primary); border-color: transparent; }
         @media(max-width: 480px) { .install { flex-wrap: wrap; } .install .it { flex-basis: 100%; } }
+        .music-card { display: flex; align-items: center; gap: 14px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 1rem 1.25rem; margin-bottom: 1.5rem; text-decoration: none; color: var(--text-main); box-shadow: var(--shadow-card); transition: var(--transition); }
+        .music-card:hover { border-color: rgba(142, 85, 104, 0.4); box-shadow: var(--shadow-subtle); }
+        .music-card > i { color: var(--accent); font-size: 1.4rem; }
+        .music-card span { flex: 1; min-width: 0; } .music-card b { display: block; font-family: 'Playfair Display', serif; font-size: 1.1rem; } .music-card small { color: var(--text-muted); }
+        .music-card u { text-decoration: none; color: var(--primary); font-weight: 600; white-space: nowrap; }
+        .task-link { display: inline-block; margin-top: 0.5rem; color: var(--primary); font-weight: 600; font-size: 0.85rem; text-decoration: none; }
         .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); font-style: italic; background: var(--card-bg); border-radius: var(--border-radius); border: 1px solid var(--border-color); box-shadow: var(--shadow-card); }
     </style>
 </head>
@@ -83,6 +89,8 @@
             <h1>Nuestra Boda 💍</h1>
             <div class="sync-status"><span class="sync-dot" id="syncDot"></span><span id="syncText">Conectando…</span></div>
         </header>
+
+        <a class="music-card" href="musica.html"><i class="fa-solid fa-music"></i><span><b>Música de la misa</b><small>Videos, precios y notas de cada opción</small></span><u>Ver detalle →</u></a>
 
         <div class="card">
             <form id="taskForm">
@@ -139,6 +147,7 @@
                         <div class="task-meta"><span class="badge"><i class="fa-solid fa-user"></i> ${escapeHtml(t.assignee)}</span></div>
                         <div class="task-title">${escapeHtml(t.title)}</div>
                         ${t.notes ? `<div class="task-notes"><i class="fa-solid fa-note-sticky"></i> ${escapeHtml(t.notes)}</div>` : ''}
+                        ${/cantante|m[úu]sica|misa/i.test(t.title) ? '<a class="task-link" href="musica.html">Ver detalle de la música →</a>' : ''}
                     </div>
                     <div class="task-actions">
                         <button class="btn-icon" onclick="editTask(${t.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>
