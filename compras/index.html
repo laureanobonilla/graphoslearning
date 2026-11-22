@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#15203a">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Compras de las casas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-casa="paola">
+<header class="top">
+    <div class="brand"><h1>Compras</h1><span class="sync" id="sync"><i id="dot"></i><span id="st">Conectando…</span></span></div>
+    <div class="houses" role="tablist" aria-label="Casa">
+        <button role="tab" data-casa="paola" aria-selected="true">Paola<b class="bd" hidden></b></button>
+        <button role="tab" data-casa="abue" aria-selected="false">Abue<b class="bd" hidden></b></button>
+        <button role="tab" data-casa="casita" aria-selected="false">Casita<b class="bd" hidden></b></button>
+    </div>
+    <div class="search"><input id="q" type="search" placeholder="Buscar o agregar un producto…" autocomplete="off" enterkeyhint="search" aria-label="Buscar o agregar un producto"></div>
+</header>
+<nav class="tabs" id="tabs" role="tablist" aria-label="Vista">
+    <button role="tab" data-tab="comprar" aria-selected="true">Por comprar<b class="n" id="nCom"></b></button>
+    <button role="tab" data-tab="fija" aria-selected="false">Lista fija</button>
+    <button role="tab" data-tab="hist" aria-selected="false">Historial</button>
+</nav>
+<main id="view" aria-live="polite"><p class="vacio">Cargando…</p></main>
+<div class="scrim" id="scrim" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Detalle del producto" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+<script src="app.js"></script>
+</body>
+</html>

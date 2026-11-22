@@ -1,0 +1,16 @@
+{
+  "name": "Compras de las casas",
+  "short_name": "Compras",
+  "description": "Listas de compras de Paola, Abue y Casita con avisos de lo que se está acabando",
+  "start_url": "/compras/",
+  "scope": "/compras/",
+  "display": "standalone",
+  "background_color": "#f3f5f9",
+  "theme_color": "#15203a",
+  "lang": "es",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
