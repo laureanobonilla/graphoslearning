@@ -4,7 +4,7 @@ var API = '/.netlify/functions/compras';
 var CASAS = { paola: 'Paola', abue: 'Abue', casita: 'Casita' };
 var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 var PRESETS = [3, 7, 10, 14, 21, 30, 45, 60, 90, 120, 180, 365];
-var S = { casa: lsGet('compras_casa') || 'paola', tab: 'comprar', q: '', prod: [], items: [], hist: [], cats: [], P: {}, buy: null, busy: 0, cargado: false };
+var S = { casa: lsGet('compras_casa') || 'paola', tab: 'fija', q: '', prod: [], items: [], hist: [], cats: [], P: {}, buy: null, busy: 0, cargado: false };
 var $ = function (s) { return document.querySelector(s); };
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
