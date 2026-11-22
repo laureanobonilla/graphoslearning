@@ -4,7 +4,7 @@ var API = '/.netlify/functions/compras';
 var CASAS = { paola: 'Paola', abue: 'Abue', casita: 'Casita' };
 var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 var PRESETS = [3, 7, 10, 14, 21, 30, 45, 60, 90, 120, 180, 365];
-var S = { casa: lsGet('compras_casa') || 'paola', tab: 'fija', q: '', prod: [], items: [], hist: [], cats: [], P: {}, buy: null, busy: 0, cargado: false };
+var S = { casa: lsGet('compras_casa') || 'paola', tab: 'fija', edit: false, q: '', prod: [], items: [], hist: [], cats: [], P: {}, buy: null, busy: 0, cargado: false };
 var $ = function (s) { return document.querySelector(s); };
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -145,14 +145,15 @@ function vistaFija() {
     lista.sort(function (a, b) { return orden[a.f.estado] - orden[b.f.estado] || (a.f.restan == null ? 1e9 : a.f.restan) - (b.f.restan == null ? 1e9 : b.f.restan) || a.f.p.nombre.localeCompare(b.f.p.nombre, 'es'); });
     var grupos = [['venc', 'Ya se acabaron'], ['pronto', 'Por acabarse'], ['ok', 'Al día'], ['sin', 'Sin registrar: ¿cuánto les queda?']], h = '';
     grupos.forEach(function (g) { var l = lista.filter(function (x) { return x.f.estado === g[0]; }); if (l.length) h += '<h2 class="cat">' + g[1] + ' · ' + l.length + '</h2>' + (g[0] === 'sin' ? '<div class="btns" style="margin-bottom:8px"><button class="btn sm" data-act="regtodos">Ya tengo todos · 1 periodo</button></div>' : '') + '<ul>' + l.map(filaFija).join('') + '</ul>'; });
-    return h + '<div class="btns" style="margin-top:18px"><button class="btn sm ghost" data-act="basicos">Agregar los básicos que falten</button></div>';
+    var barra = '<div class="btns" style="margin-bottom:2px"><button class="btn sm' + (S.edit ? '' : ' ghost') + '" data-act="editar">' + (S.edit ? 'Listo' : 'Quitar productos') + '</button></div>' + (S.edit ? '<p style="color:var(--mute);font-size:.88rem;margin:6px 2px 0">Toca «Quitar» en lo que no aplica en ' + CASAS[S.casa] + '. Si te equivocas, aparece «Deshacer».</p>' : '');
+    return barra + h + (S.edit ? '' : '<div class="btns" style="margin-top:18px"><button class="btn sm ghost" data-act="basicos">Agregar los básicos que falten</button></div>');
 }
 function filaFija(x) {
     var it = x.it, f = x.f, abierto = S.buy && S.buy.pid === it.producto_id, tot = f.per * (it.periodos || 1), frac = f.restan == null ? 0 : Math.max(0, Math.min(1, f.restan / tot));
     var estado = f.restan == null ? '<span class="chip sin">Sin registro</span>' + lineaDur(it, f) : (f.restan < 0 ? '<span class="chip venc">Venció ' + fechaCorta(it.cubre_hasta) + '</span>' : '<span class="chip ' + (f.auto ? 'pronto' : 'ok') + '">Alcanza hasta ' + fechaCorta(it.cubre_hasta) + '</span>' + plural(f.restan, 'día', 'días')) + (it.pendiente ? ' · <b>anotado</b>' : '');
     return '<li class="it" data-p="' + it.producto_id + '"><div class="row"><button class="nm" data-act="det" style="padding-left:6px"><b>' + esc(f.p.nombre) + '</b><small>' + estado + '</small>' +
         (f.restan == null ? '' : '<div class="tank" aria-hidden="true"><i class="' + (f.restan < 0 ? 'venc' : f.auto ? 'pronto' : '') + '" style="width:' + Math.round(frac * 100) + '%"></i></div>') + '</button>' +
-        (f.restan == null ? '<button class="btn sm ghost" data-act="tengo">Ya lo tengo</button>' : '<button class="btn sm ghost" data-act="' + (it.pendiente ? 'nopend' : 'falta') + '">' + (it.pendiente ? 'Anotado ✓' : 'Hace falta') + '</button>') + '</div>' + (abierto ? panelCompra(it, f) : '') + '</li>';
+        (S.edit ? '<button class="btn sm warn" data-act="sacar" aria-label="Quitar ' + esc(f.p.nombre) + ' de Productos">Quitar</button>' : f.restan == null ? '<button class="btn sm ghost" data-act="tengo">Ya lo tengo</button>' :'<button class="btn sm ghost" data-act="' + (it.pendiente ? 'nopend' : 'falta') + '">' + (it.pendiente ? 'Anotado ✓' : 'Hace falta') + '</button>') + '</div>' + (abierto ? panelCompra(it, f) : '') + '</li>';
 }
 
 function vistaHist() {
@@ -237,12 +238,14 @@ function compartir() {
 document.addEventListener('click', async function (e) {
     var b = e.target.closest('[data-act],[data-casa],[data-tab]'); if (!b) return;
     if (b.dataset.casa && b.closest('.houses')) { S.casa = b.dataset.casa; lsSet('compras_casa', S.casa); S.buy = null; pintar(); return; }
-    if (b.dataset.tab) { S.tab = b.dataset.tab; S.q = ''; $('#q').value = ''; S.buy = null; pintar(); return; }
+    if (b.dataset.tab) { S.tab = b.dataset.tab; S.edit = false; S.q = ''; $('#q').value = ''; S.buy = null; pintar(); return; }
     var li = b.closest('[data-p]'), pid = li ? Number(li.dataset.p) : sheetPid, a = b.dataset.act;
     if (a === 'ck' || a === 'tengo') { var it = getItem(pid); S.buy = S.buy && S.buy.pid === pid && a === 'ck' ? null : { pid: pid, per: it.periodos || 1, precio: it.precio }; pintar(); textoPeriodos(); var bp = $('#bp'); if (bp && S.buy) bp.focus({ preventScroll: true }); return; }
     if (a === 'mas' || a === 'menos') { S.buy.per = Math.max(1, Math.min(60, S.buy.per + (a === 'mas' ? 1 : -1))); textoPeriodos(); return; }
     if (a === 'cancel') { S.buy = null; pintar(); return; }
     if (a === 'comprado') { var pr = $('#bp').value.trim(), n = pr === '' ? null : Number(pr.replace(/[₡\s.]/g, '').replace(',', '.')); if (n != null && !(n >= 0)) { toast('El precio debe ser un número.'); return; } comprar(S.buy.pid, S.buy.per, n); return; }
+    if (a === 'editar') { S.edit = !S.edit; S.buy = null; pintar(); return; }
+    if (a === 'sacar') { var nom0 = S.P[pid].nombre; guardarItem(pid, { fijo: false }); toast('Quitado de Productos: ' + nom0, [['Deshacer', function () { guardarItem(pid, { fijo: true }); }]]); return; }
     if (a === 'det') { abrirDetalle(pid); return; }
     if (a === 'cerrar') { cerrar(); return; }
     if (a === 'falta') { guardarItem(pid, { pendiente: true }); return; }
