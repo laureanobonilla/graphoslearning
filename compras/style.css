@@ -21,7 +21,16 @@ button { cursor: pointer; }
 .brand h1 { font: 800 1.35rem/1 var(--f1); letter-spacing: -.01em; }
 .sync { display: flex; align-items: center; gap: 6px; font-size: .75rem; color: #aab3c9; }
 #dot { width: 7px; height: 7px; border-radius: 50%; background: #7d8799; } #dot.on { background: #5bd18a; } #dot.busy { background: var(--yolk); } #dot.err { background: #ff6b5a; }
-.houses { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.houses { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.houses button[data-casa=todas][aria-selected=true] { background: var(--yolk); color: var(--ink); }
+.houses button[data-casa=todas] { border-bottom: 3px solid var(--yolk); }
+.houses .bd { background: #fff; }
+.houses button[data-casa=todas] .bd { background: var(--ink); color: #fff; }
+body[data-casa=todas] { --ac: #15203a; --ac-soft: #e8ebf3; }
+.hc { font-weight: 700; } .hc-paola { color: #d6402b; } .hc-abue { color: #3b5bdb; } .hc-casita { color: #11796a; }
+.prod { padding-bottom: 2px; }
+.prod .ph { padding: 10px 14px 2px; } .prod .ph b { font: 700 1.08rem var(--f1); }
+.hl { border-top: 1px solid var(--line); } .prod .ph + .hl { border-top: 0; }
 .houses button { position: relative; border: 0; border-radius: 12px 12px 4px 4px; min-height: 48px; font: 700 1rem var(--f1); background: #26324f; color: #cfd6e6; }
 .houses button[data-casa=paola][aria-selected=true] { background: #d6402b; color: #fff; }
 .houses button[data-casa=abue][aria-selected=true] { background: #3b5bdb; color: #fff; }

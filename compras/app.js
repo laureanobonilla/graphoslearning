@@ -4,10 +4,11 @@ var API = '/.netlify/functions/compras';
 var CASAS = { paola: 'Paola', abue: 'Abue', casita: 'Casita' };
 var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'], MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 var PRESETS = [3, 7, 10, 14, 21, 30, 45, 60, 90, 120, 180, 365];
-var S = { casa: lsGet('compras_casa') || 'paola', tab: 'fija', edit: false, q: '', prod: [], items: [], hist: [], cats: [], P: {}, buy: null, busy: 0, cargado: false };
+var S = { casa: lsGet('compras_casa') || 'paola', todas: false, tab: 'fija', edit: false, q: '', prod: [], items: [], hist: [], cats: [], P: {}, buy: null, busy: 0, cargado: false };
 var $ = function (s) { return document.querySelector(s); };
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+if (S.casa === 'todas') { S.todas = true; S.tab = 'comprar'; }
 if (!CASAS[S.casa]) S.casa = 'paola';
 var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
 var norm = function (s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim(); };
@@ -65,12 +66,13 @@ async function cargar(primera) {
     } catch (e) { setSt('err', 'Sin conexión con el servidor'); if (primera) $('#view').innerHTML = '<p class="vacio"><b>No se pudo cargar</b>Revisa tu internet e intenta de nuevo.</p>'; }
 }
 function setItem(it) { var i = S.items.findIndex(function (x) { return x.casa === it.casa && x.producto_id === it.producto_id; }); if (i < 0) S.items.push(it); else S.items[i] = it; }
-function getItem(pid) { return S.items.find(function (x) { return x.casa === S.casa && x.producto_id === pid; }); }
+function getItem(pid, casa) { casa = casa || S.casa; return S.items.find(function (x) { return x.casa === casa && x.producto_id === pid; }); }
 async function guardarItem(pid, cambios) {   // optimista: se ve al instante y luego se confirma
-    var cur = getItem(pid) || { casa: S.casa, producto_id: pid, fijo: false, pendiente: false, periodo_dias: null, periodos: 1, ultima_compra: null, cubre_hasta: null, precio: null, nota: '', posponer_hasta: null };
+    var casa = S.casa;   // se fija ahora: en «Todas» el usuario puede tocar otra casa mientras esto se guarda
+    var cur = getItem(pid, casa) || { casa: casa, producto_id: pid, fijo: false, pendiente: false, periodo_dias: null, periodos: 1, ultima_compra: null, cubre_hasta: null, precio: null, nota: '', posponer_hasta: null };
     var antes = JSON.stringify(cur); setItem(Object.assign({}, cur, cambios)); pintar();
-    try { var j = await call(Object.assign({ action: 'item', casa: S.casa, producto_id: pid }, cambios)); setItem(j.item); }
-    catch (e) { var o = JSON.parse(antes); if (getItem(pid) && !cur.ultima_compra && !cur.fijo && !cur.pendiente) S.items = S.items.filter(function (x) { return !(x.casa === S.casa && x.producto_id === pid); }); else setItem(o); toast('No se guardó. Revisa tu internet.'); }
+    try { var j = await call(Object.assign({ action: 'item', casa: casa, producto_id: pid }, cambios)); setItem(j.item); }
+    catch (e) { var o = JSON.parse(antes); if (!cur.ultima_compra && !cur.fijo && !cur.pendiente) S.items = S.items.filter(function (x) { return !(x.casa === casa && x.producto_id === pid); }); else setItem(o); toast('No se guardó. Revisa tu internet.'); }
     pintar();
 }
 
@@ -84,21 +86,21 @@ function toast(msg, acciones) {
 }
 function badges() {
     var total = 0;
-    document.querySelectorAll('.houses button').forEach(function (b) { var n = avisosDe(b.dataset.casa).length; total += n; var e = b.querySelector('.bd'); e.hidden = !n; e.textContent = n; b.setAttribute('aria-label', CASAS[b.dataset.casa] + (n ? ', ' + n + ' por comprar' : '')); });
+    document.querySelectorAll('.houses button').forEach(function (b) { var t = b.dataset.casa === 'todas', n = t ? 0 : avisosDe(b.dataset.casa).length; if (!t) total += n; else n = total; var e = b.querySelector('.bd'); e.hidden = !n; e.textContent = n; b.setAttribute('aria-label', (t ? 'Todas las casas' : CASAS[b.dataset.casa]) + (n ? ', ' + n + ' por comprar' : '')); });
     document.title = (total ? '(' + total + ') ' : '') + 'Compras de las casas';
     if (navigator.setAppBadge) { try { total ? navigator.setAppBadge(total) : navigator.clearAppBadge(); } catch (e) {} }
 }
 
 // ---------- pintar ----------
 function pintar() {
-    document.body.dataset.casa = S.casa;
-    document.querySelectorAll('.houses button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.casa === S.casa); });
-    document.querySelectorAll('.tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === S.tab && !S.q); });
-    var n = avisosDe(S.casa).length; $('#nCom').textContent = n || '';
+    document.body.dataset.casa = S.todas ? 'todas' : S.casa;
+    document.querySelectorAll('.houses button').forEach(function (b) { b.setAttribute('aria-selected', S.todas ? b.dataset.casa === 'todas' : b.dataset.casa === S.casa); });
+    document.querySelectorAll('.tabs button').forEach(function (b) { b.hidden = S.todas && b.dataset.tab === 'fija'; b.setAttribute('aria-selected', b.dataset.tab === S.tab && !S.q); });
+    var n = S.todas ? Object.keys(CASAS).reduce(function (a, c) { return a + avisosDe(c).length; }, 0) : avisosDe(S.casa).length; $('#nCom').textContent = n || '';
     badges();
     var v = $('#view');
     if (!S.cargado) return;
-    v.innerHTML = S.q ? vistaBuscar() : S.tab === 'comprar' ? vistaComprar() : S.tab === 'fija' ? vistaFija() : vistaHist();
+    v.innerHTML = S.q ? vistaBuscar() : S.tab === 'comprar' ? (S.todas ? vistaComprarTodas() : vistaComprar()) : S.tab === 'fija' ? vistaFija() : vistaHist();
 }
 function porCategoria(lista, fn) {
     var orden = S.cats, g = {}; lista.forEach(function (x) { (g[x.f.p.categoria] = g[x.f.p.categoria] || []).push(x); });
@@ -121,7 +123,7 @@ function vistaComprar() {
     return out;
 }
 function filaComprar(x) {
-    var it = x.it, f = x.f, abierto = S.buy && S.buy.pid === it.producto_id;
+    var it = x.it, f = x.f, abierto = S.buy && S.buy.pid === it.producto_id && S.buy.casa === it.casa;
     return '<li class="it" data-p="' + it.producto_id + '"><div class="row"><button class="ck' + (abierto ? ' on' : '') + '" data-act="ck" aria-label="Marcar ' + esc(f.p.nombre) + ' como comprado"></button>' +
         '<button class="nm" data-act="det"><b>' + esc(f.p.nombre) + '</b><small>' + chipAviso(it, f) + lineaDur(it, f) + (it.nota ? ' · ' + esc(it.nota) : '') + '</small></button>' +
         '<button class="dots" data-act="det" aria-label="Más opciones de ' + esc(f.p.nombre) + '">⋯</button></div>' + (abierto ? panelCompra(it, f) : '') + '</li>';
@@ -132,8 +134,30 @@ function panelCompra(it, f) {
         '<label>Precio pagado (opcional) <input type="text" id="bp" inputmode="decimal" placeholder="₡" value="' + (b.precio == null ? '' : esc(b.precio)) + '"></label>' +
         '<div class="btns"><button class="btn" data-act="comprado">Listo, comprado</button><button class="btn ghost" data-act="cancel">Cancelar</button></div></div>';
 }
+// ---------- «Todas»: lo de las tres casas junto, un producto con una línea por casa ----------
+function pendientesTodas() {
+    var por = {};
+    Object.keys(CASAS).forEach(function (c) { S.items.forEach(function (i) { if (i.casa !== c || !S.P[i.producto_id]) return; var f = info(i); if (f && f.aviso) (por[i.producto_id] = por[i.producto_id] || []).push({ it: i, f: f }); }); });
+    return Object.keys(por).map(function (id) { return { f: { p: S.P[id] }, l: por[id] }; });
+}
+function vistaComprarTodas() {
+    var prods = pendientesTodas(), lineas = prods.reduce(function (a, x) { return a + x.l.length; }, 0), est = 0, sinPrecio = 0, cuenta = {};
+    prods.forEach(function (x) { x.l.forEach(function (y) { cuenta[y.it.casa] = (cuenta[y.it.casa] || 0) + 1; if (y.it.precio != null) est += Number(y.it.precio); else sinPrecio++; }); });
+    var desglose = Object.keys(CASAS).filter(function (c) { return cuenta[c]; }).map(function (c) { return CASAS[c] + ' ' + cuenta[c]; }).join(' · ');
+    var out = '<div class="resumen"><b>' + (prods.length ? plural(prods.length, 'producto', 'productos') + ' por comprar' : 'Todo al día en las tres casas') + '</b><div style="color:var(--mute);font-size:.9rem;margin-top:2px">' +
+        (prods.length ? desglose + (est ? ' · Aprox. ' + money(est) + (sinPrecio ? ' (faltan precios en ' + sinPrecio + ')' : '') : '') : 'Te aviso cuando algo esté por acabarse.') + '</div>' +
+        (prods.length ? '<div class="acts"><button class="btn sm ghost" data-act="compartir">Compartir lista</button></div>' : '') + '</div>';
+    return out + (prods.length ? porCategoria(prods, filaProdTodas) : '<p class="vacio">Usa el buscador de arriba para anotar algo a mano en cualquier casa.</p>');
+}
+function filaProdTodas(x) {
+    return '<li class="it prod"><div class="ph"><b>' + esc(x.f.p.nombre) + '</b></div>' + x.l.map(function (y) {
+        var it = y.it, f = y.f, abierto = S.buy && S.buy.pid === it.producto_id && S.buy.casa === it.casa;
+        return '<div class="hl" data-p="' + it.producto_id + '" data-c="' + it.casa + '"><div class="row"><button class="ck' + (abierto ? ' on' : '') + '" data-act="ck" aria-label="Marcar ' + esc(f.p.nombre) + ' de ' + CASAS[it.casa] + ' como comprado"></button>' +
+            '<button class="nm" data-act="det"><b class="hc hc-' + it.casa + '">' + CASAS[it.casa] + '</b><small>' + chipAviso(it, f) + lineaDur(it, f) + (it.nota ? ' · ' + esc(it.nota) : '') + '</small></button>' +
+            '<button class="dots" data-act="det" aria-label="Más opciones de ' + esc(f.p.nombre) + ' en ' + CASAS[it.casa] + '">⋯</button></div>' + (abierto ? panelCompra(it, f) : '') + '</div>'; }).join('') + '</li>';
+}
 function textoPeriodos() {
-    if (!S.buy) return; var it = getItem(S.buy.pid), f = info(it), dias = f.per * S.buy.per;
+    if (!S.buy) return; var it = getItem(S.buy.pid, S.buy.casa), f = info(it), dias = f.per * S.buy.per;
     var e = $('#bt'); if (e) e.innerHTML = (S.buy.per === 1 ? 'periodo' : 'periodos') + ' de ' + durTxt(f.per) + '<br><b>Alcanza hasta el ' + fechaCorta(sumar(hoy(), dias)) + '</b> (' + durTxt(dias) + ')';
     var n = $('#bn'); if (n) n.textContent = S.buy.per;
 }
@@ -149,7 +173,7 @@ function vistaFija() {
     return barra + h + (S.edit ? '' : '<div class="btns" style="margin-top:18px"><button class="btn sm ghost" data-act="basicos">Agregar los básicos que falten</button></div>');
 }
 function filaFija(x) {
-    var it = x.it, f = x.f, abierto = S.buy && S.buy.pid === it.producto_id, tot = f.per * (it.periodos || 1), frac = f.restan == null ? 0 : Math.max(0, Math.min(1, f.restan / tot));
+    var it = x.it, f = x.f, abierto = S.buy && S.buy.pid === it.producto_id && S.buy.casa === it.casa, tot = f.per * (it.periodos || 1), frac = f.restan == null ? 0 : Math.max(0, Math.min(1, f.restan / tot));
     var estado = f.restan == null ? '<span class="chip sin">Sin registro</span>' + lineaDur(it, f) : (f.restan < 0 ? '<span class="chip venc">Venció ' + fechaCorta(it.cubre_hasta) + '</span>' : '<span class="chip ' + (f.auto ? 'pronto' : 'ok') + '">Alcanza hasta ' + fechaCorta(it.cubre_hasta) + '</span>' + plural(f.restan, 'día', 'días')) + (it.pendiente ? ' · <b>anotado</b>' : '');
     return '<li class="it" data-p="' + it.producto_id + '"><div class="row"><button class="nm" data-act="det" style="padding-left:6px"><b>' + esc(f.p.nombre) + '</b><small>' + estado + '</small>' +
         (f.restan == null ? '' : '<div class="tank" aria-hidden="true"><i class="' + (f.restan < 0 ? 'venc' : f.auto ? 'pronto' : '') + '" style="width:' + Math.round(frac * 100) + '%"></i></div>') + '</button>' +
@@ -157,13 +181,13 @@ function filaFija(x) {
 }
 
 function vistaHist() {
-    var h = S.hist.filter(function (x) { return x.casa === S.casa && S.P[x.producto_id]; });
+    var h = S.hist.filter(function (x) { return (S.todas || x.casa === S.casa) && S.P[x.producto_id]; });
     if (!h.length) return '<p class="vacio"><b>Todavía no hay compras anotadas</b>Cuando marques algo como comprado aparece aquí.</p>';
     var mes = hoy().slice(0, 7), gasto = h.filter(function (x) { return x.fecha.slice(0, 7) === mes && x.precio; }).reduce(function (a, x) { return a + Number(x.precio); }, 0);
-    var ultimo = {}; h.forEach(function (x) { if (!ultimo[x.producto_id]) ultimo[x.producto_id] = x.id; });
+    var ultimo = {}; h.forEach(function (x) { var k = x.casa + x.producto_id; if (!ultimo[k]) ultimo[k] = x.id; });
     return (gasto ? '<div class="resumen"><b>' + money(gasto) + '</b> anotados este mes<div style="color:var(--mute);font-size:.88rem">Solo suma las compras a las que les pusiste precio.</div></div>' : '') +
         '<div class="it">' + h.slice(0, 80).map(function (x) { var p = S.P[x.producto_id];
-            return '<div class="hrow"><div><b>' + esc(p.nombre) + '</b><small>' + fechaCorta(x.fecha) + ' · ' + plural(x.periodos, 'periodo', 'periodos') + (x.precio ? ' · ' + money(x.precio) : '') + '</small></div>' + (ultimo[x.producto_id] === x.id ? '<button class="btn sm ghost" data-act="deshacer" data-h="' + x.id + '">Deshacer</button>' : '') + '</div>'; }).join('') + '</div>';
+            return '<div class="hrow" data-c="' + x.casa + '"><div><b>' + esc(p.nombre) + '</b><small>' + (S.todas ? '<span class="hc hc-' + x.casa + '">' + CASAS[x.casa] + '</span> · ' : '') + fechaCorta(x.fecha) + ' · ' + plural(x.periodos, 'periodo', 'periodos') + (x.precio ? ' · ' + money(x.precio) : '') + '</small></div>' + (ultimo[x.casa + x.producto_id] === x.id ? '<button class="btn sm ghost" data-act="deshacer" data-h="' + x.id + '">Deshacer</button>' : '') + '</div>'; }).join('') + '</div>';
 }
 
 // ---------- búsqueda ----------
@@ -176,7 +200,10 @@ function buscar(q) {
 }
 function vistaBuscar() {
     var res = buscar(S.q), exacto = res.some(function (p) { return norm(p.nombre) === norm(S.q); }), h = '';
-    if (res.length) h += '<ul class="res">' + res.map(function (p) { var it = getItem(p.id) || {}, f = it.casa ? info(it) : null;
+    if (res.length && S.todas) h += '<ul class="res">' + res.map(function (p) {
+        return '<li class="it" data-p="' + p.id + '"><div class="row"><div class="nm" style="cursor:default"><b>' + esc(p.nombre) + '</b><small>' + esc(p.categoria) + ' · dura ' + durTxt(p.periodo_dias) + '</small><div class="tg">' +
+            Object.keys(CASAS).map(function (c) { var it = getItem(p.id, c) || {}; return '<button data-act="tpend" data-c="' + c + '" aria-pressed="' + !!it.pendiente + '">' + CASAS[c] + (it.pendiente ? ' ✓' : '') + '</button>'; }).join('') + '</div></div></div></li>'; }).join('') + '</ul>';
+    else if (res.length) h += '<ul class="res">' + res.map(function (p) { var it = getItem(p.id) || {}, f = it.casa ? info(it) : null;
         return '<li class="it" data-p="' + p.id + '"><div class="row"><div class="nm" style="cursor:default"><b>' + esc(p.nombre) + '</b><small>' + esc(p.categoria) + ' · dura ' + durTxt((it.periodo_dias) || p.periodo_dias) + (f && f.restan != null ? ' · alcanza hasta ' + fechaCorta(it.cubre_hasta) : '') + '</small>' +
             '<div class="tg"><button data-act="tfijo" aria-pressed="' + !!it.fijo + '">' + (it.fijo ? 'En productos ✓' : '+ Productos') + '</button><button data-act="tpend" aria-pressed="' + !!it.pendiente + '">' + (it.pendiente ? 'Pendiente ✓' : '+ Pendiente') + '</button></div></div></div></li>'; }).join('') + '</ul>';
     if (!exacto) h += formNuevo(!res.length);
@@ -187,8 +214,10 @@ function formNuevo(solo) {
     return '<div class="nuevo" id="fNuevo"><h3>' + (solo ? 'No lo encontré. ' : '¿No es ninguno? ') + 'Agregar «' + esc(S.q.trim()) + '» como producto nuevo</h3>' +
         '<label>Categoría<select id="nCat">' + S.cats.map(function (c) { return '<option' + (c === 'Otros' ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></label>' +
         '<label>¿Cada cuánto se acaba?<select id="nDur">' + opcionesDur(30) + '</select></label>' +
-        '<label class="chk"><input type="checkbox" id="nFijo"> Está en Productos de ' + CASAS[S.casa] + '</label>' +
-        '<button class="btn" data-act="crear">Agregar a pendientes de ' + CASAS[S.casa] + '</button></div>';
+        (S.todas ? '<div style="font-size:.82rem;font-weight:600;color:var(--mute)">Anotar como pendiente en:</div>' + Object.keys(CASAS).map(function (c) { return '<label class="chk"><input type="checkbox" id="nH_' + c + '"> ' + CASAS[c] + '</label>'; }).join('') +
+            '<button class="btn" data-act="crear">Agregar a pendientes</button></div>' :
+            '<label class="chk"><input type="checkbox" id="nFijo"> Está en Productos de ' + CASAS[S.casa] + '</label>' +
+            '<button class="btn" data-act="crear">Agregar a pendientes de ' + CASAS[S.casa] + '</button></div>');
 }
 
 // ---------- detalle (hoja inferior) ----------
@@ -216,31 +245,44 @@ function cerrar() { $('#sheet').hidden = true; $('#scrim').hidden = true; sheetP
 
 // ---------- acciones ----------
 async function comprar(pid, per, precio) {
-    var h = hoy(), it = getItem(pid), f = info(it), hasta = sumar(h, f.per * per), antes = Object.assign({}, it);
+    var casa = S.casa;   // se fija ahora: en «Todas» se puede tocar otra casa mientras esto se guarda
+    var h = hoy(), it = getItem(pid, casa), f = info(it), hasta = sumar(h, f.per * per), antes = Object.assign({}, it);
     setItem(Object.assign({}, it, { pendiente: false, periodos: per, ultima_compra: h, cubre_hasta: hasta, posponer_hasta: null, precio: precio != null ? precio : it.precio })); S.buy = null; pintar();
     try {
-        var j = await call({ action: 'comprar', casa: S.casa, producto_id: pid, periodos: per, fecha: h, precio: precio });
-        setItem(j.item); S.hist.unshift({ id: j.historial_id, casa: S.casa, producto_id: pid, fecha: h, periodos: per, precio: precio }); pintar();
-        var acc = [['Deshacer', function () { deshacer(j.historial_id); }]]; if (!j.item.fijo) acc.push(['Dejar en Productos', function () { guardarItem(pid, { fijo: true }); }]);
-        toast(S.P[pid].nombre + ': alcanza hasta el ' + fechaCorta(hasta), acc);
+        var j = await call({ action: 'comprar', casa: casa, producto_id: pid, periodos: per, fecha: h, precio: precio });
+        setItem(j.item); S.hist.unshift({ id: j.historial_id, casa: casa, producto_id: pid, fecha: h, periodos: per, precio: precio }); pintar();
+        var acc = [['Deshacer', function () { S.casa = casa; deshacer(j.historial_id); }]]; if (!j.item.fijo) acc.push(['Dejar en Productos', function () { S.casa = casa; guardarItem(pid, { fijo: true }); }]);
+        toast(S.P[pid].nombre + (S.todas ? ' (' + CASAS[casa] + ')' : '') + ': alcanza hasta el ' + fechaCorta(hasta), acc);
     } catch (e) { setItem(antes); pintar(); toast('No se pudo guardar la compra. Intenta de nuevo.'); }
 }
 async function deshacer(hid) {
     try { await call({ action: 'deshacer', casa: S.casa, historial_id: hid }); await cargar(false); toast('Compra deshecha.'); } catch (e) { toast('No se pudo deshacer.'); }
 }
 function compartir() {
-    var lista = itemsCasa().map(function (i) { return { it: i, f: info(i) }; }).filter(function (x) { return x.f.aviso; }), g = {};
-    lista.forEach(function (x) { (g[x.f.p.categoria] = g[x.f.p.categoria] || []).push(x); });
-    var t = '🛒 Compras de ' + CASAS[S.casa] + ' (' + fechaCorta(hoy()) + ')\n' + S.cats.filter(function (c) { return g[c]; }).map(function (c) { return '\n*' + c + '*\n' + g[c].map(function (x) { return '☐ ' + x.f.p.nombre + (x.it.nota ? ' (' + x.it.nota + ')' : ''); }).join('\n'); }).join('\n');
+    var g = {}, t;
+    if (S.todas) {   // un producto por línea, con las casas que lo necesitan
+        pendientesTodas().forEach(function (x) { (g[x.f.p.categoria] = g[x.f.p.categoria] || []).push(x); });
+        t = '🛒 Compras de las tres casas (' + fechaCorta(hoy()) + ')\n' + S.cats.filter(function (c) { return g[c]; }).map(function (c) { return '\n*' + c + '*\n' + g[c].sort(function (a, b) { return a.f.p.nombre.localeCompare(b.f.p.nombre, 'es'); }).map(function (x) { return '☐ ' + x.f.p.nombre + ' (' + x.l.map(function (y) { return CASAS[y.it.casa]; }).join(', ') + ')'; }).join('\n'); }).join('\n');
+    } else {
+        var lista = itemsCasa().map(function (i) { return { it: i, f: info(i) }; }).filter(function (x) { return x.f.aviso; });
+        lista.forEach(function (x) { (g[x.f.p.categoria] = g[x.f.p.categoria] || []).push(x); });
+        t = '🛒 Compras de ' + CASAS[S.casa] + ' (' + fechaCorta(hoy()) + ')\n' + S.cats.filter(function (c) { return g[c]; }).map(function (c) { return '\n*' + c + '*\n' + g[c].map(function (x) { return '☐ ' + x.f.p.nombre + (x.it.nota ? ' (' + x.it.nota + ')' : ''); }).join('\n'); }).join('\n');
+    }
     if (navigator.share) navigator.share({ text: t }).catch(function () {}); else window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
 }
 
 document.addEventListener('click', async function (e) {
     var b = e.target.closest('[data-act],[data-casa],[data-tab]'); if (!b) return;
-    if (b.dataset.casa && b.closest('.houses')) { S.casa = b.dataset.casa; lsSet('compras_casa', S.casa); S.buy = null; pintar(); return; }
+    if (b.dataset.casa && b.closest('.houses')) {
+        S.edit = false; S.buy = null;
+        if (b.dataset.casa === 'todas') { S.todas = true; if (S.tab === 'fija') S.tab = 'comprar'; lsSet('compras_casa', 'todas'); }
+        else { if (S.todas) S.tab = 'fija'; S.todas = false; S.casa = b.dataset.casa; lsSet('compras_casa', S.casa); }
+        pintar(); return;
+    }
     if (b.dataset.tab) { S.tab = b.dataset.tab; S.edit = false; S.q = ''; $('#q').value = ''; S.buy = null; pintar(); return; }
+    var cc = b.closest('[data-c]'); if (cc && CASAS[cc.dataset.c]) S.casa = cc.dataset.c;   // en «Todas», cada línea trae su casa
     var li = b.closest('[data-p]'), pid = li ? Number(li.dataset.p) : sheetPid, a = b.dataset.act;
-    if (a === 'ck' || a === 'tengo') { var it = getItem(pid); S.buy = S.buy && S.buy.pid === pid && a === 'ck' ? null : { pid: pid, per: it.periodos || 1, precio: it.precio }; pintar(); textoPeriodos(); var bp = $('#bp'); if (bp && S.buy) bp.focus({ preventScroll: true }); return; }
+    if (a === 'ck' || a === 'tengo') { var it = getItem(pid); S.buy = S.buy && S.buy.pid === pid && S.buy.casa === S.casa && a === 'ck' ? null : { pid: pid, casa: S.casa, per: it.periodos || 1, precio: it.precio }; pintar(); textoPeriodos(); var bp = $('#bp'); if (bp && S.buy) bp.focus({ preventScroll: true }); return; }
     if (a === 'mas' || a === 'menos') { S.buy.per = Math.max(1, Math.min(60, S.buy.per + (a === 'mas' ? 1 : -1))); textoPeriodos(); return; }
     if (a === 'cancel') { S.buy = null; pintar(); return; }
     if (a === 'comprado') { var pr = $('#bp').value.trim(), n = pr === '' ? null : Number(pr.replace(/[₡\s.]/g, '').replace(',', '.')); if (n != null && !(n >= 0)) { toast('El precio debe ser un número.'); return; } comprar(S.buy.pid, S.buy.per, n); return; }
@@ -258,9 +300,12 @@ document.addEventListener('click', async function (e) {
     if (a === 'deshacer') { deshacer(Number(b.dataset.h)); return; }
     if (a === 'basicos') { b.disabled = true; try { var j = await call({ action: 'basicos', casa: S.casa }); await cargar(false); toast(j.agregados ? 'Se agregaron ' + plural(j.agregados, 'producto', 'productos') + ' a Productos. Marca «Ya lo tengo» en los que ya hay en casa.' : 'Ya estaban todos los básicos.'); S.tab = 'fija'; pintar(); } catch (err) { toast('No se pudo. Intenta de nuevo.'); b.disabled = false; } return; }
     if (a === 'crear') {
-        var nom = S.q.trim(); b.disabled = true;
-        try { var r = await call({ action: 'nuevo', casa: S.casa, nombre: nom, categoria: $('#nCat').value, periodo_dias: Number($('#nDur').value), fijo: $('#nFijo').checked, pendiente: true });
+        var nom = S.q.trim(), casas = S.todas ? Object.keys(CASAS).filter(function (c) { return $('#nH_' + c).checked; }) : [S.casa];
+        if (!casas.length) { toast('Elige al menos una casa.'); return; }
+        b.disabled = true;
+        try { var r = await call({ action: 'nuevo', casa: casas[0], nombre: nom, categoria: $('#nCat').value, periodo_dias: Number($('#nDur').value), fijo: S.todas ? false : $('#nFijo').checked, pendiente: true });
             r.producto.hay = norm(r.producto.nombre + ' ' + (r.producto.alias || '')); if (!S.P[r.producto.id]) S.prod.push(r.producto); S.P[r.producto.id] = r.producto; setItem(r.item);
+            for (var ci = 1; ci < casas.length; ci++) { var r3 = await call({ action: 'item', casa: casas[ci], producto_id: r.producto.id, pendiente: true }); setItem(r3.item); }
             S.q = ''; $('#q').value = ''; S.tab = 'comprar'; pintar(); toast(r.nuevo ? '«' + r.producto.nombre + '» quedó en pendientes y ya se puede buscar.' : '«' + r.producto.nombre + '» ya existía; se anotó en pendientes.'); }
         catch (err) { toast('No se pudo agregar. Intenta de nuevo.'); b.disabled = false; } return; }
     if (a === 'guardar') {
