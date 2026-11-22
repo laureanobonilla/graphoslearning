@@ -38,6 +38,14 @@
         .item:first-of-type { border-top: 0; }
         .cell label { display: none; font-size: .72rem; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
         .titulo { font-weight: 600; margin-bottom: 8px; }
+        .strip { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 4px; }
+        .strip .m { position: relative; flex: 0 0 100%; scroll-snap-align: start; min-width: 0; }
+        .strip.multi .m { flex-basis: 88%; }
+        .mx { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.6); color: #fff; border: 0; border-radius: 50%; width: 32px; height: 32px; font-size: .9rem; z-index: 2; }
+        .mx:hover { background: #c94a4a; }
+        .cnt { position: absolute; left: 8px; top: 8px; background: rgba(0,0,0,.6); color: #fff; font-size: .72rem; padding: 2px 8px; border-radius: 99px; pointer-events: none; z-index: 2; }
+        details.addm { margin-top: 8px; } details.addm summary { cursor: pointer; color: var(--primary); font-weight: 600; font-size: .88rem; padding: 8px 0; min-height: 40px; }
+        .addp { display: grid; gap: 8px; margin-top: 4px; } .addp .msg { margin: 0; }
         .media video { width: 100%; max-height: 340px; background: #000; border-radius: 10px; display: block; }
         .media .ig { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
         .media iframe { width: 100%; max-width: 330px; height: 480px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
@@ -116,7 +124,7 @@
         <form id="fAdd" novalidate>
             <label class="l" for="aT">Nombre <span style="font-weight:400">(opcional)</span></label>
             <input type="text" id="aT" maxlength="120" placeholder="Ej.: Cuarteto de cuerdas">
-            <div id="pV"><label class="l" for="aF">Video (hasta 50 MB)</label><input type="file" id="aF" accept="video/*"></div>
+            <div id="pV"><label class="l" for="aF">Videos (hasta 50 MB cada uno; puedes elegir varios)</label><input type="file" id="aF" accept="video/*" multiple></div>
             <div id="pL" hidden><label class="l" for="aU">Enlace (Instagram, YouTube, etc.)</label><input type="url" id="aU" placeholder="https://"></div>
             <div class="frow"><div><label class="l" for="aP">Precio (₡) <span style="font-weight:400">(opcional)</span></label><input type="text" id="aP" inputmode="numeric" placeholder="150.000"></div><div><label class="l" for="aE">Instrumentación extra <span style="font-weight:400">(opcional)</span></label><input type="text" id="aE" maxlength="300" placeholder="Ej.: arpa, órgano"></div></div>
             <div class="prog" id="prog" hidden><i></i></div>
@@ -180,10 +188,16 @@ function pintarOrden() {
 function setSort(k) { if (k === sort.k) sort.dir *= -1; else sort = { k, dir: k === 'precio' ? 1 : -1 }; pintarOrden(); reordenar(); render(); }   // precio: lo más barato primero
 
 // ----- tabla -----
+function unMedio(m, i, n) {
+    const x = `<button class="mx" type="button" data-delm="${i}" aria-label="Quitar este ${m.tipo === 'video' ? 'video' : 'enlace'}" title="Quitar">✕</button>` + (n > 1 ? `<span class="cnt">${i + 1} de ${n}</span>` : '');
+    if (m.tipo === 'video') return `<div class="m"><video controls preload="metadata" playsinline src="${esc(m.url)}"></video>${x}</div>`;
+    const g = m.url.match(/instagram\.com\/(?:reel|p)\/([\w-]+)/);
+    return `<div class="m"><div class="ig"><a class="open" href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))} ↗</a>${g ? `<button class="btn ghost" type="button" data-embed="${esc(g[1])}">Ver aquí mismo</button>` : ''}</div>${x}</div>`;
+}
 function mediaHtml(r) {
-    if (r.tipo === 'video') return `<video controls preload="metadata" playsinline src="${esc(r.url)}"></video>`;
-    const m = r.url.match(/instagram\.com\/(?:reel|p)\/([\w-]+)/);
-    return `<div class="ig"><a class="open" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))} ↗</a>${m ? `<button class="btn ghost" type="button" data-embed="${esc(m[1])}">Ver aquí mismo</button>` : ''}</div>`;
+    const ms = r.medios || [];
+    return `<div class="strip${ms.length > 1 ? ' multi' : ''}">${ms.map((m, i) => unMedio(m, i, ms.length)).join('')}</div>
+    <details class="addm"><summary>+ Agregar video o enlace</summary><div class="addp"><input type="file" accept="video/*" multiple data-file aria-label="Videos a agregar"><input type="url" data-url placeholder="o pega un enlace https://" aria-label="Enlace a agregar"><button class="btn ghost" type="button" data-addm>Agregar</button><p class="msg" role="status"></p></div></details>`;
 }
 function render() {
     const box = $('#rows'), gen = generales(), list = enOrden(), max = Math.max(...[...gen.values()].filter((v) => v != null));
@@ -217,8 +231,10 @@ $('#rows').addEventListener('change', async (e) => {
     catch (err) { setStatus('', 'No se guardó. Revisa tu internet.'); }
 });
 $('#rows').addEventListener('click', async (e) => {
-    const del = e.target.closest('[data-del]'), emb = e.target.closest('[data-embed]');
-    if (emb) { const w = emb.parentElement; w.insertAdjacentHTML('beforeend', `<iframe src="https://www.instagram.com/reel/${esc(emb.dataset.embed)}/embed" loading="lazy" allowfullscreen title="Reel de Instagram"></iframe>`); emb.remove(); return; }
+    const del = e.target.closest('[data-del]'), emb = e.target.closest('[data-embed]'), dm = e.target.closest('[data-delm]'), am = e.target.closest('[data-addm]');
+    if (dm) { const id = Number(dm.closest('.item').dataset.id); if (!confirm('¿Quitar este video o enlace? No se puede deshacer.')) return; try { await call({ action: 'delMedio', id, i: Number(dm.dataset.delm) }); render(); } catch (err) { alert('No se pudo quitar. Intenta de nuevo.'); } return; }
+    if (am) { agregarMedios(am); return; }
+    if (emb) { const w = emb.closest('.m'); w.insertAdjacentHTML('beforeend', `<iframe src="https://www.instagram.com/reel/${esc(emb.dataset.embed)}/embed" loading="lazy" allowfullscreen title="Reel de Instagram"></iframe>`); emb.remove(); return; }
     if (!del) return;
     const id = Number(del.closest('.item').dataset.id), r = rows.find((x) => x.id === id);
     if (!confirm('¿Quitar «' + (r ? r.titulo : 'esta opción') + '» de la tabla? No se puede deshacer.')) return;
@@ -227,6 +243,21 @@ $('#rows').addEventListener('click', async (e) => {
 $('#orden').onchange = (e) => { sort = { k: e.target.value, dir: e.target.value === 'precio' ? 1 : -1 }; pintarOrden(); reordenar(); render(); };
 $('#dir').onclick = () => { sort.dir *= -1; pintarOrden(); reordenar(); render(); };
 document.querySelectorAll('.head button').forEach((b) => b.onclick = () => setSort(b.dataset.k));
+
+async function agregarMedios(btn) {
+    const box = btn.closest('.addp'), m = box.querySelector('.msg'), id = Number(btn.closest('.item').dataset.id), files = [...box.querySelector('[data-file]').files], u = box.querySelector('[data-url]').value.trim();
+    const say = (t, k) => { m.textContent = t; m.className = 'msg ' + (k || ''); };
+    if (!files.length && !u) return say('Elige un video o pega un enlace.', 'err');
+    if (u && !/^https?:\/\//i.test(u)) return say('El enlace debe empezar con https://', 'err');
+    if (files.some((f) => f.size > 50 * 1024 * 1024)) return say('Un video pesa más de 50 MB. Envíalo por enlace o comprímelo.', 'err');
+    btn.disabled = true;
+    try {
+        let n = 0;
+        for (const f of files) { say(`Subiendo video ${++n} de ${files.length}…`); const s = await call({ action: 'signUpload', name: f.name }); await subir(s.uploadUrl, f, () => {}); await call({ action: 'addMedio', id, tipo: 'video', url: s.publicUrl }); }
+        if (u) await call({ action: 'addMedio', id, tipo: 'link', url: u });
+        render();
+    } catch (err) { say(err.code === 'maximo' ? 'Una opción admite hasta 12 videos o enlaces.' : err.code === 'enlace' || err.code === 'medio' ? 'Ese enlace no es válido.' : err.code === 'formato' ? 'Formato no aceptado. Usa mp4, mov o webm.' : 'No se pudo agregar. Intenta de nuevo.', 'err'); btn.disabled = false; }
+}
 
 // ----- agregar -----
 let modo = 'video';
@@ -244,17 +275,17 @@ $('#fAdd').addEventListener('submit', async (e) => {
     go.disabled = true;
     try {
         let body;
-        if (modo === 'link') { const u = $('#aU').value.trim(); if (!/^https?:\/\//i.test(u)) { msg('Pega un enlace que empiece con https://', 'err'); go.disabled = false; return; } body = { action: 'add', tipo: 'link', url: u, ...extra }; }
+        if (modo === 'link') { const u = $('#aU').value.trim(); if (!/^https?:\/\//i.test(u)) { msg('Pega un enlace que empiece con https://', 'err'); go.disabled = false; return; } body = { action: 'add', medios: [{ tipo: 'link', url: u }], ...extra }; }
         else {
-            const f = $('#aF').files[0]; if (!f) { msg('Elige un video.', 'err'); go.disabled = false; return; }
-            if (f.size > 50 * 1024 * 1024) { msg('El video pesa más de 50 MB. Envíalo por enlace o comprímelo.', 'err'); go.disabled = false; return; }
-            msg('Subiendo el video…'); $('#prog').hidden = false;
-            const s = await call({ action: 'signUpload', name: f.name }); await subir(s.uploadUrl, f, (q) => { $('#prog i').style.width = Math.round(q * 100) + '%'; });
-            body = { action: 'add', tipo: 'video', url: s.publicUrl, ...extra };
+            const fs = [...$('#aF').files]; if (!fs.length) { msg('Elige al menos un video.', 'err'); go.disabled = false; return; }
+            if (fs.some((f) => f.size > 50 * 1024 * 1024)) { msg('Un video pesa más de 50 MB. Envíalo por enlace o comprímelo.', 'err'); go.disabled = false; return; }
+            $('#prog').hidden = false; const medios = [];
+            for (let i = 0; i < fs.length; i++) { msg(`Subiendo video ${i + 1} de ${fs.length}…`); const s = await call({ action: 'signUpload', name: fs[i].name }); await subir(s.uploadUrl, fs[i], (q) => { $('#prog i').style.width = Math.round(((i + q) / fs.length) * 100) + '%'; }); medios.push({ tipo: 'video', url: s.publicUrl }); }
+            body = { action: 'add', medios, ...extra };
         }
         await call(body); render(); $('#fAdd').reset(); msg('Agregado a la tabla.', 'ok'); $('#prog').hidden = true; $('#prog i').style.width = '0';
         setTimeout(() => $('#rows').lastElementChild && $('#rows').lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
-    } catch (err) { $('#prog').hidden = true; msg(err.code === 'formato' ? 'Ese formato no se acepta. Usa mp4, mov o webm.' : err.code === 'enlace' ? 'Ese enlace no es válido.' : 'No se pudo agregar. Intenta de nuevo.', 'err'); }
+    } catch (err) { $('#prog').hidden = true; msg(err.code === 'formato' ? 'Ese formato no se acepta. Usa mp4, mov o webm.' : err.code === 'enlace' || err.code === 'medio' ? 'Ese enlace no es válido.' : 'No se pudo agregar. Intenta de nuevo.', 'err'); }
     go.disabled = false;
 });
 

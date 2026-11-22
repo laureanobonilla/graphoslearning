@@ -14,7 +14,8 @@ async function sb(path, opt = {}) {
     if (!res.ok) throw new Error(`Supabase ${res.status}: ${text.slice(0, 200)}`);
     return text ? JSON.parse(text) : null;
 }
-const COLS = 'id,titulo,tipo,url,precio,extra,nota_k,nota_l';
+const COLS = 'id,titulo,medios,precio,extra,nota_k,nota_l';
+const MAX_MEDIOS = 12;
 const list = () => sb(`/rest/v1/boda_musica?select=${COLS}&order=id.asc`);
 
 // Enlaces: solo http(s). A los de Instagram se les quitan los parámetros de seguimiento (?utm_...).
@@ -25,7 +26,20 @@ function cleanLink(u) {
     return x.toString().slice(0, 500);
 }
 const num = (v, lo, hi, int) => { if (v === '' || v == null) return null; const n = Number(String(v).replace(',', '.')); if (!Number.isFinite(n) || n < lo || n > hi) return undefined; return int ? Math.round(n) : Math.round(n * 100) / 100; };
-// Valida solo los campos presentes; devuelve { campos } o { error }.
+// Un «medio» es un video (subido aquí o de los iniciales del sitio) o un enlace http(s).
+function medio(m) {
+    if (!m || typeof m !== 'object') return null;
+    if (m.tipo === 'link') { const u = cleanLink(m.url); return u ? { tipo: 'link', url: u } : null; }
+    if (m.tipo === 'video') {
+        const p = String(m.url || ''), own = `${cfg().url}/storage/v1/object/public/${BUCKET}/`;
+        if (p.length > 500 || !(p.startsWith(own) || p.startsWith('/boda-kari-lau/videos/'))) return null;
+        return { tipo: 'video', url: p };
+    }
+    return null;
+}
+const prefijo = () => `${cfg().url}/storage/v1/object/public/${BUCKET}/`;
+const borrarArchivos = (medios) => Promise.all((medios || []).filter((m) => m.tipo === 'video' && m.url.startsWith(prefijo())).map((m) => sb(`/storage/v1/object/${BUCKET}/${m.url.slice(prefijo().length)}`, { method: 'DELETE' }).catch(() => {})));
+// Valida solo los campos presentes; devuelve { o } o { error }.
 function fields(b, esNuevo) {
     const o = {};
     if ('titulo' in b) o.titulo = clean(b.titulo, 120);
@@ -33,15 +47,14 @@ function fields(b, esNuevo) {
     if ('precio' in b) { const n = num(b.precio, 0, 1e8, false); if (n === undefined) return { error: 'precio' }; o.precio = n; }
     for (const k of ['nota_k', 'nota_l']) if (k in b) { const n = num(b[k], 1, 10, true); if (n === undefined) return { error: 'nota' }; o[k] = n; }
     if (esNuevo) {
-        if (b.tipo === 'link') { const u = cleanLink(b.url); if (!u) return { error: 'enlace' }; o.tipo = 'link'; o.url = u; }
-        else if (b.tipo === 'video') {
-            const p = String(b.url || ''); const own = `${cfg().url}/storage/v1/object/public/${BUCKET}/`;   // solo videos subidos aquí mismo
-            if (!p.startsWith(own) || p.length > 500) return { error: 'video' }; o.tipo = 'video'; o.url = p;
-        } else return { error: 'tipo' };
+        const ms = (Array.isArray(b.medios) ? b.medios : []).slice(0, MAX_MEDIOS).map(medio);
+        if (!ms.length || ms.some((m) => !m)) return { error: 'medio' };
+        o.medios = ms;
         if (!o.titulo) o.titulo = 'Nueva opción';
     }
     return { o };
 }
+const filaMedios = async (id) => { const r = (await sb(`/rest/v1/boda_musica?id=eq.${id}&select=medios`))[0]; return r ? (r.medios || []) : null; };
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
@@ -70,12 +83,25 @@ exports.handler = async (event) => {
             await sb(`/rest/v1/boda_musica?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ ...f.o, updated_at: new Date().toISOString() }) });
             return json(200, { rows: await list() });
         }
+        if (a === 'addMedio') {
+            if (!Number.isSafeInteger(id)) return json(400, { error: 'id' });
+            const m = medio(b), cur = await filaMedios(id); if (!m) return json(400, { error: 'medio' }); if (cur == null) return json(404, { error: 'id' });
+            if (cur.length >= MAX_MEDIOS) return json(400, { error: 'maximo' });
+            await sb(`/rest/v1/boda_musica?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ medios: cur.concat(m), updated_at: new Date().toISOString() }) });
+            return json(200, { rows: await list() });
+        }
+        if (a === 'delMedio') {
+            const i = Number(b.i); if (!Number.isSafeInteger(id) || !Number.isInteger(i)) return json(400, { error: 'id' });
+            const cur = await filaMedios(id); if (cur == null || i < 0 || i >= cur.length) return json(404, { error: 'id' });
+            await sb(`/rest/v1/boda_musica?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ medios: cur.filter((_, k) => k !== i), updated_at: new Date().toISOString() }) });
+            await borrarArchivos([cur[i]]);
+            return json(200, { rows: await list() });
+        }
         if (a === 'delete') {
             if (!Number.isSafeInteger(id)) return json(400, { error: 'id' });
-            const row = (await sb(`/rest/v1/boda_musica?id=eq.${id}&select=tipo,url`))[0];
+            const cur = await filaMedios(id);
             await sb(`/rest/v1/boda_musica?id=eq.${id}`, { method: 'DELETE' });
-            const pre = `${cfg().url}/storage/v1/object/public/${BUCKET}/`;   // si era un video subido, también se borra el archivo
-            if (row && row.tipo === 'video' && row.url.startsWith(pre)) await sb(`/storage/v1/object/${BUCKET}/${row.url.slice(pre.length)}`, { method: 'DELETE' }).catch(() => {});
+            await borrarArchivos(cur);   // si había videos subidos, también se borran los archivos
             return json(200, { rows: await list() });
         }
         return json(400, { error: 'accion' });
