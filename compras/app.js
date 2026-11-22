@@ -112,7 +112,7 @@ function vistaComprar() {
     var sinReg = itemsCasa().filter(function (i) { var f = info(i); return i.fijo && f.restan == null && !i.pendiente; }).length;
     var fijos = itemsCasa().filter(function (i) { return i.fijo; }).length;
     var out = '';
-    if (!fijos && !lista.length) return '<p class="vacio"><b>La lista de ' + CASAS[S.casa] + ' está vacía</b>Busca un producto arriba para anotarlo, o arma la lista fija con los básicos de la casa.</p><div class="btns" style="justify-content:center"><button class="btn" data-act="basicos">Agregar los básicos a la lista fija</button></div>';
+    if (!fijos && !lista.length) return '<p class="vacio"><b>La lista de ' + CASAS[S.casa] + ' está vacía</b>Busca un producto arriba para anotarlo, o arma «Lo de siempre» con los básicos de la casa.</p><div class="btns" style="justify-content:center"><button class="btn" data-act="basicos">Agregar los básicos a «Lo de siempre»</button></div>';
     var venc = lista.filter(function (x) { return x.f.restan != null && x.f.restan <= 0; }).length, est = lista.reduce(function (a, x) { return a + (x.it.precio || 0); }, 0), sinPrecio = lista.filter(function (x) { return x.it.precio == null; }).length;
     out += '<div class="resumen"><b>' + (lista.length ? plural(lista.length, 'producto', 'productos') + ' por comprar' : 'Todo al día en ' + CASAS[S.casa]) + '</b>' +
         '<div style="color:var(--mute);font-size:.9rem;margin-top:2px">' + (venc ? plural(venc, 'se acaba hoy o ya se acabó', 'se acaban hoy o ya se acabaron') + '. ' : '') + (est ? 'Aprox. ' + money(est) + (sinPrecio ? ' (faltan precios en ' + sinPrecio + ')' : '') : '') + (!lista.length ? 'Te aviso cuando algo esté por acabarse.' : '') + '</div>' +
@@ -140,7 +140,7 @@ function textoPeriodos() {
 
 function vistaFija() {
     var lista = itemsCasa().filter(function (i) { return i.fijo; }).map(function (i) { return { it: i, f: info(i) }; });
-    if (!lista.length) return '<p class="vacio"><b>Aún no hay lista fija en ' + CASAS[S.casa] + '</b>La lista fija son los productos que siempre se compran en esta casa. Búscalos arriba o carga los básicos y quita los que no usen.</p><div class="btns" style="justify-content:center"><button class="btn" data-act="basicos">Agregar los básicos</button></div>';
+    if (!lista.length) return '<p class="vacio"><b>Aún no hay nada en «Lo de siempre» de ' + CASAS[S.casa] + '</b>Aquí van los productos que siempre se compran en esta casa. Búscalos arriba o carga los básicos y quita los que no usen.</p><div class="btns" style="justify-content:center"><button class="btn" data-act="basicos">Agregar los básicos</button></div>';
     var orden = { venc: 0, pronto: 1, ok: 2, sin: 3 };
     lista.sort(function (a, b) { return orden[a.f.estado] - orden[b.f.estado] || (a.f.restan == null ? 1e9 : a.f.restan) - (b.f.restan == null ? 1e9 : b.f.restan) || a.f.p.nombre.localeCompare(b.f.p.nombre, 'es'); });
     var grupos = [['venc', 'Ya se acabaron'], ['pronto', 'Por acabarse'], ['ok', 'Al día'], ['sin', 'Sin registrar: ¿cuánto les queda?']], h = '';
@@ -177,7 +177,7 @@ function vistaBuscar() {
     var res = buscar(S.q), exacto = res.some(function (p) { return norm(p.nombre) === norm(S.q); }), h = '';
     if (res.length) h += '<ul class="res">' + res.map(function (p) { var it = getItem(p.id) || {}, f = it.casa ? info(it) : null;
         return '<li class="it" data-p="' + p.id + '"><div class="row"><div class="nm" style="cursor:default"><b>' + esc(p.nombre) + '</b><small>' + esc(p.categoria) + ' · dura ' + durTxt((it.periodo_dias) || p.periodo_dias) + (f && f.restan != null ? ' · alcanza hasta ' + fechaCorta(it.cubre_hasta) : '') + '</small>' +
-            '<div class="tg"><button data-act="tfijo" aria-pressed="' + !!it.fijo + '">' + (it.fijo ? 'En lista fija ✓' : '+ Lista fija') + '</button><button data-act="tpend" aria-pressed="' + !!it.pendiente + '">' + (it.pendiente ? 'Pendiente ✓' : '+ Pendiente') + '</button></div></div></div></li>'; }).join('') + '</ul>';
+            '<div class="tg"><button data-act="tfijo" aria-pressed="' + !!it.fijo + '">' + (it.fijo ? 'En lo de siempre ✓' : '+ Lo de siempre') + '</button><button data-act="tpend" aria-pressed="' + !!it.pendiente + '">' + (it.pendiente ? 'Pendiente ✓' : '+ Pendiente') + '</button></div></div></div></li>'; }).join('') + '</ul>';
     if (!exacto) h += formNuevo(!res.length);
     return h;
 }
@@ -186,7 +186,7 @@ function formNuevo(solo) {
     return '<div class="nuevo" id="fNuevo"><h3>' + (solo ? 'No lo encontré. ' : '¿No es ninguno? ') + 'Agregar «' + esc(S.q.trim()) + '» como producto nuevo</h3>' +
         '<label>Categoría<select id="nCat">' + S.cats.map(function (c) { return '<option' + (c === 'Otros' ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></label>' +
         '<label>¿Cada cuánto se acaba?<select id="nDur">' + opcionesDur(30) + '</select></label>' +
-        '<label class="chk"><input type="checkbox" id="nFijo"> Es fijo en ' + CASAS[S.casa] + '</label>' +
+        '<label class="chk"><input type="checkbox" id="nFijo"> Es de lo de siempre en ' + CASAS[S.casa] + '</label>' +
         '<button class="btn" data-act="crear">Agregar a pendientes de ' + CASAS[S.casa] + '</button></div>';
 }
 
@@ -196,7 +196,7 @@ function abrirDetalle(pid) {
     sheetPid = pid; var p = S.P[pid], it = getItem(pid) || { fijo: false, pendiente: false, periodo_dias: null, precio: null, nota: '' }, f = it.casa ? info(it) : null;
     var sh = $('#sheet');
     sh.innerHTML = '<h2>' + esc(p.nombre) + '</h2><div style="color:var(--mute);font-size:.9rem;margin-top:-6px">' + esc(p.categoria) + ' · estándar: dura ' + durTxt(p.periodo_dias) + (f && f.restan != null ? ' · alcanza hasta ' + fechaCorta(it.cubre_hasta) : '') + '</div>' +
-        '<label class="chk"><input type="checkbox" id="dFijo"' + (it.fijo ? ' checked' : '') + '> En la lista fija de ' + CASAS[S.casa] + '</label>' +
+        '<label class="chk"><input type="checkbox" id="dFijo"' + (it.fijo ? ' checked' : '') + '> Es de lo de siempre en ' + CASAS[S.casa] + '</label>' +
         '<label class="chk"><input type="checkbox" id="dPend"' + (it.pendiente ? ' checked' : '') + '> Pendiente de comprar</label>' +
         '<label>Cada cuánto se acaba en ' + CASAS[S.casa] + '<select id="dDur"><option value="">Estándar (' + durTxt(p.periodo_dias) + ')</option>' + PRESETS.concat(it.periodo_dias && PRESETS.indexOf(it.periodo_dias) < 0 ? [it.periodo_dias] : []).sort(function (a, b) { return a - b; }).map(function (n) { return '<option value="' + n + '"' + (n === it.periodo_dias ? ' selected' : '') + '>' + durTxt(n) + '</option>'; }).join('') + '</select></label>' +
         '<label>Precio habitual (opcional)<input type="text" id="dPrecio" inputmode="decimal" placeholder="₡" value="' + (it.precio == null ? '' : esc(it.precio)) + '"></label>' +
@@ -220,7 +220,7 @@ async function comprar(pid, per, precio) {
     try {
         var j = await call({ action: 'comprar', casa: S.casa, producto_id: pid, periodos: per, fecha: h, precio: precio });
         setItem(j.item); S.hist.unshift({ id: j.historial_id, casa: S.casa, producto_id: pid, fecha: h, periodos: per, precio: precio }); pintar();
-        var acc = [['Deshacer', function () { deshacer(j.historial_id); }]]; if (!j.item.fijo) acc.push(['Dejar en lista fija', function () { guardarItem(pid, { fijo: true }); }]);
+        var acc = [['Deshacer', function () { deshacer(j.historial_id); }]]; if (!j.item.fijo) acc.push(['Dejar en lo de siempre', function () { guardarItem(pid, { fijo: true }); }]);
         toast(S.P[pid].nombre + ': alcanza hasta el ' + fechaCorta(hasta), acc);
     } catch (e) { setItem(antes); pintar(); toast('No se pudo guardar la compra. Intenta de nuevo.'); }
 }
@@ -253,7 +253,7 @@ document.addEventListener('click', async function (e) {
     if (a === 'regtodos') { var nsr = itemsCasa().filter(function (i) { return i.fijo && !i.cubre_hasta; }).length; if (!confirm('Se anotará que ya tienen 1 periodo de cada uno de los ' + nsr + ' productos sin registrar, contando desde hoy. Después se te avisa cuando se vayan acabando. ¿Seguro?')) return; b.disabled = true; try { await call({ action: 'registrar', casa: S.casa, fecha: hoy(), periodos: 1 }); await cargar(false); toast('Listo: ya quedaron registrados.'); } catch (err) { toast('No se pudo. Intenta de nuevo.'); b.disabled = false; } return; }
     if (a === 'compartir') { compartir(); return; }
     if (a === 'deshacer') { deshacer(Number(b.dataset.h)); return; }
-    if (a === 'basicos') { b.disabled = true; try { var j = await call({ action: 'basicos', casa: S.casa }); await cargar(false); toast(j.agregados ? 'Se agregaron ' + plural(j.agregados, 'producto', 'productos') + ' a la lista fija. Marca «Ya lo tengo» en los que ya hay en casa.' : 'Ya estaban todos los básicos.'); S.tab = 'fija'; pintar(); } catch (err) { toast('No se pudo. Intenta de nuevo.'); b.disabled = false; } return; }
+    if (a === 'basicos') { b.disabled = true; try { var j = await call({ action: 'basicos', casa: S.casa }); await cargar(false); toast(j.agregados ? 'Se agregaron ' + plural(j.agregados, 'producto', 'productos') + ' a «Lo de siempre». Marca «Ya lo tengo» en los que ya hay en casa.' : 'Ya estaban todos los básicos.'); S.tab = 'fija'; pintar(); } catch (err) { toast('No se pudo. Intenta de nuevo.'); b.disabled = false; } return; }
     if (a === 'crear') {
         var nom = S.q.trim(); b.disabled = true;
         try { var r = await call({ action: 'nuevo', casa: S.casa, nombre: nom, categoria: $('#nCat').value, periodo_dias: Number($('#nDur').value), fijo: $('#nFijo').checked, pendiente: true });
