@@ -1,4 +1,4 @@
--- «¿Te está dando vuelta?» Ejecuta en Supabase → SQL Editor. Es seguro repetirlo.
+-- «¿Te está engañando tu pareja?» Ejecuta en Supabase → SQL Editor. Es seguro repetirlo.
 create table if not exists public.vuelta_sesiones (
   id          uuid primary key default gen_random_uuid(),
   respuestas  jsonb not null,

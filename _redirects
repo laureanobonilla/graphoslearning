@@ -11,3 +11,7 @@
 /vestirte           /retirada.html               404!
 /vestirte/*         /retirada.html               404!
 
+
+# ¿Te está engañando tu pareja? (antes /vuelta/)
+/vuelta    /te-engana/   301
+/vuelta/   /te-engana/   301

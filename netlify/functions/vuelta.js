@@ -1,4 +1,4 @@
-// «¿Te está dando vuelta?»: una sola función con varias acciones.
+// «¿Te está engañando tu pareja?»: una sola función con varias acciones.
 //   preguntas  → textos de las preguntas (sin puntajes)
 //   enviar     → guarda las respuestas y devuelve SOLO el gancho (sin cifra ni conclusión)
 //   crear      → crea la orden de PayPal (el precio lo decide el servidor)

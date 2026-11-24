@@ -1,4 +1,4 @@
-// «¿Te está dando vuelta?»: banco de preguntas, puntaje y lectura. Todo el puntaje vive AQUÍ (servidor):
+// «¿Te está engañando tu pareja?»: banco de preguntas, puntaje y lectura. Todo el puntaje vive AQUÍ (servidor):
 // al navegador solo se le mandan los textos de las preguntas y opciones, nunca cuánto pesa cada una.
 // Es una estimación de entretenimiento/orientación basada en lo que la persona observa; no es una prueba.
 

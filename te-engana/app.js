@@ -36,7 +36,7 @@ function portada() {
   S.fase = 'cover';
   var n = S.cfg.preguntas.length, avance = S.resp.length > 0 && S.resp.length < n;
   show('<section class="cover"><span class="tag">Test de señales · 27 preguntas</span>' +
-    '<h1>¿Te está <em>dando vuelta</em>?</h1>' +
+    '<h1>¿Te está <em>engañando</em> tu pareja?</h1>' +
     '<p>Contesta sobre lo que has notado en tu pareja: horarios, celular, ánimo, amistades. Al final sabrás qué tanto pesan las señales que te hicieron dudar.</p>' +
     '<ul><li>Es anónimo. No pedimos nombre ni correo.</li><li>Son 27 preguntas y toma unos 4 minutos.</li><li>Mientras más honesto seas, más claro sale.</li></ul>' +
     '<button class="btn" id="go">' + (avance ? 'Continuar (pregunta ' + (S.resp.length + 1) + ' de ' + n + ')' : 'Empezar') + '</button>' +
