@@ -26,6 +26,7 @@ function soltarTrampa() { trampa = false; window.removeEventListener('beforeunlo
 function onUnload(e) { if (S.fase === 'q' && S.resp.length > 0) { track('salida', S.resp.length); e.preventDefault(); e.returnValue = ''; return ''; } }
 function onPop() {
   if (S.fase !== 'q') return;
+  if (S.resp.length === 0) { soltarTrampa(); history.back(); return; }
   history.pushState({ v: 1 }, '');
   $modal.hidden = false;
   $modal.innerHTML = '<div class="box" role="dialog" aria-modal="true"><h3>¿Te vas ahora?</h3><p class="mute">Llevas ' + S.resp.length + ' de ' + S.cfg.preguntas.length + ' respuestas. Si sales, tu duda se queda sin respuesta. Guardamos tu avance por si quieres volver.</p><button class="btn" id="seguir">Seguir contestando</button><button class="btn ghost" id="salir">Salir</button></div>';
@@ -34,28 +35,24 @@ function onPop() {
 }
 
 // ---------- Pantallas ----------
-function portada() {
-  S.fase = 'cover';
-  var n = S.cfg.preguntas.length, avance = S.resp.length > 0 && S.resp.length < n;
-  show('<section class="cover"><span class="tag">Test de señales · 27 preguntas</span>' +
-    '<h1>¿Te está <em>engañando</em> tu pareja?</h1>' +
-    '<p>Contesta sobre lo que has notado en tu pareja: horarios, celular, ánimo, amistades. Al final sabrás qué tanto pesan las señales que te hicieron dudar.</p>' +
-    '<ul><li>Es anónimo. No pedimos nombre ni correo.</li><li>Son 27 preguntas y toma unos 4 minutos.</li><li>Mientras más honesto seas, más claro sale.</li></ul>' +
-    '<button class="btn" id="go">' + (avance ? 'Continuar (pregunta ' + (S.resp.length + 1) + ' de ' + n + ')' : 'Empezar') + '</button>' +
-    '<p class="small mute">Es un análisis de señales basado en lo que tú observas. No es una prueba ni un veredicto sobre nadie.</p></section>');
-  document.getElementById('go').onclick = function () { if (!avance) { S.resp = []; track('inicio'); } S.i = S.resp.length; preguntas(); };
+function portada() {   // ya no hay portada: se entra directo a la pregunta (la 1, o donde se quedó)
+  var n = S.cfg.preguntas.length;
+  if (!(S.resp.length > 0 && S.resp.length < n)) S.resp = [];
+  S.i = S.resp.length; preguntas();
 }
 function preguntas() {
   S.fase = 'q'; save(); activarTrampa();
   var P = S.cfg.preguntas, n = P.length, p = P[S.i], sel = S.resp[S.i];
-  show('<section><div class="bar" aria-hidden="true"><i style="width:' + Math.round(S.i / n * 100) + '%"></i></div>' +
+  var intro = S.i === 0 ? '<h1 style="font-size:1.7rem;margin:4px 0 18px">¿Te está <em style="color:var(--red)">engañando</em> tu pareja?</h1>' : '';
+  show('<section>' + intro + '<div class="bar" aria-hidden="true"><i style="width:' + Math.round(S.i / n * 100) + '%"></i></div>' +
     '<div class="qhead"><span>Pregunta ' + (S.i + 1) + ' de ' + n + '</span><span>' + (n - S.i - 1 ? 'Faltan ' + (n - S.i - 1) : 'La última') + '</span></div>' +
     '<h2 class="q">' + esc(p.q) + '</h2><div class="opts" role="radiogroup">' +
     p.o.map(function (t, k) { return '<button class="opt' + (sel === k ? ' on' : '') + '" role="radio" aria-checked="' + (sel === k) + '" data-k="' + k + '">' + esc(t) + '</button>'; }).join('') +
-    '</div>' + (S.i > 0 ? '<button class="back" id="atras">← Anterior</button>' : '') + '</section>');
+    '</div>' + (S.i > 0 ? '<button class="back" id="atras">← Anterior</button>' : '<p class="small mute" style="margin-top:22px">Anónimo. Es un análisis de señales basado en lo que tú observas, no una prueba.</p>') + '</section>');
   Array.prototype.forEach.call(document.querySelectorAll('.opt'), function (b) {
     b.onclick = function () {
       if (guardando) return; guardando = true;
+      if (S.i === 0 && S.resp.length === 0) track('inicio');
       S.resp[S.i] = Number(b.dataset.k); b.classList.add('on'); save(); track('pregunta', S.i + 1);
       setTimeout(function () { guardando = false; if (S.i + 1 < n) { S.i++; preguntas(); } else analizar(); }, 260);
     };
