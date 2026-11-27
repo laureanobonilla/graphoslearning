@@ -1,5 +1,5 @@
 -- te-engana: una fila por persona (aid), sin bots y sin tus visitas. p1..p27 = opcion elegida (contando desde 1).
--- Cambia la hora de corte (2026-11-27 10:53:00-06) si quieres mirar desde otro momento.
+-- Cambia la hora de corte si quieres mirar desde otro momento.
 select
   left(aid, 6) as persona,
   pais,
@@ -9,8 +9,13 @@ select
   coalesce(max(n) filter (where evento = 'pregunta'), 0) as hasta_la_pregunta,
   bool_or(evento = 'completo') as termino,
   bool_or(evento = 'gancho') as vio_el_gancho,
-  bool_or(evento = 'pago_inicio') as toco_pagar,
+  bool_or(evento = 'sinpe_subir') as toco_subir_sinpe,
+  bool_or(evento = 'sinpe_error') as fallo_al_subir,
+  bool_or(evento = 'pago_inicio') as toco_paypal,
+  bool_or(evento = 'sinpe_ok') as pago_sinpe,
   bool_or(evento = 'pago_ok') as pago,
+  bool_or(evento = 'informe_visto') as vio_el_informe,
+  max(n) filter (where evento = 'informe_scroll') as scroll_pct,
   bool_or(evento = 'salida') as cerro_la_pagina,
   max(r + 1) filter (where evento = 'pregunta' and n = 1) as p1,
   max(r + 1) filter (where evento = 'pregunta' and n = 2) as p2,
@@ -45,4 +50,5 @@ where creado >= timestamptz '2026-11-27 10:53:00-06'
   and yo  = false
   and aid is not null
 group by aid, pais
+having max(n) filter (where evento = 'pregunta') > 0
 order by llego_cr desc;

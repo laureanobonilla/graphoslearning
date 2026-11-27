@@ -25,7 +25,7 @@ function tipoImagen(b) {   // «cualquier imagen»: solo se comprueba que sea un
 }
 const SINPE_WIN = 60 * 60 * 1000, sinpeHits = new Map();
 function sinpeLimit(ip) { const now = Date.now(), h = (sinpeHits.get(ip) || []).filter((t) => now - t < SINPE_WIN); h.push(now); sinpeHits.set(ip, h); return h.length > 12; }
-const EVENTOS = new Set(['visita', 'inicio', 'pregunta', 'completo', 'gancho', 'pago_inicio', 'pago_ok', 'pago_cancelado', 'pago_error', 'sinpe_ok', 'salida']);
+const EVENTOS = new Set(['visita', 'inicio', 'pregunta', 'completo', 'gancho', 'pago_inicio', 'pago_ok', 'pago_cancelado', 'pago_error', 'sinpe_ok', 'sinpe_subir', 'sinpe_error', 'informe_visto', 'informe_scroll', 'salida']);
 
 exports.handler = async (event) => {
     if (event.httpMethod === 'GET') {

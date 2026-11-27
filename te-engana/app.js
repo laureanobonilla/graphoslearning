@@ -114,7 +114,7 @@ function sinpeUI() {
   var inp = document.getElementById('fcomp'), btn = document.getElementById('subir');
   document.getElementById('cp').onclick = function () { try { navigator.clipboard.writeText(SINPE_TEL.replace('-', '')); this.textContent = 'Copiado'; } catch (e) { this.textContent = SINPE_TEL; } };
   document.getElementById('vpp').onclick = function () { this.hidden = true; paypal(); };
-  btn.onclick = function () { inp.click(); };
+  btn.onclick = function () { track('sinpe_subir'); inp.click(); };
   inp.onchange = function () {
     var f = inp.files && inp.files[0]; if (!f) return;
     if (f.type && f.type.indexOf('image/') !== 0) { perr('Sube una imagen (captura o foto del comprobante).'); inp.value = ''; return; }
@@ -125,7 +125,7 @@ function sinpeUI() {
     }).then(function (j) {
       if (j.reporte) { track('pago_ok'); track('sinpe_ok'); S.fase = 'pagado'; save(); informe(j.reporte); }
       else throw new Error(j.error || 'No se pudo subir. Intenta de nuevo.');
-    }).catch(function (e) { btn.disabled = false; btn.textContent = 'Subir comprobante'; inp.value = ''; perr(e.message || 'No se pudo subir. Intenta de nuevo.'); });
+    }).catch(function (e) { track('sinpe_error'); btn.disabled = false; btn.textContent = 'Subir comprobante'; inp.value = ''; perr(e.message || 'No se pudo subir. Intenta de nuevo.'); });
   };
 }
 var ppP = null;
@@ -163,7 +163,18 @@ function paypal() {
     }).render(box);
   }).catch(function (e) { box.innerHTML = ''; perr(e.message); });
 }
+var scrollFn = null;
+function vigilarScroll() {
+  if (scrollFn) window.removeEventListener('scroll', scrollFn);
+  var hechos = {};
+  scrollFn = function () {
+    var h = document.documentElement.scrollHeight || 1, d = Math.round((window.scrollY + window.innerHeight) / h * 100);
+    [25, 50, 75, 100].forEach(function (m) { if (d >= m - 2 && !hechos[m]) { hechos[m] = 1; track('informe_scroll', m); } });
+  };
+  window.addEventListener('scroll', scrollFn, { passive: true });
+}
 function informe(r) {
+  track('informe_visto'); vigilarScroll();
   show('<section><p class="small mute">Tu informe</p><h1 style="font-size:1.9rem">Índice de señales</h1>' +
     '<div style="margin-top:14px"><span class="gauge">' + r.pct + '%</span><span class="band">' + esc(r.banda) + '</span></div>' +
     '<p class="mute">Qué tan fuerte es el conjunto de señales que describiste. No mide si tu pareja te es infiel: mide cuánto pesa lo que tú has observado.</p>' +
