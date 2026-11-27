@@ -12,7 +12,7 @@ function load() { try { var o = JSON.parse(localStorage.getItem(KEY) || 'null');
 function post(body) { return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().then(function (j) { j.__s = r.status; return j; }); }); }
 function aid() { try { var a = localStorage.getItem('vuelta_aid'); if (!a) { a = (self.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2)).replace(/[^\w-]/g, ''); localStorage.setItem('vuelta_aid', a); } return a; } catch (e) { return null; } }
 function esYo() { try { if (/[?&]yo=1\b/.test(location.search)) localStorage.setItem('vuelta_yo', '1'); if (/[?&]yo=0\b/.test(location.search)) localStorage.removeItem('vuelta_yo'); return localStorage.getItem('vuelta_yo') === '1'; } catch (e) { return false; } }
-function track(evento, n) { try { fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'evento', evento: evento, sid: S.id, n: n, aid: aid(), yo: esYo(), wd: !!navigator.webdriver }), keepalive: true }); } catch (e) {} }
+function track(evento, n, r) { try { fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'evento', evento: evento, sid: S.id, n: n, r: r, aid: aid(), yo: esYo(), wd: !!navigator.webdriver }), keepalive: true }); } catch (e) {} }
 function show(html) { $app.innerHTML = html; window.scrollTo(0, 0); }
 
 // ---------- Salida: guardamos el avance y avisamos, pero no se puede bloquear a nadie ----------
@@ -53,7 +53,7 @@ function preguntas() {
     b.onclick = function () {
       if (guardando) return; guardando = true;
       if (S.i === 0 && S.resp.length === 0) track('inicio');
-      S.resp[S.i] = Number(b.dataset.k); b.classList.add('on'); save(); track('pregunta', S.i + 1);
+      S.resp[S.i] = Number(b.dataset.k); b.classList.add('on'); save(); track('pregunta', S.i + 1, S.resp[S.i]);
       setTimeout(function () { guardando = false; if (S.i + 1 < n) { S.i++; preguntas(); } else analizar(); }, 260);
     };
   });

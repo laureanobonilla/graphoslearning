@@ -31,9 +31,14 @@ exports.handler = async (event) => {
             const bot = b.wd === true || !ua || BOT.test(ua);
             const fila = { sid: UUID.test(b.sid || '') ? b.sid : null, evento: b.evento, n: Number.isInteger(b.n) ? b.n : null, pais };
             const ext = { aid: /^[\w-]{8,40}$/.test(b.aid || '') ? b.aid : null, bot, yo: b.yo === true };
+            const r = Number.isInteger(b.r) && b.r >= 0 && b.r < 20 ? b.r : null;   // opción elegida (0 = la primera)
             const post = (o) => sb('/rest/v1/vuelta_eventos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(o) });
-            // Si aún no se corrió el SQL con las columnas nuevas, se guarda igual sin ellas.
-            try { await post(Object.assign({}, fila, ext)); } catch (e) { console.error('[vuelta] evento con columnas nuevas falló:', e.message); await post(fila); }
+            // Si falta alguna columna nueva en la base, se guarda con lo que sí exista.
+            try { await post(Object.assign({}, fila, ext, { r })); }
+            catch (e1) {
+                console.error('[vuelta] evento completo falló:', e1.message);
+                try { await post(Object.assign({}, fila, ext)); } catch (e2) { await post(fila); }
+            }
             return json(200, { ok: true });
         }
 
