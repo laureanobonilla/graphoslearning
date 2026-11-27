@@ -12,6 +12,7 @@ const core = require('./_lib/vuelta-core');
 
 const PRECIO = (() => { const n = Number(process.env.VUELTA_PRICE_USD || '4.99'); return Number.isFinite(n) && n >= 0.5 ? n.toFixed(2) : '4.99'; })();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BOT = /bot|crawl|spider|slurp|facebookexternalhit|meta-external|facebot|preview|headless|lighthouse|pingdom|uptime|monitor|curl|wget|python|axios|node-fetch|go-http|java\//i;
 const EVENTOS = new Set(['visita', 'inicio', 'pregunta', 'completo', 'gancho', 'pago_inicio', 'pago_ok', 'pago_cancelado', 'pago_error', 'salida']);
 
 exports.handler = async (event) => {
@@ -26,7 +27,13 @@ exports.handler = async (event) => {
     try {
         if (b.accion === 'evento') {
             if (!EVENTOS.has(b.evento)) return json(200, { ok: true });
-            await sb('/rest/v1/vuelta_eventos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ sid: UUID.test(b.sid || '') ? b.sid : null, evento: b.evento, n: Number.isInteger(b.n) ? b.n : null, pais }) });
+            const ua = String((event.headers && (event.headers['user-agent'] || event.headers['User-Agent'])) || '');
+            const bot = b.wd === true || !ua || BOT.test(ua);
+            const fila = { sid: UUID.test(b.sid || '') ? b.sid : null, evento: b.evento, n: Number.isInteger(b.n) ? b.n : null, pais };
+            const ext = { aid: /^[\w-]{8,40}$/.test(b.aid || '') ? b.aid : null, bot, yo: b.yo === true };
+            const post = (o) => sb('/rest/v1/vuelta_eventos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(o) });
+            // Si aún no se corrió el SQL con las columnas nuevas, se guarda igual sin ellas.
+            try { await post(Object.assign(fila, ext)); } catch (e) { await post(fila); }
             return json(200, { ok: true });
         }
 

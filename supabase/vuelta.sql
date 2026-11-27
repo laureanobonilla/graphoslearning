@@ -18,6 +18,9 @@ create table if not exists public.vuelta_eventos (
   pais    text,
   creado  timestamptz not null default now()
 );
+alter table public.vuelta_eventos add column if not exists aid text;
+alter table public.vuelta_eventos add column if not exists bot boolean not null default false;
+alter table public.vuelta_eventos add column if not exists yo boolean not null default false;
 create index if not exists vuelta_eventos_ev on public.vuelta_eventos (evento, creado);
 alter table public.vuelta_sesiones enable row level security;
 alter table public.vuelta_eventos enable row level security;

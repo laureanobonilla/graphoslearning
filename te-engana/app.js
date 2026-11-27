@@ -10,7 +10,9 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function save() { try { localStorage.setItem(KEY, JSON.stringify({ resp: S.resp, id: S.id, fase: S.fase })); } catch (e) {} }
 function load() { try { var o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o) { S.resp = o.resp || []; S.id = o.id || null; S.fase = o.fase || 'cover'; } } catch (e) {} }
 function post(body) { return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(function (r) { return r.json().then(function (j) { j.__s = r.status; return j; }); }); }
-function track(evento, n) { try { fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'evento', evento: evento, sid: S.id, n: n }), keepalive: true }); } catch (e) {} }
+function aid() { try { var a = localStorage.getItem('vuelta_aid'); if (!a) { a = (self.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2)).replace(/[^\w-]/g, ''); localStorage.setItem('vuelta_aid', a); } return a; } catch (e) { return null; } }
+function esYo() { try { if (/[?&]yo=1\b/.test(location.search)) localStorage.setItem('vuelta_yo', '1'); if (/[?&]yo=0\b/.test(location.search)) localStorage.removeItem('vuelta_yo'); return localStorage.getItem('vuelta_yo') === '1'; } catch (e) { return false; } }
+function track(evento, n) { try { fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accion: 'evento', evento: evento, sid: S.id, n: n, aid: aid(), yo: esYo(), wd: !!navigator.webdriver }), keepalive: true }); } catch (e) {} }
 function show(html) { $app.innerHTML = html; window.scrollTo(0, 0); }
 
 // ---------- Salida: guardamos el avance y avisamos, pero no se puede bloquear a nadie ----------
