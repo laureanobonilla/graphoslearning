@@ -38,7 +38,7 @@ const B = [
     { a: 't', w: 1, q: '¿Dejó de compartir su ubicación o cambió sus horarios de conexión?', o: [['No, nada cambió', 0], ['No uso eso con mi pareja', 0], ['Dejó de compartirla sin avisar', 3], ['Está «en línea» a horas en que dice dormir o trabajar', 2]] },
     { a: 'i', w: 1, q: 'Cuando hablan del futuro (viajes, casa, planes), ¿cómo responde?', o: [['Con ganas, hace planes conmigo', 0], ['Normal, sin más', 1], ['Cambia de tema o evita compromisos', 2], ['Pone excusas cada vez que se habla del tema', 3]] },
     { a: 'e', w: 1, q: '¿Te incluye en su vida: planes, familia, fotos, amistades?', o: [['Sí, como siempre', 0], ['Menos que antes', 2], ['Rara vez', 3], ['Me presenta como «amigo/a» o evita presentarme', 3]] },
-    { a: 'x', w: 1.5, q: 'Si tuvieras que apostar hoy, ¿qué crees que pasa?', o: [['Creo que no pasa nada; estoy inseguro/a', 0], ['No sé qué creer', 1], ['Algo está pasando', 2], ['Estoy casi seguro/a de que me engaña', 3]] },
+    { a: 'x', w: 1.5, q: 'Si tuvieras que apostar hoy, ¿qué crees que pasa?', o: [['No creo que esté pasando nada', 0], ['A veces siento inseguridad, pero no sé si soy yo quien tiene el problema', 0], ['No sé qué creer', 1], ['Siento fuertemente que algo está pasando', 2], ['Estoy casi seguro/a de que me engaña', 3]] },
     { a: 'x', w: 0, q: 'Si se confirmara, ¿qué es lo que más te pesaría?', o: [['La mentira', 0], ['Que fuera alguien cercano', 0], ['Perder la relación', 0], ['No haber hecho caso a mi intuición', 0]] }
 ];
 
