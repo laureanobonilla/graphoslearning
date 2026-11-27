@@ -74,6 +74,7 @@ function analizar() {
 }
 function gancho() {
   S.fase = 'gancho'; track('gancho');
+  var CR = S.cfg.pais === 'CR';
   var g = S.gancho || { conectadas: 2, inicial: '?', palabras: 2, total: 6 };
   show('<section><p class="small mute">Tu análisis está listo</p>' +
     '<h2>Encontramos <b style="color:var(--amber)">' + g.conectadas + ' de ' + g.total + ' áreas</b> donde tus respuestas se conectan entre sí.</h2>' +
@@ -81,10 +82,51 @@ function gancho() {
     '<div class="lockbars" aria-hidden="true"><i style="height:62%"></i><i style="height:38%"></i><i style="height:84%"></i><i style="height:50%"></i><i style="height:70%"></i><i style="height:30%"></i></div>' +
     '<p class="small mute" style="margin-top:14px">Qué área es, qué respuestas pesaron más y qué tan fuerte es el conjunto: eso está en tu informe.</p></div>' +
     '<div class="card"><h3>Tu informe completo</h3><ul class="pl" style="margin-top:8px"><li>El índice de señales con su explicación</li><li>Las 6 áreas, una por una, con lo que puede estar pasando</li><li>Las 5 respuestas tuyas que más pesaron</li><li>Lo que juega a favor de la confianza</li><li>Cómo hablarlo sin empeorar las cosas</li></ul>' +
-    '<p style="margin-top:14px"><span class="price">US$' + esc(S.cfg.precio) + '</span> <span class="mute small">pago único con PayPal o tarjeta</span></p>' +
-    '<div id="pp"></div><p class="err" id="perr" hidden></p></div>' +
+    (CR ? '<p style="margin-top:14px"><span class="price">&#8353;' + SINPE_MONTO + '</span> <span class="mute small">pago único con SINPE Móvil</span></p>' +
+      '<div class="sinpe"><p class="sp"><b>1.</b> Haz un SINPE Móvil por <b>&#8353;' + SINPE_MONTO + '</b> al <b>' + SINPE_TEL + '</b> <button class="mini" id="cp" type="button">Copiar número</button></p>' +
+      '<p class="sp"><b>2.</b> Sube aquí la captura del comprobante y tu informe se abre al instante.</p>' +
+      '<input type="file" id="fcomp" accept="image/*" hidden><button class="btn" id="subir" type="button" style="margin-top:12px">Subir comprobante</button></div>' +
+      '<p class="err" id="perr" hidden></p><button class="back" id="vpp" type="button" style="margin-top:14px">Prefiero pagar con tarjeta (US$' + esc(S.cfg.precio) + ')</button><div id="pp"></div></div>'
+    : '<p style="margin-top:14px"><span class="price">US$' + esc(S.cfg.precio) + '</span> <span class="mute small">pago único con PayPal o tarjeta</span></p>' +
+      '<div id="pp"></div><p class="err" id="perr" hidden></p></div>') +
     '<p class="small mute">Es un análisis de señales basado en lo que tú observas. No es una prueba ni un veredicto sobre nadie.</p></section>');
-  paypal();
+  if (CR) sinpeUI(); else paypal();
+}
+
+var SINPE_TEL = '8777-2993', SINPE_MONTO = '1.000';
+function comprimir(file) {   // reduce la foto para que suba rápido; si el navegador no la puede leer, se manda tal cual
+  return new Promise(function (ok) {
+    function plano() { var r = new FileReader(); r.onload = function () { ok(String(r.result).split(',')[1] || ''); }; r.onerror = function () { ok(''); }; r.readAsDataURL(file); }
+    try {
+      var url = URL.createObjectURL(file), im = new Image();
+      im.onload = function () {
+        var k = Math.min(1, 1400 / Math.max(im.width, im.height)), c = document.createElement('canvas');
+        c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+        c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        ok(c.toDataURL('image/jpeg', 0.72).split(',')[1] || '');
+      };
+      im.onerror = function () { URL.revokeObjectURL(url); plano(); };
+      im.src = url;
+    } catch (e) { plano(); }
+  });
+}
+function sinpeUI() {
+  var inp = document.getElementById('fcomp'), btn = document.getElementById('subir');
+  document.getElementById('cp').onclick = function () { try { navigator.clipboard.writeText(SINPE_TEL.replace('-', '')); this.textContent = 'Copiado'; } catch (e) { this.textContent = SINPE_TEL; } };
+  document.getElementById('vpp').onclick = function () { this.hidden = true; paypal(); };
+  btn.onclick = function () { inp.click(); };
+  inp.onchange = function () {
+    var f = inp.files && inp.files[0]; if (!f) return;
+    if (f.type && f.type.indexOf('image/') !== 0) { perr('Sube una imagen (captura o foto del comprobante).'); inp.value = ''; return; }
+    btn.disabled = true; btn.textContent = 'Subiendo…'; document.getElementById('perr').hidden = true;
+    comprimir(f).then(function (b64) {
+      if (!b64 || b64.length > 4200000) throw new Error('La imagen es muy pesada. Prueba con una captura de pantalla.');
+      return post({ accion: 'sinpe', id: S.id, imagen: b64 });
+    }).then(function (j) {
+      if (j.reporte) { track('pago_ok'); track('sinpe_ok'); S.fase = 'pagado'; save(); informe(j.reporte); }
+      else throw new Error(j.error || 'No se pudo subir. Intenta de nuevo.');
+    }).catch(function (e) { btn.disabled = false; btn.textContent = 'Subir comprobante'; inp.value = ''; perr(e.message || 'No se pudo subir. Intenta de nuevo.'); });
+  };
 }
 var ppP = null;
 function cargarPP() {

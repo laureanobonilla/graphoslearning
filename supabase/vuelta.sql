@@ -26,3 +26,10 @@ create index if not exists vuelta_eventos_ev on public.vuelta_eventos (evento, c
 alter table public.vuelta_sesiones enable row level security;
 alter table public.vuelta_eventos enable row level security;
 -- Sin políticas: solo el servidor (service key) lee y escribe.
+
+-- Pagos por SINPE Móvil: se guarda el comprobante que sube la persona (sin verificarlo) y cómo pagó.
+alter table public.vuelta_sesiones add column if not exists metodo text;        -- 'sinpe' (PayPal queda vacío)
+alter table public.vuelta_sesiones add column if not exists comprobante text;   -- nombre del archivo en el bucket
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('vuelta-comprobantes', 'vuelta-comprobantes', false, 5242880)
+on conflict (id) do nothing;

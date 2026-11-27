@@ -13,13 +13,25 @@ const core = require('./_lib/vuelta-core');
 const PRECIO = (() => { const n = Number(process.env.VUELTA_PRICE_USD || '4.99'); return Number.isFinite(n) && n >= 0.5 ? n.toFixed(2) : '4.99'; })();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BOT = /bot|crawl|spider|slurp|facebookexternalhit|meta-external|facebot|preview|headless|lighthouse|pingdom|uptime|monitor|curl|wget|python|axios|node-fetch|go-http|java\//i;
-const EVENTOS = new Set(['visita', 'inicio', 'pregunta', 'completo', 'gancho', 'pago_inicio', 'pago_ok', 'pago_cancelado', 'pago_error', 'salida']);
+const BUCKET = 'vuelta-comprobantes';
+function tipoImagen(b) {   // «cualquier imagen»: solo se comprueba que sea una imagen de verdad, no que sea un comprobante real
+    if (b.length < 200) return null;
+    if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return ['image/jpeg', 'jpg'];
+    if (b[0] === 0x89 && b.slice(1, 4).toString() === 'PNG') return ['image/png', 'png'];
+    if (b.slice(0, 4).toString() === 'GIF8') return ['image/gif', 'gif'];
+    if (b.slice(0, 4).toString() === 'RIFF' && b.slice(8, 12).toString() === 'WEBP') return ['image/webp', 'webp'];
+    if (b.slice(4, 8).toString() === 'ftyp') return ['image/heic', 'heic'];
+    return null;
+}
+const SINPE_WIN = 60 * 60 * 1000, sinpeHits = new Map();
+function sinpeLimit(ip) { const now = Date.now(), h = (sinpeHits.get(ip) || []).filter((t) => now - t < SINPE_WIN); h.push(now); sinpeHits.set(ip, h); return h.length > 12; }
+const EVENTOS = new Set(['visita', 'inicio', 'pregunta', 'completo', 'gancho', 'pago_inicio', 'pago_ok', 'pago_cancelado', 'pago_error', 'sinpe_ok', 'salida']);
 
 exports.handler = async (event) => {
     if (event.httpMethod === 'GET') {
         const clientId = process.env.PAYPAL_CLIENT_ID;
         if (!clientId) return json(503, { error: 'PayPal no está configurado.' });
-        return json(200, { clientId, precio: PRECIO, preguntas: core.publicBank() });
+        return json(200, { clientId, precio: PRECIO, pais: countryOf(event) || '', preguntas: core.publicBank() });
     }
     if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
     let b; try { b = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'JSON inválido' }); }
@@ -58,6 +70,27 @@ exports.handler = async (event) => {
 
         if (b.accion === 'ver') {
             if (!ses.pagado) return json(402, { error: 'Aún no está desbloqueado.', gancho: core.gancho(ses.respuestas), precio: PRECIO });
+            return json(200, { reporte: core.reporte(ses.respuestas) });
+        }
+
+        if (b.accion === 'sinpe') {
+            if (ses.pagado) return json(200, { reporte: core.reporte(ses.respuestas) });
+            const ipx = (event.headers && (event.headers['x-nf-client-connection-ip'] || '')) || 'x';
+            if (sinpeLimit(ipx)) return json(429, { error: 'Demasiados intentos. Espera un rato.' });
+            const raw = String(b.imagen || '');
+            if (raw.length < 300 || raw.length > 4400000 || !/^[A-Za-z0-9+/=\s]+$/.test(raw)) return json(400, { error: 'Sube una imagen (captura o foto del comprobante).' });
+            const buf = Buffer.from(raw, 'base64'), tp = tipoImagen(buf);
+            if (!tp) return json(400, { error: 'Sube una imagen (captura o foto del comprobante).' });
+            const ruta = `${id}.${tp[1]}`;
+            let guardado = null;
+            try {   // se guarda para que puedas revisarlo; si falla, igual se desbloquea
+                const base = process.env.SUPABASE_URL.replace(/\/$/, ''), key = process.env.SUPABASE_SERVICE_KEY;
+                const rr = await fetch(`${base}/storage/v1/object/${BUCKET}/${ruta}`, { method: 'POST', headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': tp[0], 'x-upsert': 'true' }, body: buf });
+                if (rr.ok) guardado = ruta; else console.error('[vuelta] comprobante no guardado', rr.status);
+            } catch (e) { console.error('[vuelta] comprobante no guardado', e.message); }
+            const ahora = new Date().toISOString();
+            try { await sb(`/rest/v1/vuelta_sesiones?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ pagado: true, pagado_en: ahora, metodo: 'sinpe', comprobante: guardado }) }); }
+            catch (e) { await sb(`/rest/v1/vuelta_sesiones?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ pagado: true, pagado_en: ahora }) }); }
             return json(200, { reporte: core.reporte(ses.respuestas) });
         }
 
