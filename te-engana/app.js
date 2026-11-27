@@ -78,7 +78,7 @@ function gancho() {
   var g = S.gancho || { conectadas: 2, inicial: '?', palabras: 2, total: 6 };
   show('<section><p class="small mute">Tu análisis está listo</p>' +
     '<h2>Encontramos <b style="color:var(--amber)">' + g.conectadas + ' de ' + g.total + ' áreas</b> donde tus respuestas se conectan entre sí.</h2>' +
-    '<div class="card"><p class="hint" style="margin-top:0">Una de ellas se distingue del resto. Empieza con «<b>' + esc(g.inicial) + '…</b>» (' + g.palabras + ' palabras).</p>' +
+    '<div class="card"><p class="hint" style="margin-top:0">Una de ellas se distingue con claridad del resto.</p>' +
     '<div class="lockbars" aria-hidden="true"><i style="height:62%"></i><i style="height:38%"></i><i style="height:84%"></i><i style="height:50%"></i><i style="height:70%"></i><i style="height:30%"></i></div>' +
     '<p class="small mute" style="margin-top:14px">Qué área es, qué respuestas pesaron más y qué tan fuerte es el conjunto: eso está en tu informe.</p></div>' +
     '<div class="card"><h3>Tu informe completo</h3><ul class="pl" style="margin-top:8px"><li>El índice de señales con su explicación</li><li>Las 6 áreas, una por una, con lo que puede estar pasando</li><li>Las 5 respuestas tuyas que más pesaron</li><li>Lo que juega a favor de la confianza</li><li>Cómo hablarlo sin empeorar las cosas</li></ul>' +
