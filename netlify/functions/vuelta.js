@@ -33,7 +33,7 @@ exports.handler = async (event) => {
             const ext = { aid: /^[\w-]{8,40}$/.test(b.aid || '') ? b.aid : null, bot, yo: b.yo === true };
             const post = (o) => sb('/rest/v1/vuelta_eventos', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(o) });
             // Si aún no se corrió el SQL con las columnas nuevas, se guarda igual sin ellas.
-            try { await post(Object.assign(fila, ext)); } catch (e) { await post(fila); }
+            try { await post(Object.assign({}, fila, ext)); } catch (e) { console.error('[vuelta] evento con columnas nuevas falló:', e.message); await post(fila); }
             return json(200, { ok: true });
         }
 
